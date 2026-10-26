@@ -5,7 +5,7 @@ Root owns exact authority. Source-owned checks execute without Docker, network,
 credentials or writable host mounts. Production operation is not enabled here.
 """
 from __future__ import annotations
-import json,os,re,subprocess,sys,time
+import json,os,re,subprocess,sys,time,tempfile
 from pathlib import Path
 from .migration_inventory import canonical,digest,strict_json
 from . import automatic_release_admission as admission
@@ -18,6 +18,31 @@ ROLES=('backend','frontend','redis','parser-worker','remote-ingestion-worker',
        'notification-worker','calendar-sync-worker','data-deletion-worker')
 LIMITS_MIB={'backend':1280,'frontend':128,'redis':128,'parser-worker':768,
     'remote-ingestion-worker':256,'notification-worker':256,'calendar-sync-worker':256,'data-deletion-worker':256}
+
+
+
+def source_check_git_index(directory,repository,source_sha):
+    """Expose only authenticated tracked paths, never operational Git metadata.
+
+    Linked worktree .git pointers are deliberately inaccessible in the check
+    sandbox. Build a standalone read-only index from the admitted commit using
+    trusted Git, without copying hooks, config, remotes, objects or credentials.
+    """
+    if not re.fullmatch(r'[a-f0-9]{40}',source_sha):
+        raise RuntimeError('automatic_check_source_invalid')
+    directory=Path(directory)
+    for name in ('objects','refs'):
+        (directory/name).mkdir(mode=0o755)
+    (directory/'HEAD').write_text('ref: refs/heads/check\n')
+    (directory/'config').write_text('[core]\nrepositoryformatversion = 0\nbare = false\n')
+    environment={'PATH':os.defpath,'HOME':'/nonexistent','GIT_CONFIG_NOSYSTEM':'1',
+        'GIT_CONFIG_GLOBAL':'/dev/null','GIT_NO_REPLACE_OBJECTS':'1',
+        'GIT_INDEX_FILE':str(directory/'index')}
+    subprocess.run(['/usr/bin/git','-C',str(repository),'-c','safe.directory='+str(repository),
+        '-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false','read-tree',source_sha],
+        env=environment,check=True,stdout=subprocess.DEVNULL)
+    for name in ('HEAD','config','index'):(directory/name).chmod(0o444)
+    directory.chmod(0o755)
 
 
 def validate_candidate_model(model,value,source_root):
@@ -187,6 +212,13 @@ def operations_adapter(base,system,value):
                     '--cap-drop','ALL','--security-opt','no-new-privileges:true','--memory','256m','--cpus','.5','--pids-limit','64',
                     '--tmpfs','/tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777','--volume',str(self.release_root)+':/source:ro',
                     '--entrypoint','python',tool,'-B','/source/'+relative]
+                if relative=='web/scripts/check_secret_hygiene.py':
+                    with tempfile.TemporaryDirectory(prefix='madar-source-check-') as temporary:
+                        source_check_git_index(temporary,self.repo,value['source_sha'])
+                        command[2:2]=['--volume',temporary+':/source-git:ro',
+                            '--env','GIT_DIR=/source-git','--env','GIT_WORK_TREE=/source',
+                            '--env','GIT_CONFIG_NOSYSTEM=1','--env','GIT_CONFIG_GLOBAL=/dev/null']
+                        return super().run(command,cwd=None,env={'PATH':os.defpath,'HOME':'/nonexistent'},capture=capture)
                 cwd=None;env={'PATH':os.defpath,'HOME':'/nonexistent'}
             elif command and command[0]=='git':
                 location=Path(cwd or self.repo).resolve()

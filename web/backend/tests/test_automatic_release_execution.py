@@ -46,3 +46,30 @@ class CandidatePrivilegesTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'roles_changed'):validate_candidate_model(model,self.value,self.source)
         self.model['services']['backend']['ports']=[{'host_ip':'0.0.0.0','published':'80','target':8000}]
         with self.assertRaisesRegex(RuntimeError,'public_port_refused'):validate_candidate_model(self.model,self.value,self.source)
+
+
+class SourceCheckGitIndexTests(unittest.TestCase):
+    def test_linked_worktree_index_without_repository_metadata(self):
+        import os,subprocess,tempfile
+        from deployment.lib.automatic_release_execution import source_check_git_index
+        with tempfile.TemporaryDirectory() as temporary:
+            base=Path(temporary);repo=base/'repo';repo.mkdir()
+            subprocess.run(['git','init','-q',str(repo)],check=True)
+            (repo/'tracked.txt').write_text('public source')
+            subprocess.run(['git','-C',str(repo),'add','.'],check=True)
+            environment=dict(os.environ,GIT_AUTHOR_NAME='fixture',GIT_AUTHOR_EMAIL='fixture@example.invalid',
+                GIT_COMMITTER_NAME='fixture',GIT_COMMITTER_EMAIL='fixture@example.invalid')
+            subprocess.run(['git','-C',str(repo),'commit','-qm','fixture'],check=True,env=environment)
+            sha=subprocess.check_output(['git','-C',str(repo),'rev-parse','HEAD']).decode().strip()
+            worktree=base/'worktree'
+            subprocess.run(['git','-C',str(repo),'worktree','add','--detach','-q',str(worktree),sha],check=True)
+            index=base/'index';index.mkdir()
+            source_check_git_index(index,repo,sha)
+            self.assertEqual(set(p.name for p in index.iterdir()),{'HEAD','config','index','objects','refs'})
+            self.assertEqual(list((index/'objects').iterdir()),[])
+            result=subprocess.check_output(['git','ls-files','-z'],cwd=worktree,
+                env=dict(os.environ,GIT_DIR=str(index),GIT_WORK_TREE=str(worktree)))
+            self.assertEqual(result,b'tracked.txt\0')
+            self.assertEqual((index/'index').stat().st_mode&0o777,0o444)
+            with self.assertRaisesRegex(RuntimeError,'source_invalid'):
+                source_check_git_index(index,repo,'HEAD')
