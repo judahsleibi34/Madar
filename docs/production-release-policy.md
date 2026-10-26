@@ -4036,3 +4036,8 @@ Isolated routine evidence keeps backup creation, actual restoration and fresh
 application verification times separate. Reverification cannot redate a backup
 or restoration. The independently protected test policy bounds recovery age;
 live verification still expires within the short evidence window.
+
+An explicit isolated automatic-source retry forwards the existing deployer
+circuit-breaker override. It creates no authority, retires no interlock, changes
+no consumed attempt, and bypasses none of the independent admission gates.
+The completion receipt records any requested override.

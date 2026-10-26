@@ -2044,3 +2044,8 @@ starts those same identities, rechecks the original actor set and candidate befo
 worker/traffic handoff, and advances only the measured disposable-test inventory
 after durable known-good state. This remains isolated-test-only engineering; an
 ordinary bootstrap receipt is never called a protected migration receipt.
+
+An explicit isolated automatic-source retry forwards the existing deployer
+circuit-breaker override. It creates no authority, retires no interlock, changes
+no consumed attempt, and bypasses none of the independent admission gates.
+The completion receipt records any requested override.

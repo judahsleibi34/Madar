@@ -359,7 +359,7 @@ def operations_adapter(base,system,value):
     return AuthorizedOperations()
 
 
-def execute(system,value,base_operations):
+def execute(system,value,base_operations,*,manual_retry=False):
     """One exact routine cycle through the EXISTING deployment state machine."""
     if os.geteuid()!=0:raise RuntimeError('automatic_execution_root_required')
     admission.sealed(value)
@@ -369,10 +369,11 @@ def execute(system,value,base_operations):
     try:
         adapter=operations_adapter(base_operations,system,value)
         deployer=ReleaseDeployer(state_root=system.state_root,compatibility=adapter.compatibility,operations=adapter)
-        result=deployer.deploy(value['source_sha'])
+        result=deployer.deploy(value['source_sha'],manual_retry=manual_retry)
         if result.get('status')!='known_good':raise RuntimeError('automatic_deployment_not_accepted')
         receipt={'operation':admission.OPERATION,'admission_sha256':digest(value),'attempt_id':value['attempt_id'],
-            'source_sha':value['source_sha'],'database':value['database'],'release':result,'completed_at':int(time.time())}
+            'source_sha':value['source_sha'],'database':value['database'],'release':result,
+            'manual_retry_requested':manual_retry,'completed_at':int(time.time())}
         adapter.accept_runtime_inventory()
         atomic_json(admission.ROOT/'attempts'/value['attempt_id']/'completion.json',receipt,exclusive=True)
         completed=True

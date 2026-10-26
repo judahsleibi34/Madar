@@ -2724,7 +2724,7 @@ print(hashlib.sha256(keys[0].encode()).hexdigest())
             database_system_identifier=policy['database_system_identifier'],controller_sha=self.installed_sha(),
             business_auth_key_sha256=business_digest)
 
-    def execute_automatic_release(self,sha):
+    def execute_automatic_release(self,sha,*,manual_retry=False):
         from deployment.lib.automatic_release_execution import execute
         from deployment.lib.automatic_release_admission import execution_policy
         from deployment.lib.environment_file import load_environment_file
@@ -2741,7 +2741,7 @@ print(hashlib.sha256(keys[0].encode()).hexdigest())
         entry=self.control_root/'bin/madar-release-deploy'
         loader=importlib.machinery.SourceFileLoader('madar_trusted_automatic_release',str(entry))
         module=importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name,loader));loader.exec_module(module)
-        return execute(self,admitted,module.DockerGitOperations)
+        return execute(self,admitted,module.DockerGitOperations,manual_retry=manual_retry)
 
     def prepare_automatic_release(self,sha):
         from deployment.lib.automatic_release_admission import observe_admission,publish
@@ -3649,6 +3649,8 @@ def main(argv: list[str] | None = None) -> int:
         help='Execute an independently admitted routine release through the existing deployer')
     parser.add_argument('--automatic-poll',action='store_true',
         help='Discover eligible main source and execute an independently admitted routine release')
+    parser.add_argument('--automatic-retry-failed-source',action='store_true',
+        help='Explicit retry suppression override; all automatic admission/authority gates still apply')
     parser.add_argument('--authenticate-operator',action='store_true',
         help='Authenticate independent infrastructure AAL2 from stdin/terminal; does not approve or execute a release')
     parser.add_argument(
@@ -3671,6 +3673,8 @@ def main(argv: list[str] | None = None) -> int:
     if os.geteuid() != 0:
         print("CONTROL-PLANE UPGRADE: FAILED\nerror: effective_root_required", file=sys.stderr)
         return 1
+    if args.automatic_retry_failed_source and not (args.automatic_release or args.automatic_poll):
+        parser.error('automatic retry requires an automatic release mode')
     if args.automatic_release or args.automatic_poll:
         if args.automatic_release and args.automatic_poll or args.dry_run or args.recover_current_schema or args.authenticate_operator:
             parser.error('automatic release modes cannot mix with other operations')
@@ -3685,7 +3689,7 @@ def main(argv: list[str] | None = None) -> int:
                 if (state.get('known_good_release') or {}).get('sha')==source and not state.get('in_progress_release'):
                     print(json.dumps({'operation':'automatic-poll','status':'already_deployed','source_sha':source}));return 0
             else:source=normalize_sha(args.sha)
-            print(json.dumps(operations.execute_automatic_release(source),sort_keys=True));return 0
+            print(json.dumps(operations.execute_automatic_release(source,manual_retry=args.automatic_retry_failed_source),sort_keys=True));return 0
         except (RuntimeError,ValueError,OSError,TypeError) as error:
             code=str(error) if isinstance(error,RuntimeError) and re.fullmatch('[a-z0-9_:,]{1,200}',str(error)) else 'automatic_execution_failed'
             if code=='automatic_execution_failed' and re.fullmatch(r'root_protected_[a-z_]+:[/a-z0-9_.-]{1,200}',str(error)):
