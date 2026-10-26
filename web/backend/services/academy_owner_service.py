@@ -5,6 +5,7 @@ from typing import Literal
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from hashlib import sha256
+import logging
 from fastapi import HTTPException
 from pydantic import Field, StrictBool, EmailStr, model_validator
 from database import service_supabase
@@ -15,6 +16,8 @@ from services.builder_asset_storage import store_builder_asset, delete_builder_a
 from services.builder_asset_validation import detect_builder_asset_content_type, validate_builder_asset_file
 from services.storage_quota_service import reserve_storage, finish_storage, release_storage
 from services.upload_config import get_data_upload_dir
+
+logger = logging.getLogger(__name__)
 
 
 def require_upgrade():
@@ -126,13 +129,24 @@ async def upload_document(actor, application, file):
     try:
         store_builder_asset(storage_key=key,content=data,content_type=mime)
         finish_storage(reservation_id=reservation,succeeded=True,storage_key=key,sha256_hex=values['sha256'])
-        result=service_supabase.rpc('manage_academy_document',{'p_tenant':actor.tenant_id,'p_user':actor.user_id,'p_application':str(application),'p_id':str(identifier),'p_data':values}).execute().data
     except Exception:
         delete_builder_asset(storage_key=key)
         release_storage(tenant_id=actor.tenant_id,category='academy_document',storage_key=key)
         finish_storage(reservation_id=reservation,succeeded=False)
         raise
-    return {k:result[k] for k in ['id','filename','mime_type','size_bytes','created_at']}
+    try:
+        result=service_supabase.rpc('manage_academy_document',{'p_tenant':actor.tenant_id,'p_user':actor.user_id,'p_application':str(application),'p_id':str(identifier),'p_data':values}).execute().data
+        if not isinstance(result,dict) or str(result.get('id')) != str(identifier):
+            raise ValueError('Document acknowledgement identity mismatch')
+        return {k:result[k] for k in ['id','filename','mime_type','size_bytes','created_at']}
+    except Exception as error:
+        # Transport failures and malformed replies cannot establish rollback.
+        # Retain bytes AND their quota until scoped metadata reconciliation;
+        # an empty follow-up read could race an in-flight metadata transaction.
+        logger.error('academy.document_commit_unknown',extra={'error_type':type(error).__name__})
+        raise HTTPException(503,{'code':'private_upload_outcome_unknown',
+            'document_id':str(identifier),
+            'message':'Document outcome is uncertain. Bytes are retained; check the application documents before uploading again.'}) from error
 
 
 def document_row(actor,application,identifier):

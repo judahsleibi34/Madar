@@ -40,4 +40,22 @@ class InstalledBackupTests(unittest.TestCase):
         (self.backup/'SHA256SUMS').write_text('fixture\n');self.sha='b'*40
         with self.assertRaisesRegex(RuntimeError,'binding_changed'):self.check()
 
+    def test_maintenance_digest_reaches_the_measured_installed_verifier(self):
+        self.witness['maintenance_manifest_sha256']='f'*64
+        manifest={'database':{'schema_version':146},'release':{'git_sha':self.sha},
+                  'maintenance_backup':'maintenance/manifest.json'}
+        path=self.backup/'manifest.json';path.write_text(json.dumps(manifest))
+        self.witness['backup_manifest_sha256']=hashlib.sha256(path.read_bytes()).hexdigest()
+        with patch.object(m.subprocess,'run',return_value=SimpleNamespace(returncode=0)) as run:
+            m.verify_migration_backup(self.backup,self.witness,self.sha,self.ops,expected_schema=146)
+        self.assertEqual(run.call_args.args[0][-3:],['verify',str(self.backup),'f'*64])
+
+    def test_missing_invalid_or_unexpected_maintenance_binding_is_rejected(self):
+        for value in (None,'','not-a-digest','F'*64,False):
+            self.witness['maintenance_manifest_sha256']=value
+            with self.subTest(value=value),patch.object(m.subprocess,'run') as run:
+                with self.assertRaisesRegex(RuntimeError,'maintenance_binding_invalid'):
+                    m.verify_migration_backup(self.backup,self.witness,self.sha,self.ops,expected_schema=150)
+                run.assert_not_called()
+
 if __name__=='__main__':unittest.main()

@@ -1,0 +1,15 @@
+{
+  "release_metadata_version": 1,
+  "deployment_profile": "automated-reporting163-164",
+  "schema": {
+    "compatible_min": 163,
+    "compatible_max": 164,
+    "target": 164,
+    "migration_class": "expand-only",
+    "rollback_compatible_min": 163,
+    "rollback_compatible_max": 163
+  },
+  "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
+  "migration_manifest": "migrations-163-164-automated-reporting.json",
+  "notes": "Unselected schema163 to schema164 candidate. Adds disabled-by-default dashboard refresh, durable daily/weekly/monthly report schedules, fenced idempotent report runs, captured dashboard definitions and exact dataset-version vectors, bounded private CSV artifact metadata, and service-role-only worker RPCs. The active release remains schema146. No scheduler, worker, migration, deployment, external delivery, or production data processing is activated by this metadata."
+}

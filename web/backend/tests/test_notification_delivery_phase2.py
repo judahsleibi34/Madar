@@ -41,42 +41,44 @@ class NotificationDeliveryQueueTests(unittest.TestCase):
         return local if (local / "database/migrations").is_dir() else Path("/workspace")
 
     def test_claim_uses_durable_lease_parameters(self):
-        client = RpcClient({"claim_notification_deliveries": [{"id": "delivery"}]})
+        client = RpcClient({"claim_notification_deliveries_v2": [{"id": "delivery"}]})
         rows = notification_delivery_queue_service.claim_deliveries(
             limit=500, lease_seconds=1, client=client
         )
         self.assertEqual(rows, [{"id": "delivery"}])
         name, payload = client.calls[0]
-        self.assertEqual(name, "claim_notification_deliveries")
+        self.assertEqual(name, "claim_notification_deliveries_v2")
         self.assertEqual(payload["p_limit"], 100)
         self.assertEqual(payload["p_lease_seconds"], 30)
 
     def test_permanent_and_retry_outcomes_are_explicit(self):
         client = RpcClient(
-            {"finish_notification_delivery": {"id": "delivery", "status": "dead"}}
+            {"finish_notification_delivery_v2": {"id": "delivery", "status": "dead"}}
         )
         result = notification_delivery_queue_service.finish_delivery(
             "delivery",
+            claim_generation=1,
             outcome="dead",
             error_code="invalid_payload",
             client=client,
         )
         self.assertEqual(result["status"], "dead")
         self.assertEqual(client.calls[0][1]["p_outcome"], "dead")
-        self.assertIsNone(client.calls[0][1]["p_available_at"])
+        self.assertEqual(client.calls[0][1]["p_claim_generation"], 1)
 
-        client.results["finish_notification_delivery"] = {
+        client.results["finish_notification_delivery_v2"] = {
             "id": "delivery-2",
             "status": "pending",
         }
         notification_delivery_queue_service.finish_delivery(
             "delivery-2",
+            claim_generation=2,
             outcome="retry",
             error_code="provider_unavailable",
             retry_after_seconds=42,
             client=client,
         )
-        self.assertIsNotNone(client.calls[-1][1]["p_available_at"])
+        self.assertEqual(client.calls[-1][1]["p_retry_after_seconds"], 42)
 
     def test_migration_has_database_backed_delivery_invariants(self):
         root = self.repository_root()

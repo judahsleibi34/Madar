@@ -1,0 +1,41 @@
+{
+  "scope": "isolated synthetic physical base backup and named-target WAL recovery",
+  "source_system_identifier": "7697417768043397147",
+  "target_lsn": "0/40001D8",
+  "required_wal": "000000010000000000000004",
+  "base_backup_verified": true,
+  "target_rows": [
+    1,
+    2
+  ],
+  "source_rows_after_delete": [
+    2,
+    3
+  ],
+  "target_recovery_paused": true,
+  "failures": {
+    "incomplete_base_backup_rejected": true,
+    "missing_archive_cannot_accept_target": true,
+    "corrupt_archive_cannot_accept_target": true
+  },
+  "elapsed_seconds": 66.84,
+  "retained_volumes": [
+    "madar-pitr-a8233c4642b4-data",
+    "madar-pitr-a8233c4642b4-wal",
+    "madar-pitr-a8233c4642b4-base",
+    "madar-pitr-a8233c4642b4-recovered",
+    "madar-pitr-a8233c4642b4-missing",
+    "madar-pitr-a8233c4642b4-corrupt",
+    "madar-pitr-a8233c4642b4-incomplete",
+    "madar-pitr-a8233c4642b4-badwal",
+    "madar-pitr-a8233c4642b4-emptywal"
+  ],
+  "production_modified": false,
+  "limitations": [
+    "same VM",
+    "not production WAL configuration",
+    "not continuous off-host archiving",
+    "not PITR application/Auth/Storage acceptance",
+    "no promotion/HA/quorum/RPO/RTO claim"
+  ]
+}

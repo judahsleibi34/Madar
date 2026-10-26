@@ -2145,15 +2145,27 @@ def update_builder_reservation_status(
 
     rpc = getattr(service_supabase, "rpc", None)
     if callable(rpc):
-        update_response = rpc(
-            "update_builder_reservation_status_notified_safe",
-            {
-                "p_reservation_id": reservation_id,
-                "p_tenant_id": context.tenant_id,
-                "p_status": status,
-                "p_updated_at": datetime.now(timezone.utc).isoformat(),
-            },
-        ).execute()
+        try:
+            update_response = rpc(
+                "update_builder_reservation_status_notified_safe",
+                {
+                    "p_reservation_id": reservation_id,
+                    "p_tenant_id": context.tenant_id,
+                    "p_status": status,
+                    "p_updated_at": datetime.now(timezone.utc).isoformat(),
+                },
+            ).execute()
+        except Exception as error:
+            if getattr(error, "message", None) == "reservation_slot_unavailable":
+                raise HTTPException(status_code=409, detail={
+                    "code": "reservation_slot_unavailable",
+                    "message": "This time slot is already booked. Choose another slot before confirming.",
+                }) from None
+            if getattr(error, "message", None) == "reservation_identity_changed":
+                raise HTTPException(status_code=409, detail={
+                    "code": "reservation_changed", "message": "This reservation changed. Refresh and try again.",
+                }) from None
+            raise
     else:
         # Lightweight in-memory unit-test clients do not implement RPC.
         # Production status mutation and email intent share the RPC transaction.

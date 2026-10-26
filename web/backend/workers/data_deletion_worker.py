@@ -12,6 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from uuid import uuid4
 
 from services.data_deletion_service import (
+    DeletionOwnershipLost,
     claim_deletion_requests,
     get_deletion_metrics,
     process_deletion_request,
@@ -21,7 +22,25 @@ from services.observability_service import configure_structured_logging
 
 logger = logging.getLogger(__name__)
 STOP_EVENT = threading.Event()
-STATE = {"healthy": False, "last_poll_at": None, "processed": 0, "failed": 0}
+STATE = {"healthy": False, "last_poll_at": None, "processed": 0, "failed": 0, "ownership_lost": 0}
+
+
+def require_deletion_ownership_protocol(*, client=None) -> None:
+    """Require the exact database-enforced ownership protocol2 contract.
+
+    Canonical schemas through159 remain incompatible. Every consuming poll rechecks the
+    marker; service transitions use only original claims and fenced RPCs.
+    """
+    if client is None:
+        from database import service_supabase
+        client = service_supabase
+    try:
+        response = client.rpc("data_deletion_ownership_protocol", {}).execute()
+        protocol = getattr(response, "data", None)
+    except Exception:
+        raise RuntimeError("data_deletion_ownership_protocol_required") from None
+    if type(protocol) is not int or protocol != 2:
+        raise RuntimeError("data_deletion_ownership_protocol_required")
 
 
 class HealthHandler(BaseHTTPRequestHandler):
@@ -39,6 +58,7 @@ class HealthHandler(BaseHTTPRequestHandler):
             content_type = "application/json"
         else:
             metrics = get_deletion_metrics()
+            metrics["deletion_worker_ownership_lost_total"] = STATE["ownership_lost"]
             body = ("\n".join(f"madar_{key} {int(value)}" for key, value in sorted(metrics.items())) + "\n").encode()
             status = 200
             content_type = "text/plain; version=0.0.4"
@@ -53,12 +73,23 @@ def run_batch(*, worker_id: str, batch_size: int) -> int:
     from services.provider_recovery import worker_consumption_allowed
     if not worker_consumption_allowed():
         return 0
+    # Recheck on every poll: a database restore or replacement must not let an
+    # already-running worker claim from an incompatible ownership protocol.
+    try:
+        require_deletion_ownership_protocol()
+    except RuntimeError:
+        STATE["healthy"] = False
+        STATE["consuming"] = False
+        raise
     requests = claim_deletion_requests(worker_id=worker_id, limit=batch_size)
     for request in requests:
         try:
             result = process_deletion_request(request)
             if result.get("state") == "failed_manual_intervention":
                 STATE["failed"] += 1
+        except DeletionOwnershipLost:
+            STATE["ownership_lost"] += 1
+            logger.warning("deletion.worker_ownership_lost")
         except Exception as error:
             STATE["failed"] += 1
             logger.error("deletion.worker_request_failed", extra={"error_type": type(error).__name__})
@@ -75,6 +106,19 @@ def main() -> int:
     if os.getenv("DATA_DELETION_WORKER_ENABLED", "false").strip().lower() not in {"1", "true", "yes", "on"}:
         logger.info("deletion.worker_disabled")
         return 0
+    from services.provider_recovery import worker_consumption_status
+    allowed, _ = worker_consumption_status()
+    if allowed:
+        try:
+            require_deletion_ownership_protocol()
+        except RuntimeError:
+            STATE["healthy"] = False
+            STATE["consuming"] = False
+            logger.error("deletion.ownership_protocol_required")
+            raise
+    # A valid READ_ONLY standby starts a non-consuming health endpoint without
+    # issuing a prohibited provider RPC. Every consuming poll still validates
+    # the exact database protocol before claiming, including after a restore.
     for selected in (signal.SIGINT, signal.SIGTERM):
         signal.signal(selected, lambda *_args: STOP_EVENT.set())
     host = os.getenv("DATA_DELETION_WORKER_HEALTH_HOST", "127.0.0.1").strip()

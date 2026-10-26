@@ -1,0 +1,140 @@
+{
+  "scope": "final retained independent synthetic native stack",
+  "source_sha": "32c77afd01a012c7d21240316d4a46e52c3cbf14",
+  "schema": 148,
+  "system_identifier": "7697415265751089186",
+  "kernel": "7.0.0-30-generic",
+  "architecture": "x86_64",
+  "cpus": 4,
+  "disk_free_bytes": 45834723328,
+  "mem_available_kib": 3615736,
+  "version": {
+    "release_sha": "32c77afd01a012c7d21240316d4a46e52c3cbf14",
+    "release_slot": "",
+    "build_timestamp": "2026-10-17T00:45:57.633169Z",
+    "schema_compatible_min": 148,
+    "schema_compatible_max": 148
+  },
+  "services": [
+    {
+      "service": "accepted-frontend",
+      "image": "sha256:b50bd74273456b1da2d9e9d938951bc2c1d509ddaa174f7deb8a27b584ba8741",
+      "running": true,
+      "health": "not configured",
+      "memory_bytes": 134217728,
+      "cpus": 0.5,
+      "restart": "no",
+      "ports": []
+    },
+    {
+      "service": "notification-worker",
+      "image": "sha256:e9a5e0924547e28b39ed7348a6998d5397b5688bebb030f46847e50a26091399",
+      "running": true,
+      "health": "healthy",
+      "memory_bytes": 201326592,
+      "cpus": 0.5,
+      "restart": "no",
+      "ports": []
+    },
+    {
+      "service": "backend",
+      "image": "sha256:e9a5e0924547e28b39ed7348a6998d5397b5688bebb030f46847e50a26091399",
+      "running": true,
+      "health": "healthy",
+      "memory_bytes": 805306368,
+      "cpus": 1.5,
+      "restart": "no",
+      "ports": []
+    },
+    {
+      "service": "frontend",
+      "image": "sha256:9889c69c8d3526c94abcf36d4099d5d47fb80dd03c4954ddc5051faab9ba6467",
+      "running": true,
+      "health": "not configured",
+      "memory_bytes": 67108864,
+      "cpus": 0.25,
+      "restart": "no",
+      "ports": [
+        {
+          "container": "8080/tcp",
+          "host_ip": "127.0.0.1",
+          "host_port": "19080"
+        },
+        {
+          "container": "8443/tcp",
+          "host_ip": "127.0.0.1",
+          "host_port": "19443"
+        }
+      ]
+    },
+    {
+      "service": "gateway",
+      "image": "sha256:9889c69c8d3526c94abcf36d4099d5d47fb80dd03c4954ddc5051faab9ba6467",
+      "running": true,
+      "health": "not configured",
+      "memory_bytes": 67108864,
+      "cpus": 0.25,
+      "restart": "no",
+      "ports": [
+        {
+          "container": "8081/tcp",
+          "host_ip": "127.0.0.1",
+          "host_port": "19081"
+        }
+      ]
+    },
+    {
+      "service": "redis",
+      "image": "sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99",
+      "running": true,
+      "health": "healthy",
+      "memory_bytes": 100663296,
+      "cpus": 0.25,
+      "restart": "no",
+      "ports": []
+    },
+    {
+      "service": "auth",
+      "image": "sha256:c0c25187a6b835e65a6f6e6c6b39d090e832d40e6de5186f2c038e0411944232",
+      "running": true,
+      "health": "healthy",
+      "memory_bytes": 201326592,
+      "cpus": 1,
+      "restart": "no",
+      "ports": []
+    },
+    {
+      "service": "storage",
+      "image": "sha256:f1546fac6d1c7e345428ac904bfaa7be7cecd50a1f549fe1cf38c628a7b15c85",
+      "running": true,
+      "health": "not configured",
+      "memory_bytes": 201326592,
+      "cpus": 0.5,
+      "restart": "no",
+      "ports": []
+    },
+    {
+      "service": "rest",
+      "image": "sha256:c9dc201e555f5d8e37e7f39cdd4df0229774996e213bfd7de8d10ac609030f2c",
+      "running": true,
+      "health": "not configured",
+      "memory_bytes": 100663296,
+      "cpus": 0.5,
+      "restart": "no",
+      "ports": []
+    },
+    {
+      "service": "postgres",
+      "image": "sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73",
+      "running": true,
+      "health": "healthy",
+      "memory_bytes": 536870912,
+      "cpus": 1,
+      "restart": "no",
+      "ports": []
+    }
+  ],
+  "temporary_benchmark_services_present": false,
+  "production_modified": false,
+  "production_authorized": false
+}

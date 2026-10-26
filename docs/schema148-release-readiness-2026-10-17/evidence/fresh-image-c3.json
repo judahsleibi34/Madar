@@ -1,0 +1,24 @@
+{
+  "scope": "fresh authenticated CI images on independent synthetic native restore",
+  "source_sha": "c3f9ce591f4706e535795b979064d3baefe421be",
+  "images": {
+    "backend": "sha256:ff32899c207805ebf603f5a5adb0bc767a86058c3b6f0bdcffe6a506b0a791ff",
+    "frontend": "sha256:100f1485c80a060295048791e1e28f67c5ff0903fe71568b74d0fe585c8871d0"
+  },
+  "artifact_id": 12082708439,
+  "run_id": 38986641301,
+  "schema": 148,
+  "target_project": "madar-independent-recovery-20261017-attempt3",
+  "native_auth_mfa_storage_worker_api": true,
+  "production_frontend_image_and_nginx": true,
+  "source_overlay_used": false,
+  "explicit_imported_scope_resume": true,
+  "elapsed_seconds": 60.155,
+  "production_modified": false,
+  "production_authorized": false,
+  "limitations": [
+    "synthetic same-VM native integration",
+    "not complete product E2E",
+    "not protected controller installation/current-data acceptance or production authorization"
+  ]
+}

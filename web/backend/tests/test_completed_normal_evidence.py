@@ -1,6 +1,7 @@
 """Evidence reuse binds executed bytes and source; summaries cannot grant it."""
 import hashlib
 import json
+import os
 from pathlib import Path
 import tempfile
 from types import SimpleNamespace
@@ -57,6 +58,35 @@ class EvidenceTests(unittest.TestCase):
     def test_changed_file_rejected_even_when_it_still_claims_pass(self):
         path=self.root/'115.json';path.write_text(path.read_text()+' ')
         with self.assertRaisesRegex(RuntimeError,'evidence_bytes_changed'):m.verify_application_evidence(self.actor)
+
+    def test_replacement_after_checksum_cannot_substitute_parsed_evidence(self):
+        path=self.root/'115.json';binding=self.document['application_evidence']['115']
+        original=json.loads(path.read_bytes());measure=m.file_digest
+        def replace_after_measure(source):
+            result=measure(source)
+            path.write_text(json.dumps({'status':'unreviewed replacement'}))
+            return result
+        with patch.object(m,'file_digest',side_effect=replace_after_measure):
+            self.assertEqual(m.measured_record(binding),original)
+
+    def test_same_inode_rewrite_after_capture_cannot_change_consumed_json(self):
+        path=self.root/'115.json';original=json.loads(path.read_bytes());parse=json.loads
+        def overwrite_then_parse(body):
+            path.write_text(json.dumps({'status':'replacement'}))
+            return parse(body)
+        with patch.object(m.json,'loads',side_effect=overwrite_then_parse):
+            self.assertEqual(m.measured_record(self.document['application_evidence']['115']),original)
+
+    def test_symlink_fifo_empty_and_oversized_evidence_fail_closed(self):
+        path=self.root/'115.json';binding=self.document['application_evidence']['115']
+        path.unlink();os.mkfifo(path)
+        with self.assertRaisesRegex(RuntimeError,'evidence_size_invalid'):m.measured_record(binding)
+        path.unlink();path.write_bytes(b'')
+        with self.assertRaisesRegex(RuntimeError,'evidence_size_invalid'):m.measured_record(binding)
+        with path.open('wb') as stream:stream.truncate(2*1024**2+1)
+        with self.assertRaisesRegex(RuntimeError,'evidence_size_invalid'):m.measured_record(binding)
+        actual=path.with_name('actual.json');path.rename(actual);path.symlink_to(actual)
+        with self.assertRaisesRegex(RuntimeError,'evidence_unavailable'):m.measured_record(binding)
 
     def test_agent_summary_without_independent_execution_is_not_acceptance(self):
         self.execution={'status':'passed','result':{'schema':136,'production_modified':False}}

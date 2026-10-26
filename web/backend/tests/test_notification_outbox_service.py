@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import Mock
 from datetime import datetime, timezone
 
 from services import notification_outbox_service
@@ -202,28 +203,19 @@ class NotificationOutboxServiceTests(unittest.TestCase):
         self.assertIsNone(global_retry["tenant_id"])
 
     def test_failure_state_sanitizes_provider_error(self):
-        client = FakeClient()
-        row = notification_outbox_service.enqueue_notification(
-            channel="email",
-            template="reservation_confirmation",
-            tenant_id=7,
-            user_id=4,
-            recipient_hash="a" * 64,
-            payload={"reservation_id": "reservation-1"},
-            client=client,
-        )
-
+        client = Mock()
+        client.rpc.return_value.execute.return_value.data = [{"status": "failed"}]
         updated = notification_outbox_service.mark_notification_result(
-            row["id"],
-            succeeded=False,
-            failure_code="SMTP password=secret connection failed",
-            client=client,
-        )
-
+            "fixture", claim_generation=3, succeeded=False,
+            failure_code="SMTP password=secret connection failed", client=client)
         self.assertTrue(updated)
-        self.assertEqual(client.rows[0]["status"], "failed")
-        self.assertEqual(client.rows[0]["last_error_code"], "delivery_failed")
-        self.assertNotIn("secret", str(client.rows[0]))
+        name, body = client.rpc.call_args.args
+        self.assertEqual(name, "finish_notification_outbox_v2")
+        self.assertEqual(body["p_claim_generation"], 3)
+        self.assertEqual(body["p_outcome"], "retry")
+        self.assertEqual(body["p_failure_code"], "delivery_failed")
+        self.assertNotIn("secret", str(body))
+        client.table.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -617,6 +617,24 @@ class BuilderReservationManagementTests(unittest.TestCase):
         self.assertEqual(response.json()["reservation"]["status"], "confirmed")
         self.assertEqual(fake_supabase.tables["builder_reservations"][0]["status"], "confirmed")
 
+    def test_database_capacity_conflict_is_409_without_provider_detail(self):
+        from postgrest.exceptions import APIError
+        fake_supabase = FakeSupabase()
+        seed_reservations(fake_supabase)
+        client = build_builder_client(fake_supabase)
+        fake_supabase.rpc = MagicMock()
+        fake_supabase.rpc.return_value.execute.side_effect = APIError({
+            "code": "P0001", "message": "reservation_slot_unavailable",
+            "details": "private-provider-content", "hint": None,
+        })
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_builder_write_access", return_value=fake_context()):
+            response = client.patch(f"/builder/reservations/{RESERVATION_ID}/status", json={"status": "confirmed"})
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()["detail"]["code"], "reservation_slot_unavailable")
+        self.assertNotIn("private-provider-content", response.text)
+        self.assertEqual(fake_supabase.tables["builder_reservations"][0]["status"], "new")
+
     def test_invalid_status_is_rejected(self):
         fake_supabase = FakeSupabase()
         seed_reservations(fake_supabase)

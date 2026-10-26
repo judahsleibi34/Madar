@@ -1,0 +1,1 @@
+{"from_schema": 146, "schema": 148, "backup_sha256": "e67bc8b45e20aff1d42952ba6bfceaf8a468cf6faaea9fed65eaec1685b4e00d", "backup": "before-notification-upgrade-201ff30445f657cf.dump", "scope": "owned synthetic staging only", "preservation_verified": true, "preserved_tables": 176, "preserved_sequences": 21}

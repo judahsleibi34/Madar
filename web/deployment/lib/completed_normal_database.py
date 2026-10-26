@@ -2,19 +2,12 @@
 import json
 from pathlib import Path
 from deployment.lib.completed_normal_admission import digest
-from deployment.lib.completed_normal_profile import profile, LEGACY, APPLICATION, COMMERCIAL
+from deployment.lib.completed_normal_profile import profile, LEGACY, APPLICATION, COMMERCIAL, FENCED, OUTBOX
 
-IDENTITY_SQL="BEGIN READ ONLY; SELECT json_build_object('system_identifier',system_identifier::text,'schema',schema_version)::text FROM pg_control_system(),public.application_schema_state WHERE contract_key='core'; COMMIT;"
+IDENTITY_SQL="BEGIN READ ONLY; SET LOCAL search_path=pg_catalog; SELECT json_build_object('system_identifier',system_identifier::text,'schema',schema_version)::text FROM pg_catalog.pg_control_system(),public.application_schema_state WHERE contract_key='core'; COMMIT;"
 
-def database_structure_digest(contract,runtime):
-    """Bind schema/roles/ACLs during NORMAL activity without freezing rows.
-
-    No role verifier or definition leaves PostgreSQL, only one digest. The
-    authoritative row baseline is still sealed after fencing and checked after
-    SQL. This never changes an already approved source or migration contract.
-    """
-    observe_native(contract,runtime)
-    sql="""BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
+STRUCTURE_SQL="""BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
+    SET LOCAL search_path=pg_catalog;
     SELECT encode(sha256(convert_to(coalesce(string_agg(v,'' ORDER BY v COLLATE "C"),''),'UTF8')),'hex')
     FROM (
       SELECT 'class:'||(to_jsonb(c)-ARRAY['relpages','reltuples','relallvisible','relallfrozen','relfrozenxid','relminmxid'])::text v FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
@@ -32,6 +25,16 @@ def database_structure_digest(contract,runtime):
       UNION ALL SELECT 'role:'||to_jsonb(r)::text FROM pg_authid r
       UNION ALL SELECT 'membership:'||to_jsonb(m)::text FROM pg_auth_members m
     ) objects; COMMIT;"""
+
+def database_structure_digest(contract,runtime):
+    """Bind schema/roles/ACLs during NORMAL activity without freezing rows.
+
+    No role verifier or definition leaves PostgreSQL, only one digest. The
+    authoritative row baseline is still sealed after fencing and checked after
+    SQL. This never changes an already approved source or migration contract.
+    """
+    observe_native(contract,runtime)
+    sql=STRUCTURE_SQL
     value=runtime.command(['docker','exec',contract['database']['container_id'],'psql','-XqAt',
         '-v','ON_ERROR_STOP=1','-U','postgres','-d','postgres','-c',sql]).strip()
     import re
@@ -40,7 +43,7 @@ def database_structure_digest(contract,runtime):
 
 def verify_preparation_baseline(contract,runtime,baseline):
     """Only the explicit new profile uses a protected execution row boundary."""
-    if profile(contract) is COMMERCIAL:
+    if profile(contract) in (COMMERCIAL,FENCED,OUTBOX):
         if database_structure_digest(contract,runtime)!=contract['database_structure_sha256']:
             raise RuntimeError('completed_upgrade_database_structure_changed')
         return
@@ -179,7 +182,7 @@ def customer_baseline(contract,runtime):
         statements.append("SELECT json_build_object('table','"+name+"','count',count(*),'sha256',"
             "encode(sha256(convert_to(coalesce(string_agg(h,'' ORDER BY h COLLATE \"C\"),''),'UTF8')),'hex'))::text "
             "FROM (SELECT encode(sha256(convert_to(to_jsonb(t)::text,'UTF8')),'hex') h FROM "+name+" t) rows;")
-    sql="BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET LOCAL statement_timeout='60s'; SET LOCAL TIME ZONE 'UTC';\n"+'\n'.join(statements)+'\nCOMMIT;'
+    sql="BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET LOCAL search_path=pg_catalog,public,extensions; SET LOCAL statement_timeout='60s'; SET LOCAL TIME ZONE 'UTC';\n"+'\n'.join(statements)+'\nCOMMIT;'
     raw=runtime.command(['docker','exec',contract['database']['container_id'],'psql','-XqAt',
         '-v','ON_ERROR_STOP=1','-U','postgres','-d','postgres','-c',sql])
     identities=[json.loads(line) for line in raw.splitlines() if line.strip()]
@@ -202,24 +205,25 @@ def migration_customer_snapshot(contract,runtime,*,columns=None):
     from deployment.lib.active_recovery_reconciliation import identifier
     schema=observe_native(contract,runtime)
     def query(body):
-        sql=("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET LOCAL statement_timeout='60s'; "
+        sql=("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET LOCAL search_path=pg_catalog,public,extensions; SET LOCAL statement_timeout='60s'; "
              "SET LOCAL TIME ZONE 'UTC';\n"+body+"\nCOMMIT;")
         raw=runtime.command(['docker','exec',contract['database']['container_id'],'psql','-XqAt',
             '-v','ON_ERROR_STOP=1','-U','postgres','-d','postgres','-c',sql])
         return [json.loads(line) for line in raw.splitlines() if line.strip()]
     if columns is None:
         if schema!=profile(contract).source:raise RuntimeError('completed_migration_customer_source_schema_changed')
+        scope=("n.nspname IN ('public','auth','storage')" if profile(contract) in (FENCED, OUTBOX) else
+            "(n.nspname='public' OR (n.nspname='auth' AND c.relname IN ('users','identities','mfa_factors')) OR "
+            "(n.nspname='storage' AND c.relname IN ('objects','buckets')))")
         rows=query("SELECT json_build_object('schema',n.nspname,'table',c.relname,'columns',"
             "json_agg(a.attname ORDER BY a.attnum))::text FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
             "JOIN pg_attribute a ON a.attrelid=c.oid AND a.attnum>0 AND NOT a.attisdropped "
-            "WHERE c.relkind IN ('r','p') AND (n.nspname='public' OR "
-            "(n.nspname='auth' AND c.relname IN ('users','identities','mfa_factors')) OR "
-            "(n.nspname='storage' AND c.relname IN ('objects','buckets'))) "
+            "WHERE c.relkind IN ('r','p') AND "+scope+" "
             "GROUP BY n.nspname,c.relname ORDER BY n.nspname,c.relname;")
         columns={row['schema']+'.'+row['table']:row['columns'] for row in rows}
     if (not isinstance(columns,dict) or (len(columns)!=101 if profile(contract) is LEGACY else len(columns)<101)
             or (len([name for name in columns if name.startswith('public.')])!=96 if profile(contract) is LEGACY
-                else len([name for name in columns if name.startswith('public.')])!=len(columns)-5)
+                else profile(contract) not in (FENCED, OUTBOX) and len([name for name in columns if name.startswith('public.')])!=len(columns)-5)
             or not {'auth.users','auth.identities','auth.mfa_factors','storage.objects','storage.buckets'}.issubset(columns)
             or any(not isinstance(names,list) or not names or len(names)!=len(set(names))
                 or any(not isinstance(n,str) or not n for n in names) for names in columns.values())):
@@ -289,6 +293,9 @@ def verify_migration_customer_preservation(before,after, *, contract=None):
     if (changed!=['public.application_schema_state']
             or before['roots']['public.application_schema_state']['count']!=after['roots']['public.application_schema_state']['count']):
         raise RuntimeError('completed_migration_existing_customer_values_changed')
+    public_count=sum(name.startswith('public.') for name in before['roots'])
     return {'operation':'current-data-original-column-migration-comparison','starting_schema':selected.source,'final_schema':selected.target,
-        'original_public_tables':len(before['roots'])-5,'original_identity_storage_tables':5,'only_schema_state_changed':True,
+        'original_public_tables':public_count if selected in (FENCED, OUTBOX) else len(before['roots'])-5,
+        'original_identity_storage_tables':len(before['roots'])-public_count if selected in (FENCED, OUTBOX) else 5,
+        **({'full_auth_storage_inventory_verified':True} if selected in (FENCED, OUTBOX) else {}),'only_schema_state_changed':True,
         'source_snapshot_sha256':digest(before),'target_snapshot_sha256':digest(after),'database_restored':False}

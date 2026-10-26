@@ -7,6 +7,9 @@ const baseUrl = process.env.CONTRAST_AUDIT_URL || "http://127.0.0.1:5173";
 const mockApi = process.env.CONTRAST_AUDIT_MOCK === "1";
 if (mockApi && !["localhost", "127.0.0.1", "[::1]"].includes(new URL(baseUrl).hostname)) throw new Error("Mock contrast checks require a loopback frontend");
 const outputDir = process.env.CONTRAST_AUDIT_OUTPUT_DIR || path.join(os.tmpdir(), "madar-contrast-audit");
+const biProjectId = "11111111-1111-4111-8111-111111111111";
+const biDatasetId = "22222222-2222-4222-8222-222222222222";
+const biVersionId = "33333333-3333-4333-8333-333333333333";
 const viewports = [
   { name: "compact", width: 390, height: 844 },
   { name: "intermediate", width: 768, height: 1024 },
@@ -34,7 +37,7 @@ const userRoutes = [
   "/agenda", "/archive", "/ecommerce/tags", "/ecommerce/categories",
   "/ecommerce/products", "/ecommerce/products/new", "/ecommerce/delivery", "/ecommerce/orders", "/ecommerce/loyalty", "/ecommerce/theme",
   "/ecommerce/store", "/my-plan", "/notifications", "/settings/change-password",
-  "/settings/security", "/settings", "/settings?tab=website", "/settings?tab=ecommerce", "/settings?tab=devices", "/settings?tab=notifications", "/admin/users",
+  "/settings/security", "/settings", "/settings?tab=website", "/settings?tab=ecommerce", "/settings?tab=devices", "/settings?tab=notifications", "/admin/users", `/business-intelligence/projects/${biProjectId}/data`,
 ];
 
 const fakeUser = (role) => ({
@@ -61,6 +64,14 @@ async function installEnvironment(page, role, theme, language) {
 
   if (mockApi) {
     const user = fakeUser(role || "user");
+    if (role === "user") {
+      await page.addInitScript(({ storageKey, projectId }) => {
+        sessionStorage.setItem(storageKey, projectId);
+      }, {
+        storageKey: `madar:selected-data-project:${user.tenant_id}:${user.id}`,
+        projectId: biProjectId,
+      });
+    }
     await page.route("**/*", route => {
       const url = new URL(route.request().url());
       const path = url.pathname;
@@ -84,8 +95,50 @@ async function installEnvironment(page, role, theme, language) {
       if (path.endsWith("/ecommerce/catalog")) return json({products:[],categories:[],tags:[],commerce_currency:"USD"});
       if (path.endsWith("/ecommerce/loyalty")) return json({currency:"USD",rule:{reward_product_id:"product-a"}});
       if (path.endsWith("/notifications/preferences")) return json({preferences:["calendar","reservations","forms","general"].flatMap(category=>["in_app","push","email"].map(channel=>({category,channel,enabled:true})))});
+      if (path.endsWith("/notifications/push-public-key")) return json({enabled:true,public_key:"contrast-audit-public-key"});
       if (path.endsWith("/auth/mfa/status")) return json({factors:[],current_level:"aal1",next_level:"aal1"});
       if (path.endsWith("/info")) return json({user});
+      if (path.endsWith(`/data/projects/${biProjectId}/datasets`)) return json({
+        available: true,
+        items: [{
+          id: biDatasetId,
+          display_name: "Operations fixture",
+          updated_at: "2026-10-24T10:00:00Z",
+          latest_version: {
+            id: biVersionId,
+            version_number: 3,
+            version_kind: "checkpoint",
+            content_hash: "contrast-audit-content-hash",
+            file_metadata: { rows: 3, column_count: 3 },
+          },
+        }],
+      });
+      if (path.endsWith(`/data/projects/${biProjectId}/datasets/${biDatasetId}`)) return json({
+        persistent_dataset_id: biDatasetId,
+        dataset_version_id: biVersionId,
+        file_path: "contrast-fixture.csv",
+        rows: 3,
+        columns: ["category", "amount", "status"],
+        preview: [
+          { category: "North", amount: 12, status: "Ready" },
+          { category: "South", amount: 7, status: "Review" },
+          { category: "East", amount: 4, status: "Ready" },
+        ],
+      });
+      if (path.endsWith("/cleaning/statistics")) return json({
+        rows: 3,
+        numeric_columns: { amount: { filled_values: 3, min: 4, max: 12, mean: 7.67, sum: 23 } },
+        categorical_columns: {
+          category: { filled_values: 3, unique_count: 3 },
+          status: { filled_values: 3, unique_count: 2 },
+        },
+      });
+      if (path.endsWith("/cleaning/missing-report")) return json({
+        category: { missing_count: 0, missing_percentage: 0 },
+        amount: { missing_count: 0, missing_percentage: 0 },
+        status: { missing_count: 0, missing_percentage: 0 },
+      });
+      if (path.endsWith("/cleaning/column-types")) return json({ category: "object", amount: "float64", status: "object" });
       if (path.startsWith("/api/") || url.origin !== new URL(baseUrl).origin) return json({success:true,user,orders:[],areas:[],projects:[],pagination:{},notifications:[],unread_count:0,installations:[],preferences:[],users:[],data:[],reservations:[],events:[],forms:[],pages:[],theme:{},rule:{},totals:{}});
       return route.continue();
     });
@@ -194,6 +247,7 @@ async function inspectContrast(page) {
       if (actual + 0.01 < threshold) failures.push({
         kind: "text", selector: selector(element), text: element.textContent.trim().replace(/\s+/g, " ").slice(0, 100),
         ratio: Number(actual.toFixed(2)), required: threshold, color: style.color, background: getComputedStyle(element).backgroundColor,
+        textFillColor: style.webkitTextFillColor, disabled: Boolean(element.disabled),
         effectiveColor: foreground.map((value) => Number(value.toFixed(2))),
         effectiveBackground: background.map((value) => Number(value.toFixed(2))),
       });
@@ -247,7 +301,13 @@ async function inspectContrast(page) {
       const key = [failure.kind, failure.selector, failure.text, failure.ratio].join("|");
       if (!keys.has(key)) { keys.add(key); unique.push(failure); }
     }
-    return { checked, failures: unique.slice(0, 80), failureCount: unique.length };
+    return {
+      checked,
+      failures: unique.slice(0, 80),
+      failureCount: unique.length,
+      notificationPromptPresent: Boolean(document.querySelector(".notification-permission-dialog")),
+      effectiveTheme: document.documentElement.dataset.theme || "unset",
+    };
   });
 }
 
@@ -264,6 +324,11 @@ async function auditRouteSet(browser, routes, role) {
         page.on("pageerror", (error) => pageErrors.push(error.message));
         const response = await page.goto(`${baseUrl}${route}`, { waitUntil: "domcontentloaded", timeout: 30_000 });
         await page.waitForTimeout(mockApi ? 500 : 1500);
+        if (mockApi && role) {
+          await page.waitForSelector(".notification-permission-dialog", { state: "visible", timeout: 2_000 }).catch(() => {});
+        }
+        await page.waitForLoadState("networkidle", { timeout: 3_000 }).catch(() => {});
+        await page.waitForTimeout(mockApi ? 100 : 250);
         await page.evaluate(async () => {
           const animations = document.getAnimations().filter(animation => animation.playState === "running" && Number.isFinite(animation.effect?.getComputedTiming().endTime));
           await Promise.all(animations.map(animation => animation.finished.catch(() => {})));
@@ -272,8 +337,15 @@ async function auditRouteSet(browser, routes, role) {
         const maxScroll = Math.max(0, pageHeight - viewport.height);
         const stepCount = Math.min(6, Math.max(1, Math.ceil(pageHeight / viewport.height)));
         const positions = Array.from({ length: stepCount }, (_, index) => stepCount === 1 ? 0 : Math.round(maxScroll * index / (stepCount - 1)));
-        const aggregate = { checked: { text: 0, placeholders: 0, controls: 0, icons: 0 }, failures: [], failureCount: 0 };
+        const aggregate = {
+          checked: { text: 0, placeholders: 0, controls: 0, icons: 0 },
+          failures: [],
+          failureCount: 0,
+          notificationPromptPresent: false,
+          effectiveThemes: [],
+        };
         const failureKeys = new Set();
+        const effectiveThemes = new Set();
         for (const position of positions) {
           await page.evaluate((top) => {
             const scroller = document.querySelector(".authenticated-main, .live-store, .tenant-site-runtime");
@@ -286,6 +358,8 @@ async function auditRouteSet(browser, routes, role) {
             await Promise.all(animations.map(animation => animation.finished.catch(() => {})));
           });
           const inspection = await inspectContrast(page);
+          aggregate.notificationPromptPresent ||= inspection.notificationPromptPresent;
+          effectiveThemes.add(inspection.effectiveTheme);
           for (const key of Object.keys(aggregate.checked)) aggregate.checked[key] += inspection.checked[key];
           for (const failure of inspection.failures) {
             const key = [failure.kind, failure.selector, failure.text, failure.ratio].join("|");
@@ -293,6 +367,7 @@ async function auditRouteSet(browser, routes, role) {
           }
         }
         aggregate.failureCount = aggregate.failures.length;
+        aggregate.effectiveThemes = [...effectiveThemes];
         results.push({ role: role || "public", route, theme, direction: languageMode.name, viewport: viewport.name, status: response?.status() || 0, pageErrors, ...aggregate });
       }
       console.log(`${role || "public"} ${viewport.name} ${theme} ${languageMode.name}: ${routes.length} pages checked`);
@@ -320,6 +395,7 @@ const report = {
   placeholderChecks: results.reduce((sum, result) => sum + result.checked.placeholders, 0),
   controlChecks: results.reduce((sum, result) => sum + result.checked.controls, 0),
   iconChecks: results.reduce((sum, result) => sum + result.checked.icons, 0),
+  notificationPromptRouteChecks: results.filter((result) => result.notificationPromptPresent).length,
   failedRouteChecks: failures.length,
   failures,
 };
@@ -327,7 +403,7 @@ await writeFile(path.join(outputDir, "report.json"), `${JSON.stringify(report, n
 console.log(JSON.stringify({
   outputDir, routeChecks: report.routeChecks, textChecks: report.textChecks,
   placeholderChecks: report.placeholderChecks, controlChecks: report.controlChecks,
-  iconChecks: report.iconChecks,
+  iconChecks: report.iconChecks, notificationPromptRouteChecks: report.notificationPromptRouteChecks,
   failedRouteChecks: report.failedRouteChecks,
 }, null, 2));
 if (failures.length > 0) process.exitCode = 1;

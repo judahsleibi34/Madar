@@ -1,4 +1,7 @@
-"""One exact completed-NORMAL bridge-first operation, using installed services.
+"""Protected completed-NORMAL operations, using installed services.
+
+Historical profiles retain bridge-first ordering. The unregistered schema150
+branch is maintenance-first and refuses missing independent private verifiers.
 
 No automatic replay or database rollback. Durable boot is a READ_ONLY forward
 repair mechanism after SQL intent; it cannot finish this operation unattended.
@@ -245,17 +248,24 @@ class CompletedNormalUpgrade:
     Artifact/model verifiers are supplied by the measured entrypoint. A caller
     summary or an old acceptance grant cannot substitute for these verifiers.
     """
-    def __init__(self,actor,*,artifact_guard,model_loader,acceptance_guard,rehearsal_guard):
+    def __init__(self,actor,*,artifact_guard,model_loader,acceptance_guard,rehearsal_guard,
+                 maintenance_acceptance_guard=None,maintenance_activation_guard=None):
         if not all(callable(f) for f in (artifact_guard,model_loader,acceptance_guard,rehearsal_guard)):
             raise RuntimeError('completed_upgrade_independent_execution_guards_required')
         self.actor=actor;self.contract=actor.contract;self.document=actor.document
         self.profile=profile(self.contract)
+        from deployment.lib.completed_normal_profile import OUTBOX
+        if self.profile is OUTBOX:
+            from deployment.lib.schema149_controller import require_controller_adapter
+            require_controller_adapter(actor)
         self.ops=actor.ops;self.root=actor.root;self.package=actor.package
         self.artifact_guard=artifact_guard;self.model_loader=model_loader
         self.acceptance_guard=acceptance_guard;self.rehearsal_guard=rehearsal_guard
         self.controller=self.contract['candidate']['controller_sha']
         self.phase='preflight';self.quiesced=False;self.admitted=False;self.fenced=False
         self.controller_installed=False;self.lock=None
+        self.maintenance_acceptance_guard=maintenance_acceptance_guard
+        self.maintenance_activation_guard=maintenance_activation_guard
 
     def preparation_source(self):
         measured,_=self.actor.measure()
@@ -367,24 +377,43 @@ class CompletedNormalUpgrade:
 
     @contextmanager
     def root_credential(self, *, migration_resumption=None):
-        """New root-issued credential, never reconstruction of expired tokens."""
-        extra={} if migration_resumption is None else {'migration_resumption':migration_resumption}
-        self.ops.write_authorization(self.controller,completed_normal_contract=self.contract,**extra)
-        # Use the existing systemd credential name without making the token
-        # public or copying it into protected historical transaction records.
-        directory=self.ops.runtime_root/('root-credentials-'+digest(self.contract)[:16])
-        directory.mkdir(mode=0o700,exist_ok=True)
-        path=directory/'madar-control-plane-upgrade'
-        if path.exists() or path.is_symlink():raise RuntimeError('completed_upgrade_root_credential_collision')
+        """Fresh authority inside an actually owned coordinator lock window.
+
+        The User=madar service acquires deploy.lock itself. After that service
+        exits, root must reacquire it before provider/backup/runtime effects.
+        Borrow an existing coordinator lock; release only a lock acquired here.
+        Neither the durable upgrade interlock nor a credential replaces flock.
+        """
+        from deployment.lib.schema150_provider_adapter import require_owned_lock
+        owned=False;attempted=False;created=False;path=None
         previous=os.environ.get('CREDENTIALS_DIRECTORY')
         try:
+            require_owned_lock(self.lock,self.ops.upgrade_root/'upgrade.lock')
+            if self.ops.deploy_lock_descriptor is None:
+                self.ops.deploy_lock_descriptor=acquire_lock(self.ops.state_root/'deploy.lock',create=False)
+                owned=True
+            require_owned_lock(self.ops.deploy_lock_descriptor,self.ops.state_root/'deploy.lock')
+            directory=self.ops.runtime_root/('root-credentials-'+digest(self.contract)[:16])
+            directory.mkdir(mode=0o700,exist_ok=True)
+            path=directory/'madar-control-plane-upgrade'
+            if path.exists() or path.is_symlink():raise RuntimeError('completed_upgrade_root_credential_collision')
+            extra={} if migration_resumption is None else {'migration_resumption':migration_resumption}
+            attempted=True
+            self.ops.write_authorization(self.controller,completed_normal_contract=self.contract,**extra)
             exclusive(path,protected(self.ops.authorization_file,private=True).read_bytes())
+            created=True
             os.environ['CREDENTIALS_DIRECTORY']=str(directory)
             yield
         finally:
             if previous is None:os.environ.pop('CREDENTIALS_DIRECTORY',None)
             else:os.environ['CREDENTIALS_DIRECTORY']=previous
-            path.unlink(missing_ok=True);self.ops.clear_authorization()
+            try:
+                try:
+                    if created:path.unlink(missing_ok=True)
+                finally:
+                    if attempted:self.ops.clear_authorization()
+            finally:
+                if owned:self.ops.release_deployment_lock()
 
     def event(self,phase,**fields):
         self.phase=phase
@@ -395,6 +424,34 @@ class CompletedNormalUpgrade:
         self.ops.run_deploy_service('completed_normal_'+mode,self.controller,
             completed_normal_contract=self.contract,completed_normal_mode=mode)
         self.event('service_'+mode+'_completed')
+
+    def migrate(self,*,provider_adapter=None):
+        """Keep governed150 SQL in the coordinator's real lock/credential window.
+
+        Historical bridge releases retain their madar service path.150 is still
+        unregistered: neither this method nor an adapter can admit the operation.
+        Its maintenance-first caller must supply the concrete, already fenced
+        actor. Runtime activation/state mutation never runs in this root stage.
+        """
+        from deployment.lib.completed_normal_profile import DELETION, RECONCILED
+        from deployment.lib.schema150_provider_adapter import Schema150ProviderAdapter
+        if self.profile not in (DELETION, RECONCILED):
+            if provider_adapter is not None:
+                raise RuntimeError('completed_migration_parent_profile_invalid')
+            return self.service('migrate')
+        if (type(provider_adapter) is not Schema150ProviderAdapter
+                or provider_adapter.contract!=self.contract or provider_adapter.runtime is not self.actor.runtime):
+            raise RuntimeError('completed_migration_concrete_provider_required')
+        from types import SimpleNamespace
+        from deployment.lib.completed_normal_migration import run_migration
+        with self.root_credential():
+            self.event('parent_migration_pending')
+            operations=SimpleNamespace(schema_version=self.actor.native,
+                recovery_helper_root=lambda:self.ops.control_root/'scripts')
+            result=run_migration(self.contract,self.ops.state_root/'releases'/self.contract['candidate']['source_sha'],
+                self.ops.state_root,operations,parent=self,provider_adapter=provider_adapter)
+            self.event('parent_migration_completed',schema=self.actor.native())
+            return result
 
     def install_controller(self):
         self.actor.source();self.actor.installation.installed()
@@ -481,6 +538,8 @@ class CompletedNormalUpgrade:
             return self._execute()
 
     def _execute(self):
+        from deployment.lib.completed_normal_profile import DELETION, RECONCILED
+        if self.profile in (DELETION, RECONCILED):return self._execute_maintenance()
         self.preflight()
         self.lock=acquire_lock(self.ops.upgrade_root/'upgrade.lock',create=False)
         try:
@@ -519,6 +578,15 @@ class CompletedNormalUpgrade:
             with self.root_credential():
                 self.event('boot_supersession_pending');self.actor.installation.install();self.actor.guard()
                 self.event('controller_installation_pending');self.install_controller()
+                from deployment.lib.completed_normal_profile import FENCED,OUTBOX
+                if self.profile in (FENCED,OUTBOX):
+                    from deployment.lib.completed_normal_evidence import measured_record
+                    from deployment.lib.schema148_artifacts import seal_candidate_provenance
+                    from deployment.lib.schema150_provider_adapter import LOCKS,require_owned_lock
+                    for descriptor,path in zip((self.lock,self.ops.deploy_lock_descriptor),LOCKS):
+                        require_owned_lock(descriptor,path)
+                    self.event('candidate_artifact_capture_pending')
+                    seal_candidate_provenance(self.actor,measured_record(self.document['application_evidence']['provenance']))
             # Existing deploy.lock must be released before the User=madar
             # service obtains it. The protected upgrade interlock stays armed.
             self.ops.release_deployment_lock()
@@ -559,6 +627,10 @@ class CompletedNormalUpgrade:
                 # owners or relying on a status flag. The same healthy bridge
                 # stays publicly available while the database is advanced.
                 handoff.revoke();kernel.verify_mode(normal=False)
+                from deployment.lib.completed_normal_profile import FENCED
+                if self.profile is FENCED:
+                    from deployment.lib.schema148_release import seal_quiescence
+                    self.event('notification_quiescence_pending');seal_quiescence(self.actor)
                 self.event('pre_migration_backup_pending')
                 backup=CompletedNormalBackupContext(self.contract,self.document,self.package,kernel,
                     stage='pre-migration',source_guard=self.actor.guard,artifact_guard=self.artifact_guard)
@@ -568,7 +640,7 @@ class CompletedNormalUpgrade:
                 exclusive(self.root/'pre-migration-customer-snapshot.json',encoded(customers))
                 seal_intent(self.contract,source_guard=self.actor.guard,runtime_guard=self.actor.native,
                     backup_guard=lambda:backup.guard())
-            self.service('migrate')
+            self.migrate()
             with self.root_credential():
                 self.event('migration_customer_preservation_pending')
                 original=json.loads(protected(self.root/'pre-migration-customer-snapshot.json',private=True).read_text())
@@ -608,8 +680,158 @@ class CompletedNormalUpgrade:
             self.failure(error)
             raise
         finally:
-            self.ops.clear_authorization();self.ops.close_locks()
-            if self.lock is not None:os.close(self.lock);self.lock=None
+            try:self.ops.clear_authorization()
+            finally:
+                try:self.ops.close_locks()
+                finally:
+                    try:
+                        if self.lock is not None:os.close(self.lock)
+                    finally:self.lock=None
+
+    def _execute_maintenance(self):
+        """Maintenance first; never publish a schema146 candidate bridge.
+
+        The registry/admission/issuer remain authoritative and fail closed.
+        Private acceptance and activation delegates must come from the measured
+        installed entrypoint; a status packet or default public smoke probe is
+        insufficient. This method neither registers150 nor issues authority.
+        """
+        from deployment.lib.completed_normal_profile import DELETION, RECONCILED
+        from deployment.lib.schema150_provider_adapter import Schema150ProviderAdapter,private_json,require_owned_lock,LOCKS
+        from deployment.lib.schema150_provider_lifecycle import ProviderMaintenance150,ProtectedProviderJournal
+        from deployment.lib.schema150_actor_inventory import validate_inventory
+        if self.profile is DELETION:
+            raise RuntimeError('schema150_superseded_release_contract_not_executable')
+        if (self.profile not in (DELETION, RECONCILED) or not callable(self.maintenance_acceptance_guard)
+                or not callable(self.maintenance_activation_guard)):
+            raise RuntimeError('schema150_independent_private_verifiers_required')
+        self.preflight()
+        self.lock=acquire_lock(self.ops.upgrade_root/'upgrade.lock',create=False)
+        try:
+            self.preflight(locked=True)
+            self.reconcile_failed_interlock()
+            self.quiesced=True;self.ops.quiesce(self.controller)
+            # Retain this lock across root credential windows. Release it only
+            # for the existing User=madar child, then rebind the actual new fd.
+            if self.ops.deploy_lock_descriptor is None:
+                self.ops.deploy_lock_descriptor=acquire_lock(self.ops.state_root/'deploy.lock',create=False)
+            with self.root_credential():
+                publish_admission(self.contract,self.ops,self.ops.state_root)
+            self.admitted=True
+            exclusive(self.root/'operator-authorization.json',encoded({
+                'operation':self.profile.operation,'context_sha256':digest(self.contract),'plan_sha256':digest(self.document),
+                'source_bundle_sha256':self.document['source_bundle_sha256'],'controller_sha':self.controller,
+                'application_sha':self.contract['candidate']['source_sha']}))
+            exclusive(self.root/'backup-timer-preimages.json',encoded(self.document['backup_timer_states']))
+            with self.root_credential():
+                self.event('boot_supersession_pending');self.actor.installation.install();self.actor.guard()
+                self.event('controller_installation_pending');self.install_controller()
+                from deployment.lib.completed_normal_evidence import measured_record
+                from deployment.lib.schema148_artifacts import seal_candidate_provenance
+                seal_candidate_provenance(self.actor,measured_record(self.document['application_evidence']['provenance']))
+                binding={'operation':self.profile.operation,'context_sha256':digest(self.contract),
+                    'source_sha':self.contract['candidate']['source_sha'],'controller_sha':self.controller,
+                    'inventory_sha256':self.contract['writer_inventory_sha256'],
+                    'system_identifier':self.contract['database']['system_identifier'],'source_schema':self.profile.source,'target_schema':self.profile.target}
+                self.actor.guard()
+                inventory=validate_inventory(private_json(self.package/'provider-inventory.json'),binding)
+                if any(k.startswith('candidate:') for k in inventory['containers']):
+                    raise RuntimeError('schema150_original_inventory_must_precede_candidate')
+                exclusive(self.root/'provider-inventory.json',encoded(inventory))
+                require_root_directory(self.root/'provider-journal',create=True)
+                provider=Schema150ProviderAdapter(self.contract,binding,self.actor.runtime,
+                    source_guard=self.actor.guard,lock_descriptors=(self.lock,self.ops.deploy_lock_descriptor),
+                    acceptance_guard=self.maintenance_acceptance_guard,activation_guard=self.maintenance_activation_guard)
+                lifecycle=ProviderMaintenance150(binding,ProtectedProviderJournal(self.root/'provider-journal'),provider)
+                kernel=self.actor.candidate()
+                handoff=CompletedNormalWriteHandoff(self.contract,kernel,source_guard=self.actor.source,
+                    boot_guard=self.actor.installation.installed,artifact_guard=self.artifact_guard,provider_adapter=provider)
+                self.event('original_provider_preimage_pending');lifecycle.prepare()
+                self.event('origin_write_fence_pending');self.fenced=True;handoff.fence_origin()
+                self.event('provider_maintenance_fence_pending');lifecycle.fence()
+                self.event('pre_migration_backup_pending')
+                backup=CompletedNormalBackupContext(self.contract,self.document,self.package,kernel,
+                    stage='pre-migration',source_guard=self.actor.guard,artifact_guard=self.artifact_guard,provider_adapter=provider)
+                receipt=backup.capture();backup.seal_migration_inputs(receipt)
+                self.event('pre_migration_customer_snapshot_pending')
+                original=migration_customer_snapshot(self.contract,self.actor.runtime)
+                exclusive(self.root/'pre-migration-customer-snapshot.json',encoded(original))
+            self.ops.release_deployment_lock()
+            self.service('prepare')
+            self.ops.deploy_lock_descriptor=acquire_lock(self.ops.state_root/'deploy.lock',create=False)
+            # A stale descriptor from before the child can never authorize SQL.
+            for fd,path in zip((self.lock,self.ops.deploy_lock_descriptor),LOCKS):require_owned_lock(fd,path)
+            provider.lock_descriptors=(self.lock,self.ops.deploy_lock_descriptor)
+            with self.root_credential():
+                self.event('fenced_candidate_seal_pending')
+                seal_candidate_stage(self.contract,source_guard=self.actor.guard,model_loader=self.model_loader,
+                    runtime=self.actor.runtime,state_root=self.ops.state_root)
+            # Fresh issuer witness now includes the exclusively published stage.
+            with self.root_credential():
+                provider.require_authority(binding,purpose='observe_quiescence')
+                provider.verify_candidate_stage()
+                provider.observe_quiescence(binding)
+                seal_intent(self.contract,source_guard=self.actor.guard,runtime_guard=self.actor.native,
+                    backup_guard=backup.guard)
+            self.migrate(provider_adapter=provider)
+            with self.root_credential():
+                self.event('migration_customer_preservation_pending')
+                after=migration_customer_snapshot(self.contract,self.actor.runtime,columns=original['columns'])
+                exclusive(self.root/'post-migration-customer-snapshot.json',encoded(after))
+                preservation=verify_migration_customer_preservation(original,after,contract=self.contract)
+                exclusive(self.root/'migration-customer-preservation.json',encoded(preservation))
+                seal_completion(self.contract,self.ops.state_root/'releases'/self.contract['candidate']['source_sha'],
+                    self.ops.state_root,source_guard=self.actor.guard,runtime_guard=self.actor.native)
+                self.event('private_provider_recovery_pending');lifecycle.prepare_private_activation()
+                self.event('target_normal_grant_pending');handoff.grant(schema=self.profile.target)
+            # Existing child owns the worker-generation transfer. Its historical
+            # guard may not accept a creation-only receipt; do not bypass it.
+            self.ops.release_deployment_lock()
+            self.service('activate')
+            self.ops.deploy_lock_descriptor=acquire_lock(self.ops.state_root/'deploy.lock',create=False)
+            for fd,path in zip((self.lock,self.ops.deploy_lock_descriptor),LOCKS):require_owned_lock(fd,path)
+            provider.lock_descriptors=(self.lock,self.ops.deploy_lock_descriptor)
+            with self.root_credential():
+                self.event('accepted_workers_pending');lifecycle.activate_after_grant(clear_boot=False,workers_only=True)
+                seal_candidate_runtime(self.contract,source_guard=self.actor.guard,model_loader=self.model_loader,
+                    runtime=self.actor.runtime,state_root=self.ops.state_root,mode='NORMAL')
+                handoff.seal_maintenance_runtime()
+                self.event('accepted_workers_and_ingress_pending');lifecycle.activate_after_grant(clear_boot=False)
+            self.ops.release_deployment_lock();self.service('adopt')
+            self.ops.deploy_lock_descriptor=acquire_lock(self.ops.state_root/'deploy.lock',create=False)
+            for fd,path in zip((self.lock,self.ops.deploy_lock_descriptor),LOCKS):require_owned_lock(fd,path)
+            provider.lock_descriptors=(self.lock,self.ops.deploy_lock_descriptor)
+            with self.root_credential():
+                self.acceptance_guard(schema=self.profile.target,normal=True)
+                self.event('post_migration_backup_pending')
+                final=CompletedNormalBackupContext(self.contract,self.document,self.package,kernel,
+                    stage='post-migration',source_guard=self.actor.guard,artifact_guard=self.artifact_guard).capture()
+                kernel.round(normal=True)
+                result={'operation':self.profile.operation,'context_sha256':digest(self.contract),'schema':self.profile.target,'mode':'NORMAL',
+                    'application_sha':self.contract['candidate']['source_sha'],'controller_sha':self.controller,
+                    'images':self.contract['candidate']['images'],'backup':final,'customer_database_restored':False}
+                exclusive(self.root/'normal-acceptance.json',encoded(result))
+                # Public acceptance precedes boot release; final completion is
+                # published only after that independently observed effect.
+                lifecycle.activate_after_grant()
+                self.ops.restore_backup_timers()
+                exclusive(self.root/'normal-completion.json',encoded(result))
+                from deployment.lib.completed_normal_baseline import seal_compatible_release
+                seal_compatible_release(self.contract,self.root,self.ops.state_root)
+                self.event('normal_completed',schema=self.profile.target,mode='NORMAL')
+            self.ops.clear_interlock()
+            return result
+        except Exception as error:
+            self.failure(error)
+            raise
+        finally:
+            try:self.ops.clear_authorization()
+            finally:
+                try:self.ops.close_locks()
+                finally:
+                    try:
+                        if self.lock is not None:os.close(self.lock)
+                    finally:self.lock=None
 
     def complete_application(self, handoff, kernel):
         """The existing handoff at144, with no migration intent or SQL child.

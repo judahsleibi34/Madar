@@ -291,6 +291,14 @@ async def execute_claim(
                 )
             ),
             incremental_persister=persist_incremental,
+            noop_persister=lambda next_cursor, credential_reference: (
+                project_source_ingestion_service.complete_noop_ingestion(
+                    tenant_id=tenant_id, project_id=project_id, source_id=source_id,
+                    user_id=user_id, ingestion_run_id=run_id, lease_token=run_lease,
+                    next_cursor=next_cursor,
+                    credential_reference=credential_reference, client=database,
+                )
+            ),
             metadata_failure_resolver=lambda _error: (
                 project_source_ingestion_service.recover_completed_ingestion(
                     tenant_id=tenant_id, project_id=project_id, source_id=source_id,
@@ -311,23 +319,25 @@ async def execute_claim(
 
         checkpoint = None
         checkpoint_error = None
-        try:
-            checkpoint = project_dataset_checkpoint_service.enqueue_dataset_checkpoint(
-                tenant_id=tenant_id, project_id=project_id, source_id=source_id,
-                resource_id=resource_id,
-                dataset_id=str(result["persistent_dataset_id"]), user_id=user_id,
-                target_revision=int(result["committed_revision"]), client=database,
-            )
-        except Exception:
-            checkpoint_error = "checkpoint_enqueue_failed"
-            logger.exception("data.automatic_sync.checkpoint_enqueue_failed", extra={
-                "tenant_id": tenant_id, "project_id": project_id, "source_id": source_id,
-            })
+        if not result.get("no_changes"):
+            try:
+                checkpoint = project_dataset_checkpoint_service.enqueue_dataset_checkpoint(
+                    tenant_id=tenant_id, project_id=project_id, source_id=source_id,
+                    resource_id=resource_id,
+                    dataset_id=str(result["persistent_dataset_id"]), user_id=user_id,
+                    target_revision=int(result["committed_revision"]), client=database,
+                )
+            except Exception:
+                checkpoint_error = "checkpoint_enqueue_failed"
+                logger.exception("data.automatic_sync.checkpoint_enqueue_failed", extra={
+                    "tenant_id": tenant_id, "project_id": project_id, "source_id": source_id,
+                })
         return {
             "schedule_id": claim["schedule_id"], "outcome": "succeeded",
             "ingestion_run_id": run_id,
             "dataset_id": result.get("persistent_dataset_id"),
             "committed_revision": result.get("committed_revision"),
+            "no_changes": bool(result.get("no_changes")),
             "checkpoint": checkpoint, "checkpoint_error": checkpoint_error,
         }
     except Exception as error:

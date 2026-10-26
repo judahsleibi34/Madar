@@ -56,6 +56,30 @@ _launch_price_book_spec = importlib.util.spec_from_file_location(
 _launch_price_book_candidate = importlib.util.module_from_spec(_launch_price_book_spec)
 _launch_price_book_spec.loader.exec_module(_launch_price_book_candidate)
 validated_launch_price_book_entries = _launch_price_book_candidate.validated_entries
+_notification_fencing_spec = importlib.util.spec_from_file_location(
+    "madar_notification_fencing_candidate", Path(__file__).with_name("notification_fencing_candidate.py"))
+_notification_fencing_candidate = importlib.util.module_from_spec(_notification_fencing_spec)
+_notification_fencing_spec.loader.exec_module(_notification_fencing_candidate)
+validated_notification_fencing_entries = _notification_fencing_candidate.validated_entries
+_reservation_integrity_spec = importlib.util.spec_from_file_location(
+    "madar_reservation_integrity_candidate", Path(__file__).with_name("reservation_integrity_candidate.py"))
+_reservation_integrity_candidate = importlib.util.module_from_spec(_reservation_integrity_spec)
+_reservation_integrity_spec.loader.exec_module(_reservation_integrity_candidate)
+validated_reservation_integrity_entries = _reservation_integrity_candidate.validated_entries
+_outbox_fencing_spec = importlib.util.spec_from_file_location(
+    "madar_outbox_fencing_candidate", Path(__file__).with_name("outbox_fencing_candidate.py"))
+_outbox_fencing_candidate = importlib.util.module_from_spec(_outbox_fencing_spec)
+_outbox_fencing_spec.loader.exec_module(_outbox_fencing_candidate)
+validated_outbox_fencing_entries = _outbox_fencing_candidate.validated_entries
+_deletion_spec = importlib.util.spec_from_file_location(
+    "madar_deletion_ownership_candidate", Path(__file__).with_name("deletion_ownership_candidate.py"))
+_deletion_candidate = importlib.util.module_from_spec(_deletion_spec)
+_deletion_spec.loader.exec_module(_deletion_candidate)
+validated_deletion_entries = _deletion_candidate.validated_entries
+
+
+
+
 _project_datasets_spec = importlib.util.spec_from_file_location(
     "madar_project_datasets_candidate",
     Path(__file__).with_name("project_datasets_candidate.py"),
@@ -126,6 +150,30 @@ _automatic_source_sync_spec = importlib.util.spec_from_file_location(
 _automatic_source_sync_candidate = importlib.util.module_from_spec(_automatic_source_sync_spec)
 _automatic_source_sync_spec.loader.exec_module(_automatic_source_sync_candidate)
 validated_automatic_source_sync_entries = _automatic_source_sync_candidate.validated_entries
+_google_sheets_spec = importlib.util.spec_from_file_location(
+    "madar_google_sheets_candidate", Path(__file__).with_name("google_sheets_candidate.py"),
+)
+_google_sheets_candidate = importlib.util.module_from_spec(_google_sheets_spec)
+_google_sheets_spec.loader.exec_module(_google_sheets_candidate)
+validated_google_sheets_entries = _google_sheets_candidate.validated_entries
+_webhook_spec = importlib.util.spec_from_file_location(
+    "madar_webhook_candidate", Path(__file__).with_name("webhook_candidate.py"),
+)
+_webhook_candidate = importlib.util.module_from_spec(_webhook_spec)
+_webhook_spec.loader.exec_module(_webhook_candidate)
+validated_webhook_entries = _webhook_candidate.validated_entries
+_bi_dashboard_spec = importlib.util.spec_from_file_location(
+    "madar_bi_dashboard_candidate", Path(__file__).with_name("bi_dashboard_candidate.py"),
+)
+_bi_dashboard_candidate = importlib.util.module_from_spec(_bi_dashboard_spec)
+_bi_dashboard_spec.loader.exec_module(_bi_dashboard_candidate)
+validated_bi_dashboard_entries = _bi_dashboard_candidate.validated_entries
+_automated_reporting_spec = importlib.util.spec_from_file_location(
+    "madar_automated_reporting_candidate", Path(__file__).with_name("automated_reporting_candidate.py"),
+)
+_automated_reporting_candidate = importlib.util.module_from_spec(_automated_reporting_spec)
+_automated_reporting_spec.loader.exec_module(_automated_reporting_candidate)
+validated_automated_reporting_entries = _automated_reporting_candidate.validated_entries
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -133,7 +181,7 @@ TREE_PATHS = {
     "database": REPO_ROOT / "database" / "migrations",
     "supabase": REPO_ROOT / "supabase" / "migrations",
 }
-FILENAME_PATTERN = re.compile(r"^(?P<number>\d{3})_(?P<description>[a-z0-9][a-z0-9_]*)\.sql$")
+FILENAME_PATTERN = re.compile(r"^(?P<number>\d{3,9})_(?P<description>[a-z0-9][a-z0-9_]*)\.sql$")
 NEXT_MIGRATION_NUMBER = 44
 
 HISTORICAL_COMMON_FILES = {
@@ -242,6 +290,10 @@ def collect_tree(label: str, directory: Path, errors: list[str]) -> dict[str, Pa
                 f"{label}: malformed migration filename {path.name!r}; "
                 "expected NNN_description.sql"
             )
+            continue
+        number = int(path.name.split('_', 1)[0])
+        if number < 1 or path.name.split('_', 1)[0] != f'{number:03d}':
+            errors.append(f"{label}: noncanonical migration version: {path.name!r}")
             continue
         files[path.name] = path
 
@@ -427,6 +479,10 @@ def check_production_lineage(errors: list[str]) -> None:
             retained_future.update({entry["number"]: entry for entry in validated_forms_review_entries(REPO_ROOT.parent)})
             retained_future.update({entry["number"]: entry for entry in validated_commercial_continuity_entries(REPO_ROOT.parent)})
             retained_future.update({entry["number"]: entry for entry in validated_launch_price_book_entries(REPO_ROOT.parent)})
+            validated_notification_fencing_entries(REPO_ROOT.parent)  # Historical source validation only.
+            validated_reservation_integrity_entries(REPO_ROOT.parent)  # Historical source validation only.
+            validated_outbox_fencing_entries(REPO_ROOT.parent)  # Historical source validation only.
+            validated_deletion_entries(REPO_ROOT.parent)  # Historical source validation only.
             retained_future.update({entry["number"]: entry for entry in validated_project_datasets_entries(REPO_ROOT.parent)})
             retained_future.update({entry["number"]: entry for entry in validated_data_sources_entries(REPO_ROOT.parent)})
             retained_future.update({entry["number"]: entry for entry in validated_source_ingestions_entries(REPO_ROOT.parent)})
@@ -437,6 +493,12 @@ def check_production_lineage(errors: list[str]) -> None:
             retained_future.update({entry["number"]: entry for entry in validated_shared_immutable_storage_entries(REPO_ROOT.parent)})
             retained_future.update({entry["number"]: entry for entry in validated_credential_vault_entries(REPO_ROOT.parent)})
             retained_future.update({entry["number"]: entry for entry in validated_automatic_source_sync_entries(REPO_ROOT.parent)})
+            from check_reconciled_history import validated_entries as reconciled_entries
+            retained_future.update({row['number']:row for row in reconciled_entries(REPO_ROOT.parent)})
+            retained_future.update({entry["number"]: entry for entry in validated_google_sheets_entries(REPO_ROOT.parent)})
+            retained_future.update({entry["number"]: entry for entry in validated_webhook_entries(REPO_ROOT.parent)})
+            retained_future.update({entry["number"]: entry for entry in validated_bi_dashboard_entries(REPO_ROOT.parent)})
+            retained_future.update({entry["number"]: entry for entry in validated_automated_reporting_entries(REPO_ROOT.parent)})
             learning=validate_learning_path(REPO_ROOT.parent)
             if learning['status']=='finalized':
                 learning_manifest=json.loads((REPO_ROOT.parent / learning['manifest_path']).read_text())
@@ -447,6 +509,26 @@ def check_production_lineage(errors: list[str]) -> None:
             path = REPO_ROOT.parent / relative
             if not path.is_file() or digest(path) != checksum:
                 errors.append(f"immutable production migration changed: {relative}")
+        generic_tail = {}
+        known_ceiling = max(retained_future, default=release_target)
+        unknown_future = [path for tree in TREE_PATHS.values() for path in tree.glob('*.sql')
+                          if FILENAME_PATTERN.fullmatch(path.name) and int(path.name.split('_',1)[0]) > known_ceiling]
+        if unknown_future:
+            # Historical contracts remain pinned above. New future versions need
+            # no per-schema candidate module. They must already exist in the
+            # exact committed source; this validates source, never selects a
+            # production release or grants migration authority. Trusted CI also
+            # compares the PR's independent base SHA, preserving later history.
+            sys.path.insert(0, str(REPO_ROOT))
+            from deployment.lib.migration_inventory import GitSource, discover
+            source = GitSource(REPO_ROOT.parent)
+            head = source.command('rev-parse', 'HEAD').decode().strip()
+            inventory = discover(REPO_ROOT.parent, source_sha=head,
+                history_base_sha='23254c786fdfa3731ff63cd004a4160b6d2f60fa')
+            for migration in inventory.migrations:
+                if migration.number > known_ceiling:
+                    generic_tail[migration.path] = migration.sql
+                    generic_tail[migration.mirror_path] = migration.sql
         for tree in TREE_PATHS.values():
             for path in tree.glob("*.sql"):
                 number = int(path.name.split("_", 1)[0])
@@ -459,11 +541,13 @@ def check_production_lineage(errors: list[str]) -> None:
                             or digest(path) != retained["sha256"]):
                         errors.append(f"checksum-pinned migration changed: {relative}")
                     continue
+                if number > known_ceiling and generic_tail.get(relative) == path.read_bytes():
+                    continue
                 if number > release_target:
                     errors.append(
                         f"unexpected migration beyond release target {release_target}: {relative}"
                     )
-    except (OSError, KeyError, ValueError, TypeError) as error:
+    except (OSError, KeyError, ValueError, TypeError, RuntimeError) as error:
         errors.append(f"production lineage manifest invalid: {type(error).__name__}")
 
 def main() -> int:
@@ -507,5 +591,16 @@ def main() -> int:
     return 0
 
 
+def check_schema148_source():
+    import importlib.util
+    root = Path(__file__).resolve().parents[2]
+    path = root / 'web/deployment/lib/schema148_release.py'
+    spec = importlib.util.spec_from_file_location('schema148_source_gate', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.source_manifest(root)
+
+
 if __name__ == "__main__":
+    check_schema148_source()
     raise SystemExit(main())

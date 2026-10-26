@@ -1,0 +1,1 @@
+PASS actual SQL claim, worker-loss lease expiry, reclaim, bounded retry availability, exhausted-attempt dead letter and terminal exclusion; fixture rolled back

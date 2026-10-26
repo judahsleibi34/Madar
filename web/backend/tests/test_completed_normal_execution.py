@@ -64,6 +64,7 @@ class ExecutionTests(unittest.TestCase):
         test=self
         class Handoff:
             def __init__(self,*a,**kw):pass
+            def seal_maintenance_runtime(self):effect('seal_normal_runtime')
             def fence_origin(self):test.origin='READ_ONLY';effect('fence_origin')
             def revoke(self):test.mode='READ_ONLY';effect('revoke')
             def grant(self,*,schema):
@@ -129,6 +130,13 @@ class ExecutionTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):self.driver.execute()
         self.assertEqual(self.calls,['preflight','preflight_locked'])
         self.assertFalse(self.root.exists());self.assertEqual(self.origin,'NORMAL')
+
+    def test_cleanup_failures_do_not_leak_the_parent_upgrade_lock(self):
+        self.ops.clear_authorization=Mock(side_effect=OSError('synthetic_clear_failure'))
+        self.ops.close_locks=Mock(side_effect=OSError('synthetic_close_failure'))
+        with self.assertRaises(OSError):self.driver.execute()
+        self.ops.close_locks.assert_called_once_with()
+        self.assertIsNone(self.driver.lock)
     def test_partial_quiesce_failure_rechecks_origin_before_exact_timer_restore(self):
         self.failure='quiesce'
         with self.assertRaises(RuntimeError):self.driver.execute()

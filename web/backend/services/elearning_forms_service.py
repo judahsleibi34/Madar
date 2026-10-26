@@ -411,11 +411,29 @@ async def submit(tenant,form,actor,payload,uploads,opportunity_id=None):
             staged.append((meta,reservation))
             store_builder_asset(storage_key=meta['storage_key'],content=data,content_type=meta['mime_type'])
             finish_storage(reservation_id=reservation,succeeded=True,storage_key=meta['storage_key'],sha256_hex=meta['sha256'])
-        result=rpc('submit_elearning_form',{'p_tenant':tenant,'p_user':actor.user_id if actor else None,'p_form':form['id'],'p_version':form['version'],'p_id':str(identifier),'p_key':str(key),'p_hash':request_hash,'p_answers':cleaned,'p_files':[meta for meta,_ in files],**({'p_opportunity':str(opportunity_id)} if opportunity_id else {})})
-        if not result['duplicate']:return result
     except Exception:
         cleanup_files(tenant,staged);raise
-    cleanup_files(tenant,staged);return result
+    try:
+        result=rpc('submit_elearning_form',{'p_tenant':tenant,'p_user':actor.user_id if actor else None,'p_form':form['id'],'p_version':form['version'],'p_id':str(identifier),'p_key':str(key),'p_hash':request_hash,'p_answers':cleaned,'p_files':[meta for meta,_ in files],**({'p_opportunity':str(opportunity_id)} if opportunity_id else {})})
+        if staged:
+            if not isinstance(result,dict) or type(result.get('duplicate')) is not bool:
+                raise ValueError('Invalid submission acknowledgement')
+            accepted_id=UUID(result['id'])
+            if not result['duplicate'] and accepted_id != identifier:
+                raise ValueError('Submission acknowledgement identity mismatch')
+        if not result['duplicate']:return result
+    except Exception as error:
+        if not staged:raise
+        # A failed reply does not prove the metadata transaction rolled back.
+        # Preserve referenced bytes and quota without replaying the mutation.
+        logger.error('learning_form.commit_unknown',extra={'error_type':type(error).__name__})
+        raise HTTPException(503,{'code':'private_upload_outcome_unknown',
+            'response_id':str(identifier),'idempotency_key':str(key),
+            'message':'Submission outcome is uncertain. Files are retained; check the response before retrying with the same submission key.'}) from error
+    # A known duplicate of ANOTHER response cannot reference this invocation's
+    # generated response-owned file keys. A duplicate of this response may.
+    if not staged or accepted_id != identifier:cleanup_files(tenant,staged)
+    return result
 
 
 def cleanup_files(tenant,staged):

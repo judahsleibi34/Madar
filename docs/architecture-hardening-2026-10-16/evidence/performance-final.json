@@ -1,0 +1,152 @@
+{
+  "baseline_sha": "876b65e73ea8ceaf398145d8677019184798a95c",
+  "candidate_sha": "27860bf2d9174fb315acbb64b0bd26b3b9bc87a5",
+  "conditions": "dedicated4vCPU/5402MiB VM; same native PostgreSQL/Auth/REST/Redis; API1.5CPU/1280MiB; nginx0.25CPU/64MiB; 3warmups,60requests,4clients per endpoint; synthetic data; no other test load",
+  "endpoints": {
+    "/health/live": {
+      "baseline": {
+        "requests": 60,
+        "concurrency": 4,
+        "errors": 0,
+        "p50_ms": 3.527,
+        "p95_ms": 15.424,
+        "p99_ms": 22.802,
+        "throughput_rps": 776.936
+      },
+      "candidate": {
+        "requests": 60,
+        "concurrency": 4,
+        "errors": 0,
+        "p50_ms": 3.527,
+        "p95_ms": 44.249,
+        "p99_ms": 47.558,
+        "throughput_rps": 591.425
+      },
+      "p95_change_percent": 186.88
+    },
+    "/auth/user_status": {
+      "baseline": {
+        "requests": 60,
+        "concurrency": 4,
+        "errors": 0,
+        "p50_ms": 160.397,
+        "p95_ms": 242.098,
+        "p99_ms": 275.864,
+        "throughput_rps": 24.458
+      },
+      "candidate": {
+        "requests": 60,
+        "concurrency": 4,
+        "errors": 0,
+        "p50_ms": 142.479,
+        "p95_ms": 188.906,
+        "p99_ms": 207.203,
+        "throughput_rps": 27.169
+      },
+      "p95_change_percent": -21.97
+    },
+    "/admin/users": {
+      "baseline": {
+        "requests": 60,
+        "concurrency": 4,
+        "errors": 0,
+        "p50_ms": 313.408,
+        "p95_ms": 407.711,
+        "p99_ms": 477.99,
+        "throughput_rps": 12.085
+      },
+      "candidate": {
+        "requests": 60,
+        "concurrency": 4,
+        "errors": 0,
+        "p50_ms": 306.956,
+        "p95_ms": 394.681,
+        "p99_ms": 405.237,
+        "throughput_rps": 12.164
+      },
+      "p95_change_percent": -3.2
+    }
+  },
+  "provider_resource_limits": {
+    "auth": {
+      "cpus": 1.0,
+      "memory_bytes": 201326592
+    },
+    "postgres": {
+      "cpus": 2.0,
+      "memory_bytes": 805306368
+    }
+  },
+  "provider_cpu_stat_delta": {
+    "auth": {
+      "usage_usec": 6005865,
+      "nr_periods": 158,
+      "nr_throttled": 6,
+      "throttled_usec": 240182
+    },
+    "postgres": {
+      "usage_usec": 26512466,
+      "nr_periods": 159,
+      "nr_throttled": 66,
+      "throttled_usec": 3440299
+    }
+  },
+  "database_query_costs": [
+    {
+      "queryid": -1257946980942637106,
+      "calls": 1240,
+      "total_exec_ms": 817.341,
+      "mean_exec_ms": 0.659,
+      "rows": 1240
+    },
+    {
+      "queryid": 5275432894868710300,
+      "calls": 1240,
+      "total_exec_ms": 542.588,
+      "mean_exec_ms": 0.438,
+      "rows": 1240
+    },
+    {
+      "queryid": -7821780334453251234,
+      "calls": 11489,
+      "total_exec_ms": 408.161,
+      "mean_exec_ms": 0.036,
+      "rows": 11489
+    },
+    {
+      "queryid": 2743605022105925518,
+      "calls": 1,
+      "total_exec_ms": 217.297,
+      "mean_exec_ms": 217.297,
+      "rows": 0
+    },
+    {
+      "queryid": -3971633845146508748,
+      "calls": 3,
+      "total_exec_ms": 133.359,
+      "mean_exec_ms": 44.453,
+      "rows": 538
+    },
+    {
+      "queryid": -7782208081047150307,
+      "calls": 1,
+      "total_exec_ms": 123.166,
+      "mean_exec_ms": 123.166,
+      "rows": 0
+    },
+    {
+      "queryid": -3317441629478912187,
+      "calls": 803,
+      "total_exec_ms": 119.118,
+      "mean_exec_ms": 0.148,
+      "rows": 775
+    },
+    {
+      "queryid": -1099182597755840431,
+      "calls": 1240,
+      "total_exec_ms": 112.984,
+      "mean_exec_ms": 0.091,
+      "rows": 1240
+    }
+  ]
+}

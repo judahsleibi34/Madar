@@ -1,0 +1,94 @@
+{
+  "baseline_sha": "876b65e73ea8ceaf398145d8677019184798a95c",
+  "candidate_sha": "d5569c296ddaef99c38837de3c8a497e420cf7b6",
+  "conditions": "dedicated4vCPU/5402MiB VM; same native PostgreSQL/Auth/REST/Redis; API1.5CPU/1280MiB; nginx0.25CPU/64MiB; 3warmups,60requests,4clients per endpoint; synthetic data; no other test load",
+  "endpoints": {
+    "/health/live": {
+      "baseline": {
+        "requests": 60,
+        "concurrency": 4,
+        "errors": 0,
+        "p50_ms": 3.652,
+        "p95_ms": 14.492,
+        "p99_ms": 15.616,
+        "throughput_rps": 888.207
+      },
+      "candidate": {
+        "requests": 60,
+        "concurrency": 4,
+        "errors": 0,
+        "p50_ms": 3.224,
+        "p95_ms": 3.856,
+        "p99_ms": 4.55,
+        "throughput_rps": 1202.545
+      },
+      "p95_change_percent": -73.39
+    },
+    "/auth/user_status": {
+      "baseline": {
+        "requests": 60,
+        "concurrency": 4,
+        "errors": 0,
+        "p50_ms": 190.38,
+        "p95_ms": 292.819,
+        "p99_ms": 296.104,
+        "throughput_rps": 21.194
+      },
+      "candidate": {
+        "requests": 60,
+        "concurrency": 4,
+        "errors": 0,
+        "p50_ms": 201.392,
+        "p95_ms": 304.596,
+        "p99_ms": 462.074,
+        "throughput_rps": 18.053
+      },
+      "p95_change_percent": 4.02
+    },
+    "/admin/users": {
+      "baseline": {
+        "requests": 60,
+        "concurrency": 4,
+        "errors": 0,
+        "p50_ms": 400.111,
+        "p95_ms": 499.412,
+        "p99_ms": 609.712,
+        "throughput_rps": 9.72
+      },
+      "candidate": {
+        "requests": 60,
+        "concurrency": 4,
+        "errors": 0,
+        "p50_ms": 416.224,
+        "p95_ms": 624.897,
+        "p99_ms": 680.137,
+        "throughput_rps": 9.003
+      },
+      "p95_change_percent": 25.13
+    }
+  },
+  "provider_resource_limits": {
+    "auth": {
+      "cpus": 1.0,
+      "memory_bytes": 201326592
+    },
+    "postgres": {
+      "cpus": 1.0,
+      "memory_bytes": 805306368
+    }
+  },
+  "provider_cpu_stat_delta": {
+    "auth": {
+      "usage_usec": 5135454,
+      "nr_periods": 202,
+      "nr_throttled": 1,
+      "throttled_usec": 55378
+    },
+    "postgres": {
+      "usage_usec": 19755065,
+      "nr_periods": 202,
+      "nr_throttled": 191,
+      "throttled_usec": 28694764
+    }
+  }
+}

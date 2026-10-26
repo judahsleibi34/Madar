@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "scope": "PR220 application architecture and fresh current-source staging",
+  "acceptance_criteria": {
+    "source_integrity": "Published SQL001\u2013160 and archives unchanged; mirrors/checksums/ancestry valid",
+    "native_integrity": "Canonical146\u2192160 and156\u2192160, data-source preservation, protocols2/2/2, stale claims, direct-write refusal and reservation concurrency pass",
+    "calendar": "Native rollback/concurrency/authorization/unknown-COMMIT and actual staging HTTP SQL transport acceptance pass",
+    "security_regression": "Existing CSRF/MFA/tenant/storage/authority regression and credential-scope checks pass",
+    "fresh_staging": "Exact-source authenticated images; owned isolated twelve-service schema160 stack; real Auth/MFA/refresh/private objects/notifications/deletion/calendar/browser acceptance",
+    "stability": "Ten minutes without OOM/unexpected restart or required heartbeat loss; owned worker restart recovers",
+    "ci": "Backend/frontend/mobile/migration safety/artifacts/fresh application staging pass at the exact final SHA; conditional skips remain skips",
+    "class_d_refusal": "Ordinary Class D and obsolete/unapproved manifest execution remain refused",
+    "merge_isolation": "Internal deployment checks and actual external main-push/merge integrations verified to prevent incompatible production deployment",
+    "production_isolation": "No production mutation/authority/release-selection change/automation activation"
+  },
+  "results": "Exact-SHA execution receipts and final assessment are recorded outside Git in /opt/madar-development/inventory; this file grants no acceptance.",
+  "protected_upgrade": "BLOCKED_DEFERRED",
+  "production_authorized": false,
+  "deferred": [
+    "protected preserved-application upgrade",
+    "independent production write handoff",
+    "maintenance receiver/full restore/reboot acceptance",
+    "automatic production dispatch and activation"
+  ]
+}

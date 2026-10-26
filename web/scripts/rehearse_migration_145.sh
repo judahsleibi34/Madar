@@ -15,17 +15,17 @@ cleanup() {
 }
 trap cleanup EXIT
 
-docker run -d --name "$CONTAINER_NAME" --label madar.rehearsal=synthetic-commercial-145 \
+docker run -d --memory=768m --cpus=0.75 --pids-limit=128 --name "$CONTAINER_NAME" --label madar.rehearsal=synthetic-commercial-145 \
   --publish 127.0.0.1:55446:5432 --tmpfs /var/lib/postgresql/data:rw,noexec,nosuid,size=1g \
   -e POSTGRES_HOST_AUTH_METHOD=trust "$POSTGRES_IMAGE" >/dev/null
 created=true
 for attempt in $(seq 1 60); do
-  if docker exec "$CONTAINER_NAME" pg_isready -U postgres >/dev/null 2>&1; then
+  if docker exec "$CONTAINER_NAME" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1; then
     break
   fi
   sleep 1
 done
-docker exec "$CONTAINER_NAME" pg_isready -U postgres >/dev/null
+docker exec "$CONTAINER_NAME" pg_isready -h 127.0.0.1 -U postgres >/dev/null
 docker exec -e PGOPTIONS='-c client_min_messages=warning' -i "$CONTAINER_NAME" \
   psql -X -U postgres -v ON_ERROR_STOP=1 -q <<'SQL'
 create role anon nologin;
@@ -62,7 +62,7 @@ for migration in "$WEB_ROOT"/database/migrations/*.sql; do
     psql -X -U postgres -v ON_ERROR_STOP=1 -q < "$migration"
 done
 docker exec "$CONTAINER_NAME" psql -X -U postgres -v ON_ERROR_STOP=1 -Atc \
-  "select schema_version=144 from public.application_schema_state where contract_key='core'" | rg '^t$'
+  "select schema_version=144 from public.application_schema_state where contract_key='core'" | grep -qx t
 
 # Migration rollback must leave both schema state and immutable history intact.
 docker exec "$CONTAINER_NAME" psql -X -U postgres -v ON_ERROR_STOP=1 -q \
@@ -76,17 +76,18 @@ before_tenants="$(docker exec "$CONTAINER_NAME" psql -X -U postgres -Atc 'select
 } | docker exec -e PGOPTIONS='-c client_min_messages=warning' -i "$CONTAINER_NAME" \
   psql -X -U postgres -v ON_ERROR_STOP=1 -q
 docker exec "$CONTAINER_NAME" psql -X -U postgres -v ON_ERROR_STOP=1 -Atc \
-  "select schema_version=144 from public.application_schema_state where contract_key='core'" | rg '^t$'
+  "select schema_version=144 from public.application_schema_state where contract_key='core'" | grep -qx t
 test "$(docker exec "$CONTAINER_NAME" psql -X -U postgres -Atc 'select count(*) from public.tenants')" = "$before_tenants"
 
 docker exec -e PGOPTIONS='-c client_min_messages=warning' -i "$CONTAINER_NAME" \
   psql -X -U postgres -v ON_ERROR_STOP=1 -q \
   < "$WEB_ROOT/database/migrations/145_enforce_paid_commercial_continuity.sql"
 docker exec "$CONTAINER_NAME" psql -X -U postgres -v ON_ERROR_STOP=1 -Atc \
-  "select schema_version=145 from public.application_schema_state where contract_key='core'" | rg '^t$'
+  "select schema_version=145 from public.application_schema_state where contract_key='core'" | grep -qx t
 
-docker run --rm --network host --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+docker run --rm --memory=256m --cpus=0.5 --pids-limit=128 --network host --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m \
   --env PYTHONPATH=/app \
+  --volume "$WEB_ROOT/backend/tests/disposable_database_support.py:/app/tests/disposable_database_support.py:ro" \
   --env APP_ENV=test \
   --env SUPABASE_URL=http://127.0.0.1:54321 \
   --env SUPABASE_ANON_KEY=madar-ci-placeholder-anon-not-a-secret \

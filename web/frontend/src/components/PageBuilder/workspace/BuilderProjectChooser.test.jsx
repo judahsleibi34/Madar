@@ -248,6 +248,29 @@ describe("BuilderProjectChooser", () => {
     expect(window.sessionStorage.getItem("selected-data-project")).toBe("source-project");
   });
 
+  it("opens a selected data project inside Business Intelligence", async () => {
+    listBuilderProjects.mockResolvedValue({
+      projects: [{ id: "bi-project", name: "Operations", slug: "data-project-operations" }],
+      pagination: { limit: 20, offset: 0, count: 1, has_more: false },
+    });
+    render(
+      <MemoryRouter initialEntries={["/business-intelligence"]}>
+        <BuilderProjectChooser
+          workspace="business-intelligence"
+          usageProfile="website"
+          dataProjectSelectionKey="selected-data-project"
+        />
+        <LocationProbe />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "My Projects" }));
+    fireEvent.click((await screen.findByText("Operations")).closest("button"));
+    expect(screen.getByTestId("location").textContent)
+      .toBe("/business-intelligence/projects/bi-project/data");
+    expect(window.sessionStorage.getItem("selected-data-project")).toBe("bi-project");
+  });
+
   it("creates and enters a project automatically when none exists", async () => {
     listBuilderProjects.mockResolvedValue({
       projects: [],

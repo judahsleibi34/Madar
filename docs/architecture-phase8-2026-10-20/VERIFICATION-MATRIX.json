@@ -1,0 +1,325 @@
+{
+  "version": 1,
+  "phase": "VIII",
+  "date": "2026-10-20",
+  "basis_source_sha": "77d637591de19a2250d377adbf77c6749c3328ef",
+  "readiness": "NOT READY",
+  "production_authorized": false,
+  "gates": [
+    {
+      "gate": "Git identity",
+      "status": "PASS",
+      "evidence": "All published implementation author/committer logins verified Saliba-codes",
+      "environment": "GITHUB API",
+      "limitations": "Reverify publication-head mapping after final commit"
+    },
+    {
+      "gate": "Migration discovery",
+      "status": "PASS",
+      "evidence": "Exact Git objects;actual temporary151 validator and150→152 candidate",
+      "environment": "REAL GIT / NATIVE DATABASE",
+      "limitations": "No production eligibility implied"
+    },
+    {
+      "gate": "Migration ordering",
+      "status": "PASS",
+      "evidence": "One/two/three sequential versions;gaps/duplicates/ancestry refuse",
+      "environment": "REAL GIT / NATIVE DATABASE",
+      "limitations": "Root must independently choose actual history origin"
+    },
+    {
+      "gate": "Mirror parity",
+      "status": "PASS",
+      "evidence": "Both captured SQL trees and historical004/005 exception checked",
+      "environment": "REAL GIT",
+      "limitations": "No SQL normalization"
+    },
+    {
+      "gate": "Historical integrity",
+      "status": "PASS",
+      "evidence": "001–150 unchanged from PR216;150 SHA256 remains63d4d0c7…b722",
+      "environment": "GIT DIFF / CHECKSUM",
+      "limitations": "No real151+ published"
+    },
+    {
+      "gate": "Deterministic manifests",
+      "status": "PASS",
+      "evidence": "Canonical exact-source plans and substitution/determinism tests",
+      "environment": "REAL GIT / SOURCE",
+      "limitations": "Plans issue no authority"
+    },
+    {
+      "gate": "Manifest provenance",
+      "status": "PARTIAL",
+      "evidence": "Captured Git/SHA256/mode inventory;source/base/operation binding",
+      "environment": "SOURCE / CI",
+      "limitations": "Production source and authority bridge incomplete"
+    },
+    {
+      "gate": "Risk analysis",
+      "status": "PASS",
+      "evidence": "Pinned PG17 AST;unknown/dynamic/destructive/nontransactional restrictive",
+      "environment": "POSTGRESQL PARSER / SOURCE",
+      "limitations": "A is not live application safety certification"
+    },
+    {
+      "gate": "Application compatibility",
+      "status": "PARTIAL",
+      "evidence": "Range/rolling metadata and independent gates;protocol escalation",
+      "environment": "MODEL / RETAINED NATIVE",
+      "limitations": "Old/new full-provider automatic acceptance unfinished"
+    },
+    {
+      "gate": "Worker compatibility",
+      "status": "PARTIAL",
+      "evidence": "Retained protocols and193 native150 staging executions;specialized CI suites",
+      "environment": "NATIVE DATABASE / SOURCE",
+      "limitations": "Source61 staging;final-source full runtime/boot cutover absent"
+    },
+    {
+      "gate": "Dynamic CI discovery",
+      "status": "PASS",
+      "evidence": "All PR bases/main plan discovery;actual routine candidate path",
+      "environment": "CI / REAL GIT",
+      "limitations": "Higher-risk native coverage explicitly BLOCKED"
+    },
+    {
+      "gate": "Native generic rehearsal",
+      "status": "PASS",
+      "evidence": "57 cases:38 source/AST/policy plus19 native;actual150→152 candidate",
+      "environment": "NATIVE DATABASE / REAL GIT",
+      "limitations": "Minimal catalog fixture,not full providers"
+    },
+    {
+      "gate": "Automatic full staging",
+      "status": "PARTIAL",
+      "evidence": "Automatically discovered routine SQL and synthetic future fixture",
+      "environment": "NATIVE DATABASE / CI",
+      "limitations": "Full Auth/MFA/Storage/app/worker pipeline incomplete"
+    },
+    {
+      "gate": "Maintenance backup",
+      "status": "PARTIAL",
+      "evidence": "Protected original-role input;actual dump/restore;physical negative cases",
+      "environment": "SOURCE / NATIVE DATABASE",
+      "limitations": "Ordinary object/roles/replica integration incomplete"
+    },
+    {
+      "gate": "Independent restore",
+      "status": "PARTIAL",
+      "evidence": "Independent cluster roles/grants/ownership/data preserved",
+      "environment": "NATIVE DATABASE",
+      "limitations": "No new complete restored application or off-host/PITR acceptance"
+    },
+    {
+      "gate": "Origin drift",
+      "status": "PASS",
+      "evidence": "Wrong schema/catalog/ACL/history refuses;protocol checked after fingerprint",
+      "environment": "NATIVE DATABASE / SOURCE",
+      "limitations": "Root baseline/receipt authenticity integration remains mandatory"
+    },
+    {
+      "gate": "Release policy",
+      "status": "PARTIAL",
+      "evidence": "Root-private reader;input SHA/mode pin;10 actual UID/file permission cases",
+      "environment": "NATIVE FILE/PERMISSIONS / MODEL",
+      "limitations": "No production policy installed or dispatcher connected"
+    },
+    {
+      "gate": "Safe automatic execution",
+      "status": "PARTIAL",
+      "evidence": "Fixture preparation match and native routine SQL engine work",
+      "environment": "MODEL / NATIVE DATABASE",
+      "limitations": "No combined protected issuer/controller automatic operation"
+    },
+    {
+      "gate": "Coordinated operation",
+      "status": "PARTIAL",
+      "evidence": "Historical contracts retained;150 deliberately unregistered",
+      "environment": "SOURCE / RETAINED NATIVE",
+      "limitations": "Full protected146→150 operation not executed"
+    },
+    {
+      "gate": "Single authoritative controller",
+      "status": "PARTIAL",
+      "evidence": "No second issuer or privileged CLI;existing coordinator unchanged in authority",
+      "environment": "SOURCE REVIEW",
+      "limitations": "Concrete full maintenance lifecycle unfinished"
+    },
+    {
+      "gate": "No self-issued write authority",
+      "status": "PASS",
+      "evidence": "Every new plan/policy/fixture explicitly lacks production authority",
+      "environment": "SOURCE / MODEL / NATIVE REFUSAL",
+      "limitations": "Existing independent handoff operational acceptance still required"
+    },
+    {
+      "gate": "Captured SQL execution",
+      "status": "PASS",
+      "evidence": "Existing executor reused;authenticated Git SQL snapshots",
+      "environment": "NATIVE DATABASE",
+      "limitations": "Production generic adapter not registered"
+    },
+    {
+      "gate": "Interrupted commit",
+      "status": "PASS",
+      "evidence": "Actual SIGKILL after151;lost reply;fresh observation;no automatic replay",
+      "environment": "NATIVE PROCESS / DATABASE",
+      "limitations": "Not a privileged guest release/reboot test"
+    },
+    {
+      "gate": "Forward repair",
+      "status": "PARTIAL",
+      "evidence": "Fresh inspected151→152 fixture remainder after committed failure",
+      "environment": "NATIVE DATABASE",
+      "limitations": "Fresh protected authorization/boot/provider repair not proven"
+    },
+    {
+      "gate": "Replay protection",
+      "status": "PASS",
+      "evidence": "Consumed attempt reservation and repeated execution refusal",
+      "environment": "NATIVE DATABASE / FILESYSTEM",
+      "limitations": "Does not replace production issuer/journal proofs"
+    },
+    {
+      "gate": "Candidate activation",
+      "status": "PARTIAL",
+      "evidence": "READ_ONLY/authority refusal retained;no premature new activation",
+      "environment": "SOURCE / RETAINED TESTS",
+      "limitations": "Sealed candidate/private acceptance/handoff incomplete"
+    },
+    {
+      "gate": "CI provenance",
+      "status": "PASS",
+      "evidence": "All four77d63759 checks pass;artifact12255154707 digest,source/build inputs,archives and OCI identities independently verified",
+      "environment": "GITHUB ACTIONS / AUTHENTICATED ARCHIVE",
+      "limitations": "Implementation77 evidence;publication-head checks independently required;no imported/full-provider acceptance"
+    },
+    {
+      "gate": "Future151",
+      "status": "PASS",
+      "evidence": "Actual unpublished151 source accepted without profile/dispatcher edit",
+      "environment": "REAL GIT / NATIVE DATABASE",
+      "limitations": "Synthetic fixture,not a real published migration"
+    },
+    {
+      "gate": "Future152plus",
+      "status": "PASS",
+      "evidence": "Two/three sequential versions and protocol-change refusal",
+      "environment": "REAL GIT / NATIVE DATABASE",
+      "limitations": "Coordinated privileged execution unfinished"
+    },
+    {
+      "gate": "Destructive denial",
+      "status": "PASS",
+      "evidence": "D cannot match routine policy or routine native executor",
+      "environment": "MODEL / NATIVE DATABASE",
+      "limitations": "Exceptional reviewed production path not implemented"
+    },
+    {
+      "gate": "Application-only release",
+      "status": "PASS",
+      "evidence": "No fake SQL;no unconditional migration backup",
+      "environment": "REAL GIT / MODEL",
+      "limitations": "Artifact/runtime/authority gates remain required"
+    },
+    {
+      "gate": "Catalog/marker namespace",
+      "status": "PASS",
+      "evidence": "Two conditional defects reproduced;52-case native correction retained",
+      "environment": "NATIVE DATABASE / SOURCE",
+      "limitations": "Production precondition absent in inspected session only"
+    },
+    {
+      "gate": "Privileged inventory",
+      "status": "PASS",
+      "evidence": "Checker reports78 application files,no unexplained omissions",
+      "environment": "SOURCE CHECK",
+      "limitations": "Completeness is not whole-platform authorization proof"
+    },
+    {
+      "gate": "Privileged full installation/reboot",
+      "status": "NOT TESTED",
+      "evidence": "Previous PhaseVII guest evidence preserved,not reused",
+      "environment": "HISTORICAL ONLY",
+      "limitations": "New full controller operation unimplemented;consumed old driver not bypassed"
+    },
+    {
+      "gate": "Provider lifecycle",
+      "status": "PARTIAL",
+      "evidence": "Concrete adapter/preimages/quiescence and original-role input hardened",
+      "environment": "SOURCE / COMPONENT",
+      "limitations": "Actual combined fencing/private recovery/boot activation incomplete"
+    },
+    {
+      "gate": "Protected write handoff",
+      "status": "NOT TESTED",
+      "evidence": "Existing issuer boundaries preserved;no new operational handoff",
+      "environment": "SOURCE ONLY",
+      "limitations": "Requires actual protected operation and independent authority"
+    },
+    {
+      "gate": "Full application restoration",
+      "status": "NOT TESTED",
+      "evidence": "Earlier PhaseVII exact-source restored application remains historical",
+      "environment": "HISTORICAL ONLY",
+      "limitations": "Current code/images not accepted as a fresh full stack"
+    },
+    {
+      "gate": "PITR and object consistency",
+      "status": "NOT TESTED",
+      "evidence": "Prior component WAL evidence not promoted",
+      "environment": "HISTORICAL ONLY",
+      "limitations": "Full object-aware/off-host objectives uncertified"
+    },
+    {
+      "gate": "Deletion credentials/reconciliation",
+      "status": "PARTIAL",
+      "evidence": "Ownership protocol retained;uncertain intents remain fail-closed",
+      "environment": "RETAINED NATIVE / SOURCE",
+      "limitations": "Scoped identity and authorized provider reconciliation incomplete"
+    },
+    {
+      "gate": "Observability",
+      "status": "PARTIAL",
+      "evidence": "Read-only source/drift/journal outputs;existing loopback observer CI checks",
+      "environment": "SOURCE / CI",
+      "limitations": "No complete new migration alert delivery pipeline"
+    },
+    {
+      "gate": "Main protection",
+      "status": "FAIL",
+      "evidence": "protected=false,rulesets=[],credential admin=false",
+      "environment": "GITHUB API READ ONLY",
+      "limitations": "Administrator action/acceptance required"
+    },
+    {
+      "gate": "Independent review",
+      "status": "BLOCKED",
+      "evidence": "Draft successor prepared;no independent approval self-certified",
+      "environment": "EXTERNAL CONTROL",
+      "limitations": "Human reviewer required"
+    },
+    {
+      "gate": "Current-production recovery evidence",
+      "status": "BLOCKED",
+      "evidence": "Synthetic proof does not attest current customer backup/replica",
+      "environment": "EXTERNAL OPERATOR CONTROL",
+      "limitations": "Separately controlled live evidence required"
+    },
+    {
+      "gate": "Production authorization",
+      "status": "BLOCKED",
+      "evidence": "No deployment/automation/controller install/migration/write grant authorized",
+      "environment": "USER BOUNDARY",
+      "limitations": "Must remain unexecuted"
+    }
+  ],
+  "counts": {
+    "PASS": 21,
+    "PARTIAL": 15,
+    "NOT TESTED": 4,
+    "FAIL": 1,
+    "BLOCKED": 3
+  }
+}

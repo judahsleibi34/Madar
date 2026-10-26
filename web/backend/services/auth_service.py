@@ -27,6 +27,7 @@ from services.identity_service import canonical_auth_email, normalize_email
 from services.api_errors import api_error, error_detail
 from services.observability_service import traced_operation
 from services.request_security import (
+    _cookie_secure,
     create_csrf_token,
     delete_csrf_cookie,
     set_csrf_cookie,
@@ -133,10 +134,7 @@ SESSION_INACTIVITY_TIMEOUT_SECONDS = int(
     os.getenv("SESSION_INACTIVITY_TIMEOUT_SECONDS", "0")
 )
 
-COOKIE_SECURE = os.getenv(
-    "COOKIE_SECURE",
-    "true" if IS_PRODUCTION else "false",
-).lower() == "true"
+COOKIE_SECURE = _cookie_secure()
 
 COOKIE_SAMESITE = os.getenv("COOKIE_SAMESITE", "lax").strip().lower()
 

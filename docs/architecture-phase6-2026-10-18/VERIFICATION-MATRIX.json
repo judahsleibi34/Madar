@@ -1,0 +1,212 @@
+{
+  "scope": "frozen code candidate36bb910fa028d380a0fb130bb8beeb1b0990bd2d;sanitized synthetic evidence",
+  "assessment": "READY FOR CODE REVIEW;NOT READY for production",
+  "production_authorized": false,
+  "gates": [
+    {
+      "gate": "Git identity",
+      "status": "PASS",
+      "evidence": "Every published new author AND committer resolves to Saliba-codes;local requested noreply."
+    },
+    {
+      "gate": "Source ancestry",
+      "status": "PASS",
+      "evidence": "Dedicated branch preserves exact214 and corrected212\u2192213\u2192214 history;no main merge."
+    },
+    {
+      "gate": "Historical migrations",
+      "status": "PASS",
+      "evidence": "001\u2013149 and active146 descriptor unchanged;150 mirrored SHA256 pinned in04."
+    },
+    {
+      "gate": "Migration150 SQL",
+      "status": "PASS",
+      "evidence": "38native ownership/upgrade cases;exact149 origin,atomic commit/rollback,actual grants."
+    },
+    {
+      "gate": "Original stale-owner defects",
+      "status": "PASS",
+      "evidence": "Exact149baseline3FAIL/2PASS;150stale failure/finalization/step successor invariants pass."
+    },
+    {
+      "gate": "Request/step ownership",
+      "status": "PASS",
+      "evidence": "Original owner/generation/attempt/live DB-clock lease;independent lock/concurrency/crash tests."
+    },
+    {
+      "gate": "Cancellation/finalization",
+      "status": "PASS",
+      "evidence": "Atomic eligibility/original freeze;authoritative exact ten-step graph;cross-request denial."
+    },
+    {
+      "gate": "External effect contract",
+      "status": "PARTIAL",
+      "evidence": "Durable canonical intent/confirmation and manual uncertainty;no exactly-once or real integration-revocation claim."
+    },
+    {
+      "gate": "Legacy backlog compatibility",
+      "status": "PASS",
+      "evidence": "Old source2FAIL/1PASS\u21923PASS;all pre150nonterminal legacy requests block;no reset or SQLrewrite."
+    },
+    {
+      "gate": "Worker compatibility",
+      "status": "PASS",
+      "evidence": "Delivery2/outbox2/deletion2;149deletion blocked;each poll;READ_ONLY nonconsuming;actual consuming150restart."
+    },
+    {
+      "gate": "Native146\u2192150 transitions",
+      "status": "PASS",
+      "evidence": "Captured ordered147/148/149/150 SQL;239hosted native executions including retained commercial and150business regressions."
+    },
+    {
+      "gate": "Intermediate operational states",
+      "status": "PARTIAL",
+      "evidence": "Source contracts reject unsafe activation;real privileged coordinated operation not executed."
+    },
+    {
+      "gate": "Protected release admission",
+      "status": "BLOCKED",
+      "evidence": "Version7candidate remains deliberately UNREGISTERED;concrete adapter/coordinator integration unfinished."
+    },
+    {
+      "gate": "Provider lifecycle",
+      "status": "PARTIAL",
+      "evidence": "Durable ordering model plus actual staging role/session/service fences;no completed protected production adapter."
+    },
+    {
+      "gate": "Boot/controller installation",
+      "status": "BLOCKED",
+      "evidence": "No full isolated root-owned systemd/install/reboot/authority/proxy handoff acceptance."
+    },
+    {
+      "gate": "Source/image integrity",
+      "status": "PASS",
+      "evidence": "Exact36bb910f independent appCI/authenticated artifact12136249264 and native runtime hashes;no overlay/relabel."
+    },
+    {
+      "gate": "Full-stack candidate",
+      "status": "PASS",
+      "evidence": "Exact36bb910f fresh images accepted311.759s at150/2/2/2 on already independently restored database."
+    },
+    {
+      "gate": "Auth/MFA",
+      "status": "PASS",
+      "evidence": "Native login/rejection,restricted AAL1\u2192AAL2,TOTP,refresh,original restored identity and private provider probes."
+    },
+    {
+      "gate": "Storage",
+      "status": "PASS",
+      "evidence": "Original metadata/object bytes and private denial;actual object deletion;bounded absence-verifier adversarial tests."
+    },
+    {
+      "gate": "Notifications",
+      "status": "PASS",
+      "evidence": "Delivery/outbox native ownership regressions and real enqueue/resolve/deliver/replay worker acceptance."
+    },
+    {
+      "gate": "Deletion workflow",
+      "status": "PASS",
+      "evidence": "Actual user+tenant ten-step completion;two effects each;foreign tenant/object preserved;consuming worker restart."
+    },
+    {
+      "gate": "Selected tenant isolation",
+      "status": "PARTIAL",
+      "evidence": "Native deletion/business/resource denial and runtime foreign preservation;global broad service role remains residual."
+    },
+    {
+      "gate": "Reservations/stock/order/payment",
+      "status": "PASS",
+      "evidence": "Native retained assertions rerun at150;synthetic gateway replay only,no live financial effects."
+    },
+    {
+      "gate": "Calendar integrity",
+      "status": "PARTIAL",
+      "evidence": "Retained atomic-version and authorization/query tests;full recurrence atomicity not established."
+    },
+    {
+      "gate": "Independent application restore",
+      "status": "PASS",
+      "evidence": "Fresh role-free independent cluster150,original roles/ACL/Auth/MFA/Storage+runtime workers;394.893s at8e17."
+    },
+    {
+      "gate": "Backup negative cases",
+      "status": "PASS",
+      "evidence": "Missing roles and truncated custom archive reject;single-transaction rollback leaves zero domain tables;owned PGremoved."
+    },
+    {
+      "gate": "Provider/database restart fences",
+      "status": "PASS",
+      "evidence": "Owned source GoTrue restart denied by NOLOGIN;PGrestart preserved roles/schema/roots;not systemd proof."
+    },
+    {
+      "gate": "Full application PITR/object consistency",
+      "status": "NOT TESTED",
+      "evidence": "No new150WAL recovery-point/object-consistency acceptance;historical component evidence distinct."
+    },
+    {
+      "gate": "Off-host/RPO/RTO",
+      "status": "NOT TESTED",
+      "evidence": "Same-VM synthetic drills only;durations do not certify recovery objectives."
+    },
+    {
+      "gate": "Current backup/replica",
+      "status": "BLOCKED",
+      "evidence": "Synthetic tests do not satisfy protected current-production-data/receiver acceptance."
+    },
+    {
+      "gate": "Complete product browser E2E",
+      "status": "PARTIAL",
+      "evidence": "Selected auth/MFA/admin/mobile checks;not full forms/builder/assets/ecommerce workflows."
+    },
+    {
+      "gate": "Cross-process cache",
+      "status": "NOT TESTED",
+      "evidence": "No new multi-process catalog invalidation acceptance in this phase."
+    },
+    {
+      "gate": "Alerts/observability",
+      "status": "PARTIAL",
+      "evidence": "Ownership/protocol/worker signals and4observer checks;no new complete durable alert delivery/clear pipeline."
+    },
+    {
+      "gate": "Performance",
+      "status": "NOT TESTED",
+      "evidence": "No representative before/after business benchmark or general speedup claim;only acceptance/drill durations."
+    },
+    {
+      "gate": "Frozen candidate CI",
+      "status": "PASS",
+      "evidence": "Backend3183PASS829SKIP;native239PASS;frontend1713PASS1SKIP;fresh artifact workflowPASS."
+    },
+    {
+      "gate": "Privileged inventory baseline",
+      "status": "FAIL",
+      "evidence": "Same11unclassified paths reproduced at exact214;not hidden or changed to force green."
+    },
+    {
+      "gate": "Main protection",
+      "status": "FAIL",
+      "evidence": "Fresh inspection protected=false,rulesets=[];credential has no administrator right."
+    },
+    {
+      "gate": "Independent human review",
+      "status": "BLOCKED",
+      "evidence": "Automated review is not independent human approval."
+    },
+    {
+      "gate": "Production authorization",
+      "status": "BLOCKED",
+      "evidence": "Not issued;no readiness report or staging journal can issue authority."
+    },
+    {
+      "gate": "Explicit source recovery/replay",
+      "status": "PASS",
+      "evidence": "Original role/service preimages and preservation checkpoint restored;positive consuming probes;repeat completed resume rejected with both project container state unchanged."
+    },
+    {
+      "gate": "Production safety",
+      "status": "PASS",
+      "evidence": "Only bounded schema146/timer read-only inspection;no production mutation/main merge."
+    }
+  ]
+}

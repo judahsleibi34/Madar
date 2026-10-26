@@ -22,6 +22,8 @@ import subprocess
 import tempfile
 import time
 import urllib.request
+import tarfile
+import base64
 from urllib.parse import quote, urlsplit
 
 BACKUP_ID = re.compile(r"madar-[0-9]{8}T[0-9]{6}Z\Z")
@@ -145,12 +147,209 @@ def verify(root: Path, *, dump: bool = True) -> dict:
                 raise BackupError('provider_object_inventory_mismatch')
         elif (root / 'provider').exists():
             raise BackupError('undeclared_provider_objects')
+        maintenance = manifest.get('maintenance_backup')
+        if maintenance is not None:
+            if maintenance != 'maintenance/manifest.json' or recovery.get('provider_objects_required') is not False:
+                raise BackupError('maintenance_backup_contract_invalid')
+            verify_maintenance(root)
+        elif (root / 'maintenance').exists():
+            raise BackupError('undeclared_maintenance_backup')
     if dump:
         result = subprocess.run(['pg_restore', '--list', str(root / 'database.dump')],
                                 capture_output=True, timeout=180)
         if result.returncode:
             raise BackupError('database_dump_unreadable')
     return manifest
+
+
+def verify_maintenance(root: Path, *, expected_sha256: str | None = None) -> dict:
+    """Verify maintenance recovery material, never authorize its use.
+
+    A protected consumer must independently pin the inner manifest digest. The
+    ordinary sender, receiver and isolated restore share this byte contract.
+    No saved SQL is executed and no original host path is opened here.
+    """
+    directory = root/'maintenance'
+    real_path(directory)
+    path = directory/'manifest.json'
+    descriptor=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+    with os.fdopen(descriptor,'rb') as source:
+        metadata=os.fstat(source.fileno())
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_size>256*1024:
+            raise BackupError('maintenance_manifest_changed')
+        body=source.read(256*1024+1)
+    # Hash and parse the same bounded descriptor capture. Published backups may
+    # be runtime-owned; checking a pathname and reopening it is not custody.
+    if len(body)>256*1024 or expected_sha256 is not None and hashlib.sha256(body).hexdigest()!=expected_sha256:
+        raise BackupError('maintenance_manifest_changed')
+    value = json.loads(body)
+    keys = {'version','binding','stage','schema','bootstrap_role','roles_sha256','roles_snapshot_sha256',
+            'objects_sha256','objects_measurement','database_fingerprint','recovery','authority_issued'}
+    if (not isinstance(value,dict) or set(value)!=keys or type(value['version']) is not int or value['version']!=1
+            or value['authority_issued'] is not False or value['stage'] not in {'pre-migration','post-migration'}
+            or type(value['schema']) is not int or value['schema']<=0
+            or not re.fullmatch('[a-zA-Z_][a-zA-Z0-9_]*',str(value['bootstrap_role']))
+            or any(not re.fullmatch('[0-9a-f]{64}',str(value[k])) for k in
+                   ('roles_sha256','roles_snapshot_sha256','objects_sha256','database_fingerprint'))):
+        raise BackupError('maintenance_manifest_invalid')
+    binding=value['binding']
+    if (not isinstance(binding,dict) or set(binding)!={'operation','context_sha256','source_sha','controller_sha',
+            'inventory_sha256','system_identifier','source_schema','target_schema'}
+            or not isinstance(binding['operation'],str) or not re.fullmatch('[a-z0-9-]{1,160}',binding['operation'])
+            or any(not re.fullmatch('[0-9a-f]{64}',str(binding[k])) for k in ('context_sha256','inventory_sha256'))
+            or any(not re.fullmatch('[0-9a-f]{40}',str(binding[k])) for k in ('source_sha','controller_sha'))
+            or not re.fullmatch('[1-9][0-9]{0,19}',str(binding['system_identifier']))
+            or any(type(binding[k]) is not int or binding[k]<=0 for k in ('source_schema','target_schema'))
+            or binding['source_schema']>=binding['target_schema']
+            or value['schema']!=binding['source_schema' if value['stage']=='pre-migration' else 'target_schema']):
+        raise BackupError('maintenance_binding_invalid')
+    recovery=value['recovery']
+    if (not isinstance(recovery,dict) or set(recovery)!={'origin_source_sha','origin_images','candidate_images',
+            'database_image','migration_manifest_sha256','controller_tree_sha256','configuration_sha256','configuration_escrow_required'}
+            or recovery['configuration_escrow_required'] is not True
+            or not re.fullmatch('[0-9a-f]{40}',str(recovery['origin_source_sha']))
+            or any(not re.fullmatch('[0-9a-f]{64}',str(recovery[k])) for k in ('migration_manifest_sha256','controller_tree_sha256'))
+            or not re.fullmatch('sha256:[0-9a-f]{64}',str(recovery['database_image']))
+            or not isinstance(recovery['configuration_sha256'],dict) or not recovery['configuration_sha256']
+            or len(recovery['configuration_sha256'])>64
+            or any(not isinstance(k,str) or not re.fullmatch('[0-9a-f]{64}',str(v)) for k,v in recovery['configuration_sha256'].items())):
+        raise BackupError('maintenance_recovery_context_invalid')
+    for key in ('origin_images','candidate_images'):
+        images=recovery[key]
+        if (not isinstance(images,dict) or set(images)!={'backend','frontend'}
+                or any(not re.fullmatch('sha256:[0-9a-f]{64}',str(v)) for v in images.values())):
+            raise BackupError('maintenance_recovery_images_invalid')
+    expected={'manifest.json','roles.sql','roles-snapshot.json','objects.tar.gz'}
+    if {p.name for p in directory.iterdir()}!=expected:
+        raise BackupError('maintenance_inventory_invalid')
+    for name,key,limit in (('roles.sql','roles_sha256',4*1024**2),
+                           ('roles-snapshot.json','roles_snapshot_sha256',4*1024**2),
+                           ('objects.tar.gz','objects_sha256',2*1024**3)):
+        target=directory/name
+        if (target.is_symlink() or not target.is_file() or not 0<target.stat().st_size<=limit
+                or digest(target)!=value[key]):
+            raise BackupError('maintenance_member_changed')
+    snapshot=json.loads((directory/'roles-snapshot.json').read_bytes())
+    if not isinstance(snapshot,dict) or set(snapshot)!={'roles','memberships','settings'}:
+        raise BackupError('maintenance_roles_snapshot_invalid')
+    saved=(directory/'roles.sql').read_text()
+    create='CREATE ROLE '+value['bootstrap_role']+';'
+    if (saved.splitlines().count(create)!=1 or not re.search(
+            '^ALTER ROLE '+re.escape(value['bootstrap_role'])+r' WITH SUPERUSER\b',saved,re.M)):
+        raise BackupError('maintenance_bootstrap_invalid')
+    measurement=value['objects_measurement']
+    allowed={'provider_storage','builder_assets','private_uploads','generated_artifacts','avatars','datasets'}
+    if (not isinstance(measurement,dict) or set(measurement)!={'version','phase','roots'}
+            or measurement['version']!=1 or measurement['phase']!='fenced'
+            or not isinstance(measurement['roots'],dict)
+            or not allowed-{'datasets'} <= set(measurement['roots'])-{'database'} <= allowed):
+        raise BackupError('maintenance_object_measurement_invalid')
+    records={name:[] for name in measurement['roots'] if name!='database'}; seen=set(); total=0
+    with tarfile.open(directory/'objects.tar.gz',mode='r|gz') as archive:
+        for index,member in enumerate(archive):
+            parts=PurePosixPath(member.name).parts
+            if (index>=131072 or not parts or parts[0] not in records
+                    or member.name!=PurePosixPath(member.name).as_posix() or '..' in parts
+                    or member.name in seen or member.sparse or not (member.isfile() or member.isdir())
+                    or member.size<0 or member.size>128*1024**2):
+                raise BackupError('maintenance_object_archive_invalid')
+            seen.add(member.name);total+=member.size
+            if total>1536*1024**2:raise BackupError('maintenance_object_archive_limit')
+            attributes=json.loads(member.pax_headers.get('madar.xattrs.base64','{}'))
+            if not isinstance(attributes,dict) or len(json.dumps(attributes))>65536:
+                raise BackupError('maintenance_object_xattr_invalid')
+            for name,raw in attributes.items():
+                if not isinstance(name,str) or '\0' in name or not isinstance(raw,str):
+                    raise BackupError('maintenance_object_xattr_invalid')
+                try:base64.b64decode(raw,validate=True)
+                except ValueError:raise BackupError('maintenance_object_xattr_invalid') from None
+            if len(parts)==1:
+                identity=measurement['roots'][parts[0]]['identity']
+                if not member.isdir() or (member.mode,member.uid,member.gid)!=(identity['mode'],identity['uid'],identity['gid']):
+                    raise BackupError('maintenance_object_root_metadata_changed')
+                continue
+            relative='/'.join(parts[1:]); row=[relative,'directory' if member.isdir() else 'file',member.mode,member.uid,member.gid]
+            if member.isfile():
+                with archive.extractfile(member) as stream: checksum=hashlib.file_digest(stream,'sha256').hexdigest()
+                row.extend([member.size,checksum])
+            records[parts[0]].append(row)
+    for name,rows in records.items():
+        rows.sort(key=lambda row:tuple(PurePosixPath(row[0]).parts))
+        checksum=hashlib.sha256(json.dumps(rows,sort_keys=True,separators=(',',':'),ensure_ascii=True).encode()).hexdigest()
+        content=measurement['roots'][name]['content']
+        actual={'sha256':checksum,'entries':len(rows),'files':sum(r[1]=='file' for r in rows),
+                'bytes':sum(r[5] for r in rows if r[1]=='file')}
+        if actual!=content:raise BackupError('maintenance_object_capture_mismatch')
+    return value
+
+
+ROLE_SNAPSHOT_SQL = """SELECT json_build_object(
+ 'roles',(SELECT coalesce(json_object_agg(rolname,to_jsonb(r)-'oid'),'{}'::json) FROM pg_authid r),
+ 'memberships',(SELECT coalesce(json_agg(json_build_object('role',roleid::regrole::text,
+ 'member',member::regrole::text,'grantor',grantor::regrole::text,'admin_option',admin_option,
+ 'inherit_option',inherit_option,'set_option',set_option) ORDER BY roleid::regrole::text,member::regrole::text),'[]'::json)
+ FROM pg_auth_members),
+ 'settings',(SELECT coalesce(json_agg(json_build_object('role',setrole::regrole::text,
+ 'database',coalesce(d.datname,''),'settings',setconfig) ORDER BY setrole::regrole::text,coalesce(d.datname,'')),
+ '[]'::json) FROM pg_db_role_setting s LEFT JOIN pg_database d ON d.oid=s.setdatabase));"""
+
+
+def database_snapshot(query) -> list:
+    """Measure data, sequences and role-based ownership/ACLs, with no raw rows.
+
+    query is a fixed code-owned read-only transport, never serialized evidence.
+    Callers must retain quiescence; bounded server timeouts fail on large data
+    instead of claiming a partial recovery. Restore cluster OIDs may differ.
+    """
+    rows=json.loads(query("SELECT coalesce(json_agg(json_build_object('schema',n.nspname,'name',c.relname,"
+        "'kind',c.relkind) ORDER BY n.nspname,c.relname),'[]'::json) FROM pg_class c JOIN pg_namespace n "
+        "ON n.oid=c.relnamespace WHERE n.nspname IN ('public','auth','storage') AND c.relkind IN ('r','p','S');"))
+    if not isinstance(rows,list) or not 0<len(rows)<=4096:raise BackupError('maintenance_relation_inventory_invalid')
+    def identifier(value):
+        if not isinstance(value,str) or not value or len(value.encode())>63 or '\0' in value:
+            raise BackupError('maintenance_relation_inventory_invalid')
+        return '"'+value.replace('"','""')+'"'
+    statements=[]
+    for row in rows:
+        table=identifier(row['schema'])+'.'+identifier(row['name'])
+        name=json.dumps([row['schema'],row['name']],separators=(',',':')).replace("'","''")
+        if row['kind']=='S':
+            statements.append("SELECT json_build_array('"+name+"',last_value,is_called)::text FROM "+table+';')
+        else:
+            statements.append("SELECT json_build_array('"+name+"',count(*),encode(sha256(convert_to(coalesce("
+                "string_agg(h,'' ORDER BY h COLLATE \"C\"),''),'UTF8')),'hex'))::text FROM "
+                "(SELECT encode(sha256(convert_to(to_jsonb(t)::text,'UTF8')),'hex') h FROM "+table+' t) rows;')
+    statements.append("SELECT json_build_object('database',(SELECT json_build_array(datname,datdba::regrole::text,datacl) "
+        "FROM pg_database WHERE datname=current_database()),'relations',(SELECT json_agg(json_build_array(n.nspname,"
+        "c.relname,c.relkind,c.relowner::regrole::text,c.relacl,c.relrowsecurity,c.relforcerowsecurity) "
+        "ORDER BY n.nspname,c.relname) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
+        "WHERE n.nspname IN ('public','auth','storage')),'schemas',(SELECT json_agg(json_build_array(nspname,"
+        "nspowner::regrole::text,nspacl) ORDER BY nspname) FROM pg_namespace WHERE nspname IN ('public','auth','storage')),"
+        "'functions',(SELECT json_agg(json_build_array(n.nspname,p.proname,pg_get_function_identity_arguments(p.oid),"
+        "p.proowner::regrole::text,p.proacl,p.prosecdef,p.proconfig,pg_get_functiondef(p.oid)) ORDER BY "
+        "n.nspname,p.proname,pg_get_function_identity_arguments(p.oid)) FROM pg_proc p JOIN pg_namespace n "
+        "ON n.oid=p.pronamespace WHERE n.nspname IN ('public','auth','storage') AND p.prokind IN ('f','p')))::text;")
+    raw=query('\n'.join(statements))
+    packet=[json.loads(line) for line in raw.splitlines() if line.strip()]
+    if len(packet)!=len(rows)+1:raise BackupError('maintenance_database_fingerprint_incomplete')
+    # pg_restore may emit semantically identical ACL items in a different array
+    # order. Keep every privilege/grantee/grantor token (including duplicates),
+    # and distinguish NULL/default ACLs from an explicitly empty ACL.
+    metadata=packet[-1]
+    grants=[(metadata['database'],2)]
+    for key,index in (('relations',4),('schemas',2),('functions',4)):
+        grants.extend((row,index) for row in metadata[key] or [])
+    for row,index in grants:
+        if row[index] is not None:
+            if not isinstance(row[index],list) or any(not isinstance(item,str) for item in row[index]):
+                raise BackupError('maintenance_acl_snapshot_invalid')
+            row[index]=sorted(row[index])
+    return packet
+
+
+def database_fingerprint(query) -> str:
+    packet=database_snapshot(query)
+    return hashlib.sha256(json.dumps(packet,sort_keys=True,separators=(',',':'),ensure_ascii=True).encode()).hexdigest()
 
 
 def verify_coordinated_checkpoint(root: Path) -> None:
@@ -527,6 +726,10 @@ def main() -> int:
         if args.operation == 'scheduled':
             scheduled(args.path)
         elif args.operation == 'verify':
+            if args.extra is not None:
+                if not re.fullmatch('[0-9a-f]{64}',args.extra):
+                    raise BackupError('maintenance_expected_digest_invalid')
+                verify_maintenance(args.path,expected_sha256=args.extra)
             verify(args.path)
         elif args.operation == 'inventory':
             inventory(args.path)

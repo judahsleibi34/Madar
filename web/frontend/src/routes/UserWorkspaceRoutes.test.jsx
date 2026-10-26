@@ -61,6 +61,9 @@ vi.mock("../components/PageBuilder", () => ({
 vi.mock("../components/DataProjects/DataProjectsPage", () => ({
   default: () => <div>Data projects page</div>,
 }));
+vi.mock("../components/BusinessIntelligence/BusinessIntelligenceWorkspace", () => ({
+  default: ({ projectId }) => <div>Business Intelligence for {projectId}</div>,
+}));
 vi.mock("../components/ELearning/ELearningWorkspace", async () => {
   const { useLocation } = await import("react-router-dom");
   return {
@@ -231,6 +234,29 @@ describe("workspace settings routes", () => {
     expect(screen.getByText("Source registry and synchronization enabled")).toBeTruthy();
     expect(screen.queryByText("Data Logs five-step workflow")).toBeNull();
     expect(screen.queryByText("Explicit project editor")).toBeNull();
+  });
+
+  it("requires project selection before opening Business Intelligence", async () => {
+    render(
+      <MemoryRouter initialEntries={["/business-intelligence"]}>
+        <UserWorkspaceRoutes {...routeProps} />
+      </MemoryRouter>
+    );
+    expect(await screen.findByText("Project chooser")).toBeTruthy();
+    expect(screen.queryByText(/Business Intelligence for/)).toBeNull();
+  });
+
+  it("opens Business Intelligence only for the explicitly confirmed project", async () => {
+    render(
+      <MemoryRouter initialEntries={[{
+        pathname: "/business-intelligence/projects/project-7/data",
+        state: { dataProjectConfirmed: true },
+      }]}>
+        <UserWorkspaceRoutes {...routeProps} />
+      </MemoryRouter>
+    );
+    expect(await screen.findByText("Business Intelligence for project-7")).toBeTruthy();
+    expect(screen.queryByText("Project chooser")).toBeNull();
   });
 
   it("remounts the calendar before rendering after the authenticated tenant changes", async () => {

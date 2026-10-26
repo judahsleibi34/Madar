@@ -143,6 +143,63 @@ class AutomaticSourceSyncTests(unittest.TestCase):
             ["attach_source_sync_ingestion156", "complete_source_sync156"],
         )
 
+    def test_unchanged_snapshot_settles_without_upload_revision_or_checkpoint(self):
+        database = Database()
+        database.responses["complete_source_sync156"] = [{"id": SCHEDULE, "status": "idle"}]
+        credential = {
+            "credential_id": "99999999-9999-4999-8999-999999999999",
+            "credential_version": 2, "source_revision": 4,
+        }
+
+        async def process(**options):
+            persisted = options["noop_persister"]("snapshot:unchanged", credential)
+            return {**persisted, "provider": {"next_cursor": "snapshot:unchanged",
+                                               "no_changes": True}}
+
+        with (
+            patch.object(service.project_source_ingestion_service, "reserve_ingestion", return_value={
+                "disposition": "reserved", "ingestion_run_id": RUN,
+                "lease_token": RUN_LEASE, "source_resource_id": RESOURCE,
+                "expected_cursor": "snapshot:old", "shared_immutable_storage": True,
+            }),
+            patch.object(service.project_source_ingestion_service, "complete_noop_ingestion",
+                         return_value={"persistent_dataset_id": "dataset-1",
+                                       "committed_revision": 3, "no_changes": True}) as complete,
+            patch.object(service.project_api_ingestion_service, "process_api_source", side_effect=process),
+            patch.object(service.project_dataset_checkpoint_service,
+                         "enqueue_dataset_checkpoint") as checkpoint,
+        ):
+            result = asyncio.run(service.execute_claim(claim(), client=database))
+        self.assertEqual(result["outcome"], "succeeded")
+        self.assertTrue(result["no_changes"])
+        self.assertEqual(result["committed_revision"], 3)
+        self.assertEqual(complete.call_args.kwargs["next_cursor"], "snapshot:unchanged")
+        self.assertEqual(complete.call_args.kwargs["credential_reference"], credential)
+        checkpoint.assert_not_called()
+
+    def test_unchanged_snapshot_uses_reconciled_google_sheets_rpc(self):
+        database = Database()
+        database.responses["complete_noop_source_ingestion161"] = [{
+            "dataset_id": "88888888-8888-4888-8888-888888888888",
+            "source_resource_id": RESOURCE,
+            "committed_revision": 3,
+            "ingestion_run_id": RUN,
+            "ingestion_status": "succeeded",
+        }]
+        result = service.project_source_ingestion_service.complete_noop_ingestion(
+            tenant_id=1, project_id=PROJECT, source_id=SOURCE, user_id=7,
+            ingestion_run_id=RUN, lease_token=RUN_LEASE,
+            next_cursor="snapshot:unchanged",
+            credential_reference={
+                "credential_id": "99999999-9999-4999-8999-999999999999",
+                "credential_version": 2, "source_revision": 4,
+            },
+            client=database,
+        )
+        self.assertEqual(database.calls[-1][0], "complete_noop_source_ingestion161")
+        self.assertEqual(result["committed_revision"], 3)
+        self.assertTrue(result["no_changes"])
+
     def test_checkpoint_failure_does_not_undo_durable_ingestion(self):
         database = Database()
         database.responses["complete_source_sync156"] = [{"id": SCHEDULE}]

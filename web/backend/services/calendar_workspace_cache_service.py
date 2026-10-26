@@ -43,7 +43,7 @@ class _CacheEntry:
 
 _cache: OrderedDict[str, _CacheEntry] = OrderedDict()
 _cache_lock = threading.RLock()
-_tenant_generations: dict[int, int] = {}
+_inflight: dict[int, set[object]] = {}
 
 
 def calendar_workspace_cache_key(
@@ -67,11 +67,13 @@ def calendar_workspace_cache_key(
     return f"{int(tenant_id)}:workspace:{parts}"
 
 
-def read_calendar_workspace_cache(key: str) -> Any | None:
+def read_calendar_workspace_cache(key: str, tenant_id: int | None = None) -> Any | None:
     current_time = time.monotonic()
     with _cache_lock:
         entry = _cache.get(key)
         if entry is None:
+            return None
+        if tenant_id is not None and entry.tenant_id != int(tenant_id):
             return None
         if entry.expires_at <= current_time:
             _cache.pop(key, None)
@@ -110,23 +112,31 @@ def get_or_create_calendar_workspace(
     tenant_id: int,
     factory: Callable[[], Any],
 ) -> tuple[Any, bool]:
-    cached = read_calendar_workspace_cache(key)
-    if cached is not None:
-        return cached, True
     target_tenant = int(tenant_id)
+    token = object()
     with _cache_lock:
-        generation = _tenant_generations.get(target_tenant, 0)
-    created = factory()
-    with _cache_lock:
-        if _tenant_generations.get(target_tenant, 0) == generation:
-            write_calendar_workspace_cache(key, target_tenant, created)
-    return created, False
+        cached = read_calendar_workspace_cache(key, target_tenant)
+        if cached is not None:
+            return cached, True
+        fills = _inflight.setdefault(target_tenant, set())
+        fills.add(token)
+    try:
+        created = factory()
+        with _cache_lock:
+            if _inflight.get(target_tenant) is fills:
+                write_calendar_workspace_cache(key, target_tenant, created)
+        return created, False
+    finally:
+        with _cache_lock:
+            fills.discard(token)
+            if not fills and _inflight.get(target_tenant) is fills:
+                _inflight.pop(target_tenant, None)
 
 
 def invalidate_calendar_workspace_cache(tenant_id: int) -> int:
     target = int(tenant_id)
     with _cache_lock:
-        _tenant_generations[target] = _tenant_generations.get(target, 0) + 1
+        _inflight.pop(target, None)
         keys = [key for key, entry in _cache.items() if entry.tenant_id == target]
         for key in keys:
             _cache.pop(key, None)
@@ -136,7 +146,7 @@ def invalidate_calendar_workspace_cache(tenant_id: int) -> int:
 def clear_calendar_workspace_cache() -> None:
     with _cache_lock:
         _cache.clear()
-        _tenant_generations.clear()
+        _inflight.clear()
 
 
 def calendar_workspace_cache_size() -> int:

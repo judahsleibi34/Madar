@@ -118,7 +118,7 @@ class NotificationPreferenceTests(unittest.TestCase):
             # eligible for a later claim. Only the freshly resolved row enters
             # the worker after re-enable.
             claim=lambda **_kwargs: claimed.append("claimed") or [
-                {"id": "new-future-delivery", "channel": "web_push", "attempts": 1}
+                {"id": "new-future-delivery", "channel": "web_push", "claim_generation": 1, "attempts": 1}
             ],
             deliver=lambda row: self.assertEqual(row["id"], "new-future-delivery"),
             finish=lambda delivery_id, **kwargs: finished.append((delivery_id, kwargs)) or {"status": "sent"},

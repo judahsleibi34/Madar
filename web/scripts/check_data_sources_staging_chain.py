@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed audit of the unselected schema146 -> schema156 staging path."""
+"""Fail-closed audit of the unselected schema146 -> schema164 staging path."""
 
 from __future__ import annotations
 
@@ -22,6 +22,14 @@ EXPECTED = (
     (153, 154, "migrations-153-154-shared-immutable-storage.json"),
     (154, 155, "migrations-154-155-credential-vault.json"),
     (155, 156, "migrations-155-156-automatic-source-sync.json"),
+    (156, 157, "migrations-157-160-reconciled.json"),
+    (157, 158, "migrations-157-160-reconciled.json"),
+    (158, 159, "migrations-157-160-reconciled.json"),
+    (159, 160, "migrations-157-160-reconciled.json"),
+    (160, 161, "migrations-160-161-google-sheets.json"),
+    (161, 162, "migrations-161-162-webhooks.json"),
+    (162, 163, "migrations-162-163-bi-dashboards.json"),
+    (163, 164, "migrations-163-164-automated-reporting.json"),
 )
 
 
@@ -52,6 +60,10 @@ def validate() -> dict:
         "shared_immutable_storage_candidate.py",
         "credential_vault_candidate.py",
         "automatic_source_sync_candidate.py",
+        "google_sheets_candidate.py",
+        "webhook_candidate.py",
+        "bi_dashboard_candidate.py",
+        "automated_reporting_candidate.py",
     )
     for filename in validators:
         _load_validator(filename).validated_entries(ROOT)
@@ -78,7 +90,7 @@ def validate() -> dict:
         raise RuntimeError("excluded_schema142_present")
     return {
         "active_schema": 146,
-        "target_schema": 156,
+        "target_schema": 164,
         "excluded_schemas": [142],
         "transitions": [f"{source}->{target}" for source, target, _ in observed],
         "manifests": sorted(seen_manifests),

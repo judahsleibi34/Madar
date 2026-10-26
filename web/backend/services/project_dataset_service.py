@@ -15,6 +15,10 @@ DATA_PROJECT_KIND = "data"
 DATASET_STATUS_ACTIVE = "active"
 PROJECT_DATASETS_SCHEMA = 147
 SHARED_IMMUTABLE_STORAGE_SCHEMA = 154
+DATA_SOURCES_SCHEMA = 148
+INCREMENTAL_DATA_SOURCES_SCHEMA = 152
+AUTOMATIC_SYNC_SCHEMA = 156
+WEBHOOK_INGESTION_SCHEMA = 158
 
 
 def _rows(response) -> list[dict[str, Any]]:
@@ -31,7 +35,7 @@ def _safe_uuid(value: object, *, detail: str = "Data project was not found.") ->
     return normalized
 
 
-def project_datasets_available(*, client=None) -> bool:
+def schema_version(*, client=None) -> int:
     database = client or service_supabase
     result = (
         database.table("application_schema_state")
@@ -42,19 +46,17 @@ def project_datasets_available(*, client=None) -> bool:
     )
     rows = _rows(result)
     try:
-        return bool(rows and int(rows[0].get("schema_version")) >= PROJECT_DATASETS_SCHEMA)
+        return int(rows[0].get("schema_version")) if rows else 0
     except (TypeError, ValueError):
-        return False
+        return 0
+
+
+def project_datasets_available(*, client=None) -> bool:
+    return schema_version(client=client) >= PROJECT_DATASETS_SCHEMA
 
 
 def _shared_immutable_storage_available(*, client=None) -> bool:
-    database = client or service_supabase
-    rows = _rows(database.table("application_schema_state").select("schema_version")
-                 .eq("contract_key", "core").limit(1).execute())
-    try:
-        return bool(rows and int(rows[0].get("schema_version")) >= SHARED_IMMUTABLE_STORAGE_SCHEMA)
-    except (TypeError, ValueError):
-        return False
+    return schema_version(client=client) >= SHARED_IMMUTABLE_STORAGE_SCHEMA
 
 
 def _storage_fields(*, shared: bool) -> str:
@@ -230,6 +232,166 @@ def list_project_datasets(
         ],
         "pagination": {"limit": limit, "offset": offset, "has_more": has_more},
     }
+
+
+def list_project_dataset_versions(
+    *,
+    tenant_id: int,
+    project_id: str,
+    user_id: int,
+    dataset_id: str,
+    limit: int,
+    offset: int,
+    client=None,
+) -> dict:
+    database = client or service_supabase
+    require_project_datasets_schema(client=database)
+    normalized_project_id = _safe_uuid(project_id)
+    normalized_dataset_id = _safe_uuid(dataset_id, detail="Dataset was not found.")
+    require_data_project(normalized_project_id, tenant_id=int(tenant_id), client=database)
+    datasets = _rows(
+        database.table("data_datasets")
+        .select("id")
+        .eq("id", normalized_dataset_id)
+        .eq("tenant_id", int(tenant_id))
+        .eq("project_id", normalized_project_id)
+        .eq("creator_user_id", int(user_id))
+        .eq("status", DATASET_STATUS_ACTIVE)
+        .limit(1)
+        .execute()
+    )
+    if not datasets:
+        raise HTTPException(status_code=404, detail="Dataset was not found.")
+    rows = _rows(
+        database.table("data_dataset_versions")
+        .select(
+            "id,dataset_id,version_number,version_kind,original_filename,content_type,"
+            "file_extension,size_bytes,content_hash,file_metadata,provenance,created_at"
+        )
+        .eq("tenant_id", int(tenant_id))
+        .eq("dataset_id", normalized_dataset_id)
+        .order("version_number", desc=True)
+        .range(int(offset), int(offset) + int(limit))
+        .execute()
+    )
+    has_more = len(rows) > limit
+    items = []
+    for row in rows[:limit]:
+        projected = _version_projection(row) or {}
+        provenance = row.get("provenance") if isinstance(row.get("provenance"), dict) else {}
+        projected["revision"] = provenance.get("target_revision") or provenance.get("committed_revision")
+        items.append(projected)
+    return {
+        "items": items,
+        "pagination": {"limit": limit, "offset": offset, "has_more": has_more},
+    }
+
+
+def get_project_dataset_freshness(
+    *, tenant_id: int, project_id: str, user_id: int, dataset_id: str, client=None,
+) -> dict:
+    """Return a secret-free source/checkpoint projection for one authorized dataset."""
+    database = client or service_supabase
+    version = schema_version(client=database)
+    if version < DATA_SOURCES_SCHEMA:
+        return {"available": False, "reason": "source_registry_unavailable"}
+    normalized_project_id = _safe_uuid(project_id)
+    normalized_dataset_id = _safe_uuid(dataset_id, detail="Dataset was not found.")
+    require_data_project(normalized_project_id, tenant_id=int(tenant_id), client=database)
+    dataset_fields = "id,source_id,updated_at"
+    if version >= INCREMENTAL_DATA_SOURCES_SCHEMA:
+        dataset_fields += ",source_resource_id,committed_revision"
+    datasets = _rows(
+        database.table("data_datasets").select(dataset_fields)
+        .eq("id", normalized_dataset_id).eq("tenant_id", int(tenant_id))
+        .eq("project_id", normalized_project_id).eq("creator_user_id", int(user_id))
+        .eq("status", DATASET_STATUS_ACTIVE).limit(1).execute()
+    )
+    if not datasets:
+        raise HTTPException(status_code=404, detail="Dataset was not found.")
+    dataset = datasets[0]
+    source_id = dataset.get("source_id")
+    if not source_id:
+        return {"available": False, "reason": "dataset_has_no_source"}
+    sources = _rows(
+        database.table("data_sources")
+        .select(
+            "id,display_name,status,sync_state,last_ingested_at,last_successful_sync_at,"
+            "last_error_code,latest_version_id,updated_at"
+        )
+        .eq("id", source_id).eq("tenant_id", int(tenant_id))
+        .eq("project_id", normalized_project_id).eq("creator_user_id", int(user_id))
+        .limit(1).execute()
+    )
+    if not sources:
+        return {"available": False, "reason": "source_unavailable"}
+    source = sources[0]
+    result = {
+        "available": True,
+        "source": {
+            "id": source.get("id"), "display_name": source.get("display_name"),
+            "status": source.get("status"), "sync_state": source.get("sync_state"),
+            "last_ingestion_attempt": source.get("last_ingested_at"),
+            "last_successful_ingestion": source.get("last_successful_sync_at"),
+            "last_error_code": source.get("last_error_code"),
+        },
+        "latest_committed_version_id": source.get("latest_version_id"),
+        "dataset_committed_at": dataset.get("updated_at"),
+        "resource": None, "checkpoint": None, "automatic_sync": None, "webhook": None,
+    }
+    if version < INCREMENTAL_DATA_SOURCES_SCHEMA or not dataset.get("source_resource_id"):
+        return result
+    resource_id = dataset["source_resource_id"]
+    resource_fields = "id,committed_revision,latest_checkpoint_version_id,updated_at"
+    if version >= WEBHOOK_INGESTION_SCHEMA:
+        resource_fields += ",reconciliation_requested_at,reconciliation_reason"
+    resources = _rows(
+        database.table("data_source_resources").select(resource_fields)
+        .eq("id", resource_id).eq("tenant_id", int(tenant_id))
+        .eq("project_id", normalized_project_id).eq("source_id", source_id)
+        .limit(1).execute()
+    )
+    if not resources:
+        return result
+    resource = resources[0]
+    result["resource"] = {
+        "committed_revision": resource.get("committed_revision"),
+        "latest_checkpoint_version_id": resource.get("latest_checkpoint_version_id"),
+        "committed_at": resource.get("updated_at"),
+        "pending_reconciliation": bool(resource.get("reconciliation_requested_at")),
+        "reconciliation_requested_at": resource.get("reconciliation_requested_at"),
+        "reconciliation_reason": resource.get("reconciliation_reason"),
+    }
+    checkpoints = _rows(
+        database.table("data_dataset_checkpoints")
+        .select("target_revision,status,version_id,record_count,state_hash,failure_code,created_at,completed_at")
+        .eq("tenant_id", int(tenant_id)).eq("project_id", normalized_project_id)
+        .eq("dataset_id", normalized_dataset_id).eq("source_resource_id", resource_id)
+        .order("target_revision", desc=True).limit(1).execute()
+    )
+    if checkpoints:
+        result["checkpoint"] = checkpoints[0]
+    if version >= AUTOMATIC_SYNC_SCHEMA:
+        schedules = _rows(
+            database.table("data_source_sync_schedules")
+            .select("enabled,status,last_attempt_at,last_success_at,last_error_category,next_due_at,updated_at")
+            .eq("tenant_id", int(tenant_id)).eq("project_id", normalized_project_id)
+            .eq("source_id", source_id).eq("source_resource_id", resource_id)
+            .limit(1).execute()
+        )
+        if schedules:
+            result["automatic_sync"] = schedules[0]
+    if version >= WEBHOOK_INGESTION_SCHEMA:
+        endpoints = _rows(
+            database.table("data_source_webhook_endpoints")
+            .select("status,last_received_at,last_processed_at,updated_at")
+            .eq("tenant_id", int(tenant_id)).eq("project_id", normalized_project_id)
+            .eq("source_id", source_id).eq("source_resource_id", resource_id)
+            .limit(1).execute()
+        )
+        if endpoints:
+            result["webhook"] = endpoints[0]
+    return result
 
 
 def reopen_project_dataset(

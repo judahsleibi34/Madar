@@ -21,6 +21,7 @@ const routes = [
   [/^\/(?:calendar|agenda)(?:\/|$)/, () => import("../components/DashboardBuilder/ReservationCalendarPage")],
   [/^\/archive(?:\/|$)/, () => import("../components/DashboardBuilder/ArchivePage")],
   [/^\/data-projects(?:\/|$)/, () => import("../components/DataProjects/DataProjectsPage")],
+  [/^\/business-intelligence(?:\/|$)/, () => import("../components/BusinessIntelligence/BusinessIntelligenceWorkspace")],
   [/^\/(?:page-builder|data-sources|builder-data|builder-responses)(?:\/|$)/, () => import("../components/PageBuilder")],
   [/^\/admin\/users(?:\/|$)/, () => import("../components/DashboardBuilder/UserManagementPage")],
   [/^\/admin\/account-access(?:\/|$)/, () => import("../components/DashboardBuilder/AdminAccountAccessPage")],

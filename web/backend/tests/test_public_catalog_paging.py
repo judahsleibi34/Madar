@@ -172,6 +172,27 @@ class PublicCatalogPagingTests(unittest.TestCase):
     def product_reads(self, columns):
         return [read for name, read in FakeQuery.log if name == "ecommerce_products" and read == columns]
 
+    def test_invalidation_during_price_bounds_read_prevents_stale_refill(self):
+        parallel_reads = public_site_routes._run_parallel_reads
+        changed = False
+
+        def read_then_update(loaders):
+            nonlocal changed
+            result = parallel_reads(loaders)
+            if "page" in loaders and not changed:
+                changed = True
+                invalidate_ecommerce_cache(9)
+                for product in self.catalog["ecommerce_products"]:
+                    product["price"] += 100
+            return result
+
+        with patch.object(public_site_routes, "_run_parallel_reads", side_effect=read_then_update):
+            public_site_routes._catalog_payload(tenant_id=9, locale="en", limit=5)
+        fresh = public_site_routes._catalog_payload(tenant_id=9, locale="en", limit=5)
+        self.assertTrue(changed)
+        self.assertEqual(fresh["price_bounds"]["min"], "100")
+        self.assertEqual(fresh["price_bounds"]["max"], "140")
+
     def test_read_all_rows_reads_past_the_response_row_cap(self):
         for parallel in (False, True):
             rows = public_site_routes._read_all_rows(

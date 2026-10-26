@@ -1,0 +1,13 @@
+{
+  "source": "32c77afd (content validated before commit)",
+  "collected": 3755,
+  "skipped": 747,
+  "executed_pass": 3008,
+  "seconds": 47.034,
+  "failures": 0,
+  "errors": 0,
+  "external_attempts": [],
+  "external_sites": [],
+  "scope": "dedicated VM locked test image; conditional native cases separately executed",
+  "production_modified": false
+}

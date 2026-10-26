@@ -1,0 +1,17 @@
+{
+  "status": "PASS",
+  "signals": [
+    "DELIVERY_OWNERSHIP_LOST",
+    "DELIVERY_ACKNOWLEDGEMENT_FAILED",
+    "NOTIFICATION_BACKLOG_AGE"
+  ],
+  "accepted_packets": 2,
+  "post_attempts": 3,
+  "failed_delivery_retried": true,
+  "same_event_id_on_retry": true,
+  "firing_duplicates_suppressed": true,
+  "recovery_delivered_once": true,
+  "scope": "actual loopback worker/sink HTTP fixtures on staging",
+  "production_destination": false,
+  "durable_restart_delivery_tested": false
+}

@@ -331,6 +331,50 @@ def complete_incremental_ingestion(
     }
 
 
+def complete_noop_ingestion(
+    *, tenant_id: int, project_id: str, source_id: str, user_id: int,
+    ingestion_run_id: str, lease_token: str, next_cursor: str,
+    credential_reference: dict, client=None,
+) -> dict:
+    """Settle a complete unchanged snapshot without creating a dataset revision."""
+    database = client or service_supabase
+    reference = credential_reference if isinstance(credential_reference, dict) else {}
+    if not all(reference.get(key) is not None for key in (
+        "credential_id", "credential_version", "source_revision",
+    )):
+        raise HTTPException(status_code=409, detail={
+            "code": "provider_credential_revision_missing",
+            "message": "The provider credential must be re-resolved before completion.",
+        })
+    rows = _rows(database.rpc("complete_noop_source_ingestion161", {
+        "p_tenant_id": int(tenant_id),
+        "p_project_id": _safe_uuid(project_id, detail="Data project was not found."),
+        "p_source_id": _safe_uuid(source_id, detail="Data source was not found."),
+        "p_actor_user_id": int(user_id),
+        "p_ingestion_run_id": _safe_uuid(ingestion_run_id),
+        "p_lease_token": _safe_uuid(lease_token, detail="Ingestion lease was not found."),
+        "p_next_cursor": str(next_cursor),
+        "p_credential_id": _safe_uuid(
+            reference["credential_id"], detail="Provider credential was not found.",
+        ),
+        "p_credential_version": int(reference["credential_version"]),
+        "p_credential_revision": int(reference["source_revision"]),
+    }).execute())
+    if not rows:
+        raise RuntimeError("No-change ingestion was not completed")
+    record = rows[0]
+    return {
+        "persistent_dataset_id": record.get("dataset_id"),
+        "dataset_version_id": None,
+        "source_resource_id": record.get("source_resource_id"),
+        "committed_revision": int(record.get("committed_revision") or 0),
+        "ingestion_run_id": record.get("ingestion_run_id"),
+        "ingestion_status": record.get("ingestion_status") or "succeeded",
+        "no_changes": True,
+        "checkpoint_current": True,
+    }
+
+
 def complete_ingestion(
     *,
     tenant_id: int,

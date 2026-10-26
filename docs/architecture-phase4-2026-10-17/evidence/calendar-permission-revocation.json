@@ -1,0 +1,27 @@
+{
+  "status": "PASS",
+  "native_authentication": true,
+  "commercial_enforcement": true,
+  "baseline_stale_private_details_reproduced": true,
+  "candidate_private_details_denied": true,
+  "candidate_role": "availability",
+  "single_request_elapsed_ms": {
+    "baseline": 53.9,
+    "candidate": 57.527
+  },
+  "latency_samples_not_benchmark": true,
+  "scope": "phase4-calendar-cache-20261017-attempt3",
+  "baseline_source_sha": "32c77afd01a012c7d21240316d4a46e52c3cbf14",
+  "candidate_source": {
+    "base_sha": "0c2d609eb1a04bb5c6b6f12bc0b47f7bfdbbfb25",
+    "route_sha256": "e2127feb0d574e1d98e3dbf4a3decd45c6dee31ddc00234d661d8ef4e0ba9798"
+  },
+  "source_class": "source-overlay-on-previously-accepted-dependency-image",
+  "production_modified": false,
+  "elapsed_seconds": 21.968,
+  "limitations": [
+    "synthetic fixture, no production artifact acceptance",
+    "immutable synthetic commercial ledger fixtures retained privately",
+    "authoritative recomputation increases calendar read workload"
+  ]
+}

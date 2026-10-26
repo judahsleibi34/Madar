@@ -74,6 +74,14 @@ class FrontendEdgeConfigTests(unittest.TestCase):
         self.assertIn("Referer: `${devProxyRequestOrigin}/`", vite)
         self.assertEqual(vite.count("...devProxyOptions"), 3)
 
+    def test_development_proxy_refuses_remote_api_and_origin_targets(self):
+        vite = (ROOT / "frontend" / "vite.config.js").read_text(encoding="utf-8")
+        self.assertIn('command === "serve"', vite)
+        self.assertIn('requireLoopbackDevelopmentUrl(devApiTarget', vite)
+        self.assertIn('requireLoopbackDevelopmentUrl(devProxyRequestOrigin', vite)
+        self.assertIn('"localhost", "127.0.0.1", "[::1]"', vite)
+        self.assertIn("must remain loopback-only", vite)
+
     def test_compose_drops_privileges_and_keeps_dev_ports_loopback_only(self):
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
         development = (ROOT / "docker-compose.dev.yml").read_text(encoding="utf-8")

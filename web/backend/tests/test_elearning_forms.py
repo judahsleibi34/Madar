@@ -117,7 +117,7 @@ class LearningFormFilesTests(unittest.TestCase):
             store.assert_not_called()
     def test_private_upload_is_response_owned_and_duplicate_cleans_only_staged_bytes(self):
         file=UploadFile(io.BytesIO(b'%PDF-1.4\n%%EOF\n'),filename='../../proof.pdf',headers=Headers({'content-type':'application/pdf'}))
-        with patch.object(service,'public_access'),patch.object(service,'require_private_storage'),patch.object(service,'reserve_storage',return_value='r'),patch.object(service,'finish_storage') as finish,patch.object(service,'release_storage',return_value=True) as release,patch.object(service,'store_builder_asset') as store,patch.object(service,'delete_builder_asset') as remove,patch.object(service,'rpc',return_value={'id':'existing','duplicate':True}) as rpc:
+        with patch.object(service,'public_access'),patch.object(service,'require_private_storage'),patch.object(service,'reserve_storage',return_value='r'),patch.object(service,'finish_storage') as finish,patch.object(service,'release_storage',return_value=True) as release,patch.object(service,'store_builder_asset') as store,patch.object(service,'delete_builder_asset') as remove,patch.object(service,'rpc',return_value={'id':str(uuid4()),'duplicate':True}) as rpc:
             result=asyncio.run(service.submit(1,self.form(),None,self.payload(),[('proof',file)]))
             self.assertTrue(result['duplicate']);key=store.call_args.kwargs['storage_key'];self.assertTrue(key.startswith('elearning-private/tenant_1/response_'));self.assertNotIn('..',key)
             values=rpc.call_args.args[1];self.assertEqual(values['p_files'][0]['field_id'],'proof');self.assertEqual(values['p_answers']['proof']['id'],values['p_files'][0]['id'])
@@ -126,6 +126,36 @@ class LearningFormFilesTests(unittest.TestCase):
         staged=[({'storage_key':'private-key'},'reservation')]
         with patch.object(service,'delete_builder_asset',side_effect=RuntimeError('storage offline')),patch.object(service,'release_storage') as release:
             service.cleanup_files(1,staged);release.assert_not_called()
+
+    def test_unknown_or_malformed_metadata_reply_retains_bytes_and_quota(self):
+        for reply in (RuntimeError('reply lost'), None, {}, {'id':str(uuid4()),'duplicate':'true'}, {'id':str(uuid4()),'duplicate':False}):
+            with self.subTest(reply=reply),patch.object(service,'public_access'),patch.object(service,'require_private_storage'),patch.object(service,'reserve_storage',return_value='r'),patch.object(service,'finish_storage') as finish,patch.object(service,'release_storage') as release,patch.object(service,'store_builder_asset'),patch.object(service,'delete_builder_asset') as remove,patch.object(service,'rpc',side_effect=reply if isinstance(reply,Exception) else None,return_value=reply) as rpc:
+                file=UploadFile(io.BytesIO(b'%PDF-1.4\n%%EOF\n'),headers=Headers({'content-type':'application/pdf'}))
+                payload=self.payload()
+                with self.assertRaises(HTTPException) as uncertain:asyncio.run(service.submit(1,self.form(),None,payload,[('proof',file)]))
+                self.assertEqual(uncertain.exception.status_code,503)
+                self.assertEqual(uncertain.exception.detail['code'],'private_upload_outcome_unknown')
+                self.assertEqual(uncertain.exception.detail['idempotency_key'],payload['idempotency_key'])
+                remove.assert_not_called();release.assert_not_called();rpc.assert_called_once()
+                finish.assert_called_once();self.assertTrue(finish.call_args.kwargs['succeeded'])
+
+    def test_acknowledged_duplicate_of_same_response_retains_referenced_staged_bytes(self):
+        file=UploadFile(io.BytesIO(b'%PDF-1.4\n%%EOF\n'),headers=Headers({'content-type':'application/pdf'}))
+        with patch.object(service,'public_access'),patch.object(service,'require_private_storage'),patch.object(service,'reserve_storage',return_value='r'),patch.object(service,'finish_storage'),patch.object(service,'release_storage') as release,patch.object(service,'store_builder_asset'),patch.object(service,'delete_builder_asset') as remove,patch.object(service,'rpc',side_effect=lambda _name,body:{'id':body['p_id'],'duplicate':True}):
+            self.assertTrue(asyncio.run(service.submit(1,self.form(),None,self.payload(),[('proof',file)]))['duplicate'])
+            remove.assert_not_called();release.assert_not_called()
+
+    def test_acknowledged_new_response_retains_private_files(self):
+        file=UploadFile(io.BytesIO(b'%PDF-1.4\n%%EOF\n'),headers=Headers({'content-type':'application/pdf'}))
+        with patch.object(service,'public_access'),patch.object(service,'require_private_storage'),patch.object(service,'reserve_storage',return_value='r'),patch.object(service,'finish_storage'),patch.object(service,'release_storage') as release,patch.object(service,'store_builder_asset'),patch.object(service,'delete_builder_asset') as remove,patch.object(service,'rpc',side_effect=lambda _name,body:{'id':body['p_id'],'duplicate':False}):
+            self.assertFalse(asyncio.run(service.submit(1,self.form(),None,self.payload(),[('proof',file)]))['duplicate'])
+            remove.assert_not_called();release.assert_not_called()
+
+    def test_staging_failure_before_rpc_cleans_without_claiming_unknown_commit(self):
+        file=UploadFile(io.BytesIO(b'%PDF-1.4\n%%EOF\n'),headers=Headers({'content-type':'application/pdf'}))
+        with patch.object(service,'public_access'),patch.object(service,'require_private_storage'),patch.object(service,'reserve_storage',return_value='r'),patch.object(service,'finish_storage'),patch.object(service,'release_storage',return_value=True) as release,patch.object(service,'store_builder_asset',side_effect=RuntimeError('upload interrupted')),patch.object(service,'delete_builder_asset') as remove,patch.object(service,'rpc') as rpc:
+            with self.assertRaises(RuntimeError):asyncio.run(service.submit(1,self.form(),None,self.payload(),[('proof',file)]))
+            rpc.assert_not_called();remove.assert_called_once();release.assert_called_once()
 
 class LearningFormApiTests(unittest.TestCase):
     def setUp(self):

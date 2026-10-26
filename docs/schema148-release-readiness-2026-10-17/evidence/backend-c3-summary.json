@@ -1,0 +1,16 @@
+{
+  "source_sha": "c3f9ce591f4706e535795b979064d3baefe421be",
+  "command": "bash ~/schema148-readiness-20261017/run-backend.sh",
+  "runner_image": "madar-schema136-preparation-test:working",
+  "scope": "isolated dedicated staging no-external-network backend suite",
+  "collected": 3752,
+  "skipped": 746,
+  "executed_pass": 3006,
+  "failures": 0,
+  "errors": 0,
+  "seconds": 44.686,
+  "external_attempts": [],
+  "external_sites": [],
+  "conditional_native_cases": "separately executed",
+  "production_modified": false
+}

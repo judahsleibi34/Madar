@@ -36,6 +36,50 @@ class BusinessWriteAuthorityTests(unittest.TestCase):
     def write(self):
         self.path.write_text(json.dumps(self.data))
 
+    def test_coordinated148_range_cannot_grant_normal_before_target(self):
+        self.data.update(version=2,compatible_min=146,compatible_max=148)
+        with patch.dict(os.environ,{"SCHEMA_COMPATIBLE_MIN":"146","SCHEMA_COMPATIBLE_MAX":"148","SCHEMA_EXCLUDED_VERSIONS":""}):
+            for schema in (146,147,148):
+                self.data.update(schema=schema,mode="READ_ONLY");self.write()
+                self.assertTrue(authority.restricted())
+                self.data["mode"]="NORMAL";self.write()
+                if schema==148:
+                    self.assertFalse(authority.restricted())
+                else:
+                    with self.assertRaises(RuntimeError):authority.read_authority()
+            self.data.update(schema=146,compatible_min=144,compatible_max=146);self.write()
+            with self.assertRaises(RuntimeError):authority.read_authority()
+
+    def test_exact160_v3_contract_never_widens_historical_v2_or_intermediate_writes(self):
+        self.data.update(version=3,schema=146,compatible_min=146,compatible_max=160,
+            operation='completed-normal-schema146-160-coordinated-release',origin_schema=146,
+            controller_sha='c'*40,migration_manifest_sha256='7633a15a9f531874409577fb9696e472631d3bbde63ae2603be0a4d23ef7c08f')
+        env={'SCHEMA_COMPATIBLE_MIN':'146','SCHEMA_COMPATIBLE_MAX':'160','SCHEMA_EXCLUDED_VERSIONS':'',
+            'MADAR_RELEASE_CONTROLLER_SHA':'c'*40,'MADAR_RELEASE_MIGRATION_MANIFEST_SHA256':self.data['migration_manifest_sha256']}
+        with patch.dict(os.environ,env):
+            for schema in range(146,161):
+                self.data.update(schema=schema,mode='READ_ONLY');self.write()
+                self.assertTrue(authority.restricted())
+                self.data['mode']='NORMAL';self.write()
+                if schema==160:self.assertFalse(authority.restricted())
+                else:
+                    with self.assertRaises(RuntimeError):authority.read_authority()
+            approved=dict(self.data)
+            for key,value in (('version',2),('origin_schema',145),('origin_schema',True),
+                    ('operation','completed-normal-schema146-150-coordinated-release'),
+                    ('controller_sha','d'*40),('migration_manifest_sha256','d'*64),
+                    ('release_sha','d'*40),('contract_digest','d'*64),('schema',161),('schema',160.0),
+                    ('compatible_max',161),('unexpected','field')):
+                self.data=dict(approved,**{key:value});self.write()
+                with self.subTest(field=key),self.assertRaises(RuntimeError):authority.read_authority()
+            self.data=approved;self.write()
+            for name in ('MADAR_RELEASE_CONTROLLER_SHA','MADAR_RELEASE_MIGRATION_MANIFEST_SHA256'):
+                with patch.dict(os.environ,{name:''}),self.assertRaises(RuntimeError):authority.read_authority()
+            # A numeric pair on a historical grant is still insufficient.
+            self.data={k:v for k,v in approved.items() if k not in {'operation','origin_schema','controller_sha','migration_manifest_sha256'}}
+            self.data['version']=2;self.write()
+            with self.assertRaises(RuntimeError):authority.read_authority()
+
     def test_read_only_authority_uses_existing_request_and_provider_fences(self):
         self.assertTrue(authority.restricted() and recovery.restricted())
         response = self.client.post("/auth/signup", json={})

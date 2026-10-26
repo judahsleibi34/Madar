@@ -1,0 +1,70 @@
+{
+  "baseline_sha": "876b65e73ea8ceaf398145d8677019184798a95c",
+  "candidate_sha": "17e8b5ee9e4aadc26677ec232c3899b080900af0",
+  "conditions": "dedicated4vCPU/5402MiB VM; same native PostgreSQL/Auth/REST/Redis; API1.5CPU/1280MiB; nginx0.25CPU/64MiB; 3warmups,60requests,4clients per endpoint; synthetic data; no other test load",
+  "endpoints": {
+    "/health/live": {
+      "baseline": {
+        "requests": 60,
+        "concurrency": 4,
+        "errors": 0,
+        "p50_ms": 3.441,
+        "p95_ms": 4.77,
+        "p99_ms": 6.483,
+        "throughput_rps": 1054.031
+      },
+      "candidate": {
+        "requests": 60,
+        "concurrency": 4,
+        "errors": 0,
+        "p50_ms": 3.588,
+        "p95_ms": 5.763,
+        "p99_ms": 8.525,
+        "throughput_rps": 1021.623
+      },
+      "p95_change_percent": 20.82
+    },
+    "/auth/user_status": {
+      "baseline": {
+        "requests": 60,
+        "concurrency": 4,
+        "errors": 0,
+        "p50_ms": 311.439,
+        "p95_ms": 503.91,
+        "p99_ms": 600.552,
+        "throughput_rps": 11.84
+      },
+      "candidate": {
+        "requests": 60,
+        "concurrency": 4,
+        "errors": 0,
+        "p50_ms": 299.459,
+        "p95_ms": 477.516,
+        "p99_ms": 513.322,
+        "throughput_rps": 12.535
+      },
+      "p95_change_percent": -5.24
+    },
+    "/admin/users": {
+      "baseline": {
+        "requests": 60,
+        "concurrency": 4,
+        "errors": 0,
+        "p50_ms": 671.621,
+        "p95_ms": 888.368,
+        "p99_ms": 898.932,
+        "throughput_rps": 6.023
+      },
+      "candidate": {
+        "requests": 60,
+        "concurrency": 4,
+        "errors": 0,
+        "p50_ms": 694.467,
+        "p95_ms": 903.406,
+        "p99_ms": 1074.354,
+        "throughput_rps": 5.886
+      },
+      "p95_change_percent": 1.69
+    }
+  }
+}

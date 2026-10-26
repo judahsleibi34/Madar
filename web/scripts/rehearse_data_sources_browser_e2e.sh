@@ -15,11 +15,13 @@ VAULT_NAME="madar-c3-browser-vault-${RUN_ID}"
 FIXTURE_NAME="madar-c3-browser-fixture-${RUN_ID}"
 BACKEND_NAME="madar-c3-browser-backend-${RUN_ID}"
 TEMP_DIR="$(mktemp -d)"
-ARTIFACT_DIR="${MADAR_E2E_ARTIFACT_DIR:-/tmp/madar-data-sources-c3-step4-${RUN_ID}}"
+REPORT_DIR="${TEMP_DIR}/private-reports"
+ARTIFACT_DIR="${MADAR_E2E_ARTIFACT_DIR:-/tmp/madar-data-sources-c3-step5-${RUN_ID}}"
 JWT_SECRET="$(openssl rand -hex 32)"
 ROOT_TOKEN="$(openssl rand -hex 24)"
 CONTROL_TOKEN="$(openssl rand -hex 24)"
 PROVIDER_TOKEN="fixture-token-not-a-real-credential"
+GOOGLE_STATE_KEY="$(openssl rand -hex 32)"
 AUTH_ID="70000000-0000-4000-8000-000000000001"
 PROJECT_ID="70000000-0000-4000-8000-000000000002"
 CROSS_AUTH_ID="70000000-0000-4000-8000-000000000011"
@@ -58,7 +60,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-mkdir -p "${ARTIFACT_DIR}"
+mkdir -p "${ARTIFACT_DIR}" "${REPORT_DIR}"
 docker network create "${NETWORK}" >/dev/null
 docker run -d --name "${PG_NAME}" --network "${NETWORK}" --network-alias pg \
   --tmpfs /var/lib/postgresql/data:rw,noexec,nosuid,size=2g \
@@ -178,16 +180,26 @@ COMMON_ENV=(
   -e DATA_SOURCE_VAULT_ADDR="http://127.0.0.1:${VAULT_PORT}"
   -e DATA_SOURCE_VAULT_TOKEN_FILE=/run/madar-e2e/vault-token
   -e DATA_SOURCE_VAULT_TRANSIT_KEY=madar-data-sources
+  -e MADAR_TEST_WEBHOOK_ADAPTER_ENABLED=true -e MADAR_WEBHOOK_INGRESS_ENABLED=true
   -e MADAR_TEST_HTTP_PROVIDER_URL="http://127.0.0.1:${PROVIDER_PORT}"
+  -e GOOGLE_SHEETS_PROVIDER_ENABLED=true -e GOOGLE_SHEETS_CLIENT_ID=fixture-google-client
+  -e GOOGLE_SHEETS_CLIENT_SECRET=fixture-google-client-secret
+  -e GOOGLE_SHEETS_STATE_KEY="${GOOGLE_STATE_KEY}"
+  -e GOOGLE_SHEETS_REDIRECT_URI="http://127.0.0.1:${FRONTEND_PORT}/api/data/oauth/google-sheets/callback"
+  -e GOOGLE_SHEETS_AUTHORIZATION_ENDPOINT="http://127.0.0.1:${PROVIDER_PORT}/google/authorize"
+  -e GOOGLE_SHEETS_TOKEN_ENDPOINT="http://127.0.0.1:${PROVIDER_PORT}/google"
+  -e GOOGLE_SHEETS_API_ENDPOINT="http://127.0.0.1:${PROVIDER_PORT}/google"
   -e DATA_IMMUTABLE_STORAGE_BACKEND=test_http
   -e DATA_IMMUTABLE_TEST_URL="http://127.0.0.1:${OBJECT_PORT}"
   -e DATA_UPLOAD_DIR=/tmp/madar-e2e/uploads
   -e MADAR_CHECKPOINT_SCRATCH_DIR=/tmp/madar-e2e/checkpoints
-  -e HOME=/tmp -e MPLCONFIGDIR=/tmp/matplotlib -e PYTHONPATH=/app
+  -e PRIVATE_CHARTS_DIR=/tmp/madar-private-reports
+  -e HOME=/tmp -e MPLCONFIGDIR=/tmp/matplotlib -e PYTHONPATH=/app -e PYTHONFAULTHANDLER=1
 )
 
 docker run -d --name "${FIXTURE_NAME}" --network host --user "$(id -u):$(id -g)" \
-  -v "${ROOT_DIR}/web/backend:/app:ro" -v "${TEMP_DIR}:/run/madar-e2e:ro" -w /app \
+  -v "${ROOT_DIR}/web/backend:/app:ro" -v "${TEMP_DIR}:/run/madar-e2e:ro" \
+  -v "${REPORT_DIR}:/tmp/madar-private-reports" -w /app \
   "${COMMON_ENV[@]}" -e MADAR_E2E_TENANT_ID=7001 -e MADAR_E2E_PROJECT_ID="${PROJECT_ID}" \
   -e MADAR_E2E_PROVIDER_TOKEN="${PROVIDER_TOKEN}" -e MADAR_E2E_CONTROL_TOKEN="${CONTROL_TOKEN}" \
   -e MADAR_E2E_PROVIDER_PORT="${PROVIDER_PORT}" -e MADAR_E2E_OBJECT_PORT="${OBJECT_PORT}" \
@@ -235,6 +247,7 @@ for _ in $(seq 1 120); do
 done
 curl -fsS "http://127.0.0.1:${FRONTEND_PORT}/" >/dev/null
 
+if [[ "${MADAR_E2E_WEBHOOK_ONLY:-NO}" != "YES" && "${MADAR_E2E_REPORTING_ONLY:-NO}" != "YES" ]]; then
 (
   cd "${ROOT_DIR}/web/frontend"
   MADAR_E2E_CONFIRM_ISOLATED=YES \
@@ -249,9 +262,10 @@ curl -fsS "http://127.0.0.1:${FRONTEND_PORT}/" >/dev/null
   MADAR_E2E_SPEC=data-sources-older-schema-live.spec.mjs \
   npx playwright test --config=playwright.data-sources-live.config.mjs
 )
+fi
 
 docker rm -f "${BACKEND_NAME}" >/dev/null
-apply_range 143 156
+apply_range 143 161
 docker restart "${REST_NAME}" >/dev/null
 for _ in $(seq 1 60); do
   docker run --rm --network "${NETWORK}" madar-backend-test \
@@ -263,8 +277,9 @@ done
 docker run -d --name "${BACKEND_NAME}" --network host --user "$(id -u):$(id -g)" \
   -v "${ROOT_DIR}/web/backend:/app:ro" -v "${TEMP_DIR}:/run/madar-e2e:ro" -w /app \
   "${COMMON_ENV[@]}" -e CSRF_SECRET="$(openssl rand -hex 32)" \
-  -e SCHEMA_COMPATIBLE_MIN=156 -e SCHEMA_COMPATIBLE_MAX=156 -e SCHEMA_EXCLUDED_VERSIONS= \
+  -e SCHEMA_COMPATIBLE_MIN=161 -e SCHEMA_COMPATIBLE_MAX=161 -e SCHEMA_EXCLUDED_VERSIONS= \
   -e FRONTEND_URLS="http://127.0.0.1:${FRONTEND_PORT}" \
+  -e FRONTEND_URL="http://127.0.0.1:${FRONTEND_PORT}" \
   -e FRONTEND_PRIMARY_URL="http://127.0.0.1:${FRONTEND_PORT}" -e PORT="${BACKEND_PORT}" \
   madar-backend-test python -c \
   'import os,uvicorn;from app import app;uvicorn.run(app,host="127.0.0.1",port=int(os.environ["PORT"]))' >/dev/null
@@ -277,11 +292,12 @@ for _ in $(seq 1 120); do
   sleep 0.25
 done
 if [[ "${ready}" != true ]]; then
-  printf 'schema156_backend_readiness_failed\n' >&2
+  printf 'schema161_backend_readiness_failed\n' >&2
   docker logs "${BACKEND_NAME}" >&2 || true
   exit 1
 fi
 
+if [[ "${MADAR_E2E_GOOGLE_ONLY:-NO}" != "YES" && "${MADAR_E2E_WEBHOOK_ONLY:-NO}" != "YES" && "${MADAR_E2E_REPORTING_ONLY:-NO}" != "YES" ]]; then
 (
   cd "${ROOT_DIR}/web/frontend"
   MADAR_E2E_CONFIRM_ISOLATED=YES \
@@ -293,6 +309,180 @@ fi
   MADAR_E2E_CONTROL_TOKEN="${CONTROL_TOKEN}" MADAR_E2E_PROJECT_ID="${PROJECT_ID}" \
   MADAR_E2E_CROSS_TENANT_PROJECT_ID="${CROSS_PROJECT_ID}" \
   MADAR_E2E_PROVIDER_TOKEN="${PROVIDER_TOKEN}" MADAR_E2E_SCREENSHOT_DIR="${ARTIFACT_DIR}" \
+  npx playwright test --config=playwright.data-sources-live.config.mjs
+)
+fi
+
+if [[ "${MADAR_E2E_WEBHOOK_ONLY:-NO}" != "YES" && "${MADAR_E2E_REPORTING_ONLY:-NO}" != "YES" ]]; then
+(
+  cd "${ROOT_DIR}/web/frontend"
+  MADAR_E2E_CONFIRM_ISOLATED=YES \
+  MADAR_E2E_BASE_URL="http://127.0.0.1:${FRONTEND_PORT}" \
+  MADAR_E2E_DATABASE_ID="${DATABASE_ID}" MADAR_E2E_RUN_ID="${RUN_ID}-google-sheets" \
+  MADAR_E2E_MIGRATIONS_APPLIED_FROM_CLEAN=YES MADAR_E2E_EXTERNAL_DELIVERY_DISABLED=YES \
+  MADAR_E2E_ACCESS_TOKEN="${ACCESS_JWT}" \
+  MADAR_E2E_CONTROL_URL="http://127.0.0.1:${CONTROL_PORT}" \
+  MADAR_E2E_CONTROL_TOKEN="${CONTROL_TOKEN}" MADAR_E2E_PROJECT_ID="${PROJECT_ID}" \
+  MADAR_E2E_CROSS_TENANT_PROJECT_ID="${CROSS_PROJECT_ID}" \
+  MADAR_E2E_PROVIDER_TOKEN="${PROVIDER_TOKEN}" MADAR_E2E_SCREENSHOT_DIR="${ARTIFACT_DIR}" \
+  MADAR_E2E_SPEC=data-sources-google-sheets-live.spec.mjs \
+  npx playwright test --config=playwright.data-sources-live.config.mjs
+)
+fi
+
+# C4 runs only after the unchanged schema161 browser/Google rehearsals. Migration162
+# remains confined to this tmpfs database and the backend remains loopback-only.
+docker rm -f "${BACKEND_NAME}" >/dev/null
+apply_range 162 162
+docker restart "${REST_NAME}" >/dev/null
+for _ in $(seq 1 60); do
+  docker run --rm --network "${NETWORK}" madar-backend-test \
+    python -c "import httpx;raise SystemExit(0 if httpx.get('http://rest:3000/',timeout=1).status_code<500 else 1)" \
+    >/dev/null 2>&1 && break
+  sleep 0.25
+done
+
+docker run -d --name "${BACKEND_NAME}" --network host --user "$(id -u):$(id -g)" \
+  -v "${ROOT_DIR}/web/backend:/app:ro" -v "${TEMP_DIR}:/run/madar-e2e:ro" -w /app \
+  "${COMMON_ENV[@]}" -e CSRF_SECRET="$(openssl rand -hex 32)" \
+  -e SCHEMA_COMPATIBLE_MIN=162 -e SCHEMA_COMPATIBLE_MAX=162 -e SCHEMA_EXCLUDED_VERSIONS= \
+  -e FRONTEND_URLS="http://127.0.0.1:${FRONTEND_PORT}" \
+  -e FRONTEND_URL="http://127.0.0.1:${FRONTEND_PORT}" \
+  -e FRONTEND_PRIMARY_URL="http://127.0.0.1:${FRONTEND_PORT}" -e PORT="${BACKEND_PORT}" \
+  madar-backend-test python -c \
+  'import os,uvicorn;from app import app;uvicorn.run(app,host="127.0.0.1",port=int(os.environ["PORT"]))' >/dev/null
+ready=false
+for _ in $(seq 1 120); do
+  if curl -fsS "http://127.0.0.1:${BACKEND_PORT}/health/recovery" >/dev/null 2>&1; then
+    ready=true
+    break
+  fi
+  sleep 0.25
+done
+if [[ "${ready}" != true ]]; then
+  printf 'schema162_backend_readiness_failed\n' >&2
+  docker logs "${BACKEND_NAME}" >&2 || true
+  exit 1
+fi
+
+if [[ "${MADAR_E2E_REPORTING_ONLY:-NO}" != "YES" ]]; then
+(
+  cd "${ROOT_DIR}/web/frontend"
+  MADAR_E2E_CONFIRM_ISOLATED=YES \
+  MADAR_E2E_BASE_URL="http://127.0.0.1:${FRONTEND_PORT}" \
+  MADAR_E2E_DATABASE_ID="${DATABASE_ID}" MADAR_E2E_RUN_ID="${RUN_ID}-webhook" \
+  MADAR_E2E_MIGRATIONS_APPLIED_FROM_CLEAN=YES MADAR_E2E_EXTERNAL_DELIVERY_DISABLED=YES \
+  MADAR_E2E_ACCESS_TOKEN="${ACCESS_JWT}" \
+  MADAR_E2E_CONTROL_URL="http://127.0.0.1:${CONTROL_PORT}" \
+  MADAR_E2E_CONTROL_TOKEN="${CONTROL_TOKEN}" MADAR_E2E_PROJECT_ID="${PROJECT_ID}" \
+  MADAR_E2E_CROSS_TENANT_PROJECT_ID="${CROSS_PROJECT_ID}" \
+  MADAR_E2E_PROVIDER_TOKEN="${PROVIDER_TOKEN}" MADAR_E2E_SCREENSHOT_DIR="${ARTIFACT_DIR}" \
+  MADAR_E2E_SPEC=data-sources-webhook-live.spec.mjs \
+  npx playwright test --config=playwright.data-sources-live.config.mjs
+)
+fi
+
+# C5 runs only after C4 completes. Schema159 and its backend remain confined to
+# this tmpfs database and loopback-only browser stack.
+docker rm -f "${BACKEND_NAME}" >/dev/null
+apply_range 163 163
+docker restart "${REST_NAME}" >/dev/null
+for _ in $(seq 1 60); do
+  docker run --rm --network "${NETWORK}" madar-backend-test \
+    python -c "import httpx;raise SystemExit(0 if httpx.get('http://rest:3000/',timeout=1).status_code<500 else 1)" \
+    >/dev/null 2>&1 && break
+  sleep 0.25
+done
+
+docker run -d --name "${BACKEND_NAME}" --network host --user "$(id -u):$(id -g)" \
+  -v "${ROOT_DIR}/web/backend:/app:ro" -v "${TEMP_DIR}:/run/madar-e2e:ro" -w /app \
+  "${COMMON_ENV[@]}" -e CSRF_SECRET="$(openssl rand -hex 32)" \
+  -e SCHEMA_COMPATIBLE_MIN=163 -e SCHEMA_COMPATIBLE_MAX=163 -e SCHEMA_EXCLUDED_VERSIONS= \
+  -e FRONTEND_URLS="http://127.0.0.1:${FRONTEND_PORT}" \
+  -e FRONTEND_URL="http://127.0.0.1:${FRONTEND_PORT}" \
+  -e FRONTEND_PRIMARY_URL="http://127.0.0.1:${FRONTEND_PORT}" -e PORT="${BACKEND_PORT}" \
+  madar-backend-test python -c \
+  'import os,uvicorn;from app import app;uvicorn.run(app,host="127.0.0.1",port=int(os.environ["PORT"]))' >/dev/null
+ready=false
+for _ in $(seq 1 120); do
+  if curl -fsS "http://127.0.0.1:${BACKEND_PORT}/health/recovery" >/dev/null 2>&1; then
+    ready=true
+    break
+  fi
+  sleep 0.25
+done
+if [[ "${ready}" != true ]]; then
+  printf 'schema163_backend_readiness_failed\n' >&2
+  docker logs "${BACKEND_NAME}" >&2 || true
+  exit 1
+fi
+
+if [[ "${MADAR_E2E_REPORTING_ONLY:-NO}" != "YES" ]]; then
+(
+  cd "${ROOT_DIR}/web/frontend"
+  MADAR_E2E_CONFIRM_ISOLATED=YES \
+  MADAR_E2E_BASE_URL="http://127.0.0.1:${FRONTEND_PORT}" \
+  MADAR_E2E_DATABASE_ID="${DATABASE_ID}" MADAR_E2E_RUN_ID="${RUN_ID}-business-intelligence" \
+  MADAR_E2E_MIGRATIONS_APPLIED_FROM_CLEAN=YES MADAR_E2E_EXTERNAL_DELIVERY_DISABLED=YES \
+  MADAR_E2E_ACCESS_TOKEN="${ACCESS_JWT}" \
+  MADAR_E2E_CONTROL_URL="http://127.0.0.1:${CONTROL_PORT}" \
+  MADAR_E2E_CONTROL_TOKEN="${CONTROL_TOKEN}" MADAR_E2E_PROJECT_ID="${PROJECT_ID}" \
+  MADAR_E2E_CROSS_TENANT_PROJECT_ID="${CROSS_PROJECT_ID}" \
+  MADAR_E2E_PROVIDER_TOKEN="${PROVIDER_TOKEN}" MADAR_E2E_SCREENSHOT_DIR="${ARTIFACT_DIR}" \
+  MADAR_E2E_SPEC=business-intelligence-live.spec.mjs \
+  npx playwright test --config=playwright.data-sources-live.config.mjs
+)
+fi
+
+# C5 Step 3 advances only the same disposable tmpfs database to candidate 164.
+# The one-shot scheduler and worker are invoked only through the token-protected
+# loopback fixture, and private CSV artifacts live in the disposable shared path.
+docker rm -f "${BACKEND_NAME}" >/dev/null
+apply_range 164 164
+docker restart "${REST_NAME}" >/dev/null
+for _ in $(seq 1 60); do
+  docker run --rm --network "${NETWORK}" madar-backend-test \
+    python -c "import httpx;raise SystemExit(0 if httpx.get('http://rest:3000/',timeout=1).status_code<500 else 1)" \
+    >/dev/null 2>&1 && break
+  sleep 0.25
+done
+
+docker run -d --name "${BACKEND_NAME}" --network host --user "$(id -u):$(id -g)" \
+  -v "${ROOT_DIR}/web/backend:/app:ro" -v "${TEMP_DIR}:/run/madar-e2e:ro" \
+  -v "${REPORT_DIR}:/tmp/madar-private-reports" -w /app \
+  "${COMMON_ENV[@]}" -e CSRF_SECRET="$(openssl rand -hex 32)" \
+  -e SCHEMA_COMPATIBLE_MIN=164 -e SCHEMA_COMPATIBLE_MAX=164 -e SCHEMA_EXCLUDED_VERSIONS= \
+  -e FRONTEND_URLS="http://127.0.0.1:${FRONTEND_PORT}" \
+  -e FRONTEND_URL="http://127.0.0.1:${FRONTEND_PORT}" \
+  -e FRONTEND_PRIMARY_URL="http://127.0.0.1:${FRONTEND_PORT}" -e PORT="${BACKEND_PORT}" \
+  madar-backend-test python -c \
+  'import os,uvicorn;from app import app;uvicorn.run(app,host="127.0.0.1",port=int(os.environ["PORT"]))' >/dev/null
+ready=false
+for _ in $(seq 1 120); do
+  if curl -fsS "http://127.0.0.1:${BACKEND_PORT}/health/recovery" >/dev/null 2>&1; then
+    ready=true
+    break
+  fi
+  sleep 0.25
+done
+if [[ "${ready}" != true ]]; then
+  printf 'schema164_backend_readiness_failed\n' >&2
+  docker logs "${BACKEND_NAME}" >&2 || true
+  exit 1
+fi
+
+(
+  cd "${ROOT_DIR}/web/frontend"
+  MADAR_E2E_CONFIRM_ISOLATED=YES \
+  MADAR_E2E_BASE_URL="http://127.0.0.1:${FRONTEND_PORT}" \
+  MADAR_E2E_DATABASE_ID="${DATABASE_ID}" MADAR_E2E_RUN_ID="${RUN_ID}-business-reporting" \
+  MADAR_E2E_MIGRATIONS_APPLIED_FROM_CLEAN=YES MADAR_E2E_EXTERNAL_DELIVERY_DISABLED=YES \
+  MADAR_E2E_ACCESS_TOKEN="${ACCESS_JWT}" \
+  MADAR_E2E_CONTROL_URL="http://127.0.0.1:${CONTROL_PORT}" \
+  MADAR_E2E_CONTROL_TOKEN="${CONTROL_TOKEN}" MADAR_E2E_PROJECT_ID="${PROJECT_ID}" \
+  MADAR_E2E_CROSS_TENANT_PROJECT_ID="${CROSS_PROJECT_ID}" \
+  MADAR_E2E_PROVIDER_TOKEN="${PROVIDER_TOKEN}" MADAR_E2E_SCREENSHOT_DIR="${ARTIFACT_DIR}" \
+  MADAR_E2E_SPEC=business-reporting-live.spec.mjs \
   npx playwright test --config=playwright.data-sources-live.config.mjs
 )
 

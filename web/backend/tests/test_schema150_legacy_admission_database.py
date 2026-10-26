@@ -1,0 +1,215 @@
+"""Legacy deletion backlog must block pre150 admission on real PostgreSQL.
+
+The fixture is a marked disposable schema149 database. No migration, external
+provider call, queue reset or inferred reconciliation is performed here. The
+legacy ambiguous-outcome fixture represents an attempted operation, not proof
+that a provider actually accepted it. Every fixture rolls back after the test.
+"""
+import os
+import json
+from pathlib import Path
+import sys
+import time
+import unittest
+from uuid import uuid4
+from unittest.mock import patch
+
+import psycopg
+
+from tests.disposable_database_support import connect_disposable_database
+
+sys.path.insert(0, os.getenv('MADAR_TEST_REPOSITORY_ROOT') or str(Path(__file__).resolve().parents[2]))
+from deployment.lib import schema150_release as release
+
+DSN = os.getenv('SCHEMA150_LEGACY_SYNTHETIC_DATABASE_DSN')
+
+
+@unittest.skipUnless(DSN, 'Requires marked disposable schema149 PostgreSQL')
+class LegacyDeletionAdmissionDatabaseTests(unittest.TestCase):
+    def setUp(self):
+        self.db = connect_disposable_database(DSN, markers={'madar-notification-synthetic-rehearsal'})
+        self.addCleanup(self.db.close)
+        # A client close sends Terminate without waiting for the server backend
+        # to exit. Establish the isolated fixture baseline on the server, using
+        # fresh autocommit observations; never terminate an unknown session or
+        # weaken the production quiescence gate to accommodate fixture timing.
+        deadline = time.monotonic() + 5
+        while True:
+            # Backend exit and internal vacuum cleanup are separate from the
+            # pg_stat_activity client count. Production correctly rejects a
+            # surviving queue relation lock; establish BOTH fixture premises.
+            others, queue_locks = self.db.execute(
+                "select (select count(*) from pg_stat_activity where datname=current_database() "
+                "and backend_type='client backend' and pid<>pg_backend_pid()),"
+                "(select count(*) from pg_locks where relation=any(array["
+                "'public.notification_deliveries'::regclass,'public.notification_outbox'::regclass,"
+                "'public.data_deletion_requests'::regclass,'public.data_deletion_steps'::regclass]) "
+                "and pid is distinct from pg_backend_pid())"
+            ).fetchone()
+            if (others, queue_locks) == (0, 0):
+                break
+            if time.monotonic() >= deadline:
+                self.fail(f'Disposable fixture not quiescent: sessions={others},queue_locks={queue_locks}')
+            time.sleep(.01)
+        self.assertEqual(self.db.execute(
+            "select schema_version from public.application_schema_state where contract_key='core'"
+        ).fetchone()[0], 149)
+        self.assertEqual(self.db.execute(
+            "select count(*) from public.data_deletion_requests where state not in "
+            "('completed','completed_with_retained_records','cancelled_before_execution')"
+        ).fetchone()[0], 0, 'Unrelated unfinished fixture work must not be modified')
+        identifier = self.db.execute('select system_identifier::text from pg_control_system()').fetchone()[0]
+        self.contract = {'database': {'system_identifier': identifier}}
+        self.key = uuid4()
+        self.db.execute("set statement_timeout='5s'; begin")
+        self.addCleanup(lambda: self.db.execute('rollback'))
+
+    def observation(self):
+        verify=release.require_database_quiescence
+        def diagnosed(observed,contract,schema):
+            try:
+                return verify(observed,contract,schema)
+            except RuntimeError as error:
+                # Preserve the exact strict decision and observed counters for
+                # a failed native fixture, never credentials/cluster identity.
+                keys=('schema','delivery_protocol','outbox_protocol','deletion_protocol',*release.COUNTERS)
+                safe={k:observed.get(k) if type(observed.get(k)) is int else 'invalid' for k in keys}
+                error.add_note('Synthetic fixture observed counters: '+json.dumps(safe,sort_keys=True))
+                # Bounded metadata only. These are positively marked synthetic
+                # resources; never log query text,customer rows or credentials.
+                details=self.db.execute("select coalesce(json_agg(x),'[]'::json) from ("
+                    "select l.locktype,l.mode,l.granted,l.pid,a.backend_type,a.state,a.datname,"
+                    "c.relname from pg_catalog.pg_locks l left join pg_catalog.pg_stat_activity a on a.pid=l.pid "
+                    "left join pg_catalog.pg_class c on c.oid=l.relation where l.relation=any(array["
+                    "'public.notification_deliveries'::regclass,'public.notification_outbox'::regclass,"
+                    "'public.data_deletion_requests'::regclass,'public.data_deletion_steps'::regclass]) "
+                    "and l.pid is distinct from pg_backend_pid() limit 16) x").fetchone()[0]
+                error.add_note('Synthetic lock metadata after refusal: '+json.dumps(details,sort_keys=True))
+                raise
+        with self.db.cursor() as cursor,patch.object(release,'require_database_quiescence',side_effect=diagnosed):
+            return release.observe_database_quiescence(cursor, self.contract, 149)
+
+    def test_legacy_retry_with_external_attempt_and_no_live_claim_rejects(self):
+        self.db.execute(
+            "insert into public.data_deletion_requests(id,request_type,target_user_id_snapshot,state,"
+            "attempt_count,last_error_code) values(%s,'user',2147483001,'waiting_retry',1,"
+            "'storage_provider_unavailable')", (self.key,))
+        self.db.execute(
+            "insert into public.data_deletion_steps(request_id,step_key,step_order,state,attempts,"
+            "last_error_code) values(%s,'delete_provider_objects',50,'waiting_retry',1,"
+            "'storage_provider_unavailable')", (self.key,))
+        self.db.execute(
+            "insert into public.data_deletion_resources(request_id,resource_kind,resource_key) "
+            "values(%s,'supabase_avatar',%s)", (self.key, 'users/' + str(uuid4()) + '/synthetic.png'))
+        before = self.db.execute(
+            'select to_jsonb(r) from public.data_deletion_requests r where id=%s', (self.key,)).fetchone()[0]
+        with self.assertRaisesRegex(RuntimeError, 'not_quiescent'):
+            self.observation()
+        self.assertEqual(self.db.execute(
+            'select to_jsonb(r) from public.data_deletion_requests r where id=%s', (self.key,)).fetchone()[0], before)
+
+    def test_legacy_unstarted_tenant_with_lost_freeze_preimages_rejects(self):
+        self.db.execute(
+            "insert into public.data_deletion_requests(id,request_type,target_tenant_id_snapshot,"
+            "state,freeze_snapshot) values(%s,'tenant',2147483002,'pending',"
+            "'{\"lifecycle_state\":\"active\"}'::jsonb)", (self.key,))
+        # Migration083 captured tenant user statuses AFTER freezing them. There
+        # is no safe automatic inference of the former active/disabled status.
+        self.db.execute(
+            "insert into public.data_deletion_subjects(request_id,user_id_snapshot,subject_kind,"
+            "account_status_snapshot) values(%s,2147483003,'tenant_platform_user','deletion_pending')", (self.key,))
+        self.db.execute(
+            "insert into public.data_deletion_steps(request_id,step_key,step_order) values(%s,'freeze',10)", (self.key,))
+        with self.assertRaisesRegex(RuntimeError, 'not_quiescent'):
+            self.observation()
+        self.assertEqual(self.db.execute(
+            'select account_status_snapshot from public.data_deletion_subjects where request_id=%s',
+            (self.key,)).fetchone()[0], 'deletion_pending')
+
+    def test_terminal_cancelled_request_with_pending_steps_is_preserved_and_allowed(self):
+        self.db.execute(
+            "insert into public.data_deletion_requests(id,request_type,target_user_id_snapshot,state) "
+            "values(%s,'user',2147483004,'cancelled_before_execution')", (self.key,))
+        keys = ('freeze','revoke_sessions','revoke_integrations','stop_queued_work',
+                'delete_provider_objects','delete_host_files','delete_application_data',
+                'delete_auth_identities','verify','finalize')
+        for order, key in enumerate(keys, 1):
+            self.db.execute(
+                'insert into public.data_deletion_steps(request_id,step_key,step_order) values(%s,%s,%s)',
+                (self.key, key, order * 10))
+        observed = self.observation()
+        self.assertEqual(observed.get('legacy_deletion_backlog', 0), 0)
+        self.assertEqual(self.db.execute(
+            "select count(*) from public.data_deletion_steps where request_id=%s and state='pending'",
+            (self.key,)).fetchone()[0], 10)
+
+    def hold_fixture_queue_barrier(self):
+        # These two cases isolate activity-cache freshness,not queue writers.
+        # Keep background vacuum/DDL out of their initial zero-lock premise.
+        # The bounded lock belongs to this fixture's observer PID (which the
+        # unchanged production query excludes),and rollback releases it.
+        self.db.execute('lock table public.notification_deliveries,public.notification_outbox,'
+                        'public.data_deletion_requests,public.data_deletion_steps in share mode')
+
+    def test_new_live_client_cannot_hide_behind_cached_zero_session_snapshot(self):
+        self.hold_fixture_queue_barrier()
+        self.assertEqual(self.observation()['other_client_sessions'], 0)
+        other = connect_disposable_database(DSN, markers={'madar-notification-synthetic-rehearsal'})
+        self.addCleanup(other.close)
+        # PostgreSQL caches pg_stat_activity in this transaction. The public
+        # guard must refresh its observation and detect even an idle new client.
+        with self.assertRaisesRegex(RuntimeError, 'not_quiescent'):
+            self.observation()
+
+    def test_repeatable_read_queue_snapshot_cannot_be_used_for_admission(self):
+        self.db.execute('set transaction isolation level repeatable read')
+        with self.assertRaisesRegex(RuntimeError,'fresh_statement_snapshot_required'):
+            self.observation()
+
+    def test_serializable_queue_snapshot_cannot_be_used_for_admission(self):
+        self.db.execute('set transaction isolation level serializable')
+        with self.assertRaisesRegex(RuntimeError,'fresh_statement_snapshot_required'):
+            self.observation()
+
+    def test_server_confirmed_client_exit_cannot_leave_cached_one_session_snapshot(self):
+        self.hold_fixture_queue_barrier()
+        # An independent read-only monitor verifies the first client's exit.
+        # It is itself a cluster client and must close before final admission.
+        monitor = psycopg.connect(self.db.info.dsn, dbname='template1',
+                                  hostaddr=self.db.info.hostaddr, autocommit=True, connect_timeout=5)
+        self.addCleanup(monitor.close)
+        self.assertEqual(monitor.execute(
+            'select system_identifier::text from pg_control_system()'
+        ).fetchone()[0], self.contract['database']['system_identifier'])
+        monitor.execute('set default_transaction_read_only=on')
+        other = connect_disposable_database(DSN, markers={'madar-notification-synthetic-rehearsal'})
+        self.addCleanup(other.close)
+        other_pid = other.execute('select pg_backend_pid()').fetchone()[0]
+        with self.assertRaisesRegex(RuntimeError, 'not_quiescent'):
+            self.observation()
+        other.close()
+        deadline = time.monotonic() + 5
+        while monitor.execute('select count(*) from pg_stat_activity where pid=%s', (other_pid,)).fetchone()[0]:
+            if time.monotonic() >= deadline:
+                self.fail('Known disposable client backend did not exit after close')
+            time.sleep(.01)
+        monitor.close()
+        # No fixture-side pg_stat_clear_snapshot() here: this must exercise the
+        # actual guard after independent server confirmation, in the SAME txn.
+        # The monitor's own Terminate is asynchronous too. Without the actual
+        # guard's snapshot refresh this bounded loop retains the stale count
+        # forever and fails; no unknown backend is killed or excluded.
+        deadline=time.monotonic()+5
+        while True:
+            try:observed=self.observation()
+            except RuntimeError as error:
+                if str(error)!='schema150_database_not_quiescent':raise
+                if time.monotonic()>=deadline:raise
+                time.sleep(.01)
+            else:
+                self.assertEqual(observed['other_client_sessions'],0)
+                break
+
+
+if __name__ == '__main__':
+    unittest.main()

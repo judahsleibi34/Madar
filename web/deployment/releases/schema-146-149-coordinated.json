@@ -1,0 +1,15 @@
+{
+  "release_metadata_version": 1,
+  "deployment_profile": "completed-normal-notification146-149",
+  "schema": {
+    "compatible_min": 146,
+    "compatible_max": 149,
+    "target": 149,
+    "migration_class": "coordinated",
+    "rollback_compatible_min": 149,
+    "rollback_compatible_max": 149
+  },
+  "migration_policy": "none",
+  "migration_manifest": "migrations-147-149-coordinated.json",
+  "notes": "Unselected exact coordinated maintenance candidate. READ_ONLY at146/147/148; NORMAL only149 after fresh protected approval, provider and every worker fence, sealed migration/preservation/artifact/backup/restore/replica/boot gates. Complete deletion ownership remains a separate release blocker; no automatic execution or production authority."
+}

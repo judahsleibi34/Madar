@@ -1,0 +1,15 @@
+{
+  "release_metadata_version": 1,
+  "deployment_profile": "completed-normal-notification146-148",
+  "schema": {
+    "compatible_min": 146,
+    "compatible_max": 148,
+    "target": 148,
+    "migration_class": "coordinated",
+    "rollback_compatible_min": 148,
+    "rollback_compatible_max": 148
+  },
+  "migration_policy": "none",
+  "migration_manifest": "migrations-147-148-coordinated.json",
+  "notes": "Unselected exact coordinated maintenance profile. READ_ONLY at146/147; NORMAL only at148 after sealed completion/preservation. Fresh protected authorization, complete old-consumer quiescence, provider reconciliation, verified backup/restore/replica and accepted images required. Never restart protocol1 after147; no automatic migration or production authority."
+}

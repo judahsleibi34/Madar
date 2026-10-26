@@ -1,0 +1,3 @@
+PASS native password login/rejection, invalid JWT, TOTP, admin AAL1 rejection/AAL2 access, restricted login, CSRF rejection, single-use MFA admission, refresh rotation
+PASS native private Storage upload/download, anonymous denial and mediated legacy avatar delivery
+PASS durable PostgREST notification intent/replay, actual worker delivery, frontend API proxy and readiness

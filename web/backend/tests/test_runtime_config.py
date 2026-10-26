@@ -130,6 +130,48 @@ class RuntimeConfigurationTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "origin"):
                     validate_runtime_configuration()
 
+    def test_production_like_csrf_controls_cannot_be_disabled(self):
+        base = {
+            "SUPABASE_URL": "https://provider.example", "SUPABASE_ANON_KEY": "anon",
+            "SUPABASE_SERVICE_KEY": "service", "CSRF_SECRET": "x" * 40,
+            "FRONTEND_URLS": "https://app.example", "REDIS_URL": "redis://redis:6379/0",
+            "ADMIN_MFA_LOGIN_ENFORCEMENT": "true", "MADAR_RELEASE_SHA": "a" * 40,
+        }
+        for environment in ("staging", "production"):
+            for changes in (
+                {"CSRF_ORIGIN_CHECK_ENABLED": "false"},
+                {"CSRF_ALLOW_MISSING_ORIGIN": "true"},
+                {"CSRF_ORIGIN_CHECK_ENABLED": "invalid"},
+            ):
+                with self.subTest(environment=environment, changes=changes), patch.dict(
+                    os.environ, {**base, "APP_ENV": environment, **changes}, clear=True,
+                ):
+                    with self.assertRaisesRegex(RuntimeError, "CSRF"):
+                        validate_runtime_configuration()
+
+    def test_all_consumed_origin_lists_are_validated_without_disclosing_values(self):
+        base = {
+            "APP_ENV": "production", "SUPABASE_URL": "https://provider.example",
+            "SUPABASE_ANON_KEY": "anon", "SUPABASE_SERVICE_KEY": "service",
+            "CSRF_SECRET": "x" * 40, "FRONTEND_URLS": "https://app.example",
+            "REDIS_URL": "redis://redis:6379/0", "ADMIN_MFA_LOGIN_ENFORCEMENT": "true",
+            "MADAR_RELEASE_SHA": "a" * 40, "CSRF_TRUSTED_ORIGINS": "https://app.example",
+        }
+        unsafe_origins = (
+            "http://external.example", "https://user:private-password@app.example",
+            "https://app.example?token=private-token", "https://app.example#private-fragment",
+            "https://app.example:invalid", "https://[broken", "https://app.example\\evil",
+            "https://app. example", "*",
+        )
+        for key in ("FRONTEND_URLS", "CSRF_TRUSTED_ORIGINS"):
+            for origin in unsafe_origins:
+                with self.subTest(key=key, origin=origin), patch.dict(
+                    os.environ, {**base, key: origin}, clear=True,
+                ):
+                    with self.assertRaisesRegex(RuntimeError, "origin") as caught:
+                        validate_runtime_configuration()
+                    self.assertNotIn(origin, str(caught.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -630,6 +630,10 @@ class DockerGitOperations:
                            for key in ("backend", "frontend"))
                     or str(images.get("worker", "")).split("@", 1)[-1] != admission["candidate"]["images"]["backend"]):
                 raise RuntimeError("completed_normal_accepted_artifact_changed")
+            from deployment.lib.completed_normal_profile import RECONCILED
+            if profile(admission) is RECONCILED:
+                env['MADAR_RELEASE_CONTROLLER_SHA']=admission['candidate']['controller_sha']
+                env['MADAR_RELEASE_MIGRATION_MANIFEST_SHA256']=admission['migration_manifest_sha256']
             context = digest(admission)
             if rendering is None:require_candidate_authority(admission)
             from deployment.lib.completed_normal_resources import allocation
@@ -771,6 +775,14 @@ class DockerGitOperations:
         # Queue consumers must not run in the inactive slot. Parser/remote
         # workers are slot-local and cannot see the active slot's Redis queue.
         with runtime_mutation_lock(self.state_root):
+            if maintenance_preparation(self):
+                self._maintenance_creation_guard(sha,slot)
+                self.verify_completed_normal_allocation(slot)
+                from deployment.lib.completed_normal_resources import ROLES
+                # No public health dependency: both ingress and original
+                # providers have already been fenced by the protected parent.
+                self._compose(sha,slot,images,'create','--no-build','--no-recreate',*ROLES,workers_active=True)
+                return
             if self._loaded_serving_slot() == slot:
                 raise RuntimeError("runtime_mutation_target_is_serving")
             if getattr(self,"completed_normal_admission",None) is not None:
@@ -791,6 +803,54 @@ class DockerGitOperations:
                 # attestation; they cannot consume before singleton handoff.
                 self._compose(sha,slot,images,'create','--no-build','--no-recreate',
                     'notification-worker','calendar-sync-worker','data-deletion-worker',workers_active=True)
+
+    def _maintenance_creation_guard(self, sha: str, slot: str) -> dict:
+        """Authenticate the fenced parent's backup witness, not public health."""
+        if not maintenance_preparation(self):raise RuntimeError('maintenance_preparation_contract_required')
+        from deployment.lib.completed_normal_admission import require_candidate_authority,credential_witness,digest
+        from deployment.lib.completed_normal_migration import intent_document
+        from deployment.lib.completed_normal_admission import validate_provider_preparation
+        contract=self.completed_normal_admission
+        selected=validate_provider_preparation(contract)
+        require_candidate_authority(contract,mode='READ_ONLY')
+        if sha!=contract['candidate']['source_sha'] or slot!=contract['candidate']['slot']:
+            raise RuntimeError('maintenance_preparation_identity_changed')
+        witness=credential_witness('migration_inputs','migration_inputs_sha256')
+        provider=witness.get('provider_maintenance')
+        expected={'operation':contract['operation'],'context_sha256':digest(contract),
+            'source_sha':sha,'controller_sha':contract['candidate']['controller_sha'],
+            'inventory_sha256':contract['writer_inventory_sha256'],
+            'system_identifier':contract['database']['system_identifier'],'source_schema':selected.source,'target_schema':selected.target}
+        if (witness.get('intent')!=intent_document(contract) or not isinstance(provider,dict)
+                or set(provider)!={'version','binding','journal_sha256','preimage_sha256'}
+                or type(provider['version']) is not int or provider['version']!=1 or provider['binding']!=expected
+                or any(not re.fullmatch('[0-9a-f]{64}',str(provider[k])) for k in ('journal_sha256','preimage_sha256'))):
+            raise RuntimeError('maintenance_preparation_fenced_witness_required')
+        state=_json_file(self.state_root/'state.json','release_state_invalid')
+        known=state.get('known_good_release') or {}
+        if (state.get('active_slot')!=contract['origin']['slot'] or known.get('slot')!=contract['origin']['slot']
+                or known.get('sha')!=contract['source_roles']['application_sha']
+                or known.get('schema')!=selected.source or state.get('in_progress_release') or state.get('rollback_failure')):
+            raise RuntimeError('maintenance_preparation_origin_changed')
+        return contract
+
+    def validate_created_candidate(self, sha: str, slot: str) -> None:
+        """Observe creation only; the root model seal is required for acceptance."""
+        from deployment.lib.completed_normal_resources import allocation,ROLES
+        from deployment.lib.emergency_routing_repair import Runtime
+        contract=self._maintenance_creation_guard(sha,slot)
+        selected=allocation(contract,slot,preparation150=True)
+        rows=Runtime().inspect(list(selected['containers'].values()))
+        if set(rows)!=set(selected['containers'].values()):raise RuntimeError('maintenance_preparation_incomplete')
+        for role in ROLES:
+            row=rows[selected['containers'][role]]
+            expected=(contract['candidate']['redis_image'] if role=='redis'
+                else contract['candidate']['images']['frontend' if role=='frontend' else 'backend'])
+            if (row['Name']!='/'+selected['containers'][role] or row['Image']!=expected
+                    or row['State'].get('Status')!='created' or row['State'].get('Running') is not False
+                    or row['State'].get('Restarting') is not False
+                    or row['HostConfig']['RestartPolicy']['Name']!='no'):
+                raise RuntimeError('maintenance_preparation_candidate_changed')
 
     def activate_workers(self, sha: str, slot: str, images: dict[str, str]) -> None:
         self._require_worker_authority(sha, slot)
@@ -908,6 +968,25 @@ class DockerGitOperations:
         admission = getattr(self, "completed_normal_admission", None)
         if admission is None:
             raise RuntimeError("completed_normal_admission_required")
+        if maintenance_preparation(self):
+            from deployment.lib.completed_normal_admission import require_maintenance_handoff,credential_witness
+            from deployment.lib.completed_normal_resources import ROLES,measured_spec_matches
+            from deployment.lib.emergency_routing_repair import Runtime
+            require_maintenance_handoff(admission)
+            origin=credential_witness('origin_runtime','origin_runtime_sha256')
+            if (origin.get('source_sha')!=admission['source_roles']['application_sha']
+                    or set(origin.get('runtimes',{}))!=set(ROLES)):
+                raise RuntimeError('completed_maintenance_origin_runtime_changed')
+            rows=Runtime().inspect([r['id'] for r in origin['runtimes'].values()])
+            if len(rows)!=len(ROLES):raise RuntimeError('completed_maintenance_origin_runtime_changed')
+            for role,record in origin['runtimes'].items():
+                row=next((r for r in rows.values() if r['Id']==record['id']),None)
+                if (row is None or row['Image']!=record['image'] or row['State'].get('Running') is not False
+                        or row['State'].get('Restarting') is not False
+                        or row['HostConfig']['RestartPolicy']['Name']!='no'
+                        or not measured_spec_matches(row,record['spec_sha256'],started_worker=role.endswith('-worker'))):
+                    raise RuntimeError('completed_maintenance_origin_not_stopped')
+            return
         roles, origin = admission["source_roles"], admission["origin"]
         from deployment.lib.completed_normal_profile import profile, LEGACY, expected_origin_grant
         legacy = profile(admission) is LEGACY
@@ -1477,11 +1556,20 @@ class DockerGitOperations:
         ], env=environment)
 
 
+def maintenance_preparation(operations) -> bool:
+    from deployment.lib.completed_normal_profile import DELETION, RECONCILED
+    contract=getattr(operations,'completed_normal_admission',None)
+    if not isinstance(contract,dict) or contract.get('operation') not in {DELETION.operation,RECONCILED.operation}:return False
+    from deployment.lib.completed_normal_admission import validate_provider_preparation
+    validate_provider_preparation(contract)
+    return True
+
+
 def prepared_release_path(state_root: Path, operations=None) -> Path:
     admission=getattr(operations,'completed_normal_admission',None)
     if admission is not None:
         from deployment.lib.completed_normal_admission import prepared_path
-        return prepared_path(admission,state_root)
+        return prepared_path(admission,state_root,preparation150=maintenance_preparation(operations))
     return state_root / "prepared-release.json"
 
 
@@ -1547,6 +1635,10 @@ def prepare_release(
 ) -> dict:
     if slot not in SLOT_PORTS:
         raise RuntimeError("candidate_slot_invalid")
+    maintenance=maintenance_preparation(operations)
+    completed_status='candidate_created_fenced' if maintenance else 'candidate_validated_workers_inactive'
+    validate_core=(operations.validate_created_candidate if maintenance else getattr(
+        operations,'validate_candidate_core',operations.validate_candidate))
     with deployment_lock(state_root):
         operations.verify_source(sha)
         schema = operations.schema_version()
@@ -1569,17 +1661,13 @@ def prepare_release(
                 or int(record.get("schema", -1)) != schema
                 or record.get("migration_plan") != migration_plan
                 or record.get("status") not in {
-                    "preparing", "candidate_validated_workers_inactive",
+                    "preparing", completed_status,
                 }
             ):
                 raise RuntimeError("prepared_release_identity_mismatch")
             images = record.get("images") or {}
-            if record["status"] == "candidate_validated_workers_inactive":
-                operations.preflight(sha, slot, images, schema)
-                validate_core = getattr(
-                    operations, "validate_candidate_core",
-                    operations.validate_candidate,
-                )
+            if record["status"] == completed_status:
+                if not maintenance:operations.preflight(sha, slot, images, schema)
                 validate_core(sha, slot)
                 return record
         else:
@@ -1600,10 +1688,6 @@ def prepare_release(
         try:
             operations.preflight(sha, slot, images, schema)
             operations.start_candidate(sha, slot, images)
-            validate_core = getattr(
-                operations, "validate_candidate_core",
-                operations.validate_candidate,
-            )
             validate_core(sha, slot)
         except Exception as error:
             record["prepare_attempt"] = int(record.get("prepare_attempt", 1)) + 1
@@ -1623,7 +1707,7 @@ def prepare_release(
             if expected_serving is not None:
                 operations.stop_candidate(slot, expected_serving=expected_serving)
             raise
-        record["status"] = "candidate_validated_workers_inactive"
+        record["status"] = completed_status
         record["validated_at"] = utc_now().isoformat()
         record.pop("last_failure", None)
         atomic_json(path, record)
@@ -1637,10 +1721,71 @@ def load_prepared_release(state_root: Path, sha: str, slot: str, operations=None
         raise RuntimeError("prepared_release_missing_or_invalid") from error
     if record.get("release_sha") != sha or record.get("candidate_slot") != slot:
         raise RuntimeError("prepared_release_identity_mismatch")
-    if record.get("status") not in {
+    allowed={
         "candidate_validated_workers_inactive", "candidate_workers_active",
-    }:
+    }
+    if maintenance_preparation(operations):
+        allowed={'candidate_created_fenced','candidate_worker_owner_accepted'}
+    if record.get("status") not in allowed:
         raise RuntimeError("prepared_release_state_invalid")
+    return record
+
+
+def accept_maintenance_worker_owner(*,sha,slot,state_root,operations,record):
+    """Existing child transfers ownership while all consumers remain stopped.
+
+    This cannot start workers, publish traffic, issue authority, or manufacture
+    running acceptance from a creation receipt. A crash after owner mutation
+    requires separately authorized forward repair, not automatic replay.
+    """
+    from deployment.lib.completed_normal_admission import require_maintenance_handoff,credential_witness,digest
+    from deployment.lib.completed_normal_resources import verify_runtime_resources
+    from deployment.lib.emergency_routing_repair import Runtime
+    contract=operations.completed_normal_admission
+    require_maintenance_handoff(contract)
+    if (record.get('status')!='candidate_created_fenced' or sha!=contract['candidate']['source_sha']
+            or slot!=contract['candidate']['slot'] or record.get('schema')!=146
+            or operations.schema_version()!=160):
+        raise RuntimeError('completed_maintenance_owner_stage_invalid')
+    for key,image in (('backend','backend'),('frontend','frontend'),('worker','backend')):
+        value=str(record.get('images',{}).get(key,''))
+        if '@sha256:' not in value or value.split('@',1)[-1]!=contract['candidate']['images'][image]:
+            raise RuntimeError('completed_maintenance_owner_images_changed')
+    stage=credential_witness('candidate_stage','candidate_stage_sha256')
+    generation=hashlib.sha256(f"bootstrap:{sha}:{slot}:{record.get('prepared_at','')}".encode()).hexdigest()
+    if stage.get('worker_generation')!=generation:
+        raise RuntimeError('completed_maintenance_owner_generation_changed')
+    runtime=Runtime()
+    with runtime_mutation_lock(state_root):
+        operations.verify_source(sha);require_maintenance_handoff(contract)
+        state=_json_file(state_root/'state.json','release_state_invalid');known=state.get('known_good_release') or {}
+        if (known.get('sha')!=contract['source_roles']['application_sha'] or known.get('slot')!=contract['origin']['slot']
+                or known.get('schema')!=146 or state.get('active_slot')!=known['slot']
+                or state.get('in_progress_release') or state.get('rollback_failure')):
+            raise RuntimeError('completed_maintenance_owner_origin_changed')
+        owner=load_worker_authority(state_root)
+        if (owner is None or owner['owner']!='CANDIDATE' or owner['generation']!=contract['origin']['worker_generation']
+                or owner['candidate']!={'sha':known['sha'],'slot':known['slot']}
+                or operations.worker_ownership(known,{'sha':sha,'slot':slot})!='none'):
+            raise RuntimeError('completed_maintenance_owner_not_quiescent')
+        rows=verify_runtime_resources(contract,stage,runtime)
+        consumers=('parser-worker','remote-ingestion-worker','notification-worker','calendar-sync-worker','data-deletion-worker')
+        if any(rows[k]['State'].get('Running') is not False or rows[k]['State'].get('Restarting') is not False
+                or rows[k]['State'].get('Status')!='created' for k in consumers):
+            raise RuntimeError('completed_maintenance_owner_consumer_started')
+        operations.require_completed_normal_origin_fenced()
+        old={'sha':known['sha'],'slot':known['slot']};candidate={'sha':sha,'slot':slot}
+        # Publish intent in the existing prepared record before irreversible
+        # singleton-owner mutation; never reuse candidate_created_fenced after
+        # an uncertain write or child exit at that boundary.
+        record.update(status='maintenance_owner_transfer_pending',worker_generation=generation,
+            maintenance_handoff_sha256=digest(require_maintenance_handoff(contract)))
+        atomic_json(prepared_release_path(state_root,operations),record)
+        write_worker_authority(state_root,generation=generation,owner='NONE',old=old,candidate=candidate)
+        operations.require_completed_normal_origin_fenced()
+        write_worker_authority(state_root,generation=generation,owner='CANDIDATE',old=old,candidate=candidate)
+        record.update(status='candidate_worker_owner_accepted',business_writes='NORMAL',workers_started=False)
+        atomic_json(prepared_release_path(state_root,operations),record)
     return record
 
 
@@ -1648,6 +1793,8 @@ def activate_prepared_release(
     *, sha: str, slot: str, state_root: Path, operations: DockerGitOperations,
 ) -> dict:
     record = load_prepared_release(state_root, sha, slot, operations)
+    if maintenance_preparation(operations):
+        return accept_maintenance_worker_owner(sha=sha,slot=slot,state_root=state_root,operations=operations,record=record)
     operations.verify_source(sha)
     validate_core = getattr(
         operations, "validate_candidate_core", operations.validate_candidate,
@@ -1716,7 +1863,8 @@ def adopt_prepared_release(
     operations: DockerGitOperations,
 ) -> dict:
     record = load_prepared_release(state_root, sha, slot, operations)
-    if record.get("status") != "candidate_workers_active":
+    maintenance=maintenance_preparation(operations)
+    if record.get("status") != ('candidate_worker_owner_accepted' if maintenance else 'candidate_workers_active'):
         raise RuntimeError("prepared_release_workers_not_active")
     state_file = state_root / "state.json"
     try:
@@ -1728,9 +1876,12 @@ def adopt_prepared_release(
     admission = getattr(operations, "completed_normal_admission", None)
     if admission is not None:
         from deployment.lib.completed_normal_admission import require_candidate_authority, digest as admission_digest
-        from deployment.lib.completed_normal_profile import profile, LEGACY
-        manual = profile(admission) is not LEGACY
+        from deployment.lib.completed_normal_profile import profile, LEGACY, RECONCILED
+        manual = profile(admission) not in (LEGACY,RECONCILED)
         require_candidate_authority(admission, mode='READ_ONLY' if manual else 'NORMAL')
+        if maintenance:
+            from deployment.lib.completed_normal_admission import require_maintenance_handoff
+            require_maintenance_handoff(admission)
         origin = existing.get("known_good_release") or {}
         if (origin.get("sha") != admission["source_roles"]["application_sha"]
                 or origin.get("slot") != admission["origin"]["slot"] or origin.get("schema") != admission['database']['schema']
@@ -1741,6 +1892,11 @@ def adopt_prepared_release(
     elif existing.get("known_good_release") or existing.get("in_progress_release"):
         raise RuntimeError("immutable_release_state_already_initialized")
     operations.verify_source(sha)
+    if maintenance:
+        runtimes=operations.verify_completed_normal_runtime(slot)
+        if not runtimes or any(row['State'].get('Running') is not True or row['State'].get('Restarting') is not False
+                or row['State'].get('Health',{}).get('Status')!='healthy' for row in runtimes.values()):
+            raise RuntimeError('completed_maintenance_adoption_runtime_not_running')
     if admission is not None and manual:
         operations.validate_candidate_core(sha,slot)
         operations.validate_completed_normal_read_only_serving(sha,slot)

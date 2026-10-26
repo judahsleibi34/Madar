@@ -1,0 +1,15 @@
+{
+  "release_metadata_version": 1,
+  "deployment_profile": "completed-normal-deletion146-150",
+  "schema": {
+    "compatible_min": 146,
+    "compatible_max": 150,
+    "target": 150,
+    "migration_class": "coordinated",
+    "rollback_compatible_min": 150,
+    "rollback_compatible_max": 150
+  },
+  "migration_policy": "none",
+  "migration_manifest": "migrations-147-150-coordinated.json",
+  "notes": "Unselected source-preparation candidate. READ_ONLY at146/147/148/149; no executable profile registration or production admission. NORMAL150 requires separately reviewed protected provider/backup/boot/write lifecycle, exact accepted images, all three ownership protocols2, sealed preservation/recovery evidence and fresh independent operational approval. No automatic execution or authority."
+}

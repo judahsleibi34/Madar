@@ -10,14 +10,16 @@ from concurrent.futures import ThreadPoolExecutor
 
 import psycopg
 from psycopg.types.json import Jsonb
+from tests.disposable_database_support import connect_disposable_database
 
 DSN = os.getenv("COMMERCIAL_SYNTHETIC_DATABASE_DSN")
+DISPOSABLE_MARKERS = frozenset({"madar-commercial-synthetic-rehearsal"})
 
 
 @unittest.skipUnless(DSN, "Requires disposable PostgreSQL commercial rehearsal")
 class CommercialLedgerDatabaseTests(unittest.TestCase):
     def setUp(self):
-        self.db = psycopg.connect(DSN, autocommit=True)
+        self.db = connect_disposable_database(DSN, markers=DISPOSABLE_MARKERS)
         self.addCleanup(self.db.close)
         self.tenant = self.db.execute("insert into public.tenants(brand_name,owner_name) values('Synthetic commercial test','Synthetic') returning tenant_id").fetchone()[0]
         auth_id = uuid4()
@@ -137,7 +139,7 @@ class CommercialLedgerDatabaseTests(unittest.TestCase):
     def test_opposite_concurrent_commands_have_one_winner(self):
         revision=self.state()["revision"]
         def run(operation):
-            with psycopg.connect(DSN,autocommit=True) as db:
+            with connect_disposable_database(DSN, markers=DISPOSABLE_MARKERS) as db:
                 try:
                     self.command(operation,{"expected_revision":revision},db=db)
                     return "success"

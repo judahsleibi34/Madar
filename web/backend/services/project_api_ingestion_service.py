@@ -11,6 +11,7 @@ from services import project_data_source_service
 from services.data_source_api_provider import (
     ProviderErrorCategory,
     ProviderFetchError,
+    ProviderNoChanges,
     fetch_bounded_records,
     get_provider,
 )
@@ -65,6 +66,7 @@ async def process_api_source(
     lifecycle_heartbeat=None,
     metadata_persister=None,
     incremental_persister=None,
+    noop_persister=None,
     metadata_failure_resolver=None,
     storage_reservation_persister=None,
     storage_object_persister=None,
@@ -106,13 +108,28 @@ async def process_api_source(
                 source_id=source_id, provider_key=provider_key, user_id=int(user_id),
             ),
         )
-        batch = fetch_bounded_records(
-            adapter,
-            resource_type=resource_type,
-            cancelled=cancelled,
-            heartbeat=lifecycle_heartbeat,
-            sync_cursor=sync_cursor,
-        )
+        try:
+            batch = fetch_bounded_records(
+                adapter,
+                resource_type=resource_type,
+                cancelled=cancelled,
+                heartbeat=lifecycle_heartbeat,
+                sync_cursor=sync_cursor,
+            )
+        except ProviderNoChanges as no_changes:
+            revalidate = getattr(adapter, "revalidate_credential", None)
+            if callable(revalidate):
+                revalidate()
+            credential_reference = getattr(adapter, "credential_reference", lambda: None)()
+            if noop_persister is None:
+                raise ProviderFetchError(ProviderErrorCategory.INVALID_RESPONSE) from no_changes
+            result = noop_persister(no_changes.next_cursor, credential_reference)
+            return {
+                **result,
+                "provider": {"provider_key": provider_key, "resource_type": resource_type,
+                             "record_count": 0, "page_count": 0,
+                             "next_cursor": no_changes.next_cursor, "no_changes": True},
+            }
         revalidate = getattr(adapter, "revalidate_credential", None)
         if callable(revalidate):
             revalidate()

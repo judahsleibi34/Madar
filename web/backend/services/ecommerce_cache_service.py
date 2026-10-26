@@ -43,6 +43,17 @@ class _CacheEntry:
 
 _cache: OrderedDict[str, _CacheEntry] = OrderedDict()
 _cache_lock = threading.RLock()
+# Tokens exist only while a miss is loading. Invalidating removes the current
+# token set, so an older database snapshot cannot refill the invalidated cache.
+_inflight: dict[int, set[object]] = {}
+# Host-based lookups learn their tenant only after reading the provider. A
+# single generation fences those fills without retaining per-host metadata.
+_generation = object()
+
+
+def capture_ecommerce_cache_generation() -> object:
+    with _cache_lock:
+        return _generation
 
 
 def ecommerce_cache_key(tenant_id: int, namespace: str, **parts: Any) -> str:
@@ -77,6 +88,7 @@ def write_ecommerce_cache(
     value: Any,
     *,
     ttl_seconds: int | None = None,
+    expected_generation: object | None = None,
 ) -> Any:
     ttl = _bounded_int(
         str(ttl_seconds) if ttl_seconds is not None else None,
@@ -85,6 +97,8 @@ def write_ecommerce_cache(
         900,
     )
     with _cache_lock:
+        if expected_generation is not None and expected_generation is not _generation:
+            return value
         _cache[key] = _CacheEntry(
             tenant_id=int(tenant_id),
             expires_at=time.monotonic() + ttl,
@@ -103,22 +117,33 @@ def get_or_create_ecommerce_cache(
     *,
     ttl_seconds: int | None = None,
 ) -> tuple[Any, bool]:
-    cached = read_ecommerce_cache(key, tenant_id)
-    if cached is not None:
-        return cached, True
-    created = factory()
-    write_ecommerce_cache(
-        key,
-        tenant_id,
-        created,
-        ttl_seconds=ttl_seconds,
-    )
-    return created, False
+    target = int(tenant_id)
+    token = object()
+    with _cache_lock:
+        cached = read_ecommerce_cache(key, target)
+        if cached is not None:
+            return cached, True
+        fills = _inflight.setdefault(target, set())
+        fills.add(token)
+    try:
+        created = factory()
+        with _cache_lock:
+            if _inflight.get(target) is fills:
+                write_ecommerce_cache(key, target, created, ttl_seconds=ttl_seconds)
+        return created, False
+    finally:
+        with _cache_lock:
+            fills.discard(token)
+            if not fills and _inflight.get(target) is fills:
+                _inflight.pop(target, None)
 
 
 def invalidate_ecommerce_cache(tenant_id: int) -> int:
+    global _generation
     target = int(tenant_id)
     with _cache_lock:
+        _generation = object()
+        _inflight.pop(target, None)
         keys = [key for key, entry in _cache.items() if entry.tenant_id == target]
         for key in keys:
             _cache.pop(key, None)
@@ -126,8 +151,11 @@ def invalidate_ecommerce_cache(tenant_id: int) -> int:
 
 
 def clear_ecommerce_cache() -> None:
+    global _generation
     with _cache_lock:
+        _generation = object()
         _cache.clear()
+        _inflight.clear()
 
 
 def ecommerce_cache_size() -> int:

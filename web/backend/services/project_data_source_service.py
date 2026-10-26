@@ -13,6 +13,8 @@ API_DATA_SOURCES_SCHEMA = 151
 INCREMENTAL_DATA_SOURCES_SCHEMA = 152
 CREDENTIAL_VAULT_SCHEMA = 155
 AUTOMATIC_SYNC_SCHEMA = 156
+GOOGLE_SHEETS_SCHEMA = 157
+WEBHOOK_INGESTION_SCHEMA = 158
 SOURCE_TYPE_SPREADSHEET_UPLOAD = "spreadsheet_upload"
 SOURCE_TYPE_API_PROVIDER = "api_provider"
 SOURCE_TYPES = {SOURCE_TYPE_SPREADSHEET_UPLOAD, SOURCE_TYPE_API_PROVIDER}
@@ -74,12 +76,20 @@ def project_data_source_capabilities(
     version = _schema_version(client=database)
     from services.provider_registry import public_provider_capabilities
     providers = public_provider_capabilities() if version >= API_DATA_SOURCES_SCHEMA else []
+    if version < GOOGLE_SHEETS_SCHEMA:
+        providers = [item for item in providers if item.get("key") != "google_sheets"]
     return {
         "source_registry_available": version >= DATA_SOURCES_SCHEMA,
         "api_sources_available": version >= API_DATA_SOURCES_SCHEMA,
         "incremental_resources_available": version >= INCREMENTAL_DATA_SOURCES_SCHEMA,
         "credential_vault_available": version >= CREDENTIAL_VAULT_SCHEMA,
         "automatic_sync_available": version >= AUTOMATIC_SYNC_SCHEMA,
+        "google_sheets_available": version >= GOOGLE_SHEETS_SCHEMA and any(
+            item.get("key") == "google_sheets" for item in providers
+        ),
+        "webhook_ingestion_available": version >= WEBHOOK_INGESTION_SCHEMA and any(
+            item.get("webhook", {}).get("supported") for item in providers
+        ),
         "providers": providers,
     }
 

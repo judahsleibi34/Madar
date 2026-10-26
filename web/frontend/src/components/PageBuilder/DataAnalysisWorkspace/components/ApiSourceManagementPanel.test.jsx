@@ -202,4 +202,88 @@ describe("ApiSourceManagementPanel", () => {
     expect(await screen.findByText(uiText.en.sourceCredential_revoked)).toBeTruthy();
     expect(screen.getByRole("checkbox").disabled).toBe(true);
   });
+
+  it("configures a Google Sheets tab and stable record identity without exposing credentials", async () => {
+    apiFetch.mockImplementation((url, options = {}) => {
+      if (url.includes("/resources?")) return Promise.resolve(response(resourceBody({ items: [] })));
+      if (url.endsWith("/credentials")) return Promise.resolve(response({ items: [{ status: "active", source_revision: 3 }] }));
+      if (url.endsWith("/google-sheets/mapping") && options.method === "PUT") return Promise.resolve(response({
+        mapping: { spreadsheet_title: "Business", sheet_title: "Orders", mapping_revision: 1 },
+      }));
+      if (url.endsWith("/google-sheets/mapping")) return Promise.resolve(response({ configured: false }));
+      if (url.endsWith("/google-sheets/inspect")) return Promise.resolve(response({
+        tabs: [{ sheet_id: 42, title: "Orders" }], requested_sheet_id: 42,
+      }));
+      if (url.endsWith("/google-sheets/preview")) return Promise.resolve(response({
+        headers: ["order_id", "amount"], rows: [{ order_id: "A-1", amount: 25 }],
+      }));
+      return Promise.resolve(response({ available: true, schedule: null }));
+    });
+    mount({
+      source: { ...source, provider_key: "google_sheets", resource_type: "sheet" },
+      capabilities: { incremental_resources_available: true },
+    });
+    const urlInput = await screen.findByLabelText(uiText.en.googleSheetsUrl);
+    fireEvent.change(urlInput, { target: { value: "https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789/edit#gid=42" } });
+    fireEvent.click(screen.getByRole("button", { name: uiText.en.googleSheetsInspect }));
+    expect(await screen.findByRole("combobox", { name: uiText.en.googleSheetsTab })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: uiText.en.googleSheetsPreview }));
+    expect((await screen.findAllByText("order_id")).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: uiText.en.googleSheetsSaveMapping }));
+    expect(await screen.findByText(/Business · Orders/)).toBeTruthy();
+    const save = apiFetch.mock.calls.find(([url, options]) => url.endsWith("/google-sheets/mapping") && options?.method === "PUT");
+    expect(JSON.parse(save[1].body)).toMatchObject({
+      sheet_id: 42, selected_columns: ["order_id", "amount"], record_id_column: "order_id",
+    });
+    expect(document.body.textContent).not.toMatch(/refresh[_ -]?token/i);
+  });
+
+  it("shows an honest webhook-unavailable state without fabricating an endpoint", async () => {
+    apiFetch.mockImplementation((url) => {
+      if (url.includes("/resources?")) return Promise.resolve(response(resourceBody({ items: [] })));
+      if (url.endsWith("/credentials")) return Promise.resolve(response({ items: [] }));
+      if (url.endsWith("/webhook")) return Promise.resolve(response({ available: false, endpoint: null }));
+      return Promise.resolve(response({ available: false }));
+    });
+    mount({ capabilities: { providers: [{ key: "approved_provider", webhook: { supported: true } }],
+      webhook_ingestion_available: false } });
+    expect(await screen.findByText(uiText.en.webhookUnavailable)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: uiText.en.webhookProvision })).toBeNull();
+  });
+
+  it("reveals a provisioned webhook secret once and uses the fenced enable operation", async () => {
+    let endpoint = null;
+    apiFetch.mockImplementation((url, options = {}) => {
+      if (url.includes("/resources?")) return Promise.resolve(response(resourceBody({ items: [] })));
+      if (url.endsWith("/credentials")) return Promise.resolve(response({ items: [] }));
+      if (url.endsWith("/webhook") && options.method === "POST") {
+        endpoint = { id: "endpoint-1", source_resource_id: "resource-1", status: "disabled", fence: 1,
+          pending_count: 0, failed_count: 0 };
+        return Promise.resolve(response({ endpoint, one_time_secret: "one-time-webhook-secret" }, 201));
+      }
+      if (url.endsWith("/webhook") && options.method === "PUT") {
+        endpoint = { ...endpoint, status: "enabled", fence: 2 };
+        return Promise.resolve(response(endpoint));
+      }
+      if (url.endsWith("/webhook/revoke") && options.method === "POST") {
+        endpoint = { ...endpoint, status: "revoked", fence: 3 };
+        return Promise.resolve(response(endpoint));
+      }
+      if (url.endsWith("/webhook")) return Promise.resolve(response({ available: true, endpoint }));
+      return Promise.resolve(response({ available: false }));
+    });
+    mount({ capabilities: { providers: [{ key: "approved_provider", webhook: { supported: true } }],
+      webhook_ingestion_available: true } });
+    fireEvent.click(await screen.findByRole("button", { name: uiText.en.webhookProvision }));
+    expect(await screen.findByText("one-time-webhook-secret")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: uiText.en.webhookEnable }));
+    expect(await screen.findByText(uiText.en.webhookEnabled)).toBeTruthy();
+    const write = apiFetch.mock.calls.find(([url, options]) => url.endsWith("/webhook") && options?.method === "PUT");
+    expect(JSON.parse(write[1].body)).toEqual({ enabled: true, expected_fence: 1 });
+    fireEvent.click(screen.getByRole("button", { name: uiText.en.webhookRevoke }));
+    expect(await screen.findByText(uiText.en.webhookRevoked)).toBeTruthy();
+    expect(screen.queryByText("one-time-webhook-secret")).toBeNull();
+    const revoke = apiFetch.mock.calls.find(([url, options]) => url.endsWith("/webhook/revoke") && options?.method === "POST");
+    expect(JSON.parse(revoke[1].body)).toEqual({ expected_fence: 2 });
+  });
 });

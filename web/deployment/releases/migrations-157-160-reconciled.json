@@ -1,0 +1,66 @@
+{
+  "manifest_version": 1,
+  "release_sha": "CURRENT",
+  "execution_status": "blocked_pending_protected_controller_reconciliation",
+  "migrations": [
+    {
+      "number": 157,
+      "from_schema": 156,
+      "to_schema": 157,
+      "path": "web/database/migrations/157_fence_notification_delivery_claims.sql",
+      "sha256": "52476307bff528438bad4605ffcf1dace7e4b2bbf5a27c44bded591e24d978de",
+      "compatibility": "coordinated",
+      "historical_source": {
+        "number": 147,
+        "sha256": "bc76737e03ddf3dc369e444f34435dbded600ab1cae3209555b5bde6647d60f3"
+      }
+    },
+    {
+      "number": 158,
+      "from_schema": 157,
+      "to_schema": 158,
+      "path": "web/database/migrations/158_guard_reservation_reactivation_capacity.sql",
+      "sha256": "4cb81048a81efe58ccf662ee9219e2c1f84d64f697695e89db0871cbbd7735c1",
+      "compatibility": "forward-compatible",
+      "historical_source": {
+        "number": 148,
+        "sha256": "a6788acfbe91129fcc55cbcd9c42440bbb91a785518afb99830c6137ed3c3096"
+      }
+    },
+    {
+      "number": 159,
+      "from_schema": 158,
+      "to_schema": 159,
+      "path": "web/database/migrations/159_fence_notification_outbox_claims.sql",
+      "sha256": "bde2aff049fe3813398926b95dd8082acf5e9cda755b3ac9eb362d99ded392ca",
+      "compatibility": "coordinated",
+      "historical_source": {
+        "number": 149,
+        "sha256": "8ed767df57f5c02be50d83621fe45d314b3d1fdb42d2b7a470170519bdf1f869"
+      }
+    },
+    {
+      "number": 160,
+      "from_schema": 159,
+      "to_schema": 160,
+      "path": "web/database/migrations/160_fence_data_deletion_ownership.sql",
+      "sha256": "26047edda49f11d7fd3100f3c8a665d332983d6d806a32a10ea48a55b62b9de2",
+      "compatibility": "coordinated",
+      "historical_source": {
+        "number": 150,
+        "sha256": "63d4d0c7af93bd3c3e93158a2e281b41eed23b83bfafd4b3f1ba22313533b722"
+      }
+    }
+  ],
+  "required_worker_protocols": {
+    "notification_delivery": 2,
+    "notification_outbox": 2,
+    "data_deletion": 2
+  },
+  "schema_contract": {
+    "origin": 156,
+    "target": 160,
+    "normal_target_only": true,
+    "operational_admission": "BLOCKED"
+  }
+}

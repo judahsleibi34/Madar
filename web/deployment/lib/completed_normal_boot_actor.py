@@ -169,7 +169,8 @@ class CompletedNormalBootActor:
         except OSError:pass
         # A verified READ_ONLY bridge is the forward-repair target. It may stay
         # available without ever regranting writes or restarting the origin.
-        if not failures and (self.root/'candidate-runtime.json').exists():
+        from deployment.lib.completed_normal_profile import DELETION, RECONCILED
+        if self.profile not in (DELETION, RECONCILED) and not failures and (self.root/'candidate-runtime.json').exists():
             try:
                 self.candidate(compensation_leaf=True).execute_read_only()
                 self.publish_restricted_bridge()
@@ -231,7 +232,10 @@ class CompletedNormalBootActor:
         failures=[]
         with verification_window(self.runtime,60):
             with runtime_mutation_lock(Path('/var/lib/madar/releases')):
-                for path in (self.root/'candidate-runtime.json',Path(self.contract['source_roles']['completion_root'])/
+                from deployment.lib.completed_normal_profile import DELETION, RECONCILED
+                candidates=(self.root/'candidate-runtime.json',)
+                if self.profile in (DELETION, RECONCILED):candidates+=(self.root/'candidate-staged-runtime.json',)
+                for path in (*candidates,Path(self.contract['source_roles']['completion_root'])/
                         ('candidate-runtime.json' if self.profile is not LEGACY else 'candidate-identities.json')):
                     if not path.exists():continue
                     try:record=json.loads(protected(path,private=True).read_text())

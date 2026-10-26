@@ -1,0 +1,13 @@
+{
+  "archive_sha256": "sha256:1726ad2ca291d0dd23e176f6feb71eb634b5fbf1f7c55e9207c26e4fd834beca",
+  "artifact_id": 12082708439,
+  "images": {
+    "backend": "sha256:ff32899c207805ebf603f5a5adb0bc767a86058c3b6f0bdcffe6a506b0a791ff",
+    "frontend": "sha256:100f1485c80a060295048791e1e28f67c5ff0903fe71568b74d0fe585c8871d0"
+  },
+  "production_authorized": false,
+  "run_id": 38986641301,
+  "scope": "authenticated fresh CI artifacts; not production admission",
+  "source_sha": "c3f9ce591f4706e535795b979064d3baefe421be",
+  "status": "PASS"
+}

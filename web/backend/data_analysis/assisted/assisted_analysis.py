@@ -113,6 +113,49 @@ class AssistedAnalysis(AnalysisBase):
                 report.add_kpi(str(label), rows[0].get("value"))
             return report.to_dict()
 
+        if operation == "distinct_count":
+            value_column = metric.get("value_column")
+            self.validate_columns([value_column, group_column])
+            if not value_column:
+                raise ValueError("value_column is required")
+            if group_column:
+                rows = (
+                    self.df.groupby(group_column, dropna=False)[value_column]
+                    .nunique(dropna=True).reset_index(name="value").to_dict(orient="records")
+                )
+            else:
+                rows = [{"value": int(self.df[value_column].nunique(dropna=True))}]
+            report.set_summary(
+                f"Distinct non-missing values in '{value_column}' were counted.",
+                f"تم حساب القيم المميزة غير المفقودة في '{value_column}'.",
+            )
+            report.add_table(str(label), rows)
+            if group_column:
+                report.add_chart(str(label), "bar", rows, group_column, "value")
+            else:
+                report.add_kpi(str(label), rows[0]["value"])
+            return report.to_dict()
+
+        if operation == "date_aggregate":
+            rows, date_metadata = self._date_aggregate(metric)
+            report.mappings.update(date_metadata)
+            invalid_count = date_metadata["invalid_date_count"]
+            if invalid_count:
+                report.warnings.append(
+                    f"{invalid_count} missing or invalid date values were excluded from date grouping."
+                )
+            if date_metadata["partial_periods"]:
+                report.warnings.append(
+                    "The first or last period may be partial for the selected dataset coverage."
+                )
+            report.set_summary(
+                f"Values were grouped by {date_metadata['period']} using the verified date field '{date_metadata['date_column']}'.",
+                f"تم تجميع القيم حسب {date_metadata['period']} باستخدام حقل التاريخ المتحقق منه '{date_metadata['date_column']}'.",
+            )
+            report.add_table(str(label), rows)
+            report.add_chart(str(label), "line", rows, "period", "value")
+            return report.to_dict()
+
         if operation in {"rate", "ratio", "percentage"}:
             numerator_column = metric.get("numerator_column")
             denominator_column = metric.get("denominator_column")
@@ -136,6 +179,70 @@ class AssistedAnalysis(AnalysisBase):
             return report.to_dict()
 
         raise ValueError(f"Unsupported custom metric operation: {operation}")
+
+    def _date_aggregate(self, metric: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        date_column = metric.get("date_column")
+        value_column = metric.get("value_column")
+        aggregation = str(metric.get("aggregation") or "count").lower().strip()
+        period = str(metric.get("period") or "month").lower().strip()
+        timezone = str(metric.get("timezone") or "UTC").strip()
+        if period not in {"day", "week", "month"}:
+            raise ValueError("Unsupported date aggregation period")
+        if aggregation not in {"count", "sum", "mean", "min", "max"}:
+            raise ValueError("Unsupported date aggregation")
+        if timezone != "UTC":
+            raise ValueError("Only UTC date aggregation is currently supported")
+        self.validate_columns([date_column, value_column])
+        if not date_column:
+            raise ValueError("date_column is required")
+        raw_dates = self.df[date_column]
+        dates = pd.to_datetime(raw_dates, errors="coerce", utc=True, format="mixed")
+        non_missing_count = int(raw_dates.notna().sum())
+        invalid_count = int(dates.isna().sum())
+        if non_missing_count == 0 or int(dates.notna().sum()) == 0:
+            raise ValueError("The selected date column has no valid values")
+        invalid_non_missing = int((raw_dates.notna() & dates.isna()).sum())
+        if invalid_non_missing and invalid_non_missing == non_missing_count:
+            raise ValueError("The selected date column is not a verified date field")
+        if aggregation != "count" and not value_column:
+            raise ValueError("value_column is required for this date aggregation")
+
+        if period == "day":
+            keys = dates.dt.strftime("%Y-%m-%d")
+        else:
+            naive_dates = dates.dt.tz_convert("UTC").dt.tz_localize(None)
+            frequency = "W-SUN" if period == "week" else "M"
+            keys = naive_dates.dt.to_period(frequency).astype("string")
+        work = pd.DataFrame({"period": keys})
+        if aggregation == "count":
+            work["value"] = 1
+            grouped = work.dropna(subset=["period"]).groupby("period", sort=True)["value"].sum()
+        else:
+            work["value"] = self.numeric(value_column)
+            grouped = work.dropna(subset=["period"]).groupby("period", sort=True)["value"].agg(aggregation)
+        rows = grouped.reset_index(name="value").to_dict(orient="records")
+        if not rows:
+            raise ValueError("No valid rows remain for date aggregation")
+
+        valid_dates = dates.dropna()
+        minimum = valid_dates.min()
+        maximum = valid_dates.max()
+        partial_periods = False
+        if period == "month":
+            partial_periods = minimum.day != 1 or maximum.day != maximum.days_in_month
+        elif period == "week":
+            partial_periods = minimum.weekday() != 0 or maximum.weekday() != 6
+        return rows, {
+            "date_column": str(date_column),
+            "value_column": str(value_column) if value_column else None,
+            "aggregation": aggregation,
+            "period": period,
+            "timezone": timezone,
+            "invalid_date_count": invalid_count,
+            "coverage_start": minimum.isoformat(),
+            "coverage_end": maximum.isoformat(),
+            "partial_periods": partial_periods,
+        }
 
     def _aggregate(self, value_column: str, operation: str, group_column: str | None = None) -> list[dict[str, Any]]:
         if not value_column:

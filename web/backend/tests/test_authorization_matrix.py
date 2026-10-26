@@ -212,6 +212,36 @@ class DataRouteAuthorizationMatrixTests(unittest.TestCase):
                 None,
             ),
             (
+                "get",
+                "/users/2/data/projects/11111111-1111-4111-8111-111111111111/"
+                "datasets/33333333-3333-4333-8333-333333333333/versions",
+                None,
+            ),
+            (
+                "post",
+                "/users/2/data/projects/11111111-1111-4111-8111-111111111111/"
+                "datasets/33333333-3333-4333-8333-333333333333/"
+                "versions/44444444-4444-4444-8444-444444444444/explore",
+                {"filters": [], "sort": [], "limit": 10, "offset": 0},
+            ),
+            (
+                "get",
+                "/users/2/data/projects/11111111-1111-4111-8111-111111111111/"
+                "datasets/33333333-3333-4333-8333-333333333333/freshness",
+                None,
+            ),
+            (
+                "post",
+                "/users/2/data/projects/11111111-1111-4111-8111-111111111111/dashboards",
+                {"name": "Private dashboard", "description": ""},
+            ),
+            (
+                "get",
+                "/users/2/data/projects/11111111-1111-4111-8111-111111111111/"
+                "dashboards/55555555-5555-4555-8555-555555555555",
+                None,
+            ),
+            (
                 "patch",
                 "/users/2/data/projects/11111111-1111-4111-8111-111111111111/"
                 "sources/33333333-3333-4333-8333-333333333333",

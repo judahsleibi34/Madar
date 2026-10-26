@@ -1,0 +1,36 @@
+{
+  "preview_backend_source": "3ab2bd506ed89f9457f0010e2b50cb01cb031ff1",
+  "preview_backend": {
+    "collected": 3782,
+    "passed": 3033,
+    "skipped": 749,
+    "failed": 0,
+    "seconds": 47.839,
+    "external_attempts": []
+  },
+  "successor_backend_source": "5e5c0c3e0dadc65eb503237528d2e85fdabd1672",
+  "successor_backend": {
+    "collected": 3814,
+    "passed": 3044,
+    "skipped": 770,
+    "failed": 0,
+    "seconds": 45.183,
+    "external_attempts": []
+  },
+  "frontend": {
+    "files": 233,
+    "passed": 1713,
+    "skipped": 1,
+    "failed": 0,
+    "seconds": 118.73,
+    "lint": "PASS",
+    "production_build": "PASS"
+  },
+  "native_preview_executions": 66,
+  "native_successor_executions": 109,
+  "native_successor_distinct_cases": 87,
+  "successor_focused_unit": 48,
+  "calendar_focused_unit": 45,
+  "production_modified": false,
+  "scope": "executed pre-freeze scoped evidence; final receipts live outside their own source commit"
+}

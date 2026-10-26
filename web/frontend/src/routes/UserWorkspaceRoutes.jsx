@@ -53,6 +53,9 @@ const DataProjectsPage = lazy(() => import("../components/DataProjects/DataProje
 const BuilderProjectChooser = lazy(() =>
   import("../components/PageBuilder/workspace/BuilderProjectChooser")
 );
+const BusinessIntelligenceWorkspace = lazy(() =>
+  import("../components/BusinessIntelligence/BusinessIntelligenceWorkspace")
+);
 
 const getDataProjectSelectionKey = (user) =>
   `madar:selected-data-project:${user?.tenant_id || user?.tenantId || "tenant"}:${user?.id || user?.auth_id || "user"}`;
@@ -106,6 +109,40 @@ function BuilderWorkspaceEntry({ workspace = "page-builder", ...pageBuilderProps
   );
 }
 
+function BusinessIntelligenceWorkspaceEntry({ lang, user }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const projectId = getBuilderProjectIdFromPath(location.pathname);
+  const selectionKey = getDataProjectSelectionKey(user);
+  const rememberedProjectId = readSelectedDataProject(selectionKey);
+
+  if (!projectId && rememberedProjectId) {
+    return <Navigate replace to={getBuilderWorkspacePath(rememberedProjectId, "data", "business-intelligence")} state={{ dataProjectConfirmed: true }} />;
+  }
+  const requiresConfirmation = location.state?.dataProjectConfirmed !== true && rememberedProjectId !== projectId;
+  if (!projectId || requiresConfirmation) {
+    return (
+      <BuilderProjectChooser
+        workspace="business-intelligence"
+        dataProjectSelectionKey={selectionKey}
+        usageProfile="website"
+      />
+    );
+  }
+  return (
+    <BusinessIntelligenceWorkspace
+      key={`${user?.tenant_id || "tenant"}:${projectId}`}
+      lang={lang}
+      projectId={projectId}
+      user={user}
+      onChangeProject={() => {
+        try { window.sessionStorage.removeItem(selectionKey); } catch { /* chooser remains reachable */ }
+        navigate(DASHBOARD_ROUTES.businessIntelligence);
+      }}
+    />
+  );
+}
+
 export default function UserWorkspaceRoutes({
   lang,
   onGoToDashboard,
@@ -122,6 +159,7 @@ export default function UserWorkspaceRoutes({
     location.pathname.startsWith("/builder-responses") ||
     location.pathname.startsWith("/data-projects") ||
     location.pathname.startsWith("/data-sources") ||
+    location.pathname.startsWith("/business-intelligence") ||
     location.pathname.startsWith("/builder-data") ||
     location.pathname.startsWith("/calendar") ||
     location.pathname.startsWith("/agenda") ||
@@ -162,6 +200,7 @@ export default function UserWorkspaceRoutes({
                   location.pathname.startsWith("/builder-responses") ||
                   location.pathname.startsWith("/data-projects") ||
                   location.pathname.startsWith("/data-sources") ||
+                  location.pathname.startsWith("/business-intelligence") ||
                   location.pathname.startsWith("/builder-data") ||
                   location.pathname.startsWith("/archive"),
                 isPageBuilderShell: location.pathname.startsWith("/page-builder"),
@@ -265,6 +304,14 @@ export default function UserWorkspaceRoutes({
             appThemeMode={themeMode}
             onAppThemeModeChange={shellProps.onThemeModeChange}
           />,
+          { compactSidebar: true }
+        )}
+      />
+
+      <Route
+        path="/business-intelligence/*"
+        element={renderShell(
+          <BusinessIntelligenceWorkspaceEntry lang={lang} user={user} />,
           { compactSidebar: true }
         )}
       />

@@ -1,0 +1,14 @@
+{
+  "manifest_version": 1,
+  "release_sha": "STAGING",
+  "migrations": [
+    {
+      "number": 164,
+      "from_schema": 163,
+      "to_schema": 164,
+      "path": "web/database/migrations/164_add_automated_reporting.sql",
+      "sha256": "d5d5a2320d5cd5e462edf5e95146d4f43826ef76e6927ea41cde8828348d72d9",
+      "compatibility": "expand-only"
+    }
+  ]
+}

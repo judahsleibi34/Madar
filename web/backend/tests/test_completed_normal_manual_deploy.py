@@ -63,5 +63,23 @@ class ManualDeployTests(unittest.TestCase):
         self.assertNotIn('/auth/',text)
         self.assertNotIn('/builder/',text)
 
+    def test_manual_migration_dispatch_uses_checksum_selected_bounds_and_exclusion(self):
+        from deployment.lib import completed_normal_migration
+        with patch.object(completed_normal_migration,'run_migration',return_value={'schema':144}) as run:
+            self.ops.verify_source=lambda sha:None
+            result=fixture.cli.automatic_migrate_known_good(sha=self.contract['candidate']['source_sha'],
+                state_root=self.ops.state_root,compatibility=self.ops.compatibility,operations=self.ops)
+            self.assertEqual(result,{'schema':144})
+            run.assert_called_once_with(self.contract,self.ops.release_root,self.ops.state_root,self.ops)
+        for bounds in ((115,136,136,()),(136,144,144,()),(136,144,143,(142,))):
+            with patch.object(completed_normal_migration,'run_migration') as run:
+                changed=copy.copy(self.ops.compatibility)
+                for name,value in zip(('schema_min','schema_max','target_schema','excluded_schemas'),bounds):
+                    object.__setattr__(changed,name,value)
+                with self.subTest(bounds=bounds),self.assertRaisesRegex(RuntimeError,'release_binding_invalid'):
+                    fixture.cli.automatic_migrate_known_good(sha=self.contract['candidate']['source_sha'],
+                        state_root=self.ops.state_root,compatibility=changed,operations=self.ops)
+                run.assert_not_called()
+
 
 if __name__=='__main__':unittest.main()

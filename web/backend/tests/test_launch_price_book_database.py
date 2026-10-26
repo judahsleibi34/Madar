@@ -5,15 +5,17 @@ from uuid import uuid4
 
 import psycopg
 from psycopg.types.json import Jsonb
+from tests.disposable_database_support import connect_disposable_database
 
 
 DSN = os.getenv("COMMERCIAL_SYNTHETIC_DATABASE_DSN")
+DISPOSABLE_MARKERS = frozenset({"madar-price-book-synthetic-rehearsal", "madar-hardening-synthetic-146"})
 
 
 @unittest.skipUnless(DSN, "Requires disposable PostgreSQL commercial rehearsal")
 class RevisedLaunchPriceBookDatabaseTests(unittest.TestCase):
     def setUp(self):
-        self.db = psycopg.connect(DSN, autocommit=True)
+        self.db = connect_disposable_database(DSN, markers=DISPOSABLE_MARKERS)
         self.addCleanup(self.db.close)
 
     def book(self, book_id):
@@ -54,7 +56,18 @@ class RevisedLaunchPriceBookDatabaseTests(unittest.TestCase):
 
     def test_opened_revised_book_quotes_commerce_and_unchanged_bundles(self):
         # Activation is a governed production step; here it is rolled back.
-        with psycopg.connect(DSN) as db:
+        windows_before = self.db.execute(
+            "select id,sales_start_at,sales_end_at from public.commercial_price_books order by id"
+        ).fetchall()
+        with connect_disposable_database(DSN, markers=DISPOSABLE_MARKERS, autocommit=False) as db:
+            # Continuity regressions deliberately create open synthetic books.
+            # Isolate this automatic-selection assertion from those newer books
+            # inside the same rollback transaction; preserve every price fact.
+            db.execute(
+                "update public.commercial_price_books set sales_end_at=clock_timestamp() "
+                "where id ~ '^(old|current|second)_[0-9a-f]{20}$' "
+                "and sales_start_at is not null and sales_end_at is null"
+            )
             tenant = db.execute(
                 "insert into public.tenants(brand_name,owner_name) values(%s,'Synthetic') returning tenant_id",
                 ("Price book " + uuid4().hex,),
@@ -77,6 +90,9 @@ class RevisedLaunchPriceBookDatabaseTests(unittest.TestCase):
             self.assertEqual(quote(["forms", "website", "ecommerce"])["pricing"]["recurring_minor"], 4000)
             db.rollback()
         self.assertIsNone(self.book("launch_2026_v2")[2])
+        self.assertEqual(self.db.execute(
+            "select id,sales_start_at,sales_end_at from public.commercial_price_books order by id"
+        ).fetchall(), windows_before)
 
 
 if __name__ == "__main__":

@@ -181,6 +181,56 @@ class ProjectDatasetServiceTests(unittest.TestCase):
         self.assertEqual([item["id"] for item in result["items"]], [DATASET_A])
         self.assertEqual(result["items"][0]["latest_version"]["id"], VERSION_A)
 
+    def test_version_history_is_newest_first_and_exactly_scoped(self):
+        client = FakeClient({
+            "application_schema_state": [{"contract_key": "core", "schema_version": 159}],
+            "builder_projects": [project()],
+            "data_datasets": [{"id": DATASET_A, "tenant_id": 1, "project_id": PROJECT_A,
+                               "creator_user_id": 7, "status": "active"}],
+            "data_dataset_versions": [
+                {"id": VERSION_A, "tenant_id": 1, "dataset_id": DATASET_A, "version_number": 1,
+                 "version_kind": "original", "provenance": {}},
+                {"id": VERSION_B, "tenant_id": 1, "dataset_id": DATASET_A, "version_number": 2,
+                 "version_kind": "derived", "provenance": {"target_revision": 8}},
+                {"id": "99999999-9999-4999-8999-999999999999", "tenant_id": 2,
+                 "dataset_id": DATASET_A, "version_number": 99, "provenance": {}},
+            ],
+        })
+        result = project_dataset_service.list_project_dataset_versions(
+            tenant_id=1, project_id=PROJECT_A, user_id=7, dataset_id=DATASET_A,
+            limit=10, offset=0, client=client,
+        )
+        self.assertEqual([item["id"] for item in result["items"]], [VERSION_B, VERSION_A])
+        self.assertEqual(result["items"][0]["revision"], 8)
+
+    def test_freshness_projection_is_scoped_and_contains_no_credentials(self):
+        source_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        resource_id = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+        client = FakeClient({
+            "application_schema_state": [{"contract_key": "core", "schema_version": 159}],
+            "builder_projects": [project()],
+            "data_datasets": [{"id": DATASET_A, "tenant_id": 1, "project_id": PROJECT_A,
+                               "creator_user_id": 7, "status": "active", "source_id": source_id,
+                               "source_resource_id": resource_id, "updated_at": "now"}],
+            "data_sources": [{"id": source_id, "tenant_id": 1, "project_id": PROJECT_A,
+                              "creator_user_id": 7, "display_name": "Orders", "status": "active",
+                              "sync_state": "ready", "last_successful_sync_at": "then",
+                              "latest_version_id": VERSION_B, "secret": "must-not-leak"}],
+            "data_source_resources": [{"id": resource_id, "tenant_id": 1, "project_id": PROJECT_A,
+                                       "source_id": source_id, "committed_revision": 8,
+                                       "latest_checkpoint_version_id": VERSION_B}],
+            "data_dataset_checkpoints": [{"tenant_id": 1, "project_id": PROJECT_A,
+                                           "dataset_id": DATASET_A, "source_resource_id": resource_id,
+                                           "target_revision": 8, "status": "completed"}],
+            "data_source_sync_schedules": [], "data_source_webhook_endpoints": [],
+        })
+        result = project_dataset_service.get_project_dataset_freshness(
+            tenant_id=1, project_id=PROJECT_A, user_id=7, dataset_id=DATASET_A, client=client,
+        )
+        self.assertTrue(result["available"])
+        self.assertEqual(result["resource"]["committed_revision"], 8)
+        self.assertNotIn("secret", repr(result).lower())
+
     def test_reopen_rejects_cross_project_cross_tenant_and_other_uploader(self):
         base_tables = {
             "builder_projects": [project()],

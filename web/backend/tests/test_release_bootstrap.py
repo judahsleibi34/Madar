@@ -6,6 +6,8 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from unittest.mock import Mock
+from contextlib import nullcontext
 
 
 WEB_ROOT = Path(os.getenv("MADAR_TEST_REPOSITORY_ROOT") or Path(__file__).resolve().parents[2])
@@ -67,6 +69,107 @@ class FakeOperations:
 class ReleaseBootstrapTests(unittest.TestCase):
     def compatibility(self):
         return release_cli.Compatibility(81, 83, 83, "expand-only", 81, 83)
+
+    def test_maintenance_child_creates_all_roles_without_starting_or_handoff(self):
+        from test_schema150_admission import deletion_contract
+        from test_schema160_release import reconciled_contract
+        for factory in (deletion_contract,reconciled_contract):
+            with self.subTest(contract=factory.__name__):
+                from deployment.lib.completed_normal_resources import ROLES
+                operations=release_cli.DockerGitOperations.__new__(release_cli.DockerGitOperations)
+                operations.completed_normal_admission=factory()
+                operations.state_root=Path('/unused-synthetic-state')
+                operations._loaded_serving_slot=Mock(side_effect=AssertionError('fenced ingress has no HTTP'))
+                operations._maintenance_creation_guard=Mock(return_value=operations.completed_normal_admission)
+                operations.verify_completed_normal_allocation=Mock()
+                operations._compose=Mock()
+                operations._inhibit_worker_slot=Mock(side_effect=AssertionError('bridge path must not run'))
+                with patch.object(release_cli,'runtime_mutation_lock',return_value=nullcontext()):
+                    operations.start_candidate(SHA,'green',{'fixture':'images'})
+                operations._maintenance_creation_guard.assert_called_once_with(SHA,'green')
+                operations._compose.assert_called_once_with(SHA,'green',{'fixture':'images'},
+                    'create','--no-build','--no-recreate',*ROLES,workers_active=True)
+                operations._inhibit_worker_slot.assert_not_called()
+                operations._loaded_serving_slot.assert_not_called()
+
+    def test_maintenance_creation_guard_binds_fenced_backup_and_original_runtime_state(self):
+        from test_schema150_admission import deletion_contract
+        from test_schema160_release import reconciled_contract
+        for factory in (deletion_contract,reconciled_contract):
+            with self.subTest(contract=factory.__name__):
+                from deployment.lib.completed_normal_admission import digest
+                from deployment.lib.completed_normal_migration import intent_document
+                import copy
+                contract=factory();sha=contract['candidate']['source_sha']
+                witness={'intent':intent_document(contract),'provider_maintenance':{'version':1,
+                    'binding':{'operation':contract['operation'],'context_sha256':digest(contract),'source_sha':sha,
+                        'controller_sha':contract['candidate']['controller_sha'],'inventory_sha256':contract['writer_inventory_sha256'],
+                        'system_identifier':contract['database']['system_identifier'],'source_schema':146,'target_schema':contract['candidate']['compatible_max']},
+                    'journal_sha256':'a'*64,'preimage_sha256':'b'*64}}
+                with tempfile.TemporaryDirectory() as directory,\
+                        patch('deployment.lib.completed_normal_admission.require_candidate_authority') as authority,\
+                        patch('deployment.lib.completed_normal_admission.credential_witness',return_value=witness) as credential:
+                    operations=release_cli.DockerGitOperations.__new__(release_cli.DockerGitOperations)
+                    operations.completed_normal_admission=contract;operations.state_root=Path(directory)
+                    state={'active_slot':contract['origin']['slot'],'known_good_release':{'slot':contract['origin']['slot'],
+                        'sha':contract['source_roles']['application_sha'],'schema':146}}
+                    path=Path(directory)/'state.json';path.write_text(json.dumps(state))
+                    self.assertEqual(operations._maintenance_creation_guard(sha,'green'),contract)
+                    authority.assert_called_once_with(contract,mode='READ_ONLY')
+                    credential.assert_called_once_with('migration_inputs','migration_inputs_sha256')
+                    for mutate in (lambda v:v['provider_maintenance']['binding'].update(system_identifier='999'),
+                            lambda v:v['provider_maintenance']['binding'].update(source_sha='0'*40),
+                            lambda v:v['provider_maintenance'].update(journal_sha256='invalid'),
+                            lambda v:v['intent'].update(manifest_sha256='0'*64)):
+                        bad=copy.deepcopy(witness);mutate(bad);credential.return_value=bad
+                        with self.assertRaisesRegex(RuntimeError,'fenced_witness_required'):
+                            operations._maintenance_creation_guard(sha,'green')
+                    credential.return_value=witness
+                    state['known_good_release']['schema']=147;path.write_text(json.dumps(state))
+                    with self.assertRaisesRegex(RuntimeError,'origin_changed'):
+                        operations._maintenance_creation_guard(sha,'green')
+
+    def test_maintenance_preparation_receipt_is_not_worker_activation_or_health(self):
+        from test_schema150_admission import deletion_contract
+        from test_schema160_release import reconciled_contract
+        for factory in (deletion_contract,reconciled_contract):
+            with self.subTest(contract=factory.__name__):
+                operations=FakeOperations()
+                operations.completed_normal_admission=factory()
+                operations.schema_version=lambda:146
+                operations.validate_created_candidate=Mock()
+                target=operations.completed_normal_admission['candidate']['compatible_max']
+                compatibility=release_cli.Compatibility(146,target,target,'coordinated',target,target)
+                with tempfile.TemporaryDirectory() as directory:
+                    root=Path(directory)
+                    record=release_cli.prepare_release(sha=SHA,slot='green',state_root=root,
+                        compatibility=compatibility,operations=operations)
+                    self.assertEqual(record['status'],'candidate_created_fenced')
+                    self.assertFalse(any(c[0] in {'validate_candidate','activate_workers'} for c in operations.calls))
+                    # Preparation now has a distinct owner-only path, but the
+                    # operational registry still rejects either unaccepted
+                    # profile before any worker/runtime activation effect.
+                    with self.assertRaisesRegex(RuntimeError,'operation_profile_invalid'):
+                        release_cli.activate_prepared_release(sha=SHA,slot='green',state_root=root,operations=operations)
+                    second=release_cli.prepare_release(sha=SHA,slot='green',state_root=root,
+                        compatibility=compatibility,operations=operations)
+                    self.assertEqual(second,record)
+                    self.assertEqual(len([c for c in operations.calls if c[0]=='start_candidate']),1)
+                self.assertEqual(operations.validate_created_candidate.call_count,2)
+
+    def test_maintenance_create_refuses_missing_authority_before_compose(self):
+        from test_schema150_admission import deletion_contract
+        operations=release_cli.DockerGitOperations.__new__(release_cli.DockerGitOperations)
+        operations.completed_normal_admission=deletion_contract()
+        operations.state_root=Path('/unused-synthetic-state')
+        operations._loaded_serving_slot=Mock(return_value='blue')
+        operations.verify_completed_normal_allocation=Mock()
+        operations._compose=Mock()
+        with patch.object(release_cli,'runtime_mutation_lock',return_value=nullcontext()),\
+                patch('deployment.lib.completed_normal_admission.require_candidate_authority',side_effect=RuntimeError('authority_missing')):
+            with self.assertRaisesRegex(RuntimeError,'authority_missing'):
+                operations.start_candidate(SHA,'green',{})
+        operations._compose.assert_not_called()
 
     def test_invalid_production_identity_fails_before_release_state_initialization(self):
         with (

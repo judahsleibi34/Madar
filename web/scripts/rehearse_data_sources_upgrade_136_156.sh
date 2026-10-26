@@ -1,28 +1,43 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ "${MADAR_CANONICAL_EXECUTOR_TESTS:-false}" == true && "${MADAR_RECONCILED_INTEGRITY_TESTS:-false}" == true ]]; then
+  echo 'Choose either canonical executor acceptance or data-source/integrity acceptance; neither replaces the other' >&2
+  exit 2
+fi
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 WEB_ROOT="${ROOT_DIR}/web"
 POSTGRES_IMAGE="postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73"
 CONTAINER_NAME="madar-staging-chain-${RANDOM}-$$"
+CONTAINER_ID=''
 BACKUP_FILE="$(mktemp /tmp/madar-schema136-XXXXXX.dump)"
 
 cleanup() {
-  docker rm -f "${CONTAINER_NAME}" >/dev/null 2>&1 || true
+  if [[ -n "${CONTAINER_ID}" ]]; then
+    if [[ "$(docker inspect --format '{{ index .Config.Labels "madar.rehearsal" }}' "${CONTAINER_ID}")" != 'data-source-chain' ]]; then
+      echo 'Refusing cleanup of an unverified rehearsal container' >&2
+      return 1
+    fi
+    docker rm -f "${CONTAINER_ID}" >/dev/null
+  fi
   rm -f "${BACKUP_FILE}"
 }
 trap cleanup EXIT
 
 python3 "${WEB_ROOT}/scripts/check_data_sources_staging_chain.py"
 
-docker run -d --name "${CONTAINER_NAME}" --network none \
+CONTAINER_ID="$(docker run -d --name "${CONTAINER_NAME}" --network none \
+  --label madar.rehearsal=data-source-chain --memory=2g --cpus=1 --pids-limit=256 \
   --tmpfs /var/lib/postgresql/data:rw,noexec,nosuid,size=2g \
-  -e POSTGRES_HOST_AUTH_METHOD=trust "${POSTGRES_IMAGE}" >/dev/null
+  -e POSTGRES_HOST_AUTH_METHOD=trust "${POSTGRES_IMAGE}")"
 for _ in $(seq 1 60); do
-  docker exec "${CONTAINER_NAME}" pg_isready -U postgres >/dev/null 2>&1 && break
+  # initdb's temporary server accepts Unix-socket connections, then exits.
+  # Only the final server listens on TCP; do not admit that temporary window.
+  docker exec "${CONTAINER_ID}" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1 && break
   sleep 1
 done
-docker exec "${CONTAINER_NAME}" pg_isready -U postgres >/dev/null
+docker exec "${CONTAINER_ID}" pg_isready -h 127.0.0.1 -U postgres >/dev/null
 
 docker exec -i "${CONTAINER_NAME}" psql -X -v ON_ERROR_STOP=1 -U postgres <<'SQL'
 create role anon nologin;
@@ -71,7 +86,36 @@ test "$(docker exec "${CONTAINER_NAME}" psql -X -U postgres -d schema136_restore
   "select schema_version from public.application_schema_state where contract_key='core'")" = "136"
 docker exec "${CONTAINER_NAME}" dropdb -U postgres schema136_restore
 
-apply_range 137 153
+apply_range 137 146
+ test "$(docker exec "${CONTAINER_NAME}" psql -X -U postgres -Atc "select schema_version from public.application_schema_state where contract_key='core'")" = "146"
+ echo 'Authoritative schema146 origin positively observed before main147–156'
+# An explicit SQL-executor-only mode starts at the positively observed146.
+# It does not certify the root controller, backup, providers or write issuer.
+if [[ "${MADAR_CANONICAL_EXECUTOR_TESTS:-false}" == true ]]; then
+  # Exercise the real application login with SCRAM, not the harness's admin
+  # trust connection. The cluster is owned, network-isolated and disposable.
+  docker exec -u postgres "${CONTAINER_ID}" sh -ec \
+    'sed -i "1i host all authenticator 127.0.0.1/32 scram-sha-256" "$PGDATA/pg_hba.conf"'
+  docker exec "${CONTAINER_ID}" psql -X -U postgres -v ON_ERROR_STOP=1 -q -c 'select pg_reload_conf()'
+  docker exec "${CONTAINER_NAME}" psql -X -U postgres -v ON_ERROR_STOP=1 -q -c \
+    "comment on database postgres is 'madar-notification-synthetic-rehearsal'"
+  docker run --rm --read-only --memory=2g --cpus=1 --pids-limit=256 \
+    --network "container:${CONTAINER_NAME}" --tmpfs /tmp:rw,noexec,nosuid,size=256m \
+    --volume "${WEB_ROOT}/backend:/app:ro" --volume "${ROOT_DIR}:/release:ro" \
+    --env PYTHONPATH=/app:/release/web --env PYTHONDONTWRITEBYTECODE=1 \
+    --env MADAR_TEST_REPOSITORY_ROOT=/release/web \
+    --env SUPABASE_URL=http://127.0.0.1:54321 \
+    --env APP_ENV=test --env SUPABASE_ANON_KEY=synthetic-placeholder-anon --env SUPABASE_SERVICE_KEY=synthetic-placeholder-service \
+    --env CANONICAL_EXECUTOR_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=5432 dbname=postgres user=postgres' \
+    --env BUSINESS_INTEGRITY_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=5432 dbname=postgres user=postgres' \
+    --env RECONCILED_SOURCE_ROOT=/release \
+    --entrypoint python "${BACKEND_TEST_IMAGE:-madar-backend-test}" -m unittest \
+      tests.test_schema160_executor_database -v
+  echo 'Canonical SQL executor and calendar transaction acceptance only; full protected application upgrade NOT TESTED'
+  exit 0
+fi
+
+apply_range 147 153
 test "$(docker exec "${CONTAINER_NAME}" psql -X -U postgres -Atc \
   "select schema_version from public.application_schema_state where contract_key='core'")" = "153"
 
@@ -230,3 +274,30 @@ end $$;
 SQL
 
 echo 'Disposable full schema136 -> 156 upgrade, rollback, migration locking, and dispatcher concurrency passed'
+
+# Explicit disposable test opt-in only; no operational controller/authority.
+if [[ "${MADAR_RECONCILED_INTEGRITY_TESTS:-false}" == true ]]; then
+  docker exec "${CONTAINER_NAME}" psql -X -U postgres -v ON_ERROR_STOP=1 -q -c \
+    "comment on database postgres is 'madar-notification-synthetic-rehearsal'"
+  docker run --rm --read-only --memory=2g --cpus=1 --pids-limit=256 \
+    --network "container:${CONTAINER_NAME}" --tmpfs /tmp:rw,noexec,nosuid,size=256m \
+    --volume "${WEB_ROOT}/backend:/app:ro" --volume "${ROOT_DIR}:/release:ro" \
+    --env PYTHONPATH=/app:/release/web --env PYTHONDONTWRITEBYTECODE=1 \
+    --env SUPABASE_URL=http://127.0.0.1:54321 \
+    --env APP_ENV=test --env SUPABASE_ANON_KEY=synthetic-placeholder-anon --env SUPABASE_SERVICE_KEY=synthetic-placeholder-service \
+    --env RECONCILED_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=5432 dbname=postgres user=postgres' \
+    --env RECONCILED_SOURCE_ROOT=/release \
+    --env NOTIFICATION_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=5432 dbname=postgres user=postgres' \
+    --env OUTBOX_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=5432 dbname=postgres user=postgres' \
+    --env DELETION_FENCING_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=5432 dbname=postgres user=postgres' \
+    --env BUSINESS_INTEGRITY_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=5432 dbname=postgres user=postgres' \
+    --env DELIVERY_TEST_SCHEMA=160 --env OUTBOX_TEST_SCHEMA=160 \
+    --entrypoint python "${BACKEND_TEST_IMAGE:-madar-backend-test}" -m unittest \
+      tests.test_reconciled_history_database.TransitionTests \
+      tests.test_reconciled_history_database.FreshCalendarEntitlementTests \
+      tests.test_reconciled_history_database.ReconciledDeliveryTests \
+      tests.test_reconciled_history_database.ReconciledOutboxTests \
+      tests.test_reconciled_history_database.ReconciledDeletionTests \
+      tests.test_data_deletion_fencing_database.Deletion150WorkflowTests \
+      tests.test_native_business_integrity_database -v
+fi

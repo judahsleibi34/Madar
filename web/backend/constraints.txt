@@ -77,6 +77,7 @@ parso==0.8.7
 patsy==1.0.2
 pexpect==4.9.0
 pillow==12.3.0
+pglast==7.21
 postgrest==2.30.0
 prompt_toolkit==3.0.52
 propcache==0.5.2

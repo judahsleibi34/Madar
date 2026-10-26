@@ -23,6 +23,8 @@ KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]{1,79}$")
 FIELD_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
 TEST_FIXTURE_PROVIDER = "http_fixture"
 TEST_FIXTURE_URL_ENV = "MADAR_TEST_HTTP_PROVIDER_URL"
+GOOGLE_SHEETS_PROVIDER = "google_sheets"
+GOOGLE_SHEETS_RESOURCE = "sheet"
 
 
 @dataclass(frozen=True)
@@ -119,8 +121,14 @@ def get_provider_spec(provider_key: str) -> ProviderSpec | None:
 
 
 def resource_supported(provider_key: str, resource_type: str) -> bool:
+    if provider_key == GOOGLE_SHEETS_PROVIDER and resource_type == GOOGLE_SHEETS_RESOURCE:
+        from services.google_sheets_connector import google_sheets_configured
+        return google_sheets_configured()
     spec = get_provider_spec(provider_key)
-    return spec is not None and resource_type in spec.resources
+    if spec is not None and resource_type in spec.resources:
+        return True
+    from services.webhook_registry import webhook_capability
+    return webhook_capability(provider_key, resource_type) is not None
 
 
 def public_provider_capabilities() -> list[dict[str, object]]:
@@ -134,7 +142,7 @@ def public_provider_capabilities() -> list[dict[str, object]]:
     fixture = _test_fixture_spec()
     if fixture is not None:
         providers.append(fixture)
-    return [
+    result = [
         {
             "key": spec.key,
             "label": str(spec.labels.get("name") or spec.key.replace("_", " ").title()),
@@ -150,3 +158,22 @@ def public_provider_capabilities() -> list[dict[str, object]]:
         }
         for spec in providers
     ]
+    from services.google_sheets_connector import google_sheets_configured
+    if google_sheets_configured():
+        result.append({
+            "key": GOOGLE_SHEETS_PROVIDER,
+            "label": "Google Sheets",
+            "description": "Read-only synchronization from one configured spreadsheet tab.",
+            "credential_type": "oauth",
+            "authorization": "oauth2_pkce",
+            "scope_notice": "Google authorization can read spreadsheets accessible to that account; Madar reads only the configured spreadsheet and tab.",
+            "resources": [{"key": GOOGLE_SHEETS_RESOURCE, "label": "Spreadsheet tab"}],
+        })
+    from services.webhook_registry import public_webhook_providers
+    for webhook_provider in public_webhook_providers():
+        existing = next((item for item in result if item["key"] == webhook_provider["key"]), None)
+        if existing is None:
+            result.append(webhook_provider)
+        else:
+            existing["webhook"] = webhook_provider["webhook"]
+    return result

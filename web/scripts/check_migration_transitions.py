@@ -64,7 +64,8 @@ def validate(web_root: Path = WEB_ROOT) -> list[str]:
     def fail(message: str) -> None:
         errors.append(message)
 
-    for number in range(84, 1000):
+    versions = {int(p.name.split('_',1)[0]) for tree in (database_root,supabase_root) for p in tree.glob('*.sql') if re.fullmatch(r'[0-9]{3,9}_[a-z0-9_]+[.]sql',p.name)}
+    for number in sorted(v for v in versions if v >= 84):
         database = sorted(database_root.glob(f"{number:03d}_*.sql"))
         supabase = sorted(supabase_root.glob(f"{number:03d}_*.sql"))
         if not database and not supabase:

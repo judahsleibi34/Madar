@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, Clock3, Database, FolderOpen, RefreshCw, ShieldOff } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock3, Database, ExternalLink, FolderOpen, RefreshCw, ShieldCheck, ShieldOff, Table2 } from "lucide-react";
 
 import { apiFetch } from "../../../../utils/apiClient";
 import { readApiResponse } from "../utils/api";
@@ -35,6 +35,9 @@ const formatTimestamp = (value, t) => {
 };
 
 export default function ApiSourceManagementPanel({ registryPath, source, capabilities = {}, onReopenDataset, t }) {
+  const isGoogleSheets = source.provider_key === "google_sheets";
+  const providerCapability = (capabilities.providers || []).find((item) => item.key === source.provider_key);
+  const webhookSupported = Boolean(providerCapability?.webhook?.supported);
   const [overview, setOverview] = useState(null);
   const [credentials, setCredentials] = useState({ status: "loading", items: [] });
   const [schedules, setSchedules] = useState({});
@@ -46,6 +49,20 @@ export default function ApiSourceManagementPanel({ registryPath, source, capabil
   const [credentialNotice, setCredentialNotice] = useState("");
   const [connectionState, setConnectionState] = useState("idle");
   const [connectionNotice, setConnectionNotice] = useState("");
+  const [googleMapping, setGoogleMapping] = useState(null);
+  const [sheetUrl, setSheetUrl] = useState("");
+  const [sheetTabs, setSheetTabs] = useState([]);
+  const [sheetId, setSheetId] = useState("");
+  const [headerRow, setHeaderRow] = useState(1);
+  const [sheetPreview, setSheetPreview] = useState(null);
+  const [selectedColumns, setSelectedColumns] = useState([]);
+  const [recordIdColumn, setRecordIdColumn] = useState("");
+  const [googleState, setGoogleState] = useState("idle");
+  const [googleNotice, setGoogleNotice] = useState("");
+  const [webhook, setWebhook] = useState({ available: false, endpoint: null });
+  const [webhookState, setWebhookState] = useState("idle");
+  const [webhookNotice, setWebhookNotice] = useState("");
+  const [oneTimeWebhookSecret, setOneTimeWebhookSecret] = useState("");
 
   const sourcePath = `${registryPath}/${encodeURIComponent(source.id)}`;
 
@@ -54,12 +71,20 @@ export default function ApiSourceManagementPanel({ registryPath, source, capabil
     setError("");
     setSchedules({});
     try {
-      const [resourceResponse, credentialResponse] = await Promise.all([
+      const [resourceResponse, credentialResponse, mappingResponse, webhookResponse] = await Promise.all([
         apiFetch(`${sourcePath}/resources?limit=100`, { credentials: "include" }),
         apiFetch(`${sourcePath}/credentials`, { credentials: "include" }),
+        isGoogleSheets
+          ? apiFetch(`${sourcePath}/google-sheets/mapping`, { credentials: "include" })
+          : Promise.resolve(null),
+        webhookSupported
+          ? apiFetch(`${sourcePath}/webhook`, { credentials: "include" })
+          : Promise.resolve(null),
       ]);
-      const [resourceBody, credentialBody] = await Promise.all([
+      const [resourceBody, credentialBody, mappingBody, webhookBody] = await Promise.all([
         readApiResponse(resourceResponse), readApiResponse(credentialResponse),
+        mappingResponse ? readApiResponse(mappingResponse) : Promise.resolve(null),
+        webhookResponse ? readApiResponse(webhookResponse) : Promise.resolve(null),
       ]);
       if (!resourceResponse.ok) {
         throw new Error(detailMessage(resourceBody, t.sourceSyncLoadFailed));
@@ -72,6 +97,9 @@ export default function ApiSourceManagementPanel({ registryPath, source, capabil
       } else {
         throw new Error(detailMessage(credentialBody, t.sourceCredentialLoadFailed));
       }
+      if (mappingResponse?.ok) setGoogleMapping(mappingBody?.configured ? mappingBody.mapping : null);
+      if (webhookResponse?.ok) setWebhook(webhookBody);
+      else if (webhookSupported) setWebhook({ available: false, endpoint: null });
 
       const resources = Array.isArray(resourceBody.items) ? resourceBody.items : [];
       if (resourceBody.available === false || !resources.length) {
@@ -108,7 +136,7 @@ export default function ApiSourceManagementPanel({ registryPath, source, capabil
       setStatus("error");
       setError(requestError.message || t.sourceSyncLoadFailed);
     }
-  }, [sourcePath, t.sourceCredentialLoadFailed, t.sourceSyncLoadFailed]);
+  }, [isGoogleSheets, sourcePath, t.sourceCredentialLoadFailed, t.sourceSyncLoadFailed, webhookSupported]);
 
   useEffect(() => {
     void load();
@@ -120,6 +148,71 @@ export default function ApiSourceManagementPanel({ registryPath, source, capabil
   const credentialReady = safeCredentialState === "ready";
   const providerReady = Boolean(overview?.provider_registered);
   const activeCredential = credentials.items.find((item) => item.status === "active");
+
+  const provisionWebhook = async () => {
+    setWebhookState("saving");
+    setWebhookNotice("");
+    setOneTimeWebhookSecret("");
+    try {
+      const response = await apiFetch(`${sourcePath}/webhook`, {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: false, expected_fence: webhook.endpoint?.fence ?? null }),
+      });
+      const body = await readApiResponse(response);
+      if (!response.ok) throw new Error(detailMessage(body, t.webhookSaveFailed));
+      setOneTimeWebhookSecret(body.one_time_secret || "");
+      setWebhook({ available: true, endpoint: body.endpoint });
+      setWebhookState("ready");
+      setWebhookNotice(t.webhookSecretCreated);
+      await load();
+    } catch (requestError) {
+      setWebhookState("error");
+      setWebhookNotice(requestError.message || t.webhookSaveFailed);
+    }
+  };
+
+  const toggleWebhook = async () => {
+    const endpoint = webhook.endpoint;
+    if (!endpoint) return;
+    setWebhookState("saving");
+    setWebhookNotice("");
+    try {
+      const response = await apiFetch(`${sourcePath}/webhook`, {
+        method: "PUT", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: endpoint.status !== "enabled", expected_fence: endpoint.fence }),
+      });
+      const body = await readApiResponse(response);
+      if (!response.ok) throw new Error(detailMessage(body, t.webhookSaveFailed));
+      setWebhook({ available: true, endpoint: body });
+      setWebhookState("ready");
+      setWebhookNotice(body.status === "enabled" ? t.webhookEnabled : t.webhookDisabled);
+    } catch (requestError) {
+      setWebhookState("error");
+      setWebhookNotice(requestError.message || t.webhookSaveFailed);
+    }
+  };
+
+  const revokeWebhook = async () => {
+    const endpoint = webhook.endpoint;
+    if (!endpoint || endpoint.status === "revoked") return;
+    setWebhookState("saving");
+    setWebhookNotice("");
+    try {
+      const response = await apiFetch(`${sourcePath}/webhook/revoke`, {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ expected_fence: endpoint.fence }),
+      });
+      const body = await readApiResponse(response);
+      if (!response.ok) throw new Error(detailMessage(body, t.webhookRevokeFailed));
+      setOneTimeWebhookSecret("");
+      setWebhook({ available: true, endpoint: body });
+      setWebhookState("ready");
+      setWebhookNotice(t.webhookRevoked);
+    } catch (requestError) {
+      setWebhookState("error");
+      setWebhookNotice(requestError.message || t.webhookRevokeFailed);
+    }
+  };
 
   const saveCredential = async (event) => {
     event.preventDefault();
@@ -249,6 +342,89 @@ export default function ApiSourceManagementPanel({ registryPath, source, capabil
     }
   };
 
+  const connectGoogle = async () => {
+    setGoogleState("saving");
+    setGoogleNotice("");
+    try {
+      const response = await apiFetch(`${sourcePath}/google-sheets/oauth/start`, {
+        method: "POST", credentials: "include",
+      });
+      const body = await readApiResponse(response);
+      if (!response.ok || !body?.authorization_url) {
+        throw new Error(detailMessage(body, t.googleSheetsConnectFailed));
+      }
+      globalThis.location.assign(body.authorization_url);
+    } catch (requestError) {
+      setGoogleState("error");
+      setGoogleNotice(requestError.message || t.googleSheetsConnectFailed);
+    }
+  };
+
+  const inspectSheet = async (event) => {
+    event.preventDefault();
+    setGoogleState("saving");
+    setGoogleNotice("");
+    try {
+      const response = await apiFetch(`${sourcePath}/google-sheets/inspect`, {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ spreadsheet_url: sheetUrl }),
+      });
+      const body = await readApiResponse(response);
+      if (!response.ok) throw new Error(detailMessage(body, t.googleSheetsInspectFailed));
+      const tabs = Array.isArray(body.tabs) ? body.tabs : [];
+      setSheetTabs(tabs);
+      const requested = tabs.find((tab) => tab.sheet_id === body.requested_sheet_id);
+      setSheetId(String(requested?.sheet_id ?? tabs[0]?.sheet_id ?? ""));
+      setGoogleState("ready");
+    } catch (requestError) {
+      setGoogleState("error");
+      setGoogleNotice(requestError.message || t.googleSheetsInspectFailed);
+    }
+  };
+
+  const previewSheet = async () => {
+    setGoogleState("saving");
+    setGoogleNotice("");
+    try {
+      const response = await apiFetch(`${sourcePath}/google-sheets/preview`, {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ spreadsheet_url: sheetUrl, sheet_id: Number(sheetId), header_row: Number(headerRow) }),
+      });
+      const body = await readApiResponse(response);
+      if (!response.ok) throw new Error(detailMessage(body, t.googleSheetsPreviewFailed));
+      setSheetPreview(body);
+      setSelectedColumns(body.headers || []);
+      setRecordIdColumn(body.headers?.[0] || "");
+      setGoogleState("ready");
+    } catch (requestError) {
+      setGoogleState("error");
+      setGoogleNotice(requestError.message || t.googleSheetsPreviewFailed);
+    }
+  };
+
+  const saveGoogleMapping = async () => {
+    setGoogleState("saving");
+    setGoogleNotice("");
+    try {
+      const response = await apiFetch(`${sourcePath}/google-sheets/mapping`, {
+        method: "PUT", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          spreadsheet_url: sheetUrl, sheet_id: Number(sheetId), header_row: Number(headerRow),
+          selected_columns: selectedColumns, record_id_column: recordIdColumn,
+          expected_revision: googleMapping?.mapping_revision ?? null,
+        }),
+      });
+      const body = await readApiResponse(response);
+      if (!response.ok) throw new Error(detailMessage(body, t.googleSheetsMappingFailed));
+      setGoogleMapping(body.mapping);
+      setGoogleState("ready");
+      setGoogleNotice(t.googleSheetsMappingSaved);
+    } catch (requestError) {
+      setGoogleState("error");
+      setGoogleNotice(requestError.message || t.googleSheetsMappingFailed);
+    }
+  };
+
   const credentialLabel = t[`sourceCredential_${safeCredentialState}`] || t.sourceCredential_unavailable;
   const CredentialIcon = credentialReady ? CheckCircle2 : AlertTriangle;
   const resources = useMemo(() => Array.isArray(overview?.items) ? overview.items : [], [overview]);
@@ -272,7 +448,7 @@ export default function ApiSourceManagementPanel({ registryPath, source, capabil
         {safeCredentialState !== "ready" && credentials.status !== "loading" ? (
           <p className="daw-source-sync-attention" role="status">{t.sourceCredentialAttention}</p>
         ) : null}
-        {!credentialReady && providerReady && capabilities.credential_vault_available ? (
+        {!isGoogleSheets && !webhookSupported && !credentialReady && providerReady && capabilities.credential_vault_available ? (
           <form className="daw-source-credential-form" onSubmit={saveCredential}>
             <label htmlFor={`daw-source-credential-${source.id}`}>
               <span>{t.sourceCredentialToken}</span>
@@ -314,6 +490,111 @@ export default function ApiSourceManagementPanel({ registryPath, source, capabil
         ) : null}
       </section>
 
+      {webhookSupported ? (
+        <section className="daw-webhook-setup" aria-labelledby={`webhook-${source.id}`}>
+          <header><ShieldCheck size={20} aria-hidden="true" /><div>
+            <h5 id={`webhook-${source.id}`}>{t.webhookTitle}</h5>
+            <p>{t.webhookDescription}</p>
+          </div></header>
+          {!capabilities.webhook_ingestion_available || !webhook.available ? (
+            <p className="daw-source-registry-notice">{t.webhookUnavailable}</p>
+          ) : webhook.endpoint ? (
+            <dl className="daw-source-freshness-grid">
+              <div><dt>{t.webhookStatus}</dt><dd>{webhook.endpoint.status}</dd></div>
+              <div><dt>{t.webhookLastReceived}</dt><dd>{formatTimestamp(webhook.endpoint.last_received_at, t)}</dd></div>
+              <div><dt>{t.webhookLastProcessed}</dt><dd>{formatTimestamp(webhook.endpoint.last_processed_at, t)}</dd></div>
+              <div><dt>{t.webhookPending}</dt><dd>{webhook.endpoint.pending_count || 0}</dd></div>
+              <div><dt>{t.webhookFailed}</dt><dd>{webhook.endpoint.failed_count || 0}</dd></div>
+            </dl>
+          ) : null}
+          {capabilities.webhook_ingestion_available && webhook.available ? (
+            <div className="daw-webhook-actions">
+              <button type="button" className="daw-secondary" disabled={webhookState === "saving"} onClick={provisionWebhook}>
+                {webhook.endpoint ? t.webhookRotate : t.webhookProvision}
+              </button>
+              {webhook.endpoint && webhook.endpoint.status !== "revoked" ? (
+                <>
+                  <button type="button" className="daw-primary" disabled={webhookState === "saving"} onClick={toggleWebhook}>
+                    {webhook.endpoint.status === "enabled" ? t.webhookDisable : t.webhookEnable}
+                  </button>
+                  <button type="button" className="daw-secondary" disabled={webhookState === "saving"} onClick={revokeWebhook}>
+                    <ShieldOff size={16} aria-hidden="true" />{t.webhookRevoke}
+                  </button>
+                </>
+              ) : null}
+            </div>
+          ) : null}
+          {oneTimeWebhookSecret ? <div className="daw-webhook-secret" role="status">
+            <strong>{t.webhookOneTimeSecret}</strong><code>{oneTimeWebhookSecret}</code><small>{t.webhookOneTimeSecretHelp}</small>
+          </div> : null}
+          <p className="daw-source-registry-notice">{t.webhookDeletionUnsupported}</p>
+          {webhookNotice ? <p className={webhookState === "error" ? "daw-source-registry-error" : "daw-source-ingestion-success"} role="status">{webhookNotice}</p> : null}
+        </section>
+      ) : null}
+
+      {isGoogleSheets ? (
+        <section className="daw-google-sheets-setup" aria-labelledby={`google-sheets-${source.id}`}>
+          <header>
+            <Table2 size={20} aria-hidden="true" />
+            <div>
+              <h5 id={`google-sheets-${source.id}`}>{t.googleSheetsTitle}</h5>
+              <p>{t.googleSheetsScopeNotice}</p>
+            </div>
+          </header>
+          {!credentialReady ? (
+            <button type="button" className="daw-primary" disabled={!providerReady || googleState === "saving"} onClick={connectGoogle}>
+              <ExternalLink size={16} aria-hidden="true" />{t.googleSheetsConnect}
+            </button>
+          ) : (
+            <form className="daw-google-sheets-form" onSubmit={inspectSheet}>
+              <label>
+                <span>{t.googleSheetsUrl}</span>
+                <input type="url" required value={sheetUrl} onChange={(event) => setSheetUrl(event.target.value)}
+                  placeholder="https://docs.google.com/spreadsheets/d/.../edit" />
+              </label>
+              <button type="submit" className="daw-secondary" disabled={!sheetUrl || googleState === "saving"}>
+                {t.googleSheetsInspect}
+              </button>
+              {sheetTabs.length ? (
+                <>
+                  <label><span>{t.googleSheetsTab}</span><select value={sheetId} onChange={(event) => setSheetId(event.target.value)}>
+                    {sheetTabs.map((tab) => <option key={tab.sheet_id} value={tab.sheet_id}>{tab.title}</option>)}
+                  </select></label>
+                  <label><span>{t.googleSheetsHeaderRow}</span><input type="number" min="1" max="1000" value={headerRow}
+                    onChange={(event) => setHeaderRow(event.target.value)} /></label>
+                  <button type="button" className="daw-secondary" onClick={previewSheet} disabled={!sheetId || googleState === "saving"}>
+                    {t.googleSheetsPreview}
+                  </button>
+                </>
+              ) : null}
+              {sheetPreview ? (
+                <div className="daw-google-sheets-mapping">
+                  <fieldset><legend>{t.googleSheetsColumns}</legend>
+                    {sheetPreview.headers.map((header) => (
+                      <label key={header} className="daw-google-column-option"><input type="checkbox"
+                        checked={selectedColumns.includes(header)} onChange={(event) => setSelectedColumns((current) => event.target.checked
+                          ? [...current, header] : current.filter((value) => value !== header))} />{header}</label>
+                    ))}
+                  </fieldset>
+                  <label><span>{t.googleSheetsRecordId}</span><select value={recordIdColumn} onChange={(event) => setRecordIdColumn(event.target.value)}>
+                    {selectedColumns.map((header) => <option key={header} value={header}>{header}</option>)}
+                  </select><small>{t.googleSheetsRecordIdHelp}</small></label>
+                  <div className="daw-google-preview-table" role="region" aria-label={t.googleSheetsPreview}>
+                    <table><thead><tr>{selectedColumns.map((header) => <th key={header}>{header}</th>)}</tr></thead>
+                      <tbody>{sheetPreview.rows.slice(0, 5).map((row, index) => <tr key={index}>{selectedColumns.map((header) => <td key={header}>{String(row[header] ?? "")}</td>)}</tr>)}</tbody></table>
+                  </div>
+                  <button type="button" className="daw-primary" onClick={saveGoogleMapping}
+                    disabled={!selectedColumns.length || !recordIdColumn || googleState === "saving"}>{t.googleSheetsSaveMapping}</button>
+                </div>
+              ) : null}
+            </form>
+          )}
+          {googleMapping ? <p className="daw-source-ingestion-success">{t.googleSheetsConfigured}: {googleMapping.spreadsheet_title} · {googleMapping.sheet_title}</p> : null}
+          {googleNotice ? <p className={googleState === "error" ? "daw-source-registry-error" : "daw-source-ingestion-success"} role="status">{googleNotice}</p> : null}
+          <p className="daw-source-registry-notice">{t.googleSheetsDeletionNotice}</p>
+        </section>
+      ) : null}
+
       {status === "loading" ? <p role="status">{t.sourceSyncLoading}</p> : null}
       {status === "error" ? (
         <div className="daw-source-sync-error" role="alert">
@@ -329,7 +610,7 @@ export default function ApiSourceManagementPanel({ registryPath, source, capabil
       {status === "ready" && overview?.available !== false && !resources.length ? (
         <div className="daw-source-connection-setup">
           <p className="daw-source-registry-notice">{t.sourceResourceEmpty}</p>
-          {credentialReady && providerReady && capabilities.incremental_resources_available ? (
+          {credentialReady && providerReady && capabilities.incremental_resources_available && (!isGoogleSheets || googleMapping) ? (
             <button
               type="button"
               className="daw-primary"

@@ -1,0 +1,15 @@
+{
+  "release_metadata_version": 1,
+  "deployment_profile": "notification-claim-fencing146-147",
+  "schema": {
+    "compatible_min": 147,
+    "compatible_max": 147,
+    "target": 147,
+    "migration_class": "coordinated",
+    "rollback_compatible_min": 147,
+    "rollback_compatible_max": 147
+  },
+  "migration_policy": "none",
+  "migration_manifest": "migrations-146-147-notification-fencing.json",
+  "notes": "Unselected coordinated worker protocol cutover. Drain all deliveries, reconcile uncertain external outcomes, take verified backup, and obtain existing governed authorization. Automatic executor must reject. Legacy claim/finish and direct queue writes disabled; only protocol2 workers can consume. No production authority or active release selection."
+}
