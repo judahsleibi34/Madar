@@ -22,8 +22,8 @@ BASE=Path('/srv/data2/madar-backups')
 def receive(plan_sha,backup_id,sums_sha,filesystem_uuid,expected_schema=115,namespace='normal-local-production',maintenance_manifest_sha256=None):
     if (not re.fullmatch(r'[0-9a-f]{64}',plan_sha) or not backup.BACKUP_ID.fullmatch(backup_id)
             or not re.fullmatch(r'[0-9a-f]{64}',sums_sha) or not re.fullmatch(r'[0-9a-f-]{36}',filesystem_uuid)
-            or type(expected_schema) is not int or expected_schema not in {115,136,144,146,148,150}
-            or expected_schema==150 and maintenance_manifest_sha256 is None
+            or type(expected_schema) is not int or expected_schema not in {115,136,144,146,148,150,160}
+            or expected_schema in {150,160} and maintenance_manifest_sha256 is None
             or maintenance_manifest_sha256 is not None and not re.fullmatch('[0-9a-f]{64}',str(maintenance_manifest_sha256))
             or namespace not in {'normal-local-production','private-schema136-rehearsal'}):
         raise RuntimeError('normal_replica_binding_invalid')
@@ -65,7 +65,9 @@ def receive(plan_sha,backup_id,sums_sha,filesystem_uuid,expected_schema=115,name
     if manifest.get('backup_id')!=backup_id or int(manifest.get('database',{}).get('schema_version',0))!=expected_schema:
         raise RuntimeError('normal_replica_backup_identity_changed')
     if maintenance_manifest_sha256 is not None:
-        maintenance=backup.verify_maintenance(staging,expected_sha256=maintenance_manifest_sha256)
+        maintenance=(backup.verify_reconciled_maintenance(staging,expected_sha256=maintenance_manifest_sha256,
+            schema=160,scope=plan_sha) if expected_schema==160 else
+            backup.verify_maintenance(staging,expected_sha256=maintenance_manifest_sha256))
         if maintenance['schema']!=expected_schema or manifest.get('maintenance_backup')!='maintenance/manifest.json':
             raise RuntimeError('normal_replica_maintenance_binding_changed')
     elif manifest.get('maintenance_backup') is not None:

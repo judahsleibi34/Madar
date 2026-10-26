@@ -47,7 +47,7 @@ def checked(args, *, env=None, user=None, timeout=1800, stdin=None, pass_fds=())
         raise RuntimeError('normal_backup_command_failed:' + code)
     return result.stdout
 
-def verify_backup_execution_context(package, *, expected_schema=115):
+def verify_backup_execution_context(package, *, expected_schema=115, completed_context=None):
     """Read-only gate with the exact uid/gid, empty groups and sealed DB lease.
 
     Recovery's version endpoint deliberately differs from known-good normal
@@ -56,7 +56,18 @@ def verify_backup_execution_context(package, *, expected_schema=115):
     No dump, freshness publication, retention, service or customer write occurs.
     """
     from scripts import backup_support
-    if type(expected_schema) is not int or expected_schema not in {115,136,144,146,148}:
+    if expected_schema==160 and type(expected_schema) is int:
+        from deployment.lib.completed_normal_backup import CompletedNormalBackupContext
+        from deployment.lib.completed_normal_admission import validate_provider_preparation
+        from deployment.lib.completed_normal_profile import RECONCILED
+        if (type(completed_context) is not CompletedNormalBackupContext
+                or validate_provider_preparation(completed_context.contract) is not RECONCILED
+                or completed_context.schema!=160 or completed_context.stage!='post-migration'
+                or completed_context.provider_adapter is None or Path(package)!=completed_context.package):
+            raise RuntimeError('normal_backup_canonical_context_required')
+        completed_context.validate(completed_context.plan,completed_context.root,package)
+        completed_context.guard()
+    elif completed_context is not None or type(expected_schema) is not int or expected_schema not in {115,136,144,146,148}:
         raise RuntimeError('normal_backup_execution_schema_invalid')
     identity = pwd.getpwnam('madar')
     cfg = {}
@@ -109,9 +120,13 @@ print(json.dumps({'uid':os.getuid(),'gid':os.getgid(),'supplementary_groups':os.
 
 
 def remote_receiver(package,plan,backup,sums,filesystem_uuid,*,expected_schema=115,namespace='normal-local-production',maintenance_manifest_sha256=None):
-    if (type(expected_schema) is not int or expected_schema not in {115,136,144,146,148,150}
+    if type(expected_schema) is int and expected_schema==160:
+        from scripts import backup_support
+        backup_support.verify_reconciled_maintenance(backup,expected_sha256=maintenance_manifest_sha256,
+            schema=160,scope=plan.digest)
+    if (type(expected_schema) is not int or expected_schema not in {115,136,144,146,148,150,160}
             or namespace not in {'normal-local-production','private-schema136-rehearsal'}
-            or expected_schema==150 and maintenance_manifest_sha256 is None
+            or expected_schema in {150,160} and maintenance_manifest_sha256 is None
             or maintenance_manifest_sha256 is not None and not re.fullmatch('[0-9a-f]{64}',str(maintenance_manifest_sha256))):
         raise RuntimeError('normal_backup_replica_scope_invalid')
     # Freeze only reviewed non-secret code at a NEW append-only Node 1 path.
@@ -172,6 +187,8 @@ def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_con
         if recovery_context is not None or authorizing_context is not None:
             raise RuntimeError('normal_backup_operation_context_conflict')
         completed_context.validate(plan,root,package)
+        if completed_context.schema==160:
+            verify_backup_execution_context(package,expected_schema=160,completed_context=completed_context)
     if authorizing_context is not None:
         import re
         if (recovery_context is not None or set(authorizing_context)!={'plan_sha256','source_bundle_sha256'}

@@ -78,7 +78,18 @@ class PublisherTests(unittest.TestCase):
         raw=json.loads((WEB/'deployment/releases'/MANIFEST).read_bytes())
         for row in raw['migrations']:
             names.update((row['path'],row['path'].replace('/database/','/supabase/')))
-        for name in names:self.files[name]=('100644',(WEB.parent/name).read_bytes())
+        inert_build_inputs={'web/backend/requirements.txt','web/backend/constraints.txt',
+            'web/frontend/package.json','web/frontend/package-lock.json'}
+        for name in names:
+            path=WEB/Path(name).relative_to('web') if name.startswith('web/') else WEB/name
+            if not name.startswith('web/') and not path.is_file():path=WEB.parent/name
+            if path.is_file():body=path.read_bytes()
+            elif name in inert_build_inputs:
+                # CI mounts executable source/SQL, not all package manifests.
+                # These inert bytes test hashing only; no build is accepted.
+                body=b'fixture-only-build-input; not artifact acceptance\n'
+            else:raise FileNotFoundError(name)
+            self.files[name]=('100644',body)
         self.args=inputs();self.sha=self.args[0]['controller_source_sha'];self.tree='a'*40
         self.authentication={'sha':self.sha,'commit':{'tree':{'sha':self.tree}}}
         self.enterContext(patch('deployment.lib.control_plane_upgrade.require_root_directory',lambda *a,**kw:None))

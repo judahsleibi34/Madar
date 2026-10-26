@@ -162,6 +162,29 @@ def verify(root: Path, *, dump: bool = True) -> dict:
     return manifest
 
 
+def verify_reconciled_maintenance(root: Path, *, expected_sha256: str, schema: int, scope: str) -> dict:
+    """Exact canonical checkpoint contract; not backup or restore authority.
+
+    Shared by sender and receiver without importing privileged controller code.
+    The independently pinned inner digest covers original roles, objects and
+    recovery identities. The append-only transfer scope binds its operation,
+    context and stage;160 is never admitted by a number-only allowlist.
+    """
+    if not isinstance(expected_sha256,str) or not re.fullmatch('[0-9a-f]{64}',expected_sha256):
+        raise BackupError('reconciled_maintenance_checkpoint_digest_required')
+    value=verify_maintenance(root,expected_sha256=expected_sha256)
+    binding=value['binding'];operation='completed-normal-schema146-160-coordinated-release'
+    expected_scope=hashlib.sha256((json.dumps({'operation':operation,
+        'context_sha256':binding['context_sha256'],'backup_stage':value['stage']},sort_keys=True,indent=2)+'\n').encode()).hexdigest()
+    if (type(schema) is not int or schema not in {146,160} or value['schema']!=schema
+            or binding['operation']!=operation or binding['source_schema']!=146 or binding['target_schema']!=160
+            or value['stage']!=('pre-migration' if schema==146 else 'post-migration')
+            or value['recovery']['migration_manifest_sha256']!='7633a15a9f531874409577fb9696e472631d3bbde63ae2603be0a4d23ef7c08f'
+            or scope!=expected_scope):
+        raise BackupError('reconciled_maintenance_checkpoint_binding_invalid')
+    return value
+
+
 def verify_maintenance(root: Path, *, expected_sha256: str | None = None) -> dict:
     """Verify maintenance recovery material, never authorize its use.
 

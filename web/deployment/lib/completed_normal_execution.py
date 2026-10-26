@@ -786,6 +786,14 @@ class CompletedNormalUpgrade:
                 exclusive(self.root/'migration-customer-preservation.json',encoded(preservation))
                 seal_completion(self.contract,self.ops.state_root/'releases'/self.contract['candidate']['source_sha'],
                     self.ops.state_root,source_guard=self.actor.guard,runtime_guard=self.actor.native)
+                if self.profile is RECONCILED:
+                    # Capture the target checkpoint while every provider/writer
+                    # is still fenced. An ordinary online backup cannot replace
+                    # original-role and object-byte maintenance preservation.
+                    self.event('post_migration_backup_pending')
+                    final=CompletedNormalBackupContext(self.contract,self.document,self.package,kernel,
+                        stage='post-migration',source_guard=self.actor.guard,artifact_guard=self.artifact_guard,
+                        provider_adapter=provider).capture()
                 self.event('private_provider_recovery_pending');lifecycle.prepare_private_activation()
                 self.event('target_normal_grant_pending');handoff.grant(schema=self.profile.target)
             # Existing child owns the worker-generation transfer. Its historical
@@ -807,9 +815,10 @@ class CompletedNormalUpgrade:
             provider.lock_descriptors=(self.lock,self.ops.deploy_lock_descriptor)
             with self.root_credential():
                 self.acceptance_guard(schema=self.profile.target,normal=True)
-                self.event('post_migration_backup_pending')
-                final=CompletedNormalBackupContext(self.contract,self.document,self.package,kernel,
-                    stage='post-migration',source_guard=self.actor.guard,artifact_guard=self.artifact_guard).capture()
+                if self.profile is not RECONCILED:
+                    self.event('post_migration_backup_pending')
+                    final=CompletedNormalBackupContext(self.contract,self.document,self.package,kernel,
+                        stage='post-migration',source_guard=self.actor.guard,artifact_guard=self.artifact_guard).capture()
                 kernel.round(normal=True)
                 result={'operation':self.profile.operation,'context_sha256':digest(self.contract),'schema':self.profile.target,'mode':'NORMAL',
                     'application_sha':self.contract['candidate']['source_sha'],'controller_sha':self.controller,

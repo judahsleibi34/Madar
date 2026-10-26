@@ -71,11 +71,15 @@ class ExecutionTests(unittest.TestCase):
                 if test.origin!='READ_ONLY' or test.owners!=1 or test.schema!=schema:raise AssertionError('unsafe_grant')
                 test.mode='NORMAL';effect('grant_'+str(schema))
         class Backup:
-            def __init__(self,*a,stage,**kw):self.stage=stage
+            def __init__(self,*a,stage,**kw):self.stage=stage;self.provider=kw.get('provider_adapter')
             def capture(self):
                 test.backup_count+=1;effect('backup_'+self.stage)
                 if self.stage=='pre-migration' and (test.mode!='READ_ONLY' or test.schema!=test.source_schema):raise AssertionError('unsafe_source_backup')
-                if self.stage=='post-migration' and (test.mode!='NORMAL' or test.schema!=test.target_schema):raise AssertionError('wrong_target_backup')
+                if self.stage=='post-migration':
+                    canonical=test.contract['operation']=='completed-normal-schema146-160-coordinated-release'
+                    if (test.mode!=('READ_ONLY' if canonical else 'NORMAL') or test.schema!=test.target_schema
+                            or canonical and (self.provider is None or self.provider.contract!=test.contract)):
+                        raise AssertionError('wrong_target_backup')
                 return {'stage':self.stage,'schema':test.schema}
             def seal_migration_inputs(self,r):effect('backup_inputs')
             def guard(self):effect('backup_guard')

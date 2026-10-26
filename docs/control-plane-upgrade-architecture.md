@@ -1,5 +1,13 @@
 # Privileged control-plane upgrade architecture
 
+Canonical160 target backup now precedes private recovery/handoff in the existing
+maintenance coordinator. It retains the concrete provider fence and original
+role/object preimages through the actual backup pipeline. Numeric160 support is
+conditional on that context and exact archive/manifest/transfer binding on both
+ends. Historical profiles retain their behavior. Independent test receiver
+enrollment and complete restored-application acceptance are still outstanding;
+this change does not register an operation or issue authority.
+
 The isolated package producer now publishes version2 requests through the
 existing frozen-source entrypoint, with fresh operation/attempt identities and
 measured source, original inventory, private probes and candidate model. It

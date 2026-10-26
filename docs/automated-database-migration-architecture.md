@@ -1,5 +1,13 @@
 # Automated database migration architecture
 
+Canonical146→160 maintenance now retains a fenced target recovery checkpoint
+before private provider recovery and write handoff, using the same protected
+backup/restore/receiver pipeline as the original checkpoint. Receiver admission
+for160 requires the exact operation, canonical manifest and context/stage scope
+plus verified role/object material. This is controller integration, not automatic
+migration eligibility or completed recovery acceptance. Ordinary Class D refusal,
+schema160 operational admission and production automatic dispatch remain closed.
+
 `web/frontend/private-provider160.conf` is now an independently pinned automation
 input because it controls the protected candidate's private HTTP/PG routing.
 It is also a protected control-plane path. This classification only strengthens

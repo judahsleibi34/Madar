@@ -1,5 +1,24 @@
 # Madar production release acceptance policy
 
+## Canonical target recovery checkpoint
+
+The maintenance coordinator captures its schema160 checkpoint after all committed
+migrations/preservation checks and before private-provider recovery, target write
+authority, workers or ingress. Both source and target checkpoints use the same
+concrete fenced provider adapter, original-role archive, actual database dump,
+object bytes, executed restore and append-only receiver pipeline. Historical
+profiles retain their original post-NORMAL backup order.
+
+Schema160 backup preflight requires the exact concrete completed-NORMAL backup
+context and independently verified provider fence/authority; a version number or
+caller PASS cannot enable it. The sender and receiver additionally verify the
+actual maintenance archive's canonical146→160 operation, manifest digest,
+context-derived transfer scope, correct stage and original-role/object material.
+Missing or corrupt material refuses. Archive verification is not restoration
+acceptance. This connects the target checkpoint contract but does not provide
+an independently enrolled test receiver or prove an actual complete application
+restore. Those remain mandatory before operational admission opens.
+
 ## Immutable isolated operation requests
 
 `prepare_completed_normal_package.py` is root/isolated-Python preparation only.
