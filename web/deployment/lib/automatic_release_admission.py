@@ -129,7 +129,7 @@ def execution_policy(operations):
     if not 0<len(body)<=32768:raise RuntimeError('automatic_policy_size')
     p=strict_json(body)
     fields={'version','enabled','environment','environment_id','controller_sha','controller_tree_sha256',
-        'test_public_key_sha256','test_runner_sha256','test_commands_sha256','evidence_max_age_seconds','operation_max_seconds','denied_database_identifiers'}
+        'test_public_key_sha256','test_runner_sha256','test_commands_sha256','evidence_max_age_seconds','operation_max_seconds','recovery_max_age_seconds','denied_database_identifiers'}
     if (not isinstance(p,dict) or set(p)!=fields or type(p['version']) is not int or p['version']!=1
             or p['enabled'] is not True or p['environment']!='isolated-test'
             or p['controller_sha']!=operations.installed_sha()
@@ -137,7 +137,7 @@ def execution_policy(operations):
             or not re.fullmatch('[a-f0-9]{64}',str(p['controller_tree_sha256']))
             or any(not re.fullmatch('[a-f0-9]{64}',str(p[k])) for k in ('test_public_key_sha256','test_runner_sha256','test_commands_sha256'))
             or any(type(p[k]) is not int or not 0<p[k]<=limit for k,limit in
-                (('evidence_max_age_seconds',600),('operation_max_seconds',900)))
+                (('evidence_max_age_seconds',600),('operation_max_seconds',900),('recovery_max_age_seconds',86400)))
             or not isinstance(p['denied_database_identifiers'],list) or not 1<=len(p['denied_database_identifiers'])<=64
             or any(not isinstance(v,str) or not re.fullmatch('[1-9][0-9]{0,31}',v) for v in p['denied_database_identifiers'])):
         raise RuntimeError('automatic_policy_not_enabled_for_accepted_environment')
@@ -208,11 +208,15 @@ def independent_evidence(source,policy,*,now=None):
             or artifacts['source_sha']!=source or artifacts['images']!=value['images']
             or not re.fullmatch('[a-f0-9]{64}',str(artifacts['build_inputs_sha256']))
             or not isinstance(recovery,dict) or set(recovery)!={'source_system_identifier','backup_sha256',
-                'restore_system_identifier','restored_schema','rows_sha256','roles_sha256','objects_sha256','restored_at'}
+                'restore_system_identifier','restored_schema','rows_sha256','roles_sha256','objects_sha256',
+                'backup_created_at','restored_at','verified_at'}
             or any(not re.fullmatch('[a-f0-9]{64}',str(recovery[k])) for k in ('backup_sha256','rows_sha256','roles_sha256','objects_sha256'))
             or recovery['source_system_identifier']==recovery['restore_system_identifier']
             or any(not re.fullmatch('[1-9][0-9]{0,31}',str(recovery[k])) for k in ('source_system_identifier','restore_system_identifier'))
-            or type(recovery['restored_at']) is not int or not 0<=now-recovery['restored_at']<=policy['evidence_max_age_seconds']
+            or any(type(recovery[k]) is not int for k in ('backup_created_at','restored_at','verified_at'))
+            or not recovery['backup_created_at']<=recovery['restored_at']<=recovery['verified_at']<=now
+            or not 0<=now-recovery['backup_created_at']<=policy['recovery_max_age_seconds']
+            or not 0<=now-recovery['verified_at']<=policy['evidence_max_age_seconds']
             or type(recovery['restored_schema']) is not int
             or not isinstance(resources,dict) or set(resources)!={'disk_free_bytes','memory_available_bytes',
                 'required_disk_bytes','required_memory_bytes','max_candidate_memory_bytes','max_candidate_cpu_millis'}

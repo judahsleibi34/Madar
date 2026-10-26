@@ -68,7 +68,7 @@ class IndependentEvidenceTests(unittest.TestCase):
         self.enterContext(patch.object(admission,'EVIDENCE',self.root))
         self.enterContext(patch.object(admission,'protected',lambda path,**kw:path)) # MODEL filesystem; native suite separately.
         self.policy={'environment':'isolated-test','environment_id':'isolated-fixture','denied_database_identifiers':['777777777'],'test_public_key_sha256':hashlib.sha256(key).hexdigest(),
-            'evidence_max_age_seconds':300,'test_runner_sha256':'a'*64,'test_commands_sha256':'b'*64}
+            'evidence_max_age_seconds':300,'recovery_max_age_seconds':3600,'test_runner_sha256':'a'*64,'test_commands_sha256':'b'*64}
         value=sample();now=int(time.time())
         self.payload={'version':1,'kind':'isolated-parent-executed-acceptance','environment_id':'isolated-fixture',
             'source_sha':value['source_sha'],'history_base_sha':value['origin']['source_sha'],'tree_sha':'c'*40,
@@ -80,7 +80,7 @@ class IndependentEvidenceTests(unittest.TestCase):
                 'artifacts':{'source_sha':value['source_sha'],'images':value['candidate']['images'],'build_inputs_sha256':'f'*64},
                 'staging':{'source_sha':value['source_sha'],'images':value['candidate']['images'],'schema':160,'database_system_identifier':'987654321','checks_sha256':'1'*64},
                 'compatibility':{'origin_source_sha':value['origin']['source_sha'],'candidate_source_sha':value['source_sha'],'origin_range':[160,162],'candidate_range':[160,162],'protocols':{'delivery':2,'outbox':2,'deletion':2}},
-                'recovery':{'source_system_identifier':'123456789','backup_sha256':'2'*64,'restore_system_identifier':'987654321','restored_schema':160,'rows_sha256':'3'*64,'roles_sha256':'4'*64,'objects_sha256':'5'*64,'restored_at':now},
+                'recovery':{'source_system_identifier':'123456789','backup_sha256':'2'*64,'restore_system_identifier':'987654321','restored_schema':160,'rows_sha256':'3'*64,'roles_sha256':'4'*64,'objects_sha256':'5'*64,'backup_created_at':now-600,'restored_at':now-500,'verified_at':now},
                 'resources':{'disk_free_bytes':100,'memory_available_bytes':100,'required_disk_bytes':50,'required_memory_bytes':50,'max_candidate_memory_bytes':30,'max_candidate_cpu_millis':100}}}
 
     def publish(self):
@@ -104,6 +104,17 @@ class IndependentEvidenceTests(unittest.TestCase):
             mutation(self.payload);self.publish()
             with self.assertRaises(RuntimeError):admission.independent_evidence('a'*40,self.policy)
             self.payload=copy.deepcopy(original)
+
+
+    def test_reverification_does_not_redate_backup_or_restore(self):
+        self.publish();verified=admission.independent_evidence('a'*40,self.policy)
+        self.assertLess(verified['gates']['recovery']['restored_at'],verified['gates']['recovery']['verified_at'])
+        for mutation in (lambda r:r.update(backup_created_at=int(time.time())-4000),
+                         lambda r:r.update(verified_at=int(time.time())-301),
+                         lambda r:r.update(restored_at=int(time.time())+5)):
+            original=copy.deepcopy(self.payload);mutation(self.payload['gates']['recovery']);self.publish()
+            with self.assertRaises(RuntimeError):admission.independent_evidence('a'*40,self.policy)
+            self.payload=original
 
 
 if __name__=='__main__':unittest.main()

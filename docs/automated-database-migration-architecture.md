@@ -2257,3 +2257,8 @@ starts those same identities, rechecks the original actor set and candidate befo
 worker/traffic handoff, and advances only the measured disposable-test inventory
 after durable known-good state. This remains isolated-test-only engineering; an
 ordinary bootstrap receipt is never called a protected migration receipt.
+
+Isolated routine evidence keeps backup creation, actual restoration and fresh
+application verification times separate. Reverification cannot redate a backup
+or restoration. The independently protected test policy bounds recovery age;
+live verification still expires within the short evidence window.
