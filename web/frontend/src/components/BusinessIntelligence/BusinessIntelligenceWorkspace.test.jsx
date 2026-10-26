@@ -260,6 +260,9 @@ describe("BusinessIntelligenceWorkspace", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Metrics" }));
     const operationSelect = screen.getAllByLabelText("Operation").find((element) => element.tagName === "SELECT");
     fireEvent.change(operationSelect, { target: { value: "sum" } });
+    // The checksum is visible before async column selection is initialized.
+    // A real user can run this metric only after that button becomes enabled.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Run calculation" }).disabled).toBe(false));
     fireEvent.click(screen.getByRole("button", { name: "Run calculation" }));
     await screen.findByRole("heading", { name: "Sum of selected column" });
     fireEvent.click(screen.getByRole("tab", { name: "Dashboard" }));
