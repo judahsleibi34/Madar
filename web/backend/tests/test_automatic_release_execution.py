@@ -73,3 +73,52 @@ class SourceCheckGitIndexTests(unittest.TestCase):
             self.assertEqual((index/'index').stat().st_mode&0o777,0o444)
             with self.assertRaisesRegex(RuntimeError,'source_invalid'):
                 source_check_git_index(index,repo,'HEAD')
+
+
+class SealedOriginRestoreTests(unittest.TestCase):
+    def adapter(self):
+        import json,tempfile
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from deployment.lib.automatic_release_execution import operations_adapter
+        temporary=tempfile.TemporaryDirectory();self.addCleanup(temporary.cleanup)
+        policy=Path(temporary.name)/'policy.json'
+        scope={role:{'name':'/madar-blue-'+role} for role in ROLES}
+        policy.write_text(json.dumps({'runtime_scope':scope}))
+        class Base:
+            def __init__(self,*args):self.state_root=Path(temporary.name);self.commands=[]
+            def restore_workers(self,*args):raise AssertionError('historical restart-policy mutation forbidden')
+            def run(self,command,**kwargs):self.commands.append(command);return ''
+            def _require_worker_authority(self,sha,slot):
+                if (sha,slot)!=('b'*40,'blue'):raise RuntimeError('wrong old owner')
+            def _require_other_worker_slot_inactive(self,slot):pass
+        value=sample()
+        with patch('deployment.lib.automatic_release_execution.protected',return_value=policy):
+            instance=operations_adapter(Base,SimpleNamespace(repo=Path(temporary.name),state_root=Path(temporary.name)),value)
+        instance._origin_fenced=['backend','parser-worker','remote-ingestion-worker']
+        instance.guard=lambda:None
+        instance.verify_actor_scope=lambda:[{'Id':role,'State':{'Running':True,'Health':{'Status':'healthy'}}} for role in ROLES]
+        return instance,value
+
+    def test_recovery_revokes_target_and_starts_only_exact_old_ids_without_configuration_changes(self):
+        from unittest.mock import patch
+        instance,value=self.adapter();release={'sha':value['origin']['source_sha'],'slot':'blue','images':dict(value['origin']['images'],artifact_reused=True)}
+        with patch('deployment.lib.automatic_release_execution.publish_candidate_grant') as grant:
+            instance.restore_workers(release)
+            self.assertEqual(grant.call_args.args[1],'READ_ONLY')
+            self.assertEqual(grant.call_count,1)
+        self.assertEqual(instance.commands,[
+            ['/usr/bin/docker','start','parser-worker','remote-ingestion-worker','backend'],
+            ['/usr/bin/docker','start','notification-worker','calendar-sync-worker','data-deletion-worker']])
+
+    def test_substituted_source_slot_image_or_foreign_origin_id_refuses(self):
+        from unittest.mock import patch
+        for change in ({'sha':'e'*40},{'slot':'green'},{'images':dict(sample()['origin']['images'],backend='foreign')}):
+            instance,value=self.adapter();release=dict(sha=value['origin']['source_sha'],slot='blue',images=value['origin']['images']);release.update(change)
+            with patch('deployment.lib.automatic_release_execution.publish_candidate_grant') as grant,self.assertRaisesRegex(RuntimeError,'origin_substituted'):
+                instance.restore_workers(release)
+            grant.assert_not_called();self.assertEqual(instance.commands,[])
+        instance,value=self.adapter();instance._origin_fenced=['foreign-id']
+        with patch('deployment.lib.automatic_release_execution.publish_candidate_grant'),self.assertRaisesRegex(RuntimeError,'inventory_incomplete'):
+            instance.restore_workers(dict(sha=value['origin']['source_sha'],slot='blue',images=value['origin']['images']))
+        self.assertEqual(instance.commands,[])

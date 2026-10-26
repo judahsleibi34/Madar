@@ -398,10 +398,40 @@ def operations_adapter(base,system,value):
             observe()
 
         def restore_workers(self,release):
+            # The historical restore helper changes restart policy to
+            # unless-stopped. This sealed test runtime must retain restart=no
+            # and its exact original identities/configuration throughout recovery.
+            if (release.get('sha')!=value['origin']['source_sha']
+                    or release.get('slot')!=value['origin']['slot']
+                    or admission.image_identities(release.get('images'))!=value['origin']['images']):
+                raise RuntimeError('automatic_restore_origin_substituted')
             publish_candidate_grant(value,'READ_ONLY')
-            self.guard()
-            if self._origin_fenced:self.run(['/usr/bin/docker','start',*self._origin_fenced])
-            return super().restore_workers(release)
+            self.guard();self.verify_actor_scope()
+            from .runtime_authority import runtime_mutation_lock
+            slot=release['slot'];sha=release['sha']
+            names=['/madar-'+slot+'-'+role for role in ROLES]
+            original={row['name']:identity for identity,row in self._initial_scope.items() if row['name'] in names}
+            if set(original)!=set(names) or not set(self._origin_fenced)<=set(original.values()):
+                raise RuntimeError('automatic_restore_origin_inventory_incomplete')
+            workers=[original['/madar-'+slot+'-'+role] for role in
+                ('notification-worker','calendar-sync-worker','data-deletion-worker')]
+            core=[original['/madar-'+slot+'-'+role] for role in
+                ('parser-worker','remote-ingestion-worker','backend') if original['/madar-'+slot+'-'+role] in self._origin_fenced]
+            with runtime_mutation_lock(self.state_root):
+                self._require_worker_authority(sha,slot);self._require_other_worker_slot_inactive(slot)
+                self.verify_actor_scope()
+                if core:self.run(['/usr/bin/docker','start',*core])
+                self.run(['/usr/bin/docker','start',*workers])
+                deadline=time.monotonic()+180
+                while True:
+                    self.guard();self._require_worker_authority(sha,slot);self._require_other_worker_slot_inactive(slot)
+                    rows={row['Id']:row for row in self.verify_actor_scope()}
+                    states=[rows[identity]['State'] for identity in core+workers]
+                    if all(row.get('Running') and row.get('Health',{}).get('Status')=='healthy' for row in states):return
+                    if (time.monotonic()>=deadline or any(not row.get('Running')
+                            or row.get('Health',{}).get('Status') not in {'starting','healthy'} for row in states)):
+                        raise RuntimeError('automatic_retained_origin_restore_failed')
+                    time.sleep(1)
     return AuthorizedOperations()
 
 
