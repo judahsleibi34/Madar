@@ -1992,3 +1992,13 @@ grammar and exact observation run in a fresh network namespace; this is NOT KVM
 controller, receiver or preserved-upgrade acceptance. Receiver transport and
 authenticated lifecycle enrollment still require integration; v2 observation
 issues no credential and does not register schema160 or open dispatch.
+
+The independent operator identity reader is also exercised against genuine
+GoTrue v2.196.0 and PostgreSQL17 in an owned internal Docker network. The native
+test uses actual password/TOTP elevation and a TLS relay of the real provider,
+root-private keys/policy in the read-only test container, and separately tests
+AAL1 refusal, foreign database/business-key refusal, current ban/unban and global
+session revocation. This verifies identity, not administrator release approval,
+rehearsal completion or execution authority. The harness pins images, bounds
+resources, checks subnet overlap, journals owned IDs, handles interruption and
+removes owned containers/network and temporary credentials on completion/failure.

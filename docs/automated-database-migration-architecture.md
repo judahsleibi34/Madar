@@ -2212,3 +2212,12 @@ risk: the initial146→160 remains Class D and cannot roll the old146 image forw
 The selected historical `release.json` and all operational guards stay unchanged.
 Future source may declare new compatibility only with independent old/new runtime
 and migration acceptance for the actual plan; metadata alone is not proof.
+
+The native generic rehearsal cleanup distinguishes an unavailable Docker daemon
+from an absent resource. It removes only exact run-labelled children before the
+database, pins filesystem teardown to the original directory device/inode and
+retains a private review record when removal or ownership cannot be proven.
+Interrupt, repeated cleanup, foreign-owner, unavailable-daemon and replaced-path
+tests exercise the actual shell trap with a modeled daemon; native PostgreSQL
+rehearsal exercises normal teardown against Docker. No shared image pruning or
+operational backup deletion is performed.

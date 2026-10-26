@@ -16,25 +16,58 @@ CONTAINER_NAME="madar-generic-synthetic-$RANDOM-$$"
 RUN_ID="generic-$(date -u +%Y%m%dT%H%M%SZ)-$RANDOM-$$"
 owned=false
 backup_dir="$(mktemp -d)"
+run_device="$(stat -c %d "$backup_dir")"
+run_inode="$(stat -c %i "$backup_dir")"
 cleanup() {
-  local cid record label
-  for record in "$backup_dir/candidate.cid" "$backup_dir/acceptance.cid"; do
-    if [[ -f "$record" ]]; then
+  local cid record label snapshot failed=0 remaining
+  # A daemon error is UNKNOWN, never proof that an owned resource is absent.
+  if ! snapshot="$(docker ps -aq --no-trunc)"; then
+    failed=1
+  else
+    for record in "$backup_dir/candidate.cid" "$backup_dir/acceptance.cid"; do
+      [[ -f "$record" && ! -L "$record" ]] || continue
       cid="$(cat "$record")"
-      if docker inspect "$cid" >/dev/null 2>&1; then
-        label="$(docker inspect --format '{{index .Config.Labels "com.madar.rehearsal.run"}}' "$cid")"
-        if [[ "$label" != "$RUN_ID" ]]; then echo 'ERROR: generic_cleanup_owner_changed' >&2; return 1; fi
-        docker rm -f -v "$cid" >/dev/null
+      if [[ ! "$cid" =~ ^[a-f0-9]{64}$ ]]; then failed=1; continue; fi
+      if [[ $'\n'"$snapshot"$'\n' != *$'\n'"$cid"$'\n'* ]]; then continue; fi
+      if ! label="$(docker inspect --format '{{index .Config.Labels "com.madar.rehearsal.run"}}' "$cid")" || [[ "$label" != "$RUN_ID" ]]; then
+        failed=1; continue
+      fi
+      docker rm -f -v "$cid" >/dev/null || failed=1
+    done
+    if "$owned" && [[ $'\n'"$snapshot"$'\n' == *$'\n'"$container_id"$'\n'* ]]; then
+      if ! label="$(docker inspect --format '{{index .Config.Labels "com.madar.rehearsal.run"}}' "$container_id")" || [[ "$label" != "$RUN_ID" ]]; then
+        failed=1
+      else docker rm -f -v "$container_id" >/dev/null || failed=1
       fi
     fi
-  done
-  if "$owned"; then
-    label="$(docker inspect --format '{{index .Config.Labels "com.madar.rehearsal.run"}}' "$container_id")"
-    if [[ "$label" != "$RUN_ID" ]]; then echo 'ERROR: generic_cleanup_owner_changed' >&2; return 1; fi
-    docker rm -f -v "$container_id" >/dev/null
   fi
-  rm -f -- "$backup_dir/database.dump" "$backup_dir/manifest.json" "$backup_dir/candidate.cid" "$backup_dir/acceptance.cid"
-  rmdir -- "$backup_dir"
+  if ! remaining="$(docker ps -aq --no-trunc --filter "label=com.madar.rehearsal.run=$RUN_ID")" || [[ -n "$remaining" ]]; then failed=1; fi
+  python3 - "$backup_dir" "$run_device" "$run_inode" "$failed" "$RUN_ID" <<'PYCLEANUP'
+import json,os,stat,sys
+from pathlib import Path
+path=Path(sys.argv[1]);expected=tuple(map(int,sys.argv[2:4]));failed=int(sys.argv[4])
+if not path.exists() and not path.is_symlink():
+    raise SystemExit(1 if failed else 0)
+fd=os.open(path,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+try:
+    before=os.fstat(fd)
+    if (before.st_dev,before.st_ino)!=expected or before.st_uid!=os.getuid() or before.st_mode&0o022:
+        raise SystemExit('generic cleanup directory changed; no filesystem deletion')
+    if failed:
+        out=os.open('cleanup-retained.json',os.O_WRONLY|os.O_CREAT|os.O_TRUNC|os.O_NOFOLLOW,0o600,dir_fd=fd)
+        with os.fdopen(out,'w') as stream:
+            json.dump({'run_id':sys.argv[5],'status':'retained_for_review','reason':'resource_absence_or_ownership_not_proven',
+                'review_condition':'reobserve exact CID files and ownership before cleanup'},stream)
+        raise SystemExit('generic cleanup incomplete; private record retained')
+    for name in ('database.dump','manifest.json','candidate.cid','acceptance.cid','cleanup-retained.json'):
+        try:os.unlink(name,dir_fd=fd)
+        except FileNotFoundError:pass
+    after=path.lstat()
+    if (after.st_dev,after.st_ino)!=expected or not stat.S_ISDIR(after.st_mode):
+        raise SystemExit('generic cleanup parent changed')
+    path.rmdir()
+finally:os.close(fd)
+PYCLEANUP
 }
 trap cleanup EXIT
 trap 'exit 130' INT

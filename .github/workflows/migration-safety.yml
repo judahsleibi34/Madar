@@ -62,6 +62,12 @@ jobs:
           timeout 1m sudo unshare --net env PYTHONDONTWRITEBYTECODE=1 \
             PYTHONPATH="$PWD/web:$PWD/web/backend/tests" MADAR_NATIVE_ISOLATED_FIREWALL=1 \
             python3 -B -m unittest test_isolated_release_firewall -v
+      - name: Native independent operator password and MFA identity
+        env:
+          BACKEND_TEST_IMAGE: madar-backend-test
+        run: |
+          docker pull supabase/gotrue:v2.196.0@sha256:c0c25187a6b835e65a6f6e6c6b39d090e832d40e6de5186f2c038e0411944232
+          timeout --signal=TERM --kill-after=60s 3m python3 -B web/staging/integration/operator_identity_native.py
       - name: Native maintenance backup and independent owner/ACL restore
         run: timeout 5m python3 web/staging/integration/phase9_maintenance_backup.py REHEARSE
       - name: Native runtime lock ownership and inode checks
