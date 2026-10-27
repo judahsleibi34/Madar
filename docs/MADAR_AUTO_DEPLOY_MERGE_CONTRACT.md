@@ -1892,3 +1892,27 @@ select production SQL, open schema160 coordinated admission or authorize product
 The exact fixture manifest must be independently pinned in the root selection and
 pass positive KVM/isolation admission. Full application A/B promotion and recovery
 remain unaccepted until the actual installed entrypoint completes those tests.
+
+
+### Isolated known-good boot recovery (2026-10-27)
+
+The installed controller has separate `--restore-isolated-fence`,
+`--install-isolated-recovery` and `--recover-known-good` operations. These are
+restricted to independently enrolled disposable KVM guests. Ordinary production
+admission, schema160 protection and production timer enablement are unchanged.
+A root-owned, expiring restart policy pins guest, filesystem, control interface
+and installed controller bytes. Early systemd fencing precedes networking and
+Docker (including socket activation); the owned guest uses static addressing,
+with no additional outbound exceptions. Existing altered rules are refused.
+
+Only an actual completed release can publish the root known-good recovery
+binding. Recovery rechecks its immutable completion, exact container/image/mount
+identities, existing NORMAL grant, worker generation, database identity, committed
+schema, protocols and authenticated history. It starts private providers, accepted
+core services and the exclusive accepted workers, then uses the existing traffic
+driver and health checks. It does not pull images, select newer source, execute
+SQL, reserve a deployment, mint grants or fabricate deployment completion. Boot
+receipts are distinct. Uncertain SQL, changed ownership or effectful interrupted
+operations remain fenced pending supported authorized recovery. Native reboot
+and physical-host restoration are separate acceptance gates; source tests alone
+do not pass either gate. Production activation requires separate authorization.

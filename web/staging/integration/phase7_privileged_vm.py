@@ -511,7 +511,13 @@ class AutomaticReleaseGuest:
                 'content':json.dumps(self.record)}]}
         self.write('user-data','#cloud-config\n'+json.dumps(cloud)+'\n')
         self.write('meta-data',json.dumps({'instance-id':self.uuid,'local-hostname':'madar-release-test'})+'\n')
-        self.write('network-config',json.dumps({'version':2,'ethernets':{'guestnet':{'match':{'macaddress':self.mac},'set-name':'ens3','dhcp4':True,'dhcp6':False}}})+'\n')
+        # The execution fence precedes networking after reboot. Static addressing
+        # avoids adding DHCP/public DNS exceptions to that strict reviewed fence.
+        # Each QEMU user-network is a distinct owned10.0.2.0/24 realm.
+        self.write('network-config',json.dumps({'version':2,'ethernets':{'guestnet':{
+            'match':{'macaddress':self.mac},'set-name':'ens3','dhcp4':False,'dhcp6':False,
+            'addresses':['10.0.2.15/24'],'routes':[{'to':'0.0.0.0/0','via':'10.0.2.2'}],
+            'nameservers':{'addresses':['10.0.2.3']}}}})+'\n')
         self.command(['/usr/bin/xorriso','-as','mkisofs','-o',str(self.directory/'seed.iso'),'-V','cidata','-J','-r',
             str(self.directory/'user-data'),str(self.directory/'meta-data'),str(self.directory/'network-config')])
         (self.directory/'seed.iso').chmod(0o600)

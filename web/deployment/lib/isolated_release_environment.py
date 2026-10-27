@@ -183,7 +183,7 @@ def verify_host_interfaces(control_interface,networks):
         if kind=='veth':continue # Docker endpoints; all actors/networks measured separately.
         raise RuntimeError('isolated_release_unfenced_host_interface')
 
-def observe(policy_path=POLICY):
+def observe_host(policy_path=POLICY):
     if os.geteuid()!=0:raise RuntimeError('isolated_release_environment_root_required')
     path=protected(policy_path,private=True)
     # Exact eight-role origins plus native providers carry independently
@@ -218,6 +218,11 @@ def observe(policy_path=POLICY):
     fs=run(['/usr/bin/findmnt','-n','-o','SOURCE,FSTYPE,UUID','/']).decode().split()
     if len(fs)!=3 or not fs[0].startswith('/dev/vd') or fs[1]!='ext4' or fs[2]!=p['root_filesystem_uuid']:
         raise RuntimeError('isolated_release_root_filesystem_invalid')
+    return {**p,'policy_sha256':hashlib.sha256(body).hexdigest()}
+
+
+def observe(policy_path=POLICY):
+    p=observe_host(policy_path)
     interface=observe_effect_fence(execution=p['version']==2)
     ids=run(['/usr/bin/docker','ps','-aq','--no-trunc']).decode().split()
     if not ids or len(ids)>128 or p['database_container_id'] not in ids:
@@ -278,4 +283,4 @@ def observe(policy_path=POLICY):
     observed=json.loads(run(['/usr/bin/docker','exec',database['Id'],'psql','-XqAt','-v','ON_ERROR_STOP=1','-U','supabase_admin' if p['version']==2 else 'postgres','-d','postgres','-c',query]))
     if observed!=[p['database_system_identifier'],'madar-isolated-'+p['realm_id']]:
         raise RuntimeError('isolated_release_database_scope_invalid')
-    return {**p,'policy_sha256':hashlib.sha256(body).hexdigest(),'control_interface':interface}
+    return {**p,'control_interface':interface}

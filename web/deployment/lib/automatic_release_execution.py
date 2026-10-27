@@ -494,6 +494,12 @@ def execute(system,value,base_operations,*,manual_retry=False):
         adapter.accept_runtime_inventory()
         atomic_json(admission.ROOT/'attempts'/value['attempt_id']/'completion.json',receipt,exclusive=True)
         completed=True
+        from .automatic_release_recovery import seal_known_good
+        from .runtime_authority import open_deployment_lock
+        import fcntl
+        with open_deployment_lock(system.state_root/'deploy.lock') as recovery_lock:
+            fcntl.flock(recovery_lock.fileno(),fcntl.LOCK_EX)
+            seal_known_good(system,value)
         return receipt
     finally:
         # Independently observe a just-written completion if interrupted after

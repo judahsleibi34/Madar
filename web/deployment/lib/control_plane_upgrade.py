@@ -2744,6 +2744,16 @@ print(hashlib.sha256(keys[0].encode()).hexdigest())
         module=importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name,loader));loader.exec_module(module)
         return execute(self,admitted,module.DockerGitOperations,manual_retry=manual_retry)
 
+    def recover_automatic_known_good(self):
+        # Boot recovery verifies existing completed authority; it deliberately
+        # does not enter automatic admission, reserve a release or issue grants.
+        from deployment.lib.automatic_release_recovery import recover
+        import importlib.machinery,importlib.util
+        entry=self.control_root/'bin/madar-release-deploy'
+        loader=importlib.machinery.SourceFileLoader('madar_trusted_boot_release',str(entry))
+        module=importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name,loader));loader.exec_module(module)
+        return recover(self,module.DockerGitOperations)
+
     def prepare_automatic_release(self,sha):
         from deployment.lib.automatic_release_admission import observe_admission,publish
         admitted=observe_admission(self,sha)
@@ -3646,6 +3656,9 @@ def main(argv: list[str] | None = None) -> int:
             "installed controller"
         ),
     )
+    parser.add_argument('--restore-isolated-fence',action='store_true',help='Restore the independently enrolled disposable guest fence before networking')
+    parser.add_argument('--recover-known-good',action='store_true',help='Recover the exact independently sealed known-good application; never migrate')
+    parser.add_argument('--install-isolated-recovery',action='store_true',help='Install boot dependencies only in a positively enrolled disposable guest')
     parser.add_argument('--automatic-release',action='store_true',
         help='Execute an independently admitted routine release through the existing deployer')
     parser.add_argument('--automatic-poll',action='store_true',
@@ -3674,6 +3687,18 @@ def main(argv: list[str] | None = None) -> int:
     if os.geteuid() != 0:
         print("CONTROL-PLANE UPGRADE: FAILED\nerror: effective_root_required", file=sys.stderr)
         return 1
+    recovery_modes=(args.restore_isolated_fence,args.recover_known_good,args.install_isolated_recovery)
+    if any(recovery_modes):
+        if sum(recovery_modes)!=1 or any((args.sha,args.dry_run,args.automatic_release,args.automatic_poll,args.automatic_retry_failed_source,args.authenticate_operator,args.recover_current_schema,args.rehearsal_attestation)):
+            parser.error('recovery is a separate lifecycle operation')
+        try:
+            from deployment.lib.automatic_release_recovery import restore_isolation,install
+            operations=SystemOperations()
+            result=(restore_isolation(operations) if args.restore_isolated_fence else
+                    install(operations) if args.install_isolated_recovery else operations.recover_automatic_known_good())
+            print(json.dumps(result,sort_keys=True));return 0
+        except (RuntimeError,ValueError,OSError,TypeError,subprocess.SubprocessError):
+            print('KNOWN-GOOD RECOVERY: REFUSED; inspect the root recovery journal and systemd log',file=sys.stderr);return 1
     if args.automatic_retry_failed_source and not (args.automatic_release or args.automatic_poll):
         parser.error('automatic retry requires an automatic release mode')
     if args.automatic_release or args.automatic_poll:
