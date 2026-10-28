@@ -43,6 +43,57 @@ def verify_traffic_driver_access():
         raise RuntimeError('automatic_traffic_driver_unavailable')
 
 
+def observe_fenced_origin_route(rows,slot,run):
+    """Observe the existing proxy's loaded route without restarting a writer.
+
+    Called only inside authenticated exceptional maintenance. A unique failed
+    upstream request proves the loaded backend port; image bytes independently
+    prove the frontend route. The on-disk upstream file alone is insufficient.
+    """
+    import hashlib,uuid,urllib.request,urllib.error
+    if slot not in {'blue','green'}:raise RuntimeError('exceptional_route_slot_invalid')
+    names={r['Name']:r for r in rows}
+    proxy=names['/madar-release-proxy'];frontend=names['/madar-'+slot+'-frontend']
+    if not proxy['State']['Running'] or not frontend['State']['Running']:
+        raise RuntimeError('exceptional_route_observer_unavailable')
+    writers={'/madar-'+slot+'-'+r for r in ROLES if r not in {'frontend','redis'}}
+    if not writers<=names.keys() or any(names[n]['State']['Running'] for n in writers):
+        raise RuntimeError('exceptional_route_origin_not_fenced')
+    opener=urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    def get(port,path):
+        request=urllib.request.Request('http://127.0.0.1:'+str(port)+path,
+            headers={'Accept-Encoding':'identity','Connection':'close'})
+        try:response=opener.open(request,timeout=5)
+        except urllib.error.HTTPError as error:response=error
+        with response:
+            body=response.read(1024*1024+1)
+            if len(body)>1024*1024:raise RuntimeError('exceptional_route_response_unbounded')
+            return response.code,body
+    backend_port,frontend_port={'blue':(8101,3100),'green':(8201,3200)}[slot]
+    nonce=str(uuid.uuid4());path='/health/version?madar_maintenance_probe='+nonce
+    since=str(int(time.time()))
+    if get(8001,path)[0]!=502:raise RuntimeError('exceptional_route_backend_not_fenced')
+    # Docker sends nginx error logs to stderr. Bound both output and time and
+    # never retain unrelated proxy requests in a release receipt.
+    with tempfile.TemporaryFile() as output:
+        result=subprocess.run(['/usr/bin/docker','logs','--since',since,'--tail','20',proxy['Id']],
+            stdout=output,stderr=subprocess.STDOUT,timeout=5,env={'PATH':os.defpath,'HOME':'/nonexistent'})
+        size=output.tell()
+        if result.returncode or size>65536:raise RuntimeError('exceptional_route_log_unavailable')
+        output.seek(0);lines=output.read().decode(errors='strict').splitlines()
+    matches=[line for line in lines if 'request: "GET '+path+' HTTP/1.1"' in line]
+    expected='upstream: "http://127.0.0.1:'+str(backend_port)+path+'"'
+    if len(matches)!=1 or 'connect() failed (111: Connection refused)' not in matches[0] or expected not in matches[0]:
+        raise RuntimeError('exceptional_route_loaded_upstream_ambiguous')
+    expected_html=run(['/usr/bin/docker','exec',frontend['Id'],'sha256sum','/usr/share/nginx/html/index.html'],capture=True).split()[0]
+    if not re.fullmatch('[a-f0-9]{64}',expected_html):raise RuntimeError('exceptional_route_frontend_identity_invalid')
+    for port in (frontend_port,3000):
+        status,body=get(port,'/')
+        if status!=200 or hashlib.sha256(body).hexdigest()!=expected_html:
+            raise RuntimeError('exceptional_route_loaded_frontend_ambiguous')
+    return slot
+
+
 
 def source_check_git_index(directory,repository,source_sha):
     """Expose only authenticated tracked paths, never operational Git metadata.
@@ -390,7 +441,17 @@ def operations_adapter(base,system,value):
             self.guard()
             with runtime_mutation_lock(self.state_root):
                 self.verify_actor_scope()
-                if self._loaded_serving_slot()==slot:raise RuntimeError('runtime_mutation_target_is_serving')
+                if self._maintenance:
+                    from .runtime_authority import load_worker_authority
+                    owner=load_worker_authority(self.state_root)
+                    if (not self._migration_completed or self._expected_route!=value['origin']['slot']
+                            or not owner or owner['owner']!='NONE'
+                            or owner['old']['sha']!=value['origin']['source_sha']
+                            or owner['candidate']['sha']!=sha):
+                        raise RuntimeError('exceptional_route_maintenance_authority_invalid')
+                    serving=observe_fenced_origin_route(self.verify_actor_scope(),value['origin']['slot'],self.run)
+                else:serving=self._loaded_serving_slot()
+                if serving==slot:raise RuntimeError('runtime_mutation_target_is_serving')
                 self._inhibit_worker_slot(slot)
                 self._compose(sha,slot,images,'create','--no-build','--no-recreate',*ROLES,workers_active=True)
                 rows=json.loads(self.run(['/usr/bin/docker','inspect',*['madar-'+slot+'-'+role for role in ROLES]],capture=True))

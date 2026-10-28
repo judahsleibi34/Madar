@@ -179,3 +179,36 @@ class ExceptionalCompletionPublicationTests(unittest.TestCase):
                 deployer.return_value.deploy.return_value={'status':'known_good'}
                 e.execute(system,v,object)
         self.assertEqual(events,['inventory','VERIFYING','receipt','COMPLETED','seal'])
+
+
+class FencedOriginRouteTests(unittest.TestCase):
+    def probe(self,*,slot='blue',port=8101,frontend=b'accepted immutable frontend',status=502,running=False,log=True):
+        import hashlib,io
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from deployment.lib.automatic_release_execution import observe_fenced_origin_route
+        nonce='11111111-1111-4111-8111-111111111111'
+        path='/health/version?madar_maintenance_probe='+nonce
+        rows=[{'Id':role,'Name':'/madar-blue-'+role,'State':{'Running':role in {'frontend','redis'} or running}} for role in ROLES]
+        rows.append({'Id':'sealed-proxy','Name':'/madar-release-proxy','State':{'Running':True}})
+        class Response(io.BytesIO):
+            code=200
+        def open_response(request,timeout):
+            response=Response(frontend)
+            if 'health/version' in request.full_url:response.code=status
+            return response
+        def docker(command,**kw):
+            self.command=command
+            if log:kw['stdout'].write(('connect() failed (111: Connection refused), request: "GET '+path+' HTTP/1.1", upstream: "http://127.0.0.1:'+str(port)+path+'"\n').encode())
+            return SimpleNamespace(returncode=0)
+        with patch('uuid.uuid4',return_value=nonce),patch('urllib.request.build_opener',return_value=SimpleNamespace(open=open_response)),patch('deployment.lib.automatic_release_execution.subprocess.run',side_effect=docker):
+            return observe_fenced_origin_route(rows,slot,lambda *a,**kw:hashlib.sha256(b'accepted immutable frontend').hexdigest()+'  index.html')
+
+    def test_loaded_fenced_backend_and_immutable_frontend_observed(self):
+        self.assertEqual(self.probe(),'blue')
+        self.assertEqual(self.command[-1],'sealed-proxy')
+        self.assertIn('--since',self.command)
+
+    def test_wrong_loaded_upstream_missing_nonce_unfenced_backend_or_foreign_frontend_refuses(self):
+        for change in ({'port':8201},{'log':False},{'status':200},{'running':True},{'frontend':b'foreign'}):
+            with self.subTest(change=change),self.assertRaises(RuntimeError):self.probe(**change)

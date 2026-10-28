@@ -4400,3 +4400,5 @@ After actual target health and promotion acceptance, the existing runtime-invent
 attestor seals the verified actor set before exceptional VERIFYING/COMPLETED
 events reobserve policy. Those events still require the exact approved policy
 digest; no unknown actor or changed policy can be accepted by this ordering.
+
+Exceptional maintenance route observation (2026-10-28): candidate creation after a committed supported migration verifies the already fenced origin through a unique loaded-proxy upstream observation and immutable frontend bytes. It requires the exact sealed actor inventory and NONE worker authority; it never restarts the old writer to obtain a healthy-route probe. Routine and post-promotion route health verification remain mandatory. A failed observation preserves maintenance, consumed authority, and committed migration evidence.
