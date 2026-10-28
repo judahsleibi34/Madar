@@ -128,6 +128,14 @@ class ApprovalJournalTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'consumed'):
             a.decide(self.system,self.request_id,'revoke','token',digest(self.request))
 
+    def test_delayed_approval_cannot_extend_frozen_execution_deadline(self):
+        frozen=self.value['expires_at']
+        with patch.object(a.time,'time',return_value=frozen-10):self.approve()
+        approval=a.verified(self.folder/'approval.json',self.key)
+        self.assertEqual(approval['expires_at'],frozen)
+        with patch.object(a.time,'time',return_value=frozen-5):
+            a.verify_execution(self.value,self.system,consume=True,token='token')
+
     def test_missing_expired_and_forged_approval_refuse(self):
         with self.assertRaises(FileNotFoundError):a.verify_execution(self.value,self.system,consume=True,token='token')
         self.approve();path=self.folder/'approval.json';original=path.read_text()

@@ -182,6 +182,7 @@ def execute(value,system,guard):
         state_file=directory/'migration-execution.json',backup_dir=backup,
         backup_verifier=lambda _:verify_backup(value,None,proof),migration_guard=before,
         transaction_guard=transaction,boundary_guard=accepted_boundary,completion_guard=complete,expected_origin=document['origin_schema'],
+        exceptional_contract=({k:value['exceptional']['contract'][k] for k in ('contract','schema','table')} if 'exceptional' in value else None),
         failure_formatter=lambda e:type(e).__name__)
     try:result=executor.run()
     except Exception as error:

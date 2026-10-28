@@ -163,6 +163,7 @@ class LockedMigrationExecutor:
         expected_origin: int | None = None,
         transaction_guard: Callable[[Any, Migration], None] | None = None,
         boundary_guard: Callable[[Any, Migration], None] | None = None,
+        exceptional_contract: dict | None = None,
     ):
         self.connection_factory = connection_factory
         self.manifest = manifest
@@ -182,6 +183,10 @@ class LockedMigrationExecutor:
         if transaction_guard is not None and not callable(transaction_guard):
             raise RuntimeError('migration_transaction_guard_invalid')
         self.transaction_guard = transaction_guard
+        if exceptional_contract is not None and (not manifest.coordinated or transaction_guard is None
+                or len(manifest.migrations)!=1 or manifest.migrations[0].compatibility!='forward-compatible'):
+            raise RuntimeError('migration_exceptional_contract_requires_coordinated_guard')
+        self.exceptional_contract = exceptional_contract
         if boundary_guard is not None and not callable(boundary_guard):
             raise RuntimeError('migration_boundary_guard_invalid')
         self.boundary_guard = boundary_guard
@@ -305,7 +310,11 @@ class LockedMigrationExecutor:
                         from .migration_risk import analyze
                         from pglast import parser
                         risk=analyze(statement.encode(),origin=migration.from_schema,target=migration.to_schema)
-                        if risk.classification not in {'A','B'} or not risk.schema_envelope_verified:
+                        allowed=risk.classification in {'A','B'}
+                        if not allowed and self.exceptional_contract is not None:
+                            from .exceptional_release_approval import supported
+                            allowed=supported(statement.encode(),origin=migration.from_schema,target=migration.to_schema)==self.exceptional_contract
+                        if not allowed or not risk.schema_envelope_verified:
                             raise RuntimeError('migration_guarded_transaction_envelope_required')
                         rows=json.loads(parser.parse_sql_json(statement))['stmts']
                         end=rows[0].get('stmt_location',0)+rows[0]['stmt_len']

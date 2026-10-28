@@ -302,7 +302,7 @@ def decide(system,request_id,action,token,confirmation):
             approval={'version':1,'approval_id':str(uuid.uuid4()),'request_sha256':digest(request),
                 'admission_sha256':request['admission_sha256'],'policy_sha256':digest(p),
                 'operator':operator,'issuer':'installed-root-release-issuer','issued_at':now,
-                'expires_at':min(request['expires_at'],now+p['max_approval_seconds'])}
+                'expires_at':min(request['expires_at'],request['admission']['expires_at'],now+p['max_approval_seconds'])}
             atomic_json(path/'approval.json',sign(approval,key),exclusive=True)
             event(path,key,'APPROVED',{'approval_sha256':digest(approval),'operator':operator})
         return {'request_id':request_id,'state':history(path,key)[-1]['state']}
@@ -320,7 +320,7 @@ def verify_execution(value,system,*,consume=False,token=None):
         if (request['admission']!=value or request['policy_sha256']!=digest(p)
                 or x['policy_sha256']!=digest(p) or approval['policy_sha256']!=digest(p)
                 or approval['request_sha256']!=digest(request) or approval['admission_sha256']!=digest(value)
-                or approval['expires_at']!=value['expires_at']):
+                or not approval['issued_at']<approval['expires_at']<=min(request['expires_at'],value['expires_at'],approval['issued_at']+p['max_approval_seconds'])):
             raise RuntimeError('exceptional_approval_scope_changed')
         if min(request['expires_at'],approval['expires_at'])<=now:
             if state=='APPROVED':event(path,key,'EXPIRED',{'approval_sha256':digest(approval)})
