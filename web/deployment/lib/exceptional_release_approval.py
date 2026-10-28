@@ -224,13 +224,22 @@ def create(system,source):
         try:
             value=observe_admission(system,source,exceptional_request_id=request_id)
             publish(value)
+            from .automatic_release_admission import execution_policy,independent_evidence
+            execution,_=execution_policy(system)
+            acceptance=independent_evidence(source,execution)
+            if (acceptance['attempt_id']!=value['attempt_id'] or acceptance['images']!=value['candidate']['images']
+                    or any(digest(acceptance['gates'][k])!=value['evidence'][k] for k in acceptance['gates'])):
+                raise RuntimeError('exceptional_review_evidence_changed')
             proof_expires=value['expires_at']
             tree=system.root_git('exceptional_review_tree','rev-parse',source+'^{tree}',cwd=system.repo).stdout.strip()
             if not re.fullmatch('[a-f0-9]{40}',tree):raise RuntimeError('exceptional_source_tree_invalid')
-            request={'version':1,'source_tree_sha':tree,'request_id':request_id,'admission_sha256':digest(value),'admission':value,
+            request={'version':1,'source_tree_sha':tree,'authenticated_acceptance':acceptance,'request_id':request_id,'admission_sha256':digest(value),'admission':value,
                 'policy_sha256':digest(p),'created_at':int(time.time()),'expires_at':min(proof_expires,int(time.time())+p['max_request_seconds']),
                 'review':{'why':'Independent approval required for '+value['plan']['risk_class']+' '+value['exceptional']['contract']['contract'],
-                    'impact':value['exceptional']['contract'],'backup_and_recovery':value['evidence']['recovery'],
+                    'impact':value['exceptional']['contract'],'backup_and_recovery':acceptance['gates']['recovery'],
+                    'independent_physical_receipt_sha256':p['physical_recovery_receipt_sha256'],
+                    'ci':acceptance['gates']['ci'],'staging':acceptance['gates']['staging'],
+                    'artifacts':acceptance['gates']['artifacts'],
                     'sql':[{k:r[k] for k in ('path','sha256','risk','from_schema','to_schema')} for r in value['plan']['migrations']],
                     'maintenance':'Write ingress and original writers unavailable until private target and exclusive workers pass acceptance.',
                     'recovery_limitations':'Committed SQL is forward-only; uncertainty preserves maintenance fencing. Approval cannot authorize replay.'}}
