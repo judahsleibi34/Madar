@@ -10,7 +10,8 @@ spec=importlib.util.spec_from_file_location('physical_test_restore',WEB/'staging
 class RestorationBoundaries(unittest.TestCase):
     def test_resource_budget_leaves_headroom_and_zero_automatic_restarts(self):
         self.assertLessEqual(sum(receiver.ROLE_BUDGET.values()),2800)
-        self.assertLessEqual(sum(receiver.ROLE_CPU.values()),2)
+        self.assertLessEqual(sum(round(v*1000) for v in receiver.ROLE_CPU.values()),2000)
+        self.assertGreaterEqual(receiver.ROLE_CPU['notification-worker'],.2)
         # Structural defaults alone are not the operational acceptance test.
 
     def test_unenrolled_or_foreign_scope_stops_before_any_docker_effect(self):

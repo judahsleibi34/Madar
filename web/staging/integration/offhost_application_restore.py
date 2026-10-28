@@ -22,7 +22,7 @@ ROLE_BUDGET={'database':384,'auth':128,'rest':128,'storage':192,'gateway':32,'re
     'notification-worker':128,'calendar-sync-worker':128,'data-deletion-worker':128,'proxy':32}
 ROLE_CPU={'database':.35,'auth':.15,'rest':.1,'storage':.1,'gateway':.05,'redis':.1,
     'frontend':.05,'backend':.35,'parser-worker':.2,'remote-ingestion-worker':.1,
-    'notification-worker':.1,'calendar-sync-worker':.1,'data-deletion-worker':.1,'proxy':.05}
+    'notification-worker':.2,'calendar-sync-worker':.1,'data-deletion-worker':.1,'proxy':.05}
 
 
 def storage_identity(configuration):
