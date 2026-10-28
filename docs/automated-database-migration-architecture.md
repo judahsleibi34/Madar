@@ -2415,3 +2415,32 @@ receipts are distinct. Uncertain SQL, changed ownership or effectful interrupted
 operations remain fenced pending supported authorized recovery. Native reboot
 and physical-host restoration are separate acceptance gates; source tests alone
 do not pass either gate. Production activation requires separate authorization.
+
+
+### Independently enrolled physical test receiver (2026-10-28)
+
+`normal_backup_replica.receive_enrolled_test` is a separately enrolled append-only
+namespace under `/opt/madar-recovery-tests/<owned-run>`. Production receiver
+BASE, filesystem/mount checks, namespaces and schema allowlists are unchanged.
+An expiring root-private enrollment binds physical host/machine/filesystem,
+source guest/database/release, operation, exact backup inventory and independent
+source signing key. Altered bytes, foreign scope, replay and incomplete transfer
+are refused. Receipt of bytes explicitly does not mean database or application
+restoration. Existing archive and storage metadata verification are reused.
+
+The bounded `staging/integration/offhost_application_restore.py` adapter requires
+actual receiver receipt and independently observed source power-off before
+restoring a physical synthetic PostgreSQL backup. Physical recovery preserves
+the source database system identifier and existing grant bytes; it never issues
+deployment authority. This requires source writer exclusivity, a separate receiver
+enrollment, exact immutable images, verified role/ACL/data/history fingerprints,
+and private application acceptance. It cannot authorize production. The receiver
+uses an internal bridge with gateway mode `isolated`, no host-network actors or
+published ports, and no external DNS forwarding. Resource totals are bounded at
+2656 MiB/1.9 CPUs for the application, leaving a separate acceptance budget.
+
+Full restored-application acceptance and authenticated evidence are distinct
+from successful transfer, pg_verifybackup and database startup. Operational proof
+and generic admission integration must be reported separately; source tests
+alone do not open schema160 or production dispatch. Exact-owner teardown refuses
+foreign actor references and preserves existing operational backup/controller data.
