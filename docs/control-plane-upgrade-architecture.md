@@ -2211,3 +2211,12 @@ Physical test restoration also preserves an explicitly captured, bounded Redis
 RDB snapshot taken after source writers stop. The restored source grant is
 unchanged, and the independently observed source power-off remains mandatory.
 This is separate from deployment authorization or restarting two write owners.
+
+The enrolled receiver's transfer authority authorizes receipt of bytes only.
+Before restoration, the independent test issuer must publish a separate private,
+expiring, single-use restore authority binding received evidence, implementation
+bytes, source-off observation, receiver, source and exact attempt. Source updates
+before that admission are recorded; changes after admission are refused. Restore
+consumption is durable before effects. Native role health checks and init settings
+are preserved. An exact-owned transient cleanup timer retires test resources on
+parent interruption; production retention and services are not selected.

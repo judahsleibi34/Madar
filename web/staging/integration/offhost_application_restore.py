@@ -73,6 +73,19 @@ def restore(run_id):
     if (digest(stopped)!=app['source_poweroff_sha256'] or stopped.get('source_guest_uuid')!=enrollment['source_guest_uuid']
             or stopped.get('source_sha')!=app['source_sha'] or stopped.get('qemu_exited') is not True):
         raise RuntimeError('offhost_test_source_not_independently_fenced')
+    authorization=strict_json(protected(root/'restore-authorization.json',private=True).read_bytes())
+    required_authority={'version','operation','operation_id','receiver_id','manifest_sha256','received_sha256',
+        'source_poweroff_sha256','implementation_sha256','source_sha','expires_at','attempt_id'}
+    if (set(authorization)!=required_authority or authorization['version']!=1
+            or authorization['operation']!='isolated-physical-application-restoration'
+            or authorization['operation_id']!=enrollment['backup_operation_id'] or authorization['receiver_id']!=enrollment['receiver_id']
+            or authorization['manifest_sha256']!=enrollment['manifest_sha256']
+            or authorization['received_sha256']!=digest(received) or authorization['source_sha']!=app['source_sha']
+            or authorization['source_poweroff_sha256']!=digest(stopped)
+            or authorization['implementation_sha256']!=digest_file(Path(__file__))
+            or type(authorization['expires_at']) is not int or not time.time()<authorization['expires_at']<=enrollment['expires_at']
+            or not re.fullmatch('[a-f0-9-]{36}',str(authorization['attempt_id']))):
+        raise RuntimeError('offhost_test_independent_restore_authority_invalid')
     for row in app['containers'].values():
         if not re.fullmatch('sha256:[a-f0-9]{64}',str(row['Image'])):raise RuntimeError('offhost_test_image_not_immutable')
         inspected=json.loads(command(['docker','image','inspect',row['Image']]))
@@ -83,6 +96,7 @@ def restore(run_id):
     # No published ports, host-network actors or host-addressed gateway.
     # Application acceptance executes inside this exact isolated bridge.
     owner={'run_id':run_id,'receiver_id':enrollment['receiver_id'],'containers':{},'network':None,'volumes':[], 'images_imported':[]}
+    atomic_json(root/'restore-consumed.json',{'authorization_sha256':digest(authorization),'attempt_id':authorization['attempt_id'],'consumed_at':int(time.time())},exclusive=True)
     atomic_json(root/'restore-owned.json',owner,exclusive=True)
     def checkpoint():atomic_json(root/'restore-owned.json',owner)
     def phase(name,**details):atomic_json(root/('restoration-'+name+'.json'),{'operation':'independent-application-restoration','operation_id':enrollment['backup_operation_id'],'receiver_id':enrollment['receiver_id'],'source_sha':app['source_sha'],'source_database_system_identifier':app['database_system_identifier'],'phase':name,**details})
@@ -137,6 +151,16 @@ def restore(run_id):
                 if re.fullmatch('[a-zA-Z0-9_.-]{1,128}',alias):args+=['--network-alias',alias]
             for env in config.get('Env',[]):args+=['--env',env]
             if host.get('ReadonlyRootfs'):args+=['--read-only']
+            if host.get('Init'):args+=['--init']
+            health=config.get('Healthcheck') or {};test=health.get('Test') or []
+            if test==['NONE']:args+=['--no-healthcheck']
+            elif test:
+                if test[0] not in {'CMD','CMD-SHELL'}:raise RuntimeError('offhost_test_healthcheck_contract_invalid')
+                shell=__import__('shlex').join(test[1:]) if test[0]=='CMD' else test[1]
+                args+=['--health-cmd',shell]
+                for field,flag in (('Interval','--health-interval'),('Timeout','--health-timeout'),('StartPeriod','--health-start-period')):
+                    if health.get(field):args+=[flag,str(health[field])+'ns']
+                if health.get('Retries'):args+=['--health-retries',str(health['Retries'])]
             user='70:70' if role=='database' else config.get('User')
             if user:args+=['--user',user]
             for target,options in (host.get('Tmpfs') or {}).items():args+=['--tmpfs',target+':'+options]
