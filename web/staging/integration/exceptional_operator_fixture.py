@@ -36,12 +36,14 @@ def prepare():
     class NoRedirect(HTTPRedirectHandler):
         def redirect_request(self,*args,**kwargs):return None
     opener=build_opener(ProxyHandler({}),NoRedirect())
-    def http(method,path,body=None,token=None):
+    statuses=[]
+    def http(method,path,body=None,token=None,*,expected=(200,)):
         req=Request(url+path,method=method,data=json.dumps(body).encode() if body is not None else None,
             headers={'Content-Type':'application/json',**({'Authorization':'Bearer '+token} if token else {})})
         with opener.open(req,timeout=5) as response:
             raw=response.read(65537)
-            if response.status!=200 or len(raw)>65536:raise RuntimeError('exceptional_operator_fixture_auth_failed')
+            statuses.append({'method':method,'path':path.split('?',1)[0],'status':response.status})
+            if response.status not in expected or len(raw)>65536:raise RuntimeError('exceptional_operator_fixture_auth_status_'+str(response.status))
             return json.loads(raw)
     try:
         # Immutable images already authenticated by the native provider fixture;
@@ -89,7 +91,7 @@ def prepare():
         email='operator-'+secrets.token_hex(8)+'@example.invalid';user_password=secrets.token_urlsafe(32)
         user=http('POST','/admin/users',{'email':email,'password':user_password,'email_confirm':True},jwt(key,'service_role'))
         session=http('POST','/token?grant_type=password',{'email':email,'password':user_password})
-        factor=http('POST','/factors',{'factor_type':'totp','friendly_name':'Disposable infrastructure operator'},session['access_token'])
+        factor=http('POST','/factors',{'factor_type':'totp','friendly_name':'Disposable infrastructure operator'},session['access_token'],expected=(200,201))
         challenge=http('POST','/factors/'+factor['id']+'/challenge',{},session['access_token'])
         elevated=http('POST','/factors/'+factor['id']+'/verify',{'challenge_id':challenge['id'],'code':totp(factor['totp']['secret'])},session['access_token'])
         profile=http('GET','/user',token=elevated['access_token'])
@@ -101,12 +103,14 @@ def prepare():
             'auth_service':{'id':auth,'image':row['Image'],'spec_sha256':measured_spec(row)},
             'authentication_key_sha256':hashlib.sha256(key.encode()).hexdigest(),'root':str(root),
             'created_container_ids':created,'network_id':network,'volume_name':volume,'production_authority':False,
-            'role':'synthetic infrastructure operator; no human or production approval claimed'}
+            'http_statuses':statuses,'role':'synthetic infrastructure operator; no human or production approval claimed'}
         atomic_json(root/'facts.json',facts)
         return facts
     except BaseException:
         # Exact positively labeled resources only; preserve compact diagnostics.
         for identity in reversed(created):
+            logs=subprocess.run(['docker','logs','--tail','40',identity],capture_output=True,timeout=10)
+            q=root/('private-failed-'+identity[:12]+'.log');q.write_bytes((logs.stdout+logs.stderr)[-16384:]);q.chmod(0o600)
             row=json.loads(command(['docker','inspect',identity]))[0]
             if row['Config']['Labels'].get(label)!=realm:raise RuntimeError('exceptional_operator_fixture_cleanup_ownership_changed')
             command(['docker','rm','-f','-v',identity])
