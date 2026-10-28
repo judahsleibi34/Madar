@@ -91,6 +91,14 @@ def restore(run_id):
         if not re.fullmatch('sha256:[a-f0-9]{64}',str(row['Image'])):raise RuntimeError('offhost_test_image_not_immutable')
         inspected=json.loads(command(['docker','image','inspect',row['Image']]))
         if len(inspected)!=1 or inspected[0]['Id']!=row['Image']:raise RuntimeError('offhost_test_image_unavailable')
+    # Metadata existence alone does not prove imported OCI content is complete.
+    # Export selected immutable platform content read-only before consuming any
+    # restore authority or creating a database. Never retag or fall back to tags.
+    for image in sorted({r['Image'] for r in app['containers'].values()}):
+        probe=subprocess.run(['docker','--host','unix:///var/run/docker.sock','image','save','--platform','linux/amd64',image],
+            stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,timeout=120,
+            env={'PATH':'/usr/sbin:/usr/bin:/sbin:/bin','HOME':'/root','DOCKER_CONFIG':'/nonexistent'})
+        if probe.returncode:raise RuntimeError('offhost_test_immutable_image_content_incomplete')
     if sum(ROLE_BUDGET.values())>2800 or sum(ROLE_CPU.values())>2.01:raise RuntimeError('offhost_test_resource_budget_exceeded')
     memory=int(next(v.split()[1] for v in Path('/proc/meminfo').read_text().splitlines() if v.startswith('MemAvailable:')))*1024
     if memory<(sum(ROLE_BUDGET.values())+768)*1024**2:raise RuntimeError('offhost_test_memory_headroom_insufficient')
@@ -147,7 +155,7 @@ def restore(run_id):
                 '--restart=no','--dns','127.0.0.1','--memory',str(ROLE_BUDGET[role])+'m','--memory-swap',str(ROLE_BUDGET[role])+'m','--cpus',str(ROLE_CPU[role]),'--pids-limit','128','--cap-drop','ALL','--security-opt','no-new-privileges',
                 '--log-opt','max-size=1m','--log-opt','max-file=2']
             aliases={row['Name'].lstrip('/'),role}
-            for endpoint in row['NetworkSettings']['Networks'].values():aliases.update(v for v in endpoint.get('Aliases',[]) if v)
+            for endpoint in row['NetworkSettings']['Networks'].values():aliases.update(v for v in (endpoint.get('Aliases') or []) if v)
             for alias in sorted(aliases):
                 if re.fullmatch('[a-zA-Z0-9_.-]{1,128}',alias):args+=['--network-alias',alias]
             for env in config.get('Env',[]):args+=['--env',env]

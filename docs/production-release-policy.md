@@ -4261,3 +4261,9 @@ before that admission are recorded; changes after admission are refused. Restore
 consumption is durable before effects. Native role health checks and init settings
 are preserved. An exact-owned transient cleanup timer retires test resources on
 parent interruption; production retention and services are not selected.
+
+Receiver image inspection must also prove selected-platform content can be
+exported: an image metadata ID with missing OCI blobs is insufficient. This
+read-only gate precedes consumption and database creation. Host-network origins
+can have null Docker DNS aliases; restoration retains the explicit service/name
+aliases while creating only the independently enrolled isolated receiver network.
