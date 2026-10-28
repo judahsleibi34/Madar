@@ -1972,3 +1972,10 @@ exported: an image metadata ID with missing OCI blobs is insufficient. This
 read-only gate precedes consumption and database creation. Host-network origins
 can have null Docker DNS aliases; restoration retains the explicit service/name
 aliases while creating only the independently enrolled isolated receiver network.
+
+Restore attempts retain exclusive per-attempt consumption records under the
+receiver's protected attempt journal. A separately issued retry has a new attempt
+identity; archiving a demonstrably pre-database failed attempt must preserve its
+consumption and actual failure. Existing database/worker effects cannot be reset
+as a preparation retry. Missing immutable image content is a technical refusal,
+not administrator approval or permission to substitute image identities.

@@ -105,7 +105,11 @@ def restore(run_id):
     # No published ports, host-network actors or host-addressed gateway.
     # Application acceptance executes inside this exact isolated bridge.
     owner={'run_id':run_id,'receiver_id':enrollment['receiver_id'],'containers':{},'network':None,'volumes':[], 'images_imported':[]}
-    atomic_json(root/'restore-consumed.json',{'authorization_sha256':digest(authorization),'attempt_id':authorization['attempt_id'],'consumed_at':int(time.time())},exclusive=True)
+    if str(__import__('uuid').UUID(authorization['attempt_id']))!=authorization['attempt_id']:
+        raise RuntimeError('offhost_test_restore_attempt_invalid')
+    consumed={'authorization_sha256':digest(authorization),'attempt_id':authorization['attempt_id'],'consumed_at':int(time.time())}
+    atomic_json(root/'attempts'/authorization['attempt_id']/'consumed.json',consumed,exclusive=True)
+    atomic_json(root/'restore-consumed.json',consumed)
     atomic_json(root/'restore-owned.json',owner,exclusive=True)
     def checkpoint():atomic_json(root/'restore-owned.json',owner)
     def phase(name,**details):atomic_json(root/('restoration-'+name+'.json'),{'operation':'independent-application-restoration','operation_id':enrollment['backup_operation_id'],'receiver_id':enrollment['receiver_id'],'source_sha':app['source_sha'],'source_database_system_identifier':app['database_system_identifier'],'phase':name,**details})
