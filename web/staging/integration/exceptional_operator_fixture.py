@@ -37,13 +37,14 @@ def prepare():
         def redirect_request(self,*args,**kwargs):return None
     opener=build_opener(ProxyHandler({}),NoRedirect())
     statuses=[]
-    def http(method,path,body=None,token=None,*,expected=(200,)):
+    def http(method,path,body=None,token=None,*,expected=(200,),limit=65536):
         req=Request(url+path,method=method,data=json.dumps(body).encode() if body is not None else None,
             headers={'Content-Type':'application/json',**({'Authorization':'Bearer '+token} if token else {})})
         with opener.open(req,timeout=5) as response:
-            raw=response.read(65537)
-            statuses.append({'method':method,'path':path.split('?',1)[0],'status':response.status})
-            if response.status not in expected or len(raw)>65536:raise RuntimeError('exceptional_operator_fixture_auth_status_'+str(response.status))
+            raw=response.read(limit+1)
+            statuses.append({'method':method,'path':path.split('?',1)[0],'status':response.status,'response_bytes':len(raw)})
+            if len(raw)>limit:raise RuntimeError('exceptional_operator_fixture_auth_response_size')
+            if response.status not in expected:raise RuntimeError('exceptional_operator_fixture_auth_status_'+str(response.status))
             return json.loads(raw)
     try:
         # Immutable images already authenticated by the native provider fixture;
@@ -91,7 +92,7 @@ def prepare():
         email='operator-'+secrets.token_hex(8)+'@example.invalid';user_password=secrets.token_urlsafe(32)
         user=http('POST','/admin/users',{'email':email,'password':user_password,'email_confirm':True},jwt(key,'service_role'))
         session=http('POST','/token?grant_type=password',{'email':email,'password':user_password})
-        factor=http('POST','/factors',{'factor_type':'totp','friendly_name':'Disposable infrastructure operator'},session['access_token'],expected=(200,201))
+        factor=http('POST','/factors',{'factor_type':'totp','friendly_name':'Disposable infrastructure operator'},session['access_token'],expected=(200,201),limit=1024*1024)
         challenge=http('POST','/factors/'+factor['id']+'/challenge',{},session['access_token'])
         elevated=http('POST','/factors/'+factor['id']+'/verify',{'challenge_id':challenge['id'],'code':totp(factor['totp']['secret'])},session['access_token'])
         profile=http('GET','/user',token=elevated['access_token'])
