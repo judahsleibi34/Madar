@@ -75,12 +75,13 @@ def restore(run_id):
         raise RuntimeError('offhost_test_source_not_independently_fenced')
     authorization=strict_json(protected(root/'restore-authorization.json',private=True).read_bytes())
     required_authority={'version','operation','operation_id','receiver_id','manifest_sha256','received_sha256',
-        'source_poweroff_sha256','implementation_sha256','source_sha','expires_at','attempt_id'}
+        'source_poweroff_sha256','implementation_sha256','source_sha','database_system_identifier','expires_at','attempt_id'}
     if (set(authorization)!=required_authority or authorization['version']!=1
             or authorization['operation']!='isolated-physical-application-restoration'
             or authorization['operation_id']!=enrollment['backup_operation_id'] or authorization['receiver_id']!=enrollment['receiver_id']
             or authorization['manifest_sha256']!=enrollment['manifest_sha256']
             or authorization['received_sha256']!=digest(received) or authorization['source_sha']!=app['source_sha']
+            or authorization['database_system_identifier']!=app['database_system_identifier']
             or authorization['source_poweroff_sha256']!=digest(stopped)
             or authorization['implementation_sha256']!=digest_file(Path(__file__))
             or type(authorization['expires_at']) is not int or not time.time()<authorization['expires_at']<=enrollment['expires_at']
