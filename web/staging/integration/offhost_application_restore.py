@@ -25,6 +25,19 @@ ROLE_CPU={'database':.35,'auth':.15,'rest':.1,'storage':.1,'gateway':.05,'redis'
     'notification-worker':.1,'calendar-sync-worker':.1,'data-deletion-worker':.1,'proxy':.05}
 
 
+def storage_identity(configuration):
+    """Keep object ownership aligned with the authenticated provider process.
+
+    An omitted Docker user is root. Named users or an implicit primary group
+    need an image-specific observation; do not guess a service UID.
+    """
+    user=configuration.get('User') or '0:0'
+    if not re.fullmatch('[0-9]+:[0-9]+',user):raise RuntimeError('offhost_test_storage_user_requires_review')
+    uid,gid=map(int,user.split(':'))
+    if max(uid,gid)>2147483647:raise RuntimeError('offhost_test_storage_user_requires_review')
+    return uid,gid
+
+
 def command(args,*,data=None,timeout=30):
     result=subprocess.run(args,input=data,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=timeout,env={'PATH':'/usr/sbin:/usr/bin:/sbin:/bin','HOME':'/root','LANG':'C.UTF-8','DOCKER_HOST':'unix:///var/run/docker.sock','DOCKER_CONFIG':'/nonexistent'})
     if result.returncode:
@@ -280,9 +293,7 @@ print(json.dumps({'system_identifier':identity[0],'schema':identity[1],'protocol
         phase('database_roles_acls_data_and_history_restored',fingerprints=len(app['fingerprints']),schema=app['schema'])
         storage_env=dict(v.split('=',1) for v in app['containers']['storage']['Config']['Env'])
         recover_metadata(app['storage_objects'],root/'objects',namespace=(storage_env.get('TENANT_ID'),storage_env.get('GLOBAL_S3_BUCKET')))
-        storage_user=app['containers']['storage']['Config'].get('User') or '0:0'
-        if not re.fullmatch('[0-9]+(?::[0-9]+)?',storage_user):raise RuntimeError('offhost_test_storage_user_requires_review')
-        parts=storage_user.split(':');storage_uid=int(parts[0]);storage_gid=int(parts[-1])
+        storage_uid,storage_gid=storage_identity(app['containers']['storage']['Config'])
         for path in (root/'objects',*(root/'objects').rglob('*')):os.chown(path,storage_uid,storage_gid)
         for role in ('auth','rest','storage','gateway','redis','parser-worker','remote-ingestion-worker','backend','frontend','notification-worker','calendar-sync-worker','data-deletion-worker','proxy'):create(role)
         deadline=time.monotonic()+240

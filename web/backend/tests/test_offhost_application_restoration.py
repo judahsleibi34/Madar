@@ -1,9 +1,9 @@
 """Receiver execution/teardown boundaries; not off-host acceptance evidence."""
-import importlib.util,json,tempfile,unittest
+import importlib.util,json,os,tempfile,unittest
 from pathlib import Path
 from unittest.mock import patch
 from deployment.lib.migration_inventory import canonical
-WEB=Path(__file__).resolve().parents[2]
+WEB=Path(os.environ.get('MADAR_TEST_REPOSITORY_ROOT',Path(__file__).resolve().parents[2]))
 spec=importlib.util.spec_from_file_location('physical_test_restore',WEB/'staging/integration/offhost_application_restore.py');receiver=importlib.util.module_from_spec(spec);spec.loader.exec_module(receiver)
 
 
@@ -61,3 +61,15 @@ class RestoreConsumptionTests(unittest.TestCase):
             root=Path(tmp);(root/'restore-owned.json').write_text('{}')
             with self.assertRaisesRegex(RuntimeError,'existing_restore_effects'):receiver.consume_restore_authority(root,{'attempt_id':str(uuid.uuid4())})
             self.assertFalse((root/'attempts').exists())
+
+
+class ProviderOwnershipTests(unittest.TestCase):
+    def test_authenticated_root_and_explicit_numeric_identity_are_preserved(self):
+        self.assertEqual(receiver.storage_identity({}), (0,0))
+        self.assertEqual(receiver.storage_identity({'User':''}), (0,0))
+        self.assertEqual(receiver.storage_identity({'User':'1000:1001'}), (1000,1001))
+
+    def test_named_or_ambiguous_user_cannot_guess_a_storage_group(self):
+        for user in ('node','1000','0:root','-1:0','2147483648:0'):
+            with self.subTest(user=user),self.assertRaisesRegex(RuntimeError,'requires_review'):
+                receiver.storage_identity({'User':user})

@@ -4293,3 +4293,10 @@ original provider configuration; the historical default remains `stub/stub`.
 Traversal and unknown namespace shapes are refused. Database-only continuation
 can reverify a matching prior read-only observation without replacing that
 receipt or restoring database bytes again. Each continuation has fresh authority.
+
+Receiver verification correction (2026-10-28): restored object ownership follows the
+authenticated Storage provider user; omitted Docker user means root, while named
+users or implicit primary groups require independent review. CI receiver tests
+use deterministic measured disk capacity and the configured repository mount,
+with an explicit insufficient-headroom refusal. Operational headroom and
+production admission checks are unchanged.

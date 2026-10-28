@@ -1,5 +1,6 @@
 """Cryptographic/enrollment refusals; physical-host proof is a separate run."""
 import base64,copy,hashlib,importlib.util,io,json,os,sys,tarfile,tempfile,time,unittest,uuid
+from types import SimpleNamespace
 from pathlib import Path
 from unittest.mock import patch
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -22,6 +23,8 @@ class EnrolledReceiverTests(unittest.TestCase):
         # Receiver appends the authenticated run ID to its fixed parent.
         (self.root/self.run).mkdir()
         self.enterContext(patch.object(receiver.os,'geteuid',return_value=0))
+        self.disk=SimpleNamespace(free=10*1024**3)
+        self.enterContext(patch.object(receiver.shutil,'disk_usage',return_value=self.disk))
         self.enterContext(patch('deployment.lib.provider_recovery_runtime.protected',side_effect=lambda p,**kw:p))
         original=Path.read_text
         def read(p,*args,**kwargs):
@@ -62,3 +65,8 @@ class EnrolledReceiverTests(unittest.TestCase):
         self.data['postgres.tar.gz']=b'changed__'
         with self.assertRaisesRegex(RuntimeError,'bytes_changed'):self.execute()
         self.assertTrue((self.root/self.run/'receive-consumed.json').exists());self.assertFalse((self.root/self.run/'received.json').exists())
+
+    def test_insufficient_measured_headroom_refuses_before_consumption(self):
+        self.disk.free=1024
+        with self.assertRaisesRegex(RuntimeError,'headroom_invalid'):self.execute()
+        self.assertFalse((self.root/self.run/'receive-consumed.json').exists())
