@@ -1,5 +1,5 @@
 """Restart authority and firewall boundaries, separate from native boot proof."""
-import copy,json,tempfile,unittest
+import copy,json,os,tempfile,unittest
 from pathlib import Path
 from unittest.mock import patch
 from deployment.lib import automatic_release_recovery as recovery
@@ -121,6 +121,7 @@ class ApplicationFailureRecoveryTests(unittest.TestCase):
                 if path==root/'in-progress.json':return scope
                 if path==prepared/'admission.json':return value
                 if path==runtime:return candidate
+                if path.name=='consumed.json':return {'admission_sha256':digest(value),'source_sha':value['source_sha'],'operation_id':value['operation_id'],'attempt_id':value['attempt_id'],'pid':2,'process_start':'1','boot_id':'2fa2bc18-a4fb-4e60-8c5b-7ce4acd052d9'}
                 if path.name=='worker-ownership.json':return m['worker_ownership']
                 self.fail(str(path))
             with patch.object(recovery,'read',side_effect=read):
@@ -132,3 +133,18 @@ class ApplicationFailureRecoveryTests(unittest.TestCase):
                 value['plan']['migrations']=[{'actual':'SQL'}]
                 scope['admission_sha256']=digest(value)
                 with self.assertRaisesRegex(RuntimeError,'effectful_operation'):recovery.pending_scope(m,{})
+
+
+class HistoricalConsumptionTests(unittest.TestCase):
+    def test_historical_observation_does_not_relax_live_authority_or_allow_a_living_owner(self):
+        from deployment.lib.migration_inventory import digest
+        value=sample();record={'admission_sha256':digest(value),'source_sha':value['source_sha'],
+            'operation_id':value['operation_id'],'attempt_id':value['attempt_id'],'pid':os.getpid(),
+            'process_start':Path('/proc/self/stat').read_text().split(') ',1)[1].split()[19],
+            'boot_id':Path('/proc/sys/kernel/random/boot_id').read_text().strip()}
+        with patch.object(recovery,'read',return_value=record),patch.object(recovery.admission,'require_reserved') as live:
+            with self.assertRaisesRegex(RuntimeError,'owner_still_running'):recovery.observe_reserved_attempt(value)
+            record['boot_id']='2fa2bc18-a4fb-4e60-8c5b-7ce4acd052d9'
+            self.assertEqual(recovery.observe_reserved_attempt(value),record);live.assert_not_called()
+            record['source_sha']='f'*40
+            with self.assertRaisesRegex(RuntimeError,'consumed_attempt_changed'):recovery.observe_reserved_attempt(value)

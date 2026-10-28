@@ -190,6 +190,31 @@ def native(system,m):
         raise RuntimeError('automatic_recovery_database_history_or_identity_changed')
     return observed.document()
 
+def observe_reserved_attempt(value):
+    """Authenticate a historical consumption record without reusing its grant.
+
+    Ordinary execution remains bound to its original live PID/start/boot. Boot
+    recovery only observes that consumed attempt, and refuses a still-live owner.
+    """
+    record=read(admission.ROOT/'attempts'/value['attempt_id']/'consumed.json')
+    fixed={'admission_sha256':digest(value),'source_sha':value['source_sha'],
+        'operation_id':value['operation_id'],'attempt_id':value['attempt_id']}
+    if (set(record)!=set(fixed)|{'pid','process_start','boot_id'}
+            or any(record.get(k)!=v for k,v in fixed.items())
+            or type(record.get('pid')) is not int or record['pid']<=1
+            or not isinstance(record.get('process_start'),str) or not record['process_start'].isdigit()):
+        raise RuntimeError('automatic_recovery_consumed_attempt_changed')
+    try:
+        if str(uuid.UUID(record['boot_id']))!=record['boot_id']:raise ValueError()
+    except (ValueError,TypeError,AttributeError):raise RuntimeError('automatic_recovery_consumed_attempt_changed') from None
+    if record['boot_id']==Path('/proc/sys/kernel/random/boot_id').read_text().strip():
+        try:start=Path('/proc',str(record['pid']),'stat').read_text().split(') ',1)[1].split()[19]
+        except FileNotFoundError:start=None
+        except (OSError,IndexError):raise RuntimeError('automatic_recovery_pending_owner_unknown') from None
+        if start==record['process_start']:raise RuntimeError('automatic_recovery_pending_owner_still_running')
+    return record
+
+
 def pending_scope(m,state):
     pointer=admission.ROOT/'in-progress.json'
     if not pointer.exists() and not pointer.is_symlink():
@@ -206,7 +231,7 @@ def pending_scope(m,state):
     values=[v for v in candidates if v['attempt_id']==attempt]
     if len(values)!=1:raise RuntimeError(unsafe)
     value=values[0]
-    admission.sealed(value,allow_expired=True);admission.require_reserved(value,allow_completed=True)
+    admission.sealed(value,allow_expired=True);observe_reserved_attempt(value)
     expected={'version':1,'operation':admission.OPERATION,'attempt_id':attempt,'admission_sha256':digest(value),
         'source_sha':value['source_sha'],'operation_id':value['operation_id'],'database_system_identifier':value['database']['system_identifier']}
     if (scope!=expected or value['plan']['migrations']

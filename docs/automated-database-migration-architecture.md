@@ -2546,3 +2546,9 @@ recovery abort, and restores the same known-good application. Nonempty migration
 plans, surviving candidates, changed ownership and uncertain effects remain
 fenced for authorized recovery. This neither replays SQL nor issues fresh
 deployment authority, and does not open production/schema160 dispatch.
+
+Recovery observes historical consumed-attempt records through a separate
+read-only check of the sealed scope, original PID/start/boot tuple and owner
+liveness. It never calls live execution authorization with an obsolete process
+identity. The ordinary issuer's strict live PID/start/boot check is unchanged;
+an active owner, altered consumed record or ambiguous effects still refuse.
