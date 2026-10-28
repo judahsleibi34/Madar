@@ -2199,3 +2199,10 @@ from successful transfer, pg_verifybackup and database startup. Operational proo
 and generic admission integration must be reported separately; source tests
 alone do not open schema160 or production dispatch. Exact-owner teardown refuses
 foreign actor references and preserves existing operational backup/controller data.
+
+Restart bindings distinguish the accepted application's deployment controller
+from the independently approved installed recovery controller. Re-enrollment
+requires the genuine completed receipt, unchanged grant and live exact runtime;
+it issues no deployment authority. The operator environment is hashed at sealing
+and rechecked before effects. Recovery always invokes the measured installed
+traffic driver, rather than an executable selected by ambient configuration.

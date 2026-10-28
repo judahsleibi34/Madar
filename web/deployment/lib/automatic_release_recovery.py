@@ -135,7 +135,9 @@ def seal_known_good(system,value):
         raise RuntimeError('automatic_recovery_history_changed')
     selection=read(Path('/etc/madar/automatic-selections')/(value['source_sha']+'.json')) if Path('/etc/madar/automatic-selections',value['source_sha']+'.json').exists() else None
     manifest={'version':1,'kind':'completed-known-good-recovery','policy_sha256':digest(p),'source_sha':value['source_sha'],
-        'controller_sha':value['controller_sha'],'attempt_id':value['attempt_id'],'admission':value,'completion_sha256':completion_sha,
+        'controller_sha':value['controller_sha'],'recovery_controller_sha':system.installed_sha(),
+        'operator_configuration_sha256':hashlib.sha256(readonly_configuration(Path('/etc/madar/production.env')).read_bytes()).hexdigest(),
+        'attempt_id':value['attempt_id'],'admission':value,'completion_sha256':completion_sha,
         'environment':host,'history':history,'selection':selection,'known_good_release':known,'worker_ownership':owner,
         'authority_sha256':grant(value),'actors':{n:byname[n]['Id'] for n in names},
         'route_sha256':hashlib.sha256(Path('/var/lib/madar/proxy/active-upstreams.conf').read_bytes()).hexdigest()}
@@ -145,9 +147,11 @@ def seal_known_good(system,value):
 def validate_manifest(system):
     p,host=policy(system);m=read(ROOT/'known-good.json')
     if (m.get('version')!=1 or m.get('kind')!='completed-known-good-recovery'
-            or m.get('policy_sha256')!=digest(p) or m.get('controller_sha')!=system.installed_sha()
+            or m.get('policy_sha256')!=digest(p) or m.get('recovery_controller_sha')!=system.installed_sha()
             or any(m['environment'].get(k)!=host.get(k) for k in ('guest_uuid','machine_id','root_filesystem_uuid','realm_id'))):
         raise RuntimeError('automatic_recovery_manifest_policy_changed')
+    if hashlib.sha256(readonly_configuration(Path('/etc/madar/production.env')).read_bytes()).hexdigest()!=m.get('operator_configuration_sha256'):
+        raise RuntimeError('automatic_recovery_operator_configuration_changed')
     receipt,sha=completed(m['admission'])
     if sha!=m['completion_sha256'] or grant(m['admission'])!=m['authority_sha256']:
         raise RuntimeError('automatic_recovery_completed_authority_changed')
@@ -257,6 +261,9 @@ def recover(system,base_operations):
                     command(['start',ids['madar-'+slot+'-'+role]])
                 record('known_good_core_started')
                 load_environment_file(Path('/etc/madar/production.env'))
+                # Recovery uses only the measured installed driver. Operator
+                # configuration is pinned but cannot select another executable.
+                os.environ['MADAR_TRAFFIC_SWITCH_COMMAND']=str(system.control_root/'bin/madar-switch-traffic')
                 class RecoveryOperations(base_operations):
                     def run(self,args,**kwargs):
                         if args and args[0]==os.getenv('MADAR_TRAFFIC_SWITCH_COMMAND'):
