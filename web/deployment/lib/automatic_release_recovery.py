@@ -86,13 +86,14 @@ def inspect_all():
     if not ids or len(ids)>128:raise RuntimeError('automatic_recovery_actor_count')
     return json.loads(run(['/usr/bin/docker','inspect',*ids]))
 
-def grant(value):
+def grant(value,*,mode='NORMAL'):
+    if mode not in {'NORMAL','READ_ONLY'}:raise RuntimeError('automatic_recovery_grant_mode_invalid')
     from .automatic_release_execution import grant_directory,runtime_context
     p=grant_directory(value)/'authority.json';body=protected(p).read_bytes();v=strict_json(body)
     expected={'version':4,'operation':admission.OPERATION,'operation_id':value['operation_id'],
         'attempt_id':value['attempt_id'],'schema':value['database']['target_schema'],
         'target_schema':value['database']['target_schema'],'release_sha':value['source_sha'],
-        'contract_digest':runtime_context(value),'mode':'NORMAL','controller_sha':value['controller_sha'],
+        'contract_digest':runtime_context(value),'mode':mode,'controller_sha':value['controller_sha'],
         'database_system_identifier':value['database']['system_identifier'],'plan_sha256':digest(value['plan']),
         'compatible_min':value['candidate']['compatible_min'],'compatible_max':value['candidate']['compatible_max']}
     if v!=expected:raise RuntimeError('automatic_recovery_existing_normal_authority_changed')
@@ -144,6 +145,13 @@ def seal_known_good(system,value):
     atomic_json(ROOT/'known-good.json',manifest)
     return {'operation':'seal-known-good-recovery','source_sha':value['source_sha'],'manifest_sha256':digest(manifest),'deployment_authority_issued':False}
 
+def same_known_good(left,right):
+    # A live rollback-target observation refreshes this audit timestamp before
+    # candidate effects. It cannot change release, schema, images or ownership.
+    return (isinstance(left,dict) and isinstance(right,dict)
+        and {k:v for k,v in left.items() if k!='schema_attested_at'}=={k:v for k,v in right.items() if k!='schema_attested_at'})
+
+
 def validate_manifest(system):
     p,host=policy(system);m=read(ROOT/'known-good.json')
     if (m.get('version')!=1 or m.get('kind')!='completed-known-good-recovery'
@@ -156,7 +164,7 @@ def validate_manifest(system):
     if sha!=m['completion_sha256'] or grant(m['admission'])!=m['authority_sha256']:
         raise RuntimeError('automatic_recovery_completed_authority_changed')
     state=read(STATE/'state.json',private=False)
-    if state.get('known_good_release')!=m['known_good_release'] or state.get('active_slot')!=m['admission']['candidate']['slot']:
+    if not same_known_good(state.get('known_good_release'),m['known_good_release']) or state.get('active_slot')!=m['admission']['candidate']['slot']:
         raise RuntimeError('automatic_recovery_current_source_changed')
     if read(STATE/'worker-ownership.json',private=False)!=m['worker_ownership']:
         raise RuntimeError('automatic_recovery_worker_ownership_ambiguous')
@@ -192,13 +200,30 @@ def pending_scope(m,state):
         if str(uuid.UUID(attempt))!=attempt:raise ValueError()
     except (ValueError,TypeError,AttributeError):raise RuntimeError('automatic_recovery_pending_scope_invalid') from None
     root=admission.ROOT/'attempts'/attempt
-    if (root/'migration-execution.json').exists() or (root/'candidate-runtime.json').exists():
-        raise RuntimeError('automatic_recovery_committed_or_effectful_operation_requires_authorized_recovery')
-    # Only interrupted preparation with no SQL/candidate effects is admitted.
+    unsafe='automatic_recovery_committed_or_effectful_operation_requires_authorized_recovery'
+    if (root/'migration-execution.json').exists() or (root/'completion.json').exists():raise RuntimeError(unsafe)
     candidates=[read(f) for f in admission.ROOT.glob('*/admission.json')]
     values=[v for v in candidates if v['attempt_id']==attempt]
-    if len(values)!=1 or scope.get('admission_sha256')!=digest(values[0]) or values[0]['origin']['source_sha']!=m['source_sha']:
-        raise RuntimeError('automatic_recovery_pending_origin_invalid')
+    if len(values)!=1:raise RuntimeError(unsafe)
+    value=values[0]
+    admission.sealed(value,allow_expired=True);admission.require_reserved(value,allow_completed=True)
+    expected={'version':1,'operation':admission.OPERATION,'attempt_id':attempt,'admission_sha256':digest(value),
+        'source_sha':value['source_sha'],'operation_id':value['operation_id'],'database_system_identifier':value['database']['system_identifier']}
+    if (scope!=expected or value['plan']['migrations']
+            or value['origin']['source_sha']!=m['source_sha'] or value['origin']['slot']!=m['admission']['candidate']['slot']
+            or value['database']['system_identifier']!=m['history']['system_identifier']
+            or value['database']['origin_schema']!=m['history']['schema'] or value['database']['target_schema']!=m['history']['schema']
+            or read(STATE/'worker-ownership.json',private=False)!=m['worker_ownership']):raise RuntimeError(unsafe)
+    runtime=root/'candidate-runtime.json'
+    if runtime.exists() or runtime.is_symlink():
+        candidate=read(runtime)
+        if not isinstance(candidate,dict) or len(candidate)!=len(ROLES):raise RuntimeError(unsafe)
+        # A finished failed-candidate cleanup is provable; an interrupted Docker
+        # effect or still-present candidate remains fenced for authorized repair.
+        present={r['Id'] for r in inspect_all()}
+        if set(candidate)&present:raise RuntimeError(unsafe)
+        grant(value,mode='READ_ONLY')
+
     return scope
 
 def recover(system,base_operations):
@@ -212,7 +237,15 @@ def recover(system,base_operations):
         with open_deployment_lock(STATE/'deploy.lock') as deploy:
             __import__('fcntl').flock(deploy.fileno(),__import__('fcntl').LOCK_EX)
             p,m,state=validate_manifest(system);manifest=m;verify_fence(p['control_interface'])
-            pending=pending_scope(m,state);rows=inspect_all();verify_runtime_scope(m['environment']['runtime_scope'],rows)
+            pending=pending_scope(m,state);rows=inspect_all()
+            # Current independently enrolled inventory can retire an obsolete
+            # inactive slot. Every accepted provider/application identity still
+            # has to match its original sealed preimage exactly.
+            _,host=policy(system);verify_runtime_scope(host['runtime_scope'],rows)
+            accepted=set(m['actors'].values())
+            selected={identity:spec for identity,spec in m['environment']['runtime_scope'].items() if identity in accepted}
+            if set(selected)!=accepted:raise RuntimeError('automatic_recovery_accepted_inventory_incomplete')
+            verify_runtime_scope(selected,[r for r in rows if r['Id'] in accepted])
             if any(r['HostConfig']['RestartPolicy']['Name']!='no' for r in rows):raise RuntimeError('automatic_recovery_restart_policy_changed')
             slot=m['admission']['candidate']['slot'];ids=m['actors'];deadline=started+p['max_recovery_seconds']
             boot=Path('/proc/sys/kernel/random/boot_id').read_text().strip();uuid.UUID(boot)
@@ -243,8 +276,13 @@ def recover(system,base_operations):
                 if pending:
                     # Keep the consumed attempt; record a distinct root recovery
                     # abort, never a fictional release completion or SQL rollback.
-                    abort={'operation':'abort-proven-pre-effect-preparation','scope':pending,'known_good_source':m['source_sha'],'boot_id':boot,'database':observation,'deployment_authority_issued':False}
-                    atomic_json(admission.ROOT/'attempts'/pending['attempt_id']/'recovery-aborted.json',abort,exclusive=True)
+                    abort={'operation':'abort-verified-application-only-attempt','scope':pending,'known_good_source':m['source_sha'],'boot_id':boot,'database':observation,'deployment_authority_issued':False,'migration_sql_executed':False}
+                    abort_path=admission.ROOT/'attempts'/pending['attempt_id']/'recovery-aborted.json'
+                    if abort_path.exists() or abort_path.is_symlink():
+                        prior=read(abort_path)
+                        if {k:v for k,v in prior.items() if k!='boot_id'}!={k:v for k,v in abort.items() if k!='boot_id'}:
+                            raise RuntimeError('automatic_recovery_existing_abort_changed')
+                    else:atomic_json(abort_path,abort,exclusive=True)
                     state.pop('in_progress_release',None)
                     from .control_plane_upgrade import atomic_json as write_state
                     current=(STATE/'state.json').stat()
@@ -285,6 +323,10 @@ def recover(system,base_operations):
             native(system,m);grant(m['admission']);ops._require_other_worker_slot_inactive(slot)
             command(['start',ids['madar-release-proxy']])
             ops.switch_traffic(slot);ops.validate_stable_candidate(m['source_sha'])
+            if pending:
+                # Rebind the same genuine completion after proven pre-SQL
+                # compensation. No new deployment receipt or authority exists.
+                seal_known_good(system,m['admission']);m=read(ROOT/'known-good.json');manifest=m
             record('healthy',active_slot=slot,database=observation,worker_generation=m['worker_ownership']['generation'])
             return read(journal)
     except BaseException as error:

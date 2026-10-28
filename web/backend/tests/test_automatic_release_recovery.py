@@ -96,3 +96,39 @@ class ConfigurationBindingTests(unittest.TestCase):
             with patch.object(recovery,'policy',return_value=(policy,host)),patch.object(recovery,'read',return_value=manifest),patch.object(recovery,'readonly_configuration',return_value=env),patch.object(recovery,'completed') as complete,patch.object(recovery,'inspect_all') as actors,self.assertRaisesRegex(RuntimeError,'operator_configuration_changed'):
                 recovery.validate_manifest(system)
             complete.assert_not_called();actors.assert_not_called()
+
+class ApplicationFailureRecoveryTests(unittest.TestCase):
+    def test_attestation_time_alone_is_not_a_different_known_good_identity(self):
+        original={'sha':'a'*40,'schema':160,'worker_generation':'b'*64,'images':{'backend':'pinned'},'schema_attested_at':'earlier'}
+        self.assertTrue(recovery.same_known_good(original,dict(original,schema_attested_at='later')))
+        for change in ({'sha':'c'*40},{'schema':161},{'worker_generation':'c'*64},{'images':{'backend':'foreign'}}):
+            with self.subTest(change=change):self.assertFalse(recovery.same_known_good(original,dict(original,**change)))
+
+    def test_app_only_cleanup_allows_abort_but_sql_or_surviving_candidate_refuses(self):
+        from deployment.lib.migration_inventory import digest
+        value=sample();value['database']['origin_schema']=value['database']['target_schema']=160
+        scope={'version':1,'operation':recovery.admission.OPERATION,'attempt_id':value['attempt_id'],
+            'admission_sha256':digest(value),'source_sha':value['source_sha'],'operation_id':value['operation_id'],
+            'database_system_identifier':value['database']['system_identifier']}
+        m={'source_sha':value['origin']['source_sha'],'admission':{'candidate':{'slot':value['origin']['slot']}},
+            'history':{'schema':160,'system_identifier':value['database']['system_identifier']},'worker_ownership':{'same':'original'}}
+        with tempfile.TemporaryDirectory() as tmp,patch.object(recovery.admission,'ROOT',Path(tmp)),patch.object(recovery.admission,'sealed'),patch.object(recovery.admission,'require_reserved'),patch.object(recovery,'grant') as grant,patch.object(recovery,'inspect_all',return_value=[{'Id':'accepted'}]) as rows:
+            root=Path(tmp);(root/'in-progress.json').touch();attempt=root/'attempts'/value['attempt_id'];attempt.mkdir(parents=True)
+            prepared=root/value['source_sha'];prepared.mkdir();(prepared/'admission.json').touch()
+            runtime=attempt/'candidate-runtime.json';runtime.touch()
+            candidate={str(i):{} for i in range(8)}
+            def read(path,**kw):
+                if path==root/'in-progress.json':return scope
+                if path==prepared/'admission.json':return value
+                if path==runtime:return candidate
+                if path.name=='worker-ownership.json':return m['worker_ownership']
+                self.fail(str(path))
+            with patch.object(recovery,'read',side_effect=read):
+                self.assertEqual(recovery.pending_scope(m,{}),scope)
+                grant.assert_called_once_with(value,mode='READ_ONLY')
+                rows.return_value=[{'Id':'0'}]
+                with self.assertRaisesRegex(RuntimeError,'effectful_operation'):recovery.pending_scope(m,{})
+                rows.return_value=[{'Id':'accepted'}]
+                value['plan']['migrations']=[{'actual':'SQL'}]
+                scope['admission_sha256']=digest(value)
+                with self.assertRaisesRegex(RuntimeError,'effectful_operation'):recovery.pending_scope(m,{})

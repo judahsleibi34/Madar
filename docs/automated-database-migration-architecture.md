@@ -2530,3 +2530,19 @@ source tests. It does not open schema160, exceptional Class D dispatch, automati
 production scheduling or a new deployment authority. The October 28 physical
 receipt is verified at its recorded historical acceptance time; its successful
 historical verification does not refresh it for a later release.
+
+Known-good compensation correction (2026-10-28): a refreshed
+`schema_attested_at` audit timestamp cannot change the accepted source identity;
+all other known-good fields, images, schema, worker generation and grants remain
+strictly bound. Independently enrolled current inventory may retire an inactive
+slot, while every accepted actor must still match its sealed original preimage.
+
+A consumed application-only attempt may recover automatically after exact
+candidate teardown when its original worker ownership is unchanged, candidate
+authority is READ_ONLY, no candidate remains and no SQL/completion receipt exists.
+Recovery independently reobserves the original database and history, preserves
+the consumed attempt and original deployment completion, records an idempotent
+recovery abort, and restores the same known-good application. Nonempty migration
+plans, surviving candidates, changed ownership and uncertain effects remain
+fenced for authorized recovery. This neither replays SQL nor issues fresh
+deployment authority, and does not open production/schema160 dispatch.
