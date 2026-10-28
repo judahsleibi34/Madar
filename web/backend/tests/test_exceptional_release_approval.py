@@ -194,6 +194,27 @@ class ApprovalJournalTests(unittest.TestCase):
 
 
 class ExceptionalCliTests(unittest.TestCase):
+    def test_lock_loser_cannot_poison_the_active_exceptional_journal(self):
+        from deployment.lib import control_plane_upgrade as c
+        from deployment.lib import automatic_release_execution as execution
+        from deployment.lib import environment_file
+        web=Path(os.environ.get('MADAR_TEST_REPOSITORY_ROOT',Path(__file__).resolve().parents[2]))
+        for acquired in (False,True):
+            with self.subTest(acquired=acquired),tempfile.TemporaryDirectory() as tmp,patch.dict(os.environ):
+                system=c.SystemOperations.__new__(c.SystemOperations)
+                system.repo=Path(tmp);system.state_root=Path(tmp);system.interlock_file=Path(tmp)/'interlock'
+                system.control_root=web/'deployment';system.prepare_upgrade_roots=MagicMock()
+                status={'request':{'admission':{}},'request_sha256':'d'*64,'state':'APPROVED','consumed':False}
+                def fail(*args,**kwargs):
+                    if acquired:system.exceptional_execution_lock_acquired=True
+                    raise RuntimeError('deployment_lock_unavailable')
+                with patch.object(admission,'execution_policy'),patch.object(admission,'require_no_pending_operation'),patch.object(a,'inspect',return_value=status),patch.object(a,'execution_event') as audit,patch.object(environment_file,'load_environment_file'),patch.object(execution,'execute',side_effect=fail):
+                    with self.assertRaisesRegex(RuntimeError,'deployment_lock_unavailable'):
+                        system.exceptional_release_action('execute',request_id=str(uuid.uuid4()),token='stdin-only',confirmation='d'*64)
+                self.assertEqual(audit.call_count,int(acquired))
+                self.assertIsNone(system.exceptional_operator_token)
+                self.assertFalse(system.exceptional_execution_lock_acquired)
+
     def test_display_never_reads_operator_secret_or_executes_release(self):
         from deployment.lib import control_plane_upgrade as c
         ops=MagicMock();ops.exceptional_release_action.return_value={'state':'AWAITING_ADMIN_APPROVAL'}

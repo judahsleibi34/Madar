@@ -4384,3 +4384,7 @@ observe every required container healthy after functional checks as well as befo
 
 Disposable provider readiness must observe the final TCP PostgreSQL listener;
 initdb's temporary Unix-socket server does not establish runtime readiness.
+
+Only a controller that acquired the existing execution lock may record exceptional
+execution failure. A concurrent lock loser cannot change the active approval
+journal or revoke the owning controller's operation.

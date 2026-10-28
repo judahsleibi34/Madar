@@ -2080,3 +2080,7 @@ The existing locked executor admits exceptional transactional SQL only with the 
 AST-verified supported contract, one coordinated forward-compatible step, and the
 existing under-lock impact guard. Approval deadlines can shorten, never extend,
 the immutable admission deadline; delayed approval does not change that scope.
+
+Only a controller that acquired the existing execution lock may record exceptional
+execution failure. A concurrent lock loser cannot change the active approval
+journal or revoke the owning controller's operation.

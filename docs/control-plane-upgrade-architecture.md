@@ -2340,3 +2340,7 @@ the immutable admission deadline; delayed approval does not change that scope.
 The independent test receiver reserves 0.2 CPU for notification execution and its
 health probe, within its unchanged two-CPU total ceiling. Native acceptance must
 observe every required container healthy after functional checks as well as before.
+
+Only a controller that acquired the existing execution lock may record exceptional
+execution failure. A concurrent lock loser cannot change the active approval
+journal or revoke the owning controller's operation.

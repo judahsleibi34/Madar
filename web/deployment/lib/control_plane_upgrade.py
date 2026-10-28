@@ -2775,16 +2775,19 @@ print(hashlib.sha256(keys[0].encode()).hexdigest())
         loader=importlib.machinery.SourceFileLoader('madar_trusted_exceptional_release',str(entry))
         module=importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name,loader));loader.exec_module(module)
         self.exceptional_operator_token=token
+        self.exceptional_execution_lock_acquired=False
         try:return execute(self,value,module.DockerGitOperations)
         except BaseException as error:
             # A consumed attempt is never made reusable after a crash/failure.
             # SIGKILL leaves its durable journal for boot/recovery inspection.
             status=approval.inspect(self,request_id)
             target='RECOVERY_REQUIRED' if status['consumed'] else 'FAILED'
-            if status['state'] in {'APPROVED','REVALIDATING','AUTHORIZED_FOR_EXECUTION','EXECUTING','VERIFYING'}:
+            if self.exceptional_execution_lock_acquired is True and status['state'] in {'APPROVED','REVALIDATING','AUTHORIZED_FOR_EXECUTION','EXECUTING','VERIFYING'}:
                 approval.execution_event(self,value,target,{'error_type':type(error).__name__})
             raise
-        finally:self.exceptional_operator_token=None
+        finally:
+            self.exceptional_operator_token=None
+            self.exceptional_execution_lock_acquired=False
 
     def recover_automatic_known_good(self):
         # Boot recovery verifies existing completed authority; it deliberately

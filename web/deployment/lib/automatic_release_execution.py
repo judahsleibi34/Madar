@@ -528,6 +528,7 @@ def execute(system,value,base_operations,*,manual_retry=False):
     admission.sealed(value)
     lock=acquire_lock(system.upgrade_root/'upgrade.lock',create=True)
     system.automatic_upgrade_lock=lock
+    if 'exceptional' in value:system.exceptional_execution_lock_acquired=True
     previous=os.environ.get('CREDENTIALS_DIRECTORY');adapter=None;result=None;completed=False
     try:
         adapter=operations_adapter(base_operations,system,value)
