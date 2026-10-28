@@ -164,6 +164,97 @@ def execution_policy(operations):
     return p,environment
 
 
+PHYSICAL_RECOVERY=Path('/etc/madar/independent-test-recovery')
+
+def physical_recovery_evidence(recovery,policy,origin_source,protocols,*,now):
+    """Consume separately pinned off-host restoration, never a self-signed PASS.
+
+    A physical PG copy retains its system identifier. Only an independently
+    enrolled physical receiver, exact root-pinned receipt and actual application
+    acceptance may use that identity here. The old logical-restore contract is
+    unchanged, and this evidence cannot authorize production.
+    """
+    import base64
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+    fields={'kind','source_system_identifier','restore_system_identifier','restored_schema','receipt_sha256'}
+    if (not isinstance(recovery,dict) or set(recovery)!=fields
+            or recovery['kind']!='independent-physical-application-v1' or policy['environment']!='isolated-test'
+            or not re.fullmatch('[a-f0-9]{64}',str(recovery['receipt_sha256']))):
+        raise RuntimeError('automatic_physical_recovery_scope_invalid')
+    raw=protected(PHYSICAL_RECOVERY/(recovery['receipt_sha256']+'.json'),private=True).read_bytes()
+    if not 0<len(raw)<=2*1024**2:raise RuntimeError('automatic_physical_recovery_record_size')
+    trust=strict_json(raw)
+    fields={'version','kind','environment_id','receipt_sha256','receiver_public_key','source_physical_host_uuid',
+        'receiver_physical_host_uuid','receiver_filesystem_uuid','source_guest_uuid','source_sha',
+        'database_system_identifier','schema','backup_earliest_at','expires_at','manifest_sha256',
+        'received_sha256','completion_sha256','history_sha256','receiver_id','operation_id','attempt_id',
+        'receiver_implementation_sha256','receiver_source_sha','receipt'}
+    if (not isinstance(trust,dict) or set(trust)!=fields or type(trust['version']) is not int or trust['version']!=1
+            or trust['kind']!='independently-enrolled-physical-test-restoration'
+            or trust['environment_id']!=policy['environment_id'] or trust['source_sha']!=origin_source
+            or trust['database_system_identifier'] in policy['denied_database_identifiers']
+            or type(trust['expires_at']) is not int or trust['expires_at']<=now
+            or trust['receipt_sha256']!=recovery['receipt_sha256'] or digest(trust['receipt'])!=trust['receipt_sha256']):
+        raise RuntimeError('automatic_physical_recovery_root_binding_invalid')
+    for name in ('source_physical_host_uuid','receiver_physical_host_uuid','receiver_filesystem_uuid','source_guest_uuid','receiver_id','operation_id','attempt_id'):
+        if str(uuid.UUID(trust[name]))!=trust[name]:raise RuntimeError('automatic_physical_recovery_identity_invalid')
+    if (type(trust['schema']) is not int or not re.fullmatch('[1-9][0-9]{0,19}',str(trust['database_system_identifier']))
+            or any(not re.fullmatch('[a-f0-9]{64}',str(trust[k])) for k in ('manifest_sha256','received_sha256','completion_sha256','history_sha256','receiver_implementation_sha256'))
+            or not re.fullmatch('[a-f0-9]{40}',str(trust['receiver_source_sha']))):
+        raise RuntimeError('automatic_physical_recovery_identity_invalid')
+    packet=trust['receipt']
+    if not isinstance(packet,dict) or set(packet)!={'payload','signature','receiver_public_key'}:
+        raise RuntimeError('automatic_physical_recovery_packet_invalid')
+    try:
+        key=base64.b64decode(trust['receiver_public_key'],validate=True)
+        if packet['receiver_public_key']!=trust['receiver_public_key']:raise ValueError()
+        Ed25519PublicKey.from_public_bytes(key).verify(base64.b64decode(packet['signature'],validate=True),canonical(packet['payload']))
+    except Exception:raise RuntimeError('automatic_physical_recovery_receiver_signature_invalid') from None
+    value=packet['payload'];observed=value.get('database_observation',{});functional=value.get('functional_acceptance',{})
+    bound=('source_physical_host_uuid','receiver_physical_host_uuid','receiver_filesystem_uuid',
+        'source_guest_uuid','source_sha','manifest_sha256','received_sha256','receiver_id','operation_id','attempt_id',
+        'receiver_implementation_sha256','receiver_source_sha')
+    if (any(value.get(k)!=trust[k] for k in bound)
+            or value.get('version')!=1 or value.get('kind')!='independently-restored-synthetic-application'
+            or value.get('backup_format')!='postgres-physical-and-application-v1'
+            or value.get('source_physical_host_uuid')==value.get('receiver_physical_host_uuid')
+            or value.get('source_guest_uuid')==value.get('receiver_physical_host_uuid')
+            or value.get('source_and_restored_database_system_identifier')!=trust['database_system_identifier']
+            or recovery['source_system_identifier']!=trust['database_system_identifier']
+            or recovery['restore_system_identifier']!=trust['database_system_identifier']
+            or recovery['restored_schema']!=trust['schema']
+            or observed.get('system_identifier')!=trust['database_system_identifier'] or observed.get('schema')!=trust['schema']
+            or observed.get('protocols')!=[protocols[k] for k in ('delivery','outbox','deletion')]
+            or observed.get('read_only') is not True or type(observed.get('fingerprints')) is not int or observed['fingerprints']<=0
+            or value.get('release_context',{}).get('completion_sha256')!=trust['completion_sha256']
+            or value.get('release_context',{}).get('history',{}).get('history_sha256')!=trust['history_sha256']
+            or any(value.get(k) is not False for k in ('production_modified','new_deployment_authority_issued','release_migration_sql_executed'))):
+        raise RuntimeError('automatic_physical_recovery_observation_changed')
+    actors=value.get('runtime',{})
+    if (not isinstance(actors,dict) or len(actors)!=14 or len({r.get('id') for r in actors.values()})!=14
+            or any(not isinstance(name,str) or not name.startswith('/madar-recovery-'+trust['receiver_id'][:12]+'-')
+                or not isinstance(row,dict) or set(row)!={'id','image','spec_sha256'}
+                or not re.fullmatch('[a-f0-9]{64}',str(row['id'])) or not re.fullmatch('sha256:[a-f0-9]{64}',str(row['image']))
+                or not re.fullmatch('[a-f0-9]{64}',str(row['spec_sha256'])) for name,row in actors.items())):
+        raise RuntimeError('automatic_physical_recovery_runtime_invalid')
+    times=[trust['backup_earliest_at'],value.get('received_at'),value.get('accepted_at')]
+    if (any(type(v) is not int for v in times) or not times[0]<=times[1]<=times[2]<=now
+            or now-times[0]>policy['recovery_max_age_seconds'] or now-times[2]>policy['evidence_max_age_seconds']):
+        raise RuntimeError('automatic_physical_recovery_stale')
+    required=('ready','original_password_login','original_auth_identity','original_mfa_totp','admin_AAL2',
+        'refresh_rotation','anonymous_storage_denied','original_forms_and_reservations_read',
+        'reservation_transaction_api','tenant_isolation','notification_delivery','private_frontend_backend_routing',
+        'network_external_access_refused','external_dns_refused')
+    if (any(functional.get(k) is not True for k in required)
+            or functional.get('source_sha')!=origin_source or functional.get('schema')!=trust['schema']
+            or functional.get('database_system_identifier')!=trust['database_system_identifier']
+            or not re.fullmatch('[a-f0-9]{64}',str(functional.get('original_private_object_sha256')))
+            or functional.get('calendar',{}).get('status')!='PASS'
+            or functional.get('external_notifications_sent') is not False):
+        raise RuntimeError('automatic_physical_recovery_application_unaccepted')
+    return True
+
+
 def independent_evidence(source,policy,*,now=None):
     """Authenticate the independent TEST runner, never a candidate PASS file.
 
@@ -215,12 +306,15 @@ def independent_evidence(source,policy,*,now=None):
         raise RuntimeError('automatic_independent_ci_or_staging_incomplete')
     source_record=value['gates']['source'];artifacts=value['gates']['artifacts']
     recovery=value['gates']['recovery'];resources=value['gates']['resources']
+    physical=False
+    if isinstance(recovery,dict) and recovery.get('kind')=='independent-physical-application-v1':
+        physical=physical_recovery_evidence(recovery,policy,compat['origin_source_sha'],compat['protocols'],now=now)
     if (source_record!={'repository':'judahsleibi34/Madar','branch':'refs/heads/main','source_sha':source,
                        'history_base_sha':value['history_base_sha'],'tree_sha':value['tree_sha']}
             or not isinstance(artifacts,dict) or set(artifacts)!={'source_sha','images','build_inputs_sha256'}
             or artifacts['source_sha']!=source or artifacts['images']!=value['images']
             or not re.fullmatch('[a-f0-9]{64}',str(artifacts['build_inputs_sha256']))
-            or not isinstance(recovery,dict) or set(recovery)!={'source_system_identifier','backup_sha256',
+            or (not physical and (not isinstance(recovery,dict) or set(recovery)!={'source_system_identifier','backup_sha256',
                 'restore_system_identifier','restored_schema','rows_sha256','roles_sha256','objects_sha256',
                 'backup_created_at','restored_at','verified_at'}
             or any(not re.fullmatch('[a-f0-9]{64}',str(recovery[k])) for k in ('backup_sha256','rows_sha256','roles_sha256','objects_sha256'))
@@ -230,7 +324,7 @@ def independent_evidence(source,policy,*,now=None):
             or not recovery['backup_created_at']<=recovery['restored_at']<=recovery['verified_at']<=now
             or not 0<=now-recovery['backup_created_at']<=policy['recovery_max_age_seconds']
             or not 0<=now-recovery['verified_at']<=policy['evidence_max_age_seconds']
-            or type(recovery['restored_schema']) is not int
+            or type(recovery['restored_schema']) is not int))
             or not isinstance(resources,dict) or set(resources)!={'disk_free_bytes','memory_available_bytes',
                 'required_disk_bytes','required_memory_bytes','max_candidate_memory_bytes','max_candidate_cpu_millis'}
             or any(type(v) is not int or v<=0 for v in resources.values())

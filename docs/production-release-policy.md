@@ -4300,3 +4300,11 @@ users or implicit primary groups require independent review. CI receiver tests
 use deterministic measured disk capacity and the configured repository mount,
 with an explicit insufficient-headroom refusal. Operational headroom and
 production admission checks are unchanged.
+
+Physical test restore receipts require independent root enrollment and an exact
+receipt/key/scope pin before the routine issuer may consume them. A retained
+physical PostgreSQL system identifier is not evidence of same-host independence;
+physical host, filesystem, source fencing and full application acceptance provide
+that separate evidence. Existing logical restore restrictions remain unchanged.
+Stale evidence and production requests remain refused. No production receiver
+policy or authorization is installed by the test receipt consumer.

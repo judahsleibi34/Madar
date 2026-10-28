@@ -2259,3 +2259,11 @@ users or implicit primary groups require independent review. CI receiver tests
 use deterministic measured disk capacity and the configured repository mount,
 with an explicit insufficient-headroom refusal. Operational headroom and
 production admission checks are unchanged.
+
+The existing automatic admission module consumes independently pinned physical
+restoration evidence from root-only `/etc/madar/independent-test-recovery`.
+The trusted parent enrolls the actual independently observed receiver public key
+and exact signed receipt scope; candidate code cannot enroll a key or replace a
+root pin. This evidence path neither issues recovery/deployment authority nor
+changes the installed production controller. Historical native verification is
+not a fresh acceptance or permission to replay restoration.

@@ -2005,3 +2005,9 @@ users or implicit primary groups require independent review. CI receiver tests
 use deterministic measured disk capacity and the configured repository mount,
 with an explicit insufficient-headroom refusal. Operational headroom and
 production admission checks are unchanged.
+
+Physical test recovery admission is separate from the logical restore contract.
+It requires an exact root-pinned independently observed receiver key and signed
+full-application receipt; retaining a PostgreSQL system identifier alone never
+satisfies recovery. No source push enrolls a receiver, opens protected schema160
+admission, authorizes Class D execution, or activates production automation.

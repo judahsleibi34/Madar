@@ -2504,3 +2504,29 @@ users or implicit primary groups require independent review. CI receiver tests
 use deterministic measured disk capacity and the configured repository mount,
 with an explicit insufficient-headroom refusal. Operational headroom and
 production admission checks are unchanged.
+
+### Independently enrolled physical test restoration
+
+Routine isolated admission now distinguishes its existing logical-restoration
+packet from `independent-physical-application-v1`. The latter references an exact
+signed full-application receipt under the root-only directory
+`/etc/madar/independent-test-recovery/<receipt-sha256>.json`. Enrollment pins the
+receiver public key from independently observed receiver state, physical host and
+filesystem, source guest/release/database, backup/receive/completion/history
+identities, reviewed receiver implementation, conservative backup-age bound and
+expiry. The receipt's embedded public key cannot enroll itself.
+
+The physical copy may retain its original PostgreSQL system identifier only
+under this separate contract. Actual database/protocol observations, fourteen
+measured runtime actors, original Auth/MFA/Storage/business acceptance, tenant
+isolation and external-effects isolation are mandatory. Both receiver and parent
+acceptance signatures remain required. Missing pins, changed scope, untrusted
+ownership, incomplete acceptance and stale receipts refuse admission. Ordinary
+logical restoration still requires a distinct PostgreSQL identity.
+
+This is test-only evidence consumption inside the existing issuer, not a restore
+executor or production permission. No production trust record is installed by
+source tests. It does not open schema160, exceptional Class D dispatch, automatic
+production scheduling or a new deployment authority. The October 28 physical
+receipt is verified at its recorded historical acceptance time; its successful
+historical verification does not refresh it for a later release.

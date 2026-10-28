@@ -154,3 +154,82 @@ class DurableAutomaticOperationTests(unittest.TestCase):
             self.assertTrue((root/'in-progress.json').exists())
             record['source_sha']=value['source_sha'];completion.write_bytes(canonical(record));admission.finish_operation(value)
             self.assertFalse((root/'in-progress.json').exists());admission.require_no_pending_operation()
+
+class PhysicalRecoveryAdmissionTests(IndependentEvidenceTests):
+    """Separate receiver signature and root pin; the logical policy stays strict."""
+    def setUp(self):
+        super().setUp()
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+        from cryptography.hazmat.primitives.serialization import Encoding,PublicFormat
+        self.receiver_key=Ed25519PrivateKey.generate()
+        public=base64.b64encode(self.receiver_key.public_key().public_bytes(Encoding.Raw,PublicFormat.Raw)).decode()
+        now=int(time.time());receiver_id=str(uuid.uuid4())
+        observed={'system_identifier':'123456789','schema':160,'protocols':[2,2,2],'read_only':True,'fingerprints':218}
+        self.receipt={'version':1,'kind':'independently-restored-synthetic-application',
+            'source_physical_host_uuid':str(uuid.uuid4()),'receiver_physical_host_uuid':str(uuid.uuid4()),
+            'receiver_filesystem_uuid':str(uuid.uuid4()),'source_guest_uuid':str(uuid.uuid4()),
+            'source_sha':'b'*40,'manifest_sha256':'1'*64,'received_sha256':'2'*64,'receiver_id':receiver_id,
+            'operation_id':str(uuid.uuid4()),'attempt_id':str(uuid.uuid4()),'receiver_implementation_sha256':'3'*64,
+            'receiver_source_sha':'c'*40,'backup_format':'postgres-physical-and-application-v1',
+            'source_and_restored_database_system_identifier':'123456789','database_observation':observed,
+            'release_context':{'completion_sha256':'4'*64,'history':{'history_sha256':'5'*64}},
+            'production_modified':False,'new_deployment_authority_issued':False,'release_migration_sql_executed':False,
+            'received_at':now-100,'accepted_at':now-1,
+            'runtime':{'/madar-recovery-'+receiver_id[:12]+'-'+str(n):{'id':f'{n:064x}','image':'sha256:'+'a'*64,'spec_sha256':'b'*64} for n in range(14)}}
+        required=('ready','original_password_login','original_auth_identity','original_mfa_totp','admin_AAL2',
+            'refresh_rotation','anonymous_storage_denied','original_forms_and_reservations_read',
+            'reservation_transaction_api','tenant_isolation','notification_delivery','private_frontend_backend_routing',
+            'network_external_access_refused','external_dns_refused')
+        self.receipt['functional_acceptance']={k:True for k in required}|{'source_sha':'b'*40,'schema':160,
+            'database_system_identifier':'123456789','original_private_object_sha256':'6'*64,
+            'calendar':{'status':'PASS'},'external_notifications_sent':False}
+        names=('source_physical_host_uuid','receiver_physical_host_uuid','receiver_filesystem_uuid','source_guest_uuid',
+            'source_sha','manifest_sha256','received_sha256','receiver_id','operation_id','attempt_id',
+            'receiver_implementation_sha256','receiver_source_sha')
+        self.trust={k:self.receipt[k] for k in names}|{'version':1,'kind':'independently-enrolled-physical-test-restoration',
+            'environment_id':self.policy['environment_id'],'receiver_public_key':public,'database_system_identifier':'123456789',
+            'schema':160,'backup_earliest_at':now-200,'expires_at':now+200,'completion_sha256':'4'*64,'history_sha256':'5'*64}
+        self.enterContext(patch.object(admission,'PHYSICAL_RECOVERY',self.root))
+        self.seal_receiver()
+
+    def seal_receiver(self):
+        packet={'payload':self.receipt,'receiver_public_key':self.trust['receiver_public_key'],
+            'signature':base64.b64encode(self.receiver_key.sign(canonical(self.receipt))).decode()}
+        sha=digest(packet);self.trust.update(receipt=packet,receipt_sha256=sha)
+        (self.root/(sha+'.json')).write_bytes(canonical(self.trust))
+        self.payload['gates']['recovery']={'kind':'independent-physical-application-v1','source_system_identifier':'123456789',
+            'restore_system_identifier':'123456789','restored_schema':160,'receipt_sha256':sha}
+        self.publish()
+
+    def test_same_identifier_is_accepted_only_for_independently_pinned_physical_restoration(self):
+        self.assertEqual(admission.independent_evidence('a'*40,self.policy),self.payload)
+        p=self.root/(self.trust['receipt_sha256']+'.json');p.unlink()
+        with self.assertRaises(Exception):admission.independent_evidence('a'*40,self.policy)
+
+    def test_receipt_signature_cannot_be_replaced_by_the_outer_runner(self):
+        packet=self.trust['receipt'];packet['signature']=base64.b64encode(b'forged').decode()
+        sha=digest(packet);self.trust.update(receipt_sha256=sha)
+        (self.root/(sha+'.json')).write_bytes(canonical(self.trust))
+        self.payload['gates']['recovery']['receipt_sha256']=sha;self.publish()
+        with self.assertRaisesRegex(RuntimeError,'receiver_signature_invalid'):admission.independent_evidence('a'*40,self.policy)
+
+    def test_even_a_signed_receiver_cannot_change_independently_pinned_identity_or_acceptance(self):
+        original=copy.deepcopy(self.receipt)
+        changes=(lambda r:r.update(source_physical_host_uuid=r['receiver_physical_host_uuid']),
+            lambda r:r.update(source_sha='e'*40),lambda r:r['database_observation'].update(protocols=[1,2,2]),
+            lambda r:r['functional_acceptance'].update(tenant_isolation=False),
+            lambda r:r['functional_acceptance'].update(original_mfa_totp=False),
+            lambda r:r.update(accepted_at=int(time.time())-400),lambda r:r.update(production_modified=True),
+            lambda r:r['release_context'].update(completion_sha256='f'*64),lambda r:r.update(runtime={}))
+        for change in changes:
+            self.receipt=copy.deepcopy(original);change(self.receipt);self.seal_receiver()
+            with self.subTest(change=change),self.assertRaises(RuntimeError):admission.independent_evidence('a'*40,self.policy)
+
+    # Inherited logical-only mutations do not describe this physical envelope.
+    def test_reverification_does_not_redate_backup_or_restore(self):
+        self.trust['backup_earliest_at']=int(time.time())-4000;self.seal_receiver()
+        with self.assertRaisesRegex(RuntimeError,'stale'):admission.independent_evidence('a'*40,self.policy)
+
+    def test_failed_ci_stale_evidence_or_same_cluster_restore_cannot_be_approved(self):
+        self.payload['gates']['ci']['exit_codes']=[1];self.publish()
+        with self.assertRaises(RuntimeError):admission.independent_evidence('a'*40,self.policy)
