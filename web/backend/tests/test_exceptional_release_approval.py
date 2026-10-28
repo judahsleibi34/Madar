@@ -54,9 +54,9 @@ class ApprovalJournalTests(unittest.TestCase):
         self.key=b'approval-signing-only-independent-of-authentication-0123456789'
         self.request_id=str(uuid.uuid4());self.folder=self.path/self.request_id;self.folder.mkdir()
         self.policy={'max_approval_seconds':120}
-        self.value=sample();self.value['plan'].update(risk_class='D',migrations=[{'number':161}])
+        self.value=sample();self.value['expires_at']=int(time.time())+120;self.value['plan'].update(risk_class='D',migrations=[{'number':161}])
         self.value['exceptional']={'request_id':self.request_id,'policy_sha256':digest(self.policy),
-            'contract':{'contract':'drop-independent-table-v1'}}
+            'writer_inventory_sha256':'d'*64,'contract':{'contract':'drop-independent-table-v1'}}
         self.operator={'operator_auth_id':str(uuid.uuid4()),'policy_sha256':'a'*64,
             'session_id_sha256':'b'*64,'aal':'aal2'}
         self.system=MagicMock();self.system.authenticate_operator.return_value=self.operator
@@ -160,6 +160,13 @@ class ApprovalJournalTests(unittest.TestCase):
         self.approve();self.system.reobserve_automatic_admission.side_effect=RuntimeError('backup_corrupt')
         with self.assertRaisesRegex(RuntimeError,'backup_corrupt'):a.verify_execution(self.value,self.system,consume=True,token='token')
         self.assertFalse((self.folder/'approval-consumed.json').exists())
+
+    def test_failed_preflight_without_request_remains_visible_to_operator(self):
+        (self.folder/'request.json').unlink()
+        a.event(self.folder,self.key,'FAILED',{'error_type':'RuntimeError'})
+        value=a.inspect(self.system,self.request_id)
+        self.assertEqual(value['state'],'FAILED');self.assertIsNone(value['request'])
+        self.assertEqual(len(value['audit']),8)
 
     def test_audit_removal_modification_and_invalid_transition_refuse(self):
         with self.assertRaisesRegex(RuntimeError,'transition'):a.event(self.folder,self.key,'COMPLETED',{})

@@ -144,8 +144,8 @@ def inspect_contract(plan,inventory,db,p,*,locked=False):
 
 def validate_extension(value):
     x=value.get('exceptional');plan=value['plan']
-    if (not isinstance(x,dict) or set(x)!={'request_id','policy_sha256','contract'}
-            or not re.fullmatch('[a-f0-9]{64}',str(x['policy_sha256']))
+    if (not isinstance(x,dict) or set(x)!={'request_id','policy_sha256','contract','writer_inventory_sha256'}
+            or any(not re.fullmatch('[a-f0-9]{64}',str(x[k])) for k in ('policy_sha256','writer_inventory_sha256'))
             or not isinstance(x['contract'],dict) or x['contract'].get('contract') not in CONTRACTS
             or plan.get('risk_class')!=CONTRACTS[x['contract']['contract']]
             or len(plan.get('migrations',[]))!=1 or value.get('environment')!='isolated-test'):
@@ -173,8 +173,14 @@ def verified(path,key):
 @contextmanager
 def journal_lock(request_id):
     from .control_plane_upgrade import acquire_lock,require_root_directory
-    identifier(request_id);require_root_directory(root(),create=True)
+    from .automatic_release_admission import ROOT
+    identifier(request_id);require_root_directory(ROOT,create=True);require_root_directory(root(),create=True)
     path=root()/request_id;require_root_directory(path,create=True)
+    # Persist new request and journal namespace entries, not just their files.
+    for parent in (ROOT.parent,ROOT,root()):
+        directory=os.open(parent,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+        try:os.fsync(directory)
+        finally:os.close(directory)
     fd=acquire_lock(path/'approval.lock',create=True)
     try:yield path
     finally:os.close(fd)
@@ -239,7 +245,12 @@ def create(system,source):
 def inspect(system,request_id):
     _,key=policy(system)
     with journal_lock(request_id) as path:
-        request=_request(path,key);entries=history(path,key);state=entries[-1]['state']
+        entries=history(path,key)
+        if not entries:raise RuntimeError('exceptional_request_unknown')
+        state=entries[-1]['state']
+        if not (path/'request.json').exists():
+            return {'request':None,'request_id':request_id,'request_sha256':None,'state':state,'approval':None,'consumed':False,'audit':entries}
+        request=_request(path,key)
         approval=verified(path/'approval.json',key) if (path/'approval.json').exists() else None
         if state in {'APPROVED','AWAITING_ADMIN_APPROVAL'} and min(request['expires_at'],(approval or {}).get('expires_at',request['expires_at']))<=int(time.time()):state='EXPIRED'
         return {'request':request,'request_sha256':digest(request),'state':state,
@@ -287,7 +298,8 @@ def verify_execution(value,system,*,consume=False,token=None):
         state=history(path,key)[-1]['state'];now=int(time.time())
         if (request['admission']!=value or request['policy_sha256']!=digest(p)
                 or x['policy_sha256']!=digest(p) or approval['policy_sha256']!=digest(p)
-                or approval['request_sha256']!=digest(request) or approval['admission_sha256']!=digest(value)):
+                or approval['request_sha256']!=digest(request) or approval['admission_sha256']!=digest(value)
+                or approval['expires_at']!=value['expires_at']):
             raise RuntimeError('exceptional_approval_scope_changed')
         if min(request['expires_at'],approval['expires_at'])<=now:
             if state=='APPROVED':event(path,key,'EXPIRED',{'approval_sha256':digest(approval)})

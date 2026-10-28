@@ -418,6 +418,7 @@ def observe_admission(operations,source,*,attempt_id=None,created_at=None,expire
             from .exceptional_release_approval import policy as exceptional_policy,inspect_contract
             ep,_=exceptional_policy(operations)
             exceptional={'request_id':exceptional_request_id,'policy_sha256':digest(ep),
+                'writer_inventory_sha256':digest(environment['runtime_scope']),
                 'contract':inspect_contract(plan,inventory,db,ep)}
         measurements=measure_class_b(db,plan,expected_system_identifier=catalog.system_identifier,
             expected_structure_sha256=catalog.structure_sha256) if value['risk_class']=='B' else None
@@ -490,6 +491,10 @@ def observe_admission(operations,source,*,attempt_id=None,created_at=None,expire
     elif not result['policy_match']:raise RuntimeError('automatic_policy_refused:'+','.join(result['reasons']))
     start=now if created_at is None else created_at
     end=min(start+policy['operation_max_seconds'],proof['expires_at'],routine['expires_at']) if expires_at is None else expires_at
+    if exceptional is not None:
+        maximum=start+min(ep['max_approval_seconds'],ep['max_request_seconds'])
+        if expires_at is not None and end>maximum:raise RuntimeError('exceptional_operation_exceeds_approval_lifetime')
+        end=min(end,maximum)
     if end>routine['expires_at']:raise RuntimeError('automatic_scope_exceeds_policy_expiry')
     target_slot='green' if slot=='blue' else 'blue'
     output={'version':1,'operation':OPERATION,'operation_id':value['operation_id'],'attempt_id':attempt_id or proof['attempt_id'],

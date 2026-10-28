@@ -126,8 +126,10 @@ def execute(value,system,guard):
         observed=observe(cursor.connection,required_protocols=document['compatibility_intent']['worker_protocols'],expected_structure_sha256=structure)
         if observed.system_identifier!=value['database']['system_identifier']:raise RuntimeError('automatic_migration_executor_database_changed')
         if 'exceptional' in value:
-            cursor.execute("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid() AND backend_type='client backend'")
+            cursor.execute("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid() AND backend_type<>'autovacuum worker'")
             if cursor.fetchone()!=(0,):raise RuntimeError('exceptional_unexpected_database_writer_session')
+            cursor.execute("SELECT count(*) FROM pg_prepared_xacts WHERE database=current_database()")
+            if cursor.fetchone()!=(0,):raise RuntimeError('exceptional_unresolved_prepared_transaction')
         # Conservative A budgets use the same independently protected ceilings.
         # B permission itself remains operation-specific and independently checked.
         apply_transaction_limits(cursor,policy,expected_schema=migration.from_schema)

@@ -145,7 +145,7 @@ def operations_adapter(base,system,value):
             self._maintenance=False;self._private_providers=[]
             self._initial_scope=strict_json(protected(Path('/etc/madar/isolated-release-test.json'),private=True).read_bytes())['runtime_scope']
 
-        def verify_actor_scope(self):
+        def verify_actor_scope(self,*,enforce_maintenance=True):
             from .isolated_release_environment import verify_runtime_scope
             from .completed_normal_resources import measured_spec_matches
             import copy,hashlib
@@ -168,6 +168,11 @@ def operations_adapter(base,system,value):
                 if (path/'active-upstreams.conf').read_bytes()!=body:raise RuntimeError('automatic_proxy_route_changed')
                 binding['contents_sha256']=digest({'active-upstreams.conf':{'sha256':hashlib.sha256(body).hexdigest(),'uid':1000,'mode':0o644}})
             verify_runtime_scope(expected,[r for r in rows if r['Id'] in self._initial_scope])
+            if self._maintenance and enforce_maintenance:
+                stopped={'/madar-'+value['origin']['slot']+'-'+r for r in ROLES if r not in {'frontend','redis'}}
+                if not self._migration_completed:stopped|={'/supabase-auth','/supabase-rest','/supabase-storage'}
+                if any(r['Name'] in stopped and r['State']['Running'] for r in rows):
+                    raise RuntimeError('exceptional_original_writer_restarted')
             for row in rows:
                 if row['Id'] not in candidate:continue
                 old=candidate[row['Id']]
@@ -231,7 +236,7 @@ def operations_adapter(base,system,value):
 
         def fence_exceptional_failure(self):
             if 'exceptional' not in value:return
-            rows=self.verify_actor_scope()
+            rows=self.verify_actor_scope(enforce_maintenance=False)
             stop=[r['Id'] for r in rows if r['Name'] in {'/madar-'+slot+'-'+role
                 for slot in ('blue','green') for role in ROLES if role not in {'frontend','redis'}} and r['State']['Running']]
             if stop:self.run(['/usr/bin/docker','stop','--time','15',*stop])

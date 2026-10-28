@@ -2757,7 +2757,9 @@ print(hashlib.sha256(keys[0].encode()).hexdigest())
         if action in {'approve','reject','revoke'}:
             return approval.decide(self,request_id,action,token,confirmation)
         if action!='execute':raise UpgradeError('exceptional_action_invalid')
-        status=approval.inspect(self,request_id);value=status['request']['admission']
+        status=approval.inspect(self,request_id)
+        if status['request'] is None:raise UpgradeError('exceptional_request_unaccepted')
+        value=status['request']['admission']
         if confirmation!=status['request_sha256']:raise UpgradeError('exceptional_explicit_confirmation_required')
         if status['state']!='APPROVED' or status['consumed']:raise UpgradeError('exceptional_approval_not_executable')
         require_no_pending_operation()
