@@ -538,10 +538,12 @@ def execute(system,value,base_operations,*,manual_retry=False):
         receipt={'operation':admission.OPERATION,'admission_sha256':digest(value),'attempt_id':value['attempt_id'],
             'source_sha':value['source_sha'],'database':value['database'],'release':result,
             'manual_retry_requested':manual_retry,'completed_at':int(time.time())}
+        # The independently protected policy observer must see the exact
+        # verified target inventory before it authenticates completion events.
+        adapter.accept_runtime_inventory()
         if 'exceptional' in value:
             from .exceptional_release_approval import execution_event
             execution_event(system,value,'VERIFYING',{'release_sha':value['source_sha'],'status':result['status']})
-        adapter.accept_runtime_inventory()
         atomic_json(admission.ROOT/'attempts'/value['attempt_id']/'completion.json',receipt,exclusive=True)
         completed=True
         if 'exceptional' in value:

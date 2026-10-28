@@ -4395,3 +4395,8 @@ SQL execution/boundary/completion marker, unchanged original worker authority,
 and independently reverified known-good database/schema/history. Recovery issues
 no migration authority and never reuses the consumed approval. Any later or
 ambiguous boundary remains fenced for authorized recovery.
+
+After actual target health and promotion acceptance, the existing runtime-inventory
+attestor seals the verified actor set before exceptional VERIFYING/COMPLETED
+events reobserve policy. Those events still require the exact approved policy
+digest; no unknown actor or changed policy can be accepted by this ordering.

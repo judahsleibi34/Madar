@@ -352,7 +352,9 @@ def verify_execution(value,system,*,consume=False,token=None):
 
 
 def execution_event(system,value,state,detail):
-    _,key=policy(system)
+    p,key=policy(system)
+    if digest(p)!=validate_extension(value)['policy_sha256']:
+        raise RuntimeError('exceptional_policy_changed')
     with journal_lock(validate_extension(value)['request_id']) as path:
         return event(path,key,state,detail)
 

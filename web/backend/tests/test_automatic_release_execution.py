@@ -156,3 +156,26 @@ class SealedOriginRestoreTests(unittest.TestCase):
         with patch('deployment.lib.automatic_release_execution.publish_candidate_grant'),self.assertRaisesRegex(RuntimeError,'inventory_incomplete'):
             instance.restore_workers(dict(sha=value['origin']['source_sha'],slot='blue',images=value['origin']['images']))
         self.assertEqual(instance.commands,[])
+
+
+class ExceptionalCompletionPublicationTests(unittest.TestCase):
+    def test_verified_inventory_precedes_policy_observation_and_completion_receipt(self):
+        import os,tempfile
+        from types import SimpleNamespace
+        from unittest.mock import patch,MagicMock
+        from deployment.lib import automatic_release_execution as e
+        from deployment.lib import exceptional_release_approval as approval
+        from deployment.lib import automatic_release_recovery as recovery
+        from deployment.lib import runtime_authority
+        events=[];v=sample();v['exceptional']={'request_id':'model-request'}
+        adapter=SimpleNamespace(_credential_root=None,compatibility=None,
+            accept_runtime_inventory=lambda:events.append('inventory'))
+        def event(*args):
+            self.assertIn('inventory',events);events.append(args[2])
+        with tempfile.TemporaryDirectory() as tmp,patch.dict(os.environ):
+            root=Path(tmp);system=SimpleNamespace(upgrade_root=root,state_root=root,
+                clear_authorization=MagicMock(),clear_interlock=MagicMock())
+            with patch.object(e.os,'geteuid',return_value=0),patch.object(e.admission,'sealed'),patch.object(e.admission,'ROOT',root),patch.object(e.admission,'finish_operation'),patch.object(e,'acquire_lock',side_effect=lambda *args,**kw:os.open(root/'lock',os.O_CREAT|os.O_RDWR,0o600)),patch.object(e,'operations_adapter',return_value=adapter),patch.object(e,'ReleaseDeployer') as deployer,patch.object(e,'atomic_json',side_effect=lambda *args,**kw:events.append('receipt')),patch.object(approval,'execution_event',side_effect=event),patch.object(recovery,'seal_known_good',side_effect=lambda *args:events.append('seal')),patch.object(runtime_authority,'open_deployment_lock',side_effect=lambda *_:tempfile.TemporaryFile()):
+                deployer.return_value.deploy.return_value={'status':'known_good'}
+                e.execute(system,v,object)
+        self.assertEqual(events,['inventory','VERIFYING','receipt','COMPLETED','seal'])
