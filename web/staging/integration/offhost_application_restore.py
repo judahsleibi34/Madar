@@ -57,12 +57,16 @@ def restore(run_id):
     for name,sha in received['files'].items():
         if digest_file(protected(incoming/name,private=True))!=sha:raise RuntimeError('offhost_test_received_bytes_changed')
     app=strict_json(protected(incoming/'application.json',private=True).read_bytes())
-    required={'version','source_sha','database_system_identifier','schema','slot','containers','binds','fingerprints','storage_objects','original_fixture','source_poweroff_sha256','redis_snapshot'}
+    required={'version','source_sha','database_system_identifier','schema','slot','containers','binds','fingerprints','storage_objects','original_fixture','source_poweroff_sha256','redis_snapshot','release_context'}
     if (set(app)!=required or app['version']!=1 or app['source_sha']!=enrollment['source_sha']
             or app['database_system_identifier']!=enrollment['source_database_system_identifier']
             or set(app['containers'])!=set(ROLE_BUDGET) or app['slot'] not in {'blue','green'}
             or not re.fullmatch('[a-f0-9]{64}',str(app['source_poweroff_sha256']))):
         raise RuntimeError('offhost_test_application_contract_invalid')
+    context=app['release_context']
+    if (context.get('history',{}).get('system_identifier')!=app['database_system_identifier'] or context['history'].get('schema')!=app['schema']
+            or any(not re.fullmatch('[a-f0-9]{64}',str(context.get(k))) for k in ('admission_sha256','plan_sha256','completion_sha256','recovery_manifest_sha256'))):
+        raise RuntimeError('offhost_test_release_context_invalid')
     # The independent parent publishes this only after the exact source QEMU
     # process has exited. Candidate code cannot publish a receiver root receipt.
     stopped=strict_json(protected(root/'source-powered-off.json',private=True).read_bytes())
@@ -251,7 +255,7 @@ def retire_scope(run_id):
             if command(['docker','ps','-aq','--filter','ancestor='+image]).strip():retained.append(image);continue
             try:command(['docker','image','rm',image]);images.append(image)
             except RuntimeError:retained.append(image)
-    event_command=['docker','events','--since',str(int(before['start_time'])),'--until',str(int(time.time())),
+    event_command=['docker','events','--since',str(int(before['start_time'])),'--until',str(int(time.time())+2),
         '--filter','label=com.madar.test.receiver='+enrollment['receiver_id'],'--format','{{json .}}']
     events=[json.loads(line) for line in command(event_command).decode().splitlines()]
     # No archive, credential, DB, VM or foreign path can survive inside a
