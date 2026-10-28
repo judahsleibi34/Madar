@@ -239,15 +239,17 @@ def pending_scope(m,state):
             or value['database']['system_identifier']!=m['history']['system_identifier']
             or value['database']['origin_schema']!=m['history']['schema'] or value['database']['target_schema']!=m['history']['schema']
             or read(STATE/'worker-ownership.json',private=False)!=m['worker_ownership']):raise RuntimeError(unsafe)
-    runtime=root/'candidate-runtime.json'
-    if runtime.exists() or runtime.is_symlink():
+    from .automatic_release_execution import grant_directory
+    runtime=root/'candidate-runtime.json';authority=grant_directory(value)/'authority.json'
+    has_runtime=runtime.exists() or runtime.is_symlink()
+    if has_runtime or authority.exists() or authority.is_symlink():grant(value,mode='READ_ONLY')
+    if has_runtime:
         candidate=read(runtime)
         if not isinstance(candidate,dict) or len(candidate)!=len(ROLES):raise RuntimeError(unsafe)
         # A finished failed-candidate cleanup is provable; an interrupted Docker
         # effect or still-present candidate remains fenced for authorized repair.
         present={r['Id'] for r in inspect_all()}
         if set(candidate)&present:raise RuntimeError(unsafe)
-        grant(value,mode='READ_ONLY')
 
     return scope
 
@@ -256,11 +258,19 @@ def recover(system,base_operations):
     from .control_plane_upgrade import acquire_lock
     from .runtime_authority import open_deployment_lock,runtime_mutation_lock
     from .environment_file import load_environment_file
+    # Authenticate the guest and code before any recovery journal/lock effect.
+    initial_policy,_=policy(system)
     lock=acquire_lock(system.upgrade_root/'upgrade.lock',create=True)
     started=time.monotonic();journal=None;manifest=None
     try:
         with open_deployment_lock(STATE/'deploy.lock') as deploy:
             __import__('fcntl').flock(deploy.fileno(),__import__('fcntl').LOCK_EX)
+            from .control_plane_upgrade import require_root_directory
+            require_root_directory(ROOT,create=True)
+            boot=Path('/proc/sys/kernel/random/boot_id').read_text().strip();uuid.UUID(boot)
+            journal=ROOT/('boot-'+boot+'.json')
+            atomic_json(journal,{'operation':'known-good-boot-recovery','boot_id':boot,'phase':'verifying_completed_scope',
+                'controller_sha':initial_policy['controller_sha'],'deployment_authority_issued':False,'migration_sql_executed':False})
             p,m,state=validate_manifest(system);manifest=m;verify_fence(p['control_interface'])
             pending=pending_scope(m,state);rows=inspect_all()
             # Current independently enrolled inventory can retire an obsolete
@@ -364,7 +374,7 @@ def recover(system,base_operations):
                 try:run(['/usr/bin/docker','stop','--time','15',*selected])
                 except Exception:pass
         if journal is not None:
-            atomic_json(journal,{'operation':'known-good-boot-recovery','phase':'fenced','source_sha':manifest['source_sha'],'error_type':type(error).__name__,'error_code':str(error) if isinstance(error,RuntimeError) else 'bounded_effect_failed','migration_sql_executed':False,'deployment_authority_issued':False})
+            atomic_json(journal,{'operation':'known-good-boot-recovery','phase':'fenced','source_sha':manifest['source_sha'] if manifest is not None else None,'error_type':type(error).__name__,'error_code':str(error) if isinstance(error,RuntimeError) else 'bounded_effect_failed','migration_sql_executed':False,'deployment_authority_issued':False})
         raise
     finally:os.close(lock)
 

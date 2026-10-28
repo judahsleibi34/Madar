@@ -2289,3 +2289,10 @@ read-only check of the sealed scope, original PID/start/boot tuple and owner
 liveness. It never calls live execution authorization with an obsolete process
 identity. The ordinary issuer's strict live PID/start/boot check is unchanged;
 an active owner, altered consumed record or ambiguous effects still refuse.
+
+Recovery diagnostics are created only after positive guest/code policy
+verification, and before examining pending state, so trusted-host refusals have
+a durable fenced boot record. Any existing pending candidate grant must remain
+READ_ONLY even before candidate creation. CI's live-owner test uses a bounded
+real child process because its test runner can be PID1; host-owner validation
+is not relaxed to accommodate a container test runner.

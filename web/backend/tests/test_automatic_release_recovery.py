@@ -137,14 +137,31 @@ class ApplicationFailureRecoveryTests(unittest.TestCase):
 
 class HistoricalConsumptionTests(unittest.TestCase):
     def test_historical_observation_does_not_relax_live_authority_or_allow_a_living_owner(self):
+        import subprocess,sys
         from deployment.lib.migration_inventory import digest
-        value=sample();record={'admission_sha256':digest(value),'source_sha':value['source_sha'],
-            'operation_id':value['operation_id'],'attempt_id':value['attempt_id'],'pid':os.getpid(),
-            'process_start':Path('/proc/self/stat').read_text().split(') ',1)[1].split()[19],
-            'boot_id':Path('/proc/sys/kernel/random/boot_id').read_text().strip()}
-        with patch.object(recovery,'read',return_value=record),patch.object(recovery.admission,'require_reserved') as live:
-            with self.assertRaisesRegex(RuntimeError,'owner_still_running'):recovery.observe_reserved_attempt(value)
-            record['boot_id']='2fa2bc18-a4fb-4e60-8c5b-7ce4acd052d9'
-            self.assertEqual(recovery.observe_reserved_attempt(value),record);live.assert_not_called()
-            record['source_sha']='f'*40
-            with self.assertRaisesRegex(RuntimeError,'consumed_attempt_changed'):recovery.observe_reserved_attempt(value)
+        value=sample()
+        # The CI test runner is PID1. Exercise a real supported owner PID rather
+        # than relaxing the controller's host-process validation for the test.
+        child=subprocess.Popen([sys.executable,'-c','import sys;sys.stdin.read(1)'],stdin=subprocess.PIPE,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        try:
+            record={'admission_sha256':digest(value),'source_sha':value['source_sha'],
+                'operation_id':value['operation_id'],'attempt_id':value['attempt_id'],'pid':child.pid,
+                'process_start':Path('/proc',str(child.pid),'stat').read_text().split(') ',1)[1].split()[19],
+                'boot_id':Path('/proc/sys/kernel/random/boot_id').read_text().strip()}
+            with patch.object(recovery,'read',return_value=record),patch.object(recovery.admission,'require_reserved') as live:
+                with self.assertRaisesRegex(RuntimeError,'owner_still_running'):recovery.observe_reserved_attempt(value)
+                record['boot_id']='2fa2bc18-a4fb-4e60-8c5b-7ce4acd052d9'
+                self.assertEqual(recovery.observe_reserved_attempt(value),record);live.assert_not_called()
+                record['source_sha']='f'*40
+                with self.assertRaisesRegex(RuntimeError,'consumed_attempt_changed'):recovery.observe_reserved_attempt(value)
+        finally:
+            child.stdin.close();child.wait(timeout=5)
+
+
+class EarlyRecoverySafetyTests(unittest.TestCase):
+    def test_foreign_or_expired_guest_policy_refuses_before_lock_or_journal_creation(self):
+        from types import SimpleNamespace
+        system=SimpleNamespace(upgrade_root=Path('/unusable'))
+        with patch.object(recovery,'policy',side_effect=RuntimeError('unapproved_guest')),patch('deployment.lib.control_plane_upgrade.acquire_lock') as lock,patch.object(recovery,'atomic_json') as publish,self.assertRaisesRegex(RuntimeError,'unapproved_guest'):
+            recovery.recover(system,object)
+        lock.assert_not_called();publish.assert_not_called()
