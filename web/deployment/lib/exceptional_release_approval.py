@@ -218,7 +218,9 @@ def create(system,source):
             value=observe_admission(system,source,exceptional_request_id=request_id)
             publish(value)
             proof_expires=value['expires_at']
-            request={'version':1,'request_id':request_id,'admission_sha256':digest(value),'admission':value,
+            tree=system.root_git('exceptional_review_tree','rev-parse',source+'^{tree}',cwd=system.repo).stdout.strip()
+            if not re.fullmatch('[a-f0-9]{40}',tree):raise RuntimeError('exceptional_source_tree_invalid')
+            request={'version':1,'source_tree_sha':tree,'request_id':request_id,'admission_sha256':digest(value),'admission':value,
                 'policy_sha256':digest(p),'created_at':int(time.time()),'expires_at':min(proof_expires,int(time.time())+p['max_request_seconds']),
                 'review':{'why':'Independent approval required for '+value['plan']['risk_class']+' '+value['exceptional']['contract']['contract'],
                     'impact':value['exceptional']['contract'],'backup_and_recovery':value['evidence']['recovery'],

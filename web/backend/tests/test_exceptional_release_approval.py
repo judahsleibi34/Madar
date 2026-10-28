@@ -29,6 +29,14 @@ class SupportedExceptionalSqlTests(unittest.TestCase):
             with self.subTest(body=body),self.assertRaises(RuntimeError):
                 a.supported(scaffold(160,161,body),origin=160,target=161)
 
+    def test_candidate_control_plane_or_protocol_change_cannot_approve_itself(self):
+        from types import SimpleNamespace
+        for mutation in ({'protected_control_plane_changed':True},{'worker_protocol_change':True},{'execution_class':'unsupported'}):
+            document={'origin_schema':160,'target_schema':161,'protected_control_plane_changed':False,'worker_protocol_change':False,'execution_class':'transactional','compatibility_covers_path':True}
+            document.update(mutation)
+            plan=SimpleNamespace(document=lambda:document);inventory=SimpleNamespace(forward=lambda *_:[object()])
+            with self.assertRaisesRegex(RuntimeError,'plan_unsupported'):a.inspect_contract(plan,inventory,None,{})
+
     def test_wrong_schema_envelope_and_transaction_refuse(self):
         sql=scaffold(160,161,'DROP TABLE public.retired_items;')
         for value in (sql.replace(b'BEGIN;',b''),sql.replace(b'COMMIT;',b''),sql):

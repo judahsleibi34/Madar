@@ -107,7 +107,7 @@ def execute(value,system,guard):
         path=captured/(str(item.number)+'.sql')
         fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o400)
         with os.fdopen(fd,'wb') as f:f.write(item.sql);f.flush();os.fsync(f.fileno())
-        migrations.append(Migration(item.number,path,item.sha256,expected['from_schema'],expected['to_schema'],'expand-only'))
+        migrations.append(Migration(item.number,path,item.sha256,expected['from_schema'],expected['to_schema'],'forward-compatible' if 'exceptional' in value else 'expand-only'))
     boundaries={b['schema']:b for b in proof['boundaries']}
     original=strict_json(protected(HISTORY,private=True).read_bytes())
     expected_original={'version':1,'system_identifier':value['database']['system_identifier'],

@@ -137,7 +137,7 @@ def operations_adapter(base,system,value):
         def __init__(self):
             candidate=value['candidate'];plan=value['plan']
             compatibility=Compatibility(candidate['compatible_min'],candidate['compatible_max'],
-                plan['target_schema'],'none' if not plan['migrations'] else 'expand-only',
+                plan['target_schema'],'none' if not plan['migrations'] else 'forward-compatible' if 'exceptional' in value else 'expand-only',
                 value['origin']['compatible_min'],value['origin']['compatible_max'])
             super().__init__(system.repo,system.state_root,Path('/etc/madar/production.env'),compatibility)
             self.automatic_release_admission=value;self._issuer=system;self._credential_root=None
