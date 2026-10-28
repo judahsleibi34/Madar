@@ -280,7 +280,10 @@ print(json.dumps({'system_identifier':identity[0],'schema':identity[1],'protocol
         phase('database_roles_acls_data_and_history_restored',fingerprints=len(app['fingerprints']),schema=app['schema'])
         storage_env=dict(v.split('=',1) for v in app['containers']['storage']['Config']['Env'])
         recover_metadata(app['storage_objects'],root/'objects',namespace=(storage_env.get('TENANT_ID'),storage_env.get('GLOBAL_S3_BUCKET')))
-        for path in (root/'objects',*(root/'objects').rglob('*')):os.chown(path,1000,1000)
+        storage_user=app['containers']['storage']['Config'].get('User') or '0:0'
+        if not re.fullmatch('[0-9]+(?::[0-9]+)?',storage_user):raise RuntimeError('offhost_test_storage_user_requires_review')
+        parts=storage_user.split(':');storage_uid=int(parts[0]);storage_gid=int(parts[-1])
+        for path in (root/'objects',*(root/'objects').rglob('*')):os.chown(path,storage_uid,storage_gid)
         for role in ('auth','rest','storage','gateway','redis','parser-worker','remote-ingestion-worker','backend','frontend','notification-worker','calendar-sync-worker','data-deletion-worker','proxy'):create(role)
         deadline=time.monotonic()+240
         while True:
