@@ -129,10 +129,40 @@ class ApplicationFailureRecoveryTests(unittest.TestCase):
                 grant.assert_called_once_with(value,mode='READ_ONLY')
                 rows.return_value=[{'Id':'0'}]
                 with self.assertRaisesRegex(RuntimeError,'effectful_operation'):recovery.pending_scope(m,{})
+
                 rows.return_value=[{'Id':'accepted'}]
                 value['plan']['migrations']=[{'actual':'SQL'}]
                 scope['admission_sha256']=digest(value)
                 with self.assertRaisesRegex(RuntimeError,'effectful_operation'):recovery.pending_scope(m,{})
+
+    def test_planned_sql_may_be_abandoned_only_before_any_candidate_or_execution_boundary(self):
+        from deployment.lib.migration_inventory import digest
+        value=sample();value['database'].update(origin_schema=160,target_schema=161)
+        value['plan']['migrations']=[{'number':161}]
+        scope={'version':1,'operation':recovery.admission.OPERATION,'attempt_id':value['attempt_id'],
+            'admission_sha256':digest(value),'source_sha':value['source_sha'],'operation_id':value['operation_id'],
+            'database_system_identifier':value['database']['system_identifier']}
+        m={'source_sha':value['origin']['source_sha'],'admission':{'candidate':{'slot':value['origin']['slot']}},
+            'history':{'schema':160,'system_identifier':value['database']['system_identifier']},'worker_ownership':{'same':'original'}}
+        with tempfile.TemporaryDirectory() as tmp,patch.object(recovery.admission,'ROOT',Path(tmp)),patch.object(recovery.admission,'sealed'),patch.object(recovery,'observe_reserved_attempt'),patch.object(recovery,'grant'):
+            root=Path(tmp);(root/'in-progress.json').touch();attempt=root/'attempts'/value['attempt_id'];attempt.mkdir(parents=True)
+            directory=root/digest(value);directory.mkdir();(directory/'admission.json').touch()
+            def read(path,**kw):
+                if path==root/'in-progress.json':return scope
+                if path==directory/'admission.json':return value
+                if path.name=='worker-ownership.json':return m['worker_ownership']
+                self.fail(str(path))
+            with patch.object(recovery,'read',side_effect=read):
+                for phase in ('source_validation','immutable_build','preflight'):
+                    state={'in_progress_release':{'release_sha':value['source_sha'],'phase':phase}}
+                    self.assertEqual(recovery.pending_scope(m,state),scope)
+                    for name in ('candidate-runtime.json','migration-execution.json','migration-completion.json','migration-boundaries.json','locked-exceptional-impact.json'):
+                        path=attempt/name;path.touch()
+                        with self.assertRaisesRegex(RuntimeError,'effectful_operation'):recovery.pending_scope(m,state)
+                        path.unlink()
+                for phase in ('migration','candidate_start','observation',None):
+                    with self.assertRaisesRegex(RuntimeError,'effectful_operation'):
+                        recovery.pending_scope(m,{'in_progress_release':{'release_sha':value['source_sha'],'phase':phase}})
 
 
 class HistoricalConsumptionTests(unittest.TestCase):

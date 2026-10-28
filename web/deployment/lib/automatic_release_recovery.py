@@ -226,7 +226,9 @@ def pending_scope(m,state):
     except (ValueError,TypeError,AttributeError):raise RuntimeError('automatic_recovery_pending_scope_invalid') from None
     root=admission.ROOT/'attempts'/attempt
     unsafe='automatic_recovery_committed_or_effectful_operation_requires_authorized_recovery'
-    if (root/'migration-execution.json').exists() or (root/'completion.json').exists():raise RuntimeError(unsafe)
+    if any((root/name).exists() or (root/name).is_symlink() for name in
+            ('migration-execution.json','migration-completion.json','migration-boundaries.json','locked-exceptional-impact.json','completion.json')):
+        raise RuntimeError(unsafe)
     candidates=[read(f) for f in admission.ROOT.glob('*/admission.json')]
     values=[v for v in candidates if v['attempt_id']==attempt]
     if len(values)!=1:raise RuntimeError(unsafe)
@@ -234,13 +236,22 @@ def pending_scope(m,state):
     admission.sealed(value,allow_expired=True);observe_reserved_attempt(value)
     expected={'version':1,'operation':admission.OPERATION,'attempt_id':attempt,'admission_sha256':digest(value),
         'source_sha':value['source_sha'],'operation_id':value['operation_id'],'database_system_identifier':value['database']['system_identifier']}
-    if (scope!=expected or value['plan']['migrations']
+    runtime=root/'candidate-runtime.json'
+    interrupted=state.get('in_progress_release') or {}
+    # The trusted SQL executor fsyncs migration-execution before SQL. Only the
+    # earlier source/build/preflight boundary, with unchanged original worker
+    # authority and no candidate runtime, can abandon a planned migration.
+    planned_pre_effect=(bool(value['plan']['migrations'])
+        and interrupted.get('release_sha')==value['source_sha']
+        and interrupted.get('phase') in {'source_validation','immutable_build','preflight'}
+        and not runtime.exists() and not runtime.is_symlink())
+    if (scope!=expected or (value['plan']['migrations'] and not planned_pre_effect)
             or value['origin']['source_sha']!=m['source_sha'] or value['origin']['slot']!=m['admission']['candidate']['slot']
             or value['database']['system_identifier']!=m['history']['system_identifier']
-            or value['database']['origin_schema']!=m['history']['schema'] or value['database']['target_schema']!=m['history']['schema']
+            or value['database']['origin_schema']!=m['history']['schema'] or (not planned_pre_effect and value['database']['target_schema']!=m['history']['schema'])
             or read(STATE/'worker-ownership.json',private=False)!=m['worker_ownership']):raise RuntimeError(unsafe)
     from .automatic_release_execution import grant_directory
-    runtime=root/'candidate-runtime.json';authority=grant_directory(value)/'authority.json'
+    authority=grant_directory(value)/'authority.json'
     has_runtime=runtime.exists() or runtime.is_symlink()
     if has_runtime or authority.exists() or authority.is_symlink():grant(value,mode='READ_ONLY')
     if has_runtime:
@@ -311,7 +322,8 @@ def recover(system,base_operations):
                 if pending:
                     # Keep the consumed attempt; record a distinct root recovery
                     # abort, never a fictional release completion or SQL rollback.
-                    abort={'operation':'abort-verified-application-only-attempt','scope':pending,'known_good_source':m['source_sha'],'boot_id':boot,'database':observation,'deployment_authority_issued':False,'migration_sql_executed':False}
+                    planned=read(admission.ROOT/pending['admission_sha256']/'admission.json')['plan']['migrations']
+                    abort={'operation':'abort-verified-pre-effect-migration-attempt' if planned else 'abort-verified-application-only-attempt','scope':pending,'known_good_source':m['source_sha'],'boot_id':boot,'database':observation,'deployment_authority_issued':False,'migration_sql_executed':False}
                     abort_path=admission.ROOT/'attempts'/pending['attempt_id']/'recovery-aborted.json'
                     if abort_path.exists() or abort_path.is_symlink():
                         prior=read(abort_path)

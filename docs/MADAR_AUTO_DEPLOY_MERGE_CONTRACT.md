@@ -2084,3 +2084,10 @@ the immutable admission deadline; delayed approval does not change that scope.
 Only a controller that acquired the existing execution lock may record exceptional
 execution failure. A concurrent lock loser cannot change the active approval
 journal or revoke the owning controller's operation.
+
+A consumed planned migration may be abandoned by known-good boot recovery only
+at the authenticated source/build/preflight boundary: no candidate runtime, no
+SQL execution/boundary/completion marker, unchanged original worker authority,
+and independently reverified known-good database/schema/history. Recovery issues
+no migration authority and never reuses the consumed approval. Any later or
+ambiguous boundary remains fenced for authorized recovery.
