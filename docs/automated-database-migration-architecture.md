@@ -2484,3 +2484,10 @@ through single-statement prepared PostgreSQL execution inside an established
 READ ONLY snapshot. This observer cannot apply migrations or metadata-supplied
 SQL writes. Database identity, schema, roles/ACL/data and protocol checks precede
 provider/application startup; the owned observer is bounded and removed.
+
+A failed database-only receiver stage can continue only with separately issued
+continuation authority binding its exact stopped database ID, owned runtime,
+failed stage, prior consumed attempt and new implementation. Existing database
+bytes are not restored again. Verification unwraps only the exact trusted
+historical catalog observer; all other inputs remain single prepared statements
+in READ ONLY. Unknown runtime/provider effects remain refused.

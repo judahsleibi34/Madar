@@ -47,17 +47,17 @@ def root_for(run_id,*,allow_expired=False):
     return root,enrollment
 
 
-def consume_restore_authority(root,authorization):
+def consume_restore_authority(root,authorization,*,continuation=False):
     if str(__import__('uuid').UUID(authorization['attempt_id']))!=authorization['attempt_id']:
         raise RuntimeError('offhost_test_restore_attempt_invalid')
-    if (root/'restore-owned.json').exists():raise RuntimeError('offhost_test_existing_restore_effects_require_recovery')
+    if (root/'restore-owned.json').exists() and not continuation:raise RuntimeError('offhost_test_existing_restore_effects_require_recovery')
     consumed={'authorization_sha256':digest(authorization),'attempt_id':authorization['attempt_id'],'consumed_at':int(time.time())}
     atomic_json(root/'attempts'/authorization['attempt_id']/'consumed.json',consumed,exclusive=True)
     atomic_json(root/'restore-consumed.json',consumed)
     return consumed
 
 
-def restore(run_id):
+def restore(run_id,*,continuation=False):
     global DIAGNOSTIC_ROOT
     root,enrollment=root_for(run_id);DIAGNOSTIC_ROOT=root
     received=strict_json(protected(root/'received.json',private=True).read_bytes())
@@ -83,11 +83,13 @@ def restore(run_id):
     if (digest(stopped)!=app['source_poweroff_sha256'] or stopped.get('source_guest_uuid')!=enrollment['source_guest_uuid']
             or stopped.get('source_sha')!=app['source_sha'] or stopped.get('qemu_exited') is not True):
         raise RuntimeError('offhost_test_source_not_independently_fenced')
-    authorization=strict_json(protected(root/'restore-authorization.json',private=True).read_bytes())
+    authorization=strict_json(protected(root/('continuation-authorization.json' if continuation else 'restore-authorization.json'),private=True).read_bytes())
     required_authority={'version','operation','operation_id','receiver_id','manifest_sha256','received_sha256',
         'source_poweroff_sha256','implementation_sha256','source_sha','database_system_identifier','expires_at','attempt_id'}
+    if continuation:required_authority|={'runtime_sha256','previous_attempt_id','stage_sha256','database_container_id'}
+    expected_operation='isolated-physical-application-restoration-continuation' if continuation else 'isolated-physical-application-restoration'
     if (set(authorization)!=required_authority or authorization['version']!=1
-            or authorization['operation']!='isolated-physical-application-restoration'
+            or authorization['operation']!=expected_operation
             or authorization['operation_id']!=enrollment['backup_operation_id'] or authorization['receiver_id']!=enrollment['receiver_id']
             or authorization['manifest_sha256']!=enrollment['manifest_sha256']
             or authorization['received_sha256']!=digest(received) or authorization['source_sha']!=app['source_sha']
@@ -114,21 +116,42 @@ def restore(run_id):
     if memory<(sum(ROLE_BUDGET.values())+768)*1024**2:raise RuntimeError('offhost_test_memory_headroom_insufficient')
     # No published ports, host-network actors or host-addressed gateway.
     # Application acceptance executes inside this exact isolated bridge.
-    owner={'run_id':run_id,'receiver_id':enrollment['receiver_id'],'containers':{},'network':None,'volumes':[], 'images_imported':[]}
-    consume_restore_authority(root,authorization)
-    atomic_json(root/'restore-owned.json',owner,exclusive=True)
+    if continuation:
+        owner=strict_json(protected(root/'restore-owned.json',private=True).read_bytes())
+        stage=strict_json(protected(root/'restoration-fenced_failed_restoration.json',private=True).read_bytes())
+        if (owner['receiver_id']!=enrollment['receiver_id'] or owner['run_id']!=run_id or set(owner['containers'])!={'database'}
+                or owner['containers']['database']!=authorization['database_container_id'] or digest(owner)!=authorization['runtime_sha256']
+                or digest(stage)!=authorization['stage_sha256'] or (root/'database-observation.json').exists()):
+            raise RuntimeError('offhost_test_continuation_stage_not_supported')
+        previous=strict_json(protected(root/'restore-authorization.json',private=True).read_bytes())
+        if previous['attempt_id']!=authorization['previous_attempt_id'] or not (root/'attempts'/previous['attempt_id']/'consumed.json').exists():
+            raise RuntimeError('offhost_test_continuation_origin_unconsumed')
+        actual=json.loads(command(['docker','inspect',owner['containers']['database']]))
+        all_owned=command(['docker','ps','-aq','--no-trunc','--filter','label=com.madar.test.receiver='+enrollment['receiver_id']]).decode().split()
+        if (len(actual)!=1 or set(all_owned)!={owner['containers']['database']} or actual[0]['State']['Running']
+                or actual[0]['Image']!=app['containers']['database']['Image']
+                or actual[0]['Config']['Labels'].get('com.madar.test.receiver')!=enrollment['receiver_id']):
+            raise RuntimeError('offhost_test_continuation_runtime_ambiguous')
+        consume_restore_authority(root,authorization,continuation=True)
+    else:
+        owner={'run_id':run_id,'receiver_id':enrollment['receiver_id'],'containers':{},'network':None,'volumes':[], 'images_imported':[]}
+        consume_restore_authority(root,authorization)
+        atomic_json(root/'restore-owned.json',owner,exclusive=True)
     def checkpoint():atomic_json(root/'restore-owned.json',owner)
     def phase(name,**details):atomic_json(root/('restoration-'+name+'.json'),{'operation':'independent-application-restoration','operation_id':enrollment['backup_operation_id'],'receiver_id':enrollment['receiver_id'],'source_sha':app['source_sha'],'source_database_system_identifier':app['database_system_identifier'],'phase':name,**details})
     try:
-        phase('authenticated_backup_received')
-        for name in ('postgres','objects'):
-            source=incoming/(name+'.tar.gz');target=root/name
-            restore_archive(source,target,max_bytes=1024**3,max_members=100000)
-            verify_restored_archive(source,target,max_bytes=1024**3,max_members=100000)
-        for path in (root/'postgres',*(root/'postgres').rglob('*')):
-            os.chown(path,70,70);path.chmod(0o700 if path.is_dir() else 0o600)
-        command(['docker','run','--name','madar-recovery-'+enrollment['receiver_id'][:12]+'-verify','--label','com.madar.test.receiver='+enrollment['receiver_id'],'--rm','--network','none','--read-only','--user','70:70','--cap-drop','ALL','--security-opt','no-new-privileges','--memory','384m','--memory-swap','384m','--cpus','.5','--pids-limit','64','--mount','type=bind,src='+str(root/'postgres')+',dst=/restore,readonly','--entrypoint','pg_verifybackup',app['containers']['database']['Image'],'/restore'],timeout=120)
-        phase('postgres_physical_backup_independently_verified')
+        if continuation:phase('continuation_of_existing_database',database_container_id=owner['containers']['database'],attempt_id=authorization['attempt_id'])
+        else:
+            phase('authenticated_backup_received')
+        if not continuation:
+            for name in ('postgres','objects'):
+                source=incoming/(name+'.tar.gz');target=root/name
+                restore_archive(source,target,max_bytes=1024**3,max_members=100000)
+                verify_restored_archive(source,target,max_bytes=1024**3,max_members=100000)
+            for path in (root/'postgres',*(root/'postgres').rglob('*')):
+                os.chown(path,70,70);path.chmod(0o700 if path.is_dir() else 0o600)
+            command(['docker','run','--name','madar-recovery-'+enrollment['receiver_id'][:12]+'-verify','--label','com.madar.test.receiver='+enrollment['receiver_id'],'--rm','--network','none','--read-only','--user','70:70','--cap-drop','ALL','--security-opt','no-new-privileges','--memory','384m','--memory-swap','384m','--cpus','.5','--pids-limit','64','--mount','type=bind,src='+str(root/'postgres')+',dst=/restore,readonly','--entrypoint','pg_verifybackup',app['containers']['database']['Image'],'/restore'],timeout=120)
+            phase('postgres_physical_backup_independently_verified')
         redis_bytes=__import__('base64').b64decode(app['redis_snapshot']['body'],validate=True)
         if len(redis_bytes)>8*1024**2 or hashlib.sha256(redis_bytes).hexdigest()!=app['redis_snapshot']['sha256']:
             raise RuntimeError('offhost_test_redis_snapshot_changed')
@@ -136,18 +159,22 @@ def restore(run_id):
         mounts={}
         for key,record in app['binds'].items():
             if not re.fullmatch('[a-f0-9]{64}',key) or set(record)!={'files','mutable'}:raise RuntimeError('offhost_test_bind_inventory_invalid')
-            dest=root/'binds'/key;dest.mkdir(parents=True,mode=0o755)
+            dest=root/'binds'/key
+            if not continuation:dest.mkdir(parents=True,mode=0o755)
             for relative,row in record['files'].items():
                 parts=Path(relative)
                 if parts.is_absolute() or '..' in parts.parts or str(parts)=='.' or set(row)!={'body','mode'}:raise RuntimeError('offhost_test_bind_path_invalid')
                 body=base64.b64decode(row['body'],validate=True)
                 if len(body)>16*1024**2 or row['mode'] not in {0o400,0o444,0o600,0o644,0o755}:raise RuntimeError('offhost_test_bind_bytes_or_permissions_invalid')
-                target=dest/parts;target.parent.mkdir(parents=True,exist_ok=True,mode=0o755);target.write_bytes(body);target.chmod(row['mode'])
-            if record['mutable']:
+                target=dest/parts
+                if continuation:
+                    if target.is_symlink() or target.read_bytes()!=body:raise RuntimeError('offhost_test_continuation_binding_changed')
+                else:target.parent.mkdir(parents=True,exist_ok=True,mode=0o755);target.write_bytes(body);target.chmod(row['mode'])
+            if record['mutable'] and not continuation:
                 for path in (dest,*dest.rglob('*')):os.chown(path,65534,65534)
             mounts[key]=dest
         network='madar-recovery-'+enrollment['receiver_id']
-        owner['network']=command(['docker','network','create','--internal','--opt','com.docker.network.bridge.gateway_mode_ipv4=isolated','--label','com.madar.test.receiver='+enrollment['receiver_id'],network]).decode().strip();checkpoint()
+        if not continuation:owner['network']=command(['docker','network','create','--internal','--opt','com.docker.network.bridge.gateway_mode_ipv4=isolated','--label','com.madar.test.receiver='+enrollment['receiver_id'],network]).decode().strip();checkpoint()
         measured_network=json.loads(command(['docker','network','inspect',owner['network']]))[0]
         if (measured_network['Driver']!='bridge' or measured_network['Internal'] is not True
                 or measured_network.get('EnableIPv6') or measured_network['Options'].get('com.docker.network.bridge.gateway_mode_ipv4')!='isolated'):
@@ -204,7 +231,9 @@ def restore(run_id):
             args+=[row['Image'],*entry[1:],*(config.get('Cmd') or [])]
             identity=command(args).decode().strip();owner['containers'][role]=identity;checkpoint()
             command(['docker','start',identity]);return identity
-        create('database');deadline=time.monotonic()+90
+        if continuation:command(['docker','start',owner['containers']['database']])
+        else:create('database')
+        deadline=time.monotonic()+90
         while True:
             probe=subprocess.run(['docker','--host','unix:///var/run/docker.sock','exec',owner['containers']['database'],'pg_isready','-U','supabase_admin','-d','postgres'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=10)
             if probe.returncode==0:break
@@ -217,18 +246,23 @@ def restore(run_id):
         # statements and an established READ ONLY snapshot prevent SQL escape.
         observer="""import json,sys,hashlib,psycopg
 p=json.load(sys.stdin)
+sys.path.insert(0,'/source/web')
+from deployment.lib.completed_normal_database import STRUCTURE_SQL
+trusted_structure=STRUCTURE_SQL.split('SET LOCAL search_path=pg_catalog;',1)[1].rsplit('; COMMIT;',1)[0]
 with psycopg.connect(host='database',dbname='postgres',user='supabase_admin',password=p['password']) as db:
  with db.transaction():
   db.execute('SET TRANSACTION READ ONLY')
+  db.execute('SET LOCAL search_path=pg_catalog')
   db.execute("SET LOCAL statement_timeout='10s'")
   db.execute("SET LOCAL lock_timeout='2s'")
   identity=db.execute("SELECT system_identifier::text,schema_version FROM pg_control_system(),public.application_schema_state WHERE contract_key='core'").fetchone()
   assert identity==(p['system_identifier'],p['schema']), 'restored_database_identity_changed'
   for label,record in p['fingerprints'].items():
-   value=db.execute(record['query'],prepare=True).fetchone()[0]
+   query=trusted_structure if record['query']==STRUCTURE_SQL else record['query']
+   value=db.execute(query,prepare=True).fetchone()[0]
    raw='' if value is None else str(value).strip()
    assert hashlib.sha256(raw.encode()).hexdigest()==record['sha256'], 'restored_fingerprint_changed:'+label
-  protocols=db.execute('SELECT notification_delivery_protocol(),notification_outbox_protocol(),data_deletion_ownership_protocol()').fetchone()
+  protocols=db.execute('SELECT public.notification_delivery_protocol(),public.notification_outbox_protocol(),public.data_deletion_ownership_protocol()').fetchone()
   assert protocols==(2,2,2), 'restored_protocols_changed'
 print(json.dumps({'system_identifier':identity[0],'schema':identity[1],'protocols':list(protocols),'fingerprints':len(p['fingerprints']),'read_only':True,'single_statement_prepared_observation':True}))
 """
@@ -236,7 +270,7 @@ print(json.dumps({'system_identifier':identity[0],'schema':identity[1],'protocol
         tool='sha256:3b7e1b0cd406712c50cfbc777c97a0188c9d0239b6a79c53a28862e4278b2dca'
         observed=command(['docker','run','--rm','-i','--name','madar-recovery-'+enrollment['receiver_id'][:12]+'-observe',
             '--label','com.madar.test.receiver='+enrollment['receiver_id'],'--network',network,'--dns','127.0.0.1',
-            '--read-only','--user','65534:65534','--cap-drop','ALL','--security-opt','no-new-privileges',
+            '--read-only','--mount','type=bind,src='+str(Path(__file__).resolve().parents[3])+',dst=/source,readonly','--user','65534:65534','--cap-drop','ALL','--security-opt','no-new-privileges',
             '--memory','128m','--memory-swap','128m','--cpus','.1','--pids-limit','64','--entrypoint','python',tool,'-B','-c',observer],
             data=json.dumps(payload).encode(),timeout=180)
         observation=json.loads(observed);atomic_json(root/'database-observation.json',observation,exclusive=True)
@@ -337,6 +371,7 @@ def retire_scope(run_id):
 if __name__=='__main__':
     try:
         if len(sys.argv)==3 and sys.argv[1]=='--retire':result=retire_scope(sys.argv[2])
+        elif len(sys.argv)==3 and sys.argv[1]=='--continue':result=restore(sys.argv[2],continuation=True)
         elif len(sys.argv)==3 and sys.argv[1]=='--cleanup':result=cleanup(sys.argv[2])
         elif len(sys.argv)==2:result=restore(sys.argv[1])
         else:raise RuntimeError('offhost_test_operation_invalid')
