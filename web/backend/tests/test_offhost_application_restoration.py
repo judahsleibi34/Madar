@@ -40,3 +40,24 @@ class RestorationBoundaries(unittest.TestCase):
                 with patch.object(receiver,'root_for',return_value=(root,{'receiver_id':'own'})),patch.object(receiver,'protected',side_effect=lambda p,**kw:p),patch.object(receiver,'command',side_effect=command),self.assertRaisesRegex(RuntimeError,'foreign'):
                     receiver.cleanup('run')
                 self.assertFalse(any('rm' in cmd or 'stop' in cmd for cmd in calls))
+
+
+class RestoreConsumptionTests(unittest.TestCase):
+    def test_archiving_active_pointer_does_not_make_an_old_authority_replayable(self):
+        import uuid
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);first={'attempt_id':str(uuid.uuid4())}
+            record=receiver.consume_restore_authority(root,first)
+            self.assertEqual(record['attempt_id'],first['attempt_id'])
+            (root/'restore-consumed.json').rename(root/'archived-active-pointer.json')
+            with self.assertRaisesRegex(RuntimeError,'consumed'):receiver.consume_restore_authority(root,first)
+            second={'attempt_id':str(uuid.uuid4())};receiver.consume_restore_authority(root,second)
+            self.assertTrue((root/'attempts'/first['attempt_id']/'consumed.json').exists())
+            self.assertTrue((root/'attempts'/second['attempt_id']/'consumed.json').exists())
+
+    def test_existing_effects_prevent_even_a_fresh_attempt_from_resetting_target(self):
+        import uuid
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);(root/'restore-owned.json').write_text('{}')
+            with self.assertRaisesRegex(RuntimeError,'existing_restore_effects'):receiver.consume_restore_authority(root,{'attempt_id':str(uuid.uuid4())})
+            self.assertFalse((root/'attempts').exists())

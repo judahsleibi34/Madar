@@ -47,6 +47,16 @@ def root_for(run_id,*,allow_expired=False):
     return root,enrollment
 
 
+def consume_restore_authority(root,authorization):
+    if str(__import__('uuid').UUID(authorization['attempt_id']))!=authorization['attempt_id']:
+        raise RuntimeError('offhost_test_restore_attempt_invalid')
+    if (root/'restore-owned.json').exists():raise RuntimeError('offhost_test_existing_restore_effects_require_recovery')
+    consumed={'authorization_sha256':digest(authorization),'attempt_id':authorization['attempt_id'],'consumed_at':int(time.time())}
+    atomic_json(root/'attempts'/authorization['attempt_id']/'consumed.json',consumed,exclusive=True)
+    atomic_json(root/'restore-consumed.json',consumed)
+    return consumed
+
+
 def restore(run_id):
     global DIAGNOSTIC_ROOT
     root,enrollment=root_for(run_id);DIAGNOSTIC_ROOT=root
@@ -105,11 +115,7 @@ def restore(run_id):
     # No published ports, host-network actors or host-addressed gateway.
     # Application acceptance executes inside this exact isolated bridge.
     owner={'run_id':run_id,'receiver_id':enrollment['receiver_id'],'containers':{},'network':None,'volumes':[], 'images_imported':[]}
-    if str(__import__('uuid').UUID(authorization['attempt_id']))!=authorization['attempt_id']:
-        raise RuntimeError('offhost_test_restore_attempt_invalid')
-    consumed={'authorization_sha256':digest(authorization),'attempt_id':authorization['attempt_id'],'consumed_at':int(time.time())}
-    atomic_json(root/'attempts'/authorization['attempt_id']/'consumed.json',consumed,exclusive=True)
-    atomic_json(root/'restore-consumed.json',consumed)
+    consume_restore_authority(root,authorization)
     atomic_json(root/'restore-owned.json',owner,exclusive=True)
     def checkpoint():atomic_json(root/'restore-owned.json',owner)
     def phase(name,**details):atomic_json(root/('restoration-'+name+'.json'),{'operation':'independent-application-restoration','operation_id':enrollment['backup_operation_id'],'receiver_id':enrollment['receiver_id'],'source_sha':app['source_sha'],'source_database_system_identifier':app['database_system_identifier'],'phase':name,**details})
@@ -214,7 +220,8 @@ p=json.load(sys.stdin)
 with psycopg.connect(host='database',dbname='postgres',user='supabase_admin',password=p['password']) as db:
  with db.transaction():
   db.execute('SET TRANSACTION READ ONLY')
-  db.execute("SET LOCAL statement_timeout='10s';SET LOCAL lock_timeout='2s'")
+  db.execute("SET LOCAL statement_timeout='10s'")
+  db.execute("SET LOCAL lock_timeout='2s'")
   identity=db.execute("SELECT system_identifier::text,schema_version FROM pg_control_system(),public.application_schema_state WHERE contract_key='core'").fetchone()
   assert identity==(p['system_identifier'],p['schema']), 'restored_database_identity_changed'
   for label,record in p['fingerprints'].items():
