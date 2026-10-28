@@ -4381,3 +4381,6 @@ the immutable admission deadline; delayed approval does not change that scope.
 The independent test receiver reserves 0.2 CPU for notification execution and its
 health probe, within its unchanged two-CPU total ceiling. Native acceptance must
 observe every required container healthy after functional checks as well as before.
+
+Disposable provider readiness must observe the final TCP PostgreSQL listener;
+initdb's temporary Unix-socket server does not establish runtime readiness.

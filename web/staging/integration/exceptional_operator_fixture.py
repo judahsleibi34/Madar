@@ -64,7 +64,8 @@ def prepare():
             pg_image,'postgres','-c','max_connections=16','-c','shared_buffers=16MB'])
         created.append(pg)
         for _ in range(60):
-            p=subprocess.run(['docker','exec',pg,'pg_isready','-U','postgres','-d','operators'],capture_output=True,timeout=5)
+            # initdb's temporary Unix-socket server is not the final service.
+            p=subprocess.run(['docker','exec',pg,'pg_isready','-h','127.0.0.1','-U','postgres','-d','operators'],capture_output=True,timeout=5)
             if p.returncode==0:break
             time.sleep(1)
         else:raise RuntimeError('exceptional_operator_fixture_database_deadline')
