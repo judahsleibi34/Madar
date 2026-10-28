@@ -80,3 +80,19 @@ class RecoveryBoundaries(unittest.TestCase):
                 p=root/name;p.touch()
                 with self.subTest(boundary=name),self.assertRaisesRegex(RuntimeError,'effectful_operation'):recovery.pending_scope({}, {})
                 p.unlink()
+
+
+class ConfigurationBindingTests(unittest.TestCase):
+    def test_changed_operator_environment_refuses_before_completed_authority_or_effects(self):
+        from types import SimpleNamespace
+        from deployment.lib.migration_inventory import digest
+        host={'guest_uuid':'own','machine_id':'own','root_filesystem_uuid':'own','realm_id':'own'}
+        policy={'trusted':'independent'}
+        with tempfile.TemporaryDirectory() as tmp:
+            env=Path(tmp)/'production.env';env.write_text('changed bytes')
+            manifest={'version':1,'kind':'completed-known-good-recovery','policy_sha256':digest(policy),
+                'recovery_controller_sha':'a'*40,'environment':host,'operator_configuration_sha256':'b'*64}
+            system=SimpleNamespace(installed_sha=lambda:'a'*40)
+            with patch.object(recovery,'policy',return_value=(policy,host)),patch.object(recovery,'read',return_value=manifest),patch.object(recovery,'readonly_configuration',return_value=env),patch.object(recovery,'completed') as complete,patch.object(recovery,'inspect_all') as actors,self.assertRaisesRegex(RuntimeError,'operator_configuration_changed'):
+                recovery.validate_manifest(system)
+            complete.assert_not_called();actors.assert_not_called()

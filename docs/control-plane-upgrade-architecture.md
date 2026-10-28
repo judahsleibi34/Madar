@@ -2206,3 +2206,8 @@ requires the genuine completed receipt, unchanged grant and live exact runtime;
 it issues no deployment authority. The operator environment is hashed at sealing
 and rechecked before effects. Recovery always invokes the measured installed
 traffic driver, rather than an executable selected by ambient configuration.
+
+Physical test restoration also preserves an explicitly captured, bounded Redis
+RDB snapshot taken after source writers stop. The restored source grant is
+unchanged, and the independently observed source power-off remains mandatory.
+This is separate from deployment authorization or restarting two write owners.

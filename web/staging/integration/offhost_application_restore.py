@@ -16,6 +16,7 @@ from deployment.lib.coordinated_archive_restore import restore_archive,verify_re
 from deployment.lib.coordinated_storage_restore import recover_metadata
 from deployment.lib.coordinated_checkpoint import digest_file
 
+DIAGNOSTIC_ROOT=None
 ROLE_BUDGET={'database':384,'auth':128,'rest':128,'storage':192,'gateway':32,'redis':64,
     'frontend':64,'backend':768,'parser-worker':384,'remote-ingestion-worker':96,
     'notification-worker':128,'calendar-sync-worker':128,'data-deletion-worker':128,'proxy':32}
@@ -25,8 +26,11 @@ ROLE_CPU={'database':.35,'auth':.15,'rest':.1,'storage':.1,'gateway':.05,'redis'
 
 
 def command(args,*,data=None,timeout=30):
-    result=subprocess.run(args,input=data,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=timeout)
-    if result.returncode:raise RuntimeError('offhost_test_effect_failed:'+Path(args[0]).name)
+    result=subprocess.run(args,input=data,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=timeout,env={'PATH':'/usr/sbin:/usr/bin:/sbin:/bin','HOME':'/root','LANG':'C.UTF-8','DOCKER_HOST':'unix:///var/run/docker.sock','DOCKER_CONFIG':'/nonexistent'})
+    if result.returncode:
+        if DIAGNOSTIC_ROOT is not None:
+            p=DIAGNOSTIC_ROOT/'private-effect-error.log';p.write_bytes((result.stdout+result.stderr)[-65536:]);p.chmod(0o600)
+        raise RuntimeError('offhost_test_effect_failed:'+Path(args[0]).name)
     return result.stdout
 
 
@@ -44,7 +48,8 @@ def root_for(run_id,*,allow_expired=False):
 
 
 def restore(run_id):
-    root,enrollment=root_for(run_id)
+    global DIAGNOSTIC_ROOT
+    root,enrollment=root_for(run_id);DIAGNOSTIC_ROOT=root
     received=strict_json(protected(root/'received.json',private=True).read_bytes())
     if received['manifest_sha256']!=enrollment['manifest_sha256'] or received['receiver_id']!=enrollment['receiver_id']:
         raise RuntimeError('offhost_test_received_scope_changed')
@@ -52,7 +57,7 @@ def restore(run_id):
     for name,sha in received['files'].items():
         if digest_file(protected(incoming/name,private=True))!=sha:raise RuntimeError('offhost_test_received_bytes_changed')
     app=strict_json(protected(incoming/'application.json',private=True).read_bytes())
-    required={'version','source_sha','database_system_identifier','schema','slot','containers','binds','fingerprints','storage_objects','original_fixture','source_poweroff_sha256'}
+    required={'version','source_sha','database_system_identifier','schema','slot','containers','binds','fingerprints','storage_objects','original_fixture','source_poweroff_sha256','redis_snapshot'}
     if (set(app)!=required or app['version']!=1 or app['source_sha']!=enrollment['source_sha']
             or app['database_system_identifier']!=enrollment['source_database_system_identifier']
             or set(app['containers'])!=set(ROLE_BUDGET) or app['slot'] not in {'blue','green'}
@@ -87,6 +92,10 @@ def restore(run_id):
             os.chown(path,70,70);path.chmod(0o700 if path.is_dir() else 0o600)
         command(['docker','run','--name','madar-recovery-'+enrollment['receiver_id'][:12]+'-verify','--label','com.madar.test.receiver='+enrollment['receiver_id'],'--rm','--network','none','--read-only','--user','70:70','--cap-drop','ALL','--security-opt','no-new-privileges','--memory','384m','--memory-swap','384m','--cpus','.5','--pids-limit','64','--mount','type=bind,src='+str(root/'postgres')+',dst=/restore,readonly','--entrypoint','pg_verifybackup',app['containers']['database']['Image'],'/restore'],timeout=120)
         phase('postgres_physical_backup_independently_verified')
+        redis_bytes=__import__('base64').b64decode(app['redis_snapshot']['body'],validate=True)
+        if len(redis_bytes)>8*1024**2 or hashlib.sha256(redis_bytes).hexdigest()!=app['redis_snapshot']['sha256']:
+            raise RuntimeError('offhost_test_redis_snapshot_changed')
+        (root/'redis.rdb').write_bytes(redis_bytes);(root/'redis.rdb').chmod(0o444)
         mounts={}
         for key,record in app['binds'].items():
             if not re.fullmatch('[a-f0-9]{64}',key) or set(record)!={'files','mutable'}:raise RuntimeError('offhost_test_bind_inventory_invalid')
@@ -127,6 +136,7 @@ def restore(run_id):
             user='70:70' if role=='database' else config.get('User')
             if user:args+=['--user',user]
             for target,options in (host.get('Tmpfs') or {}).items():args+=['--tmpfs',target+':'+options]
+            if role=='redis':args+=['--mount','type=bind,src='+str(root/'redis.rdb')+',dst=/data/dump.rdb,readonly']
             for mount in row['Mounts']:
                 if mount['Type']=='tmpfs':continue
                 destination=mount['Destination']
