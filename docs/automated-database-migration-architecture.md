@@ -2478,3 +2478,9 @@ identity; archiving a demonstrably pre-database failed attempt must preserve its
 consumption and actual failure. Existing database/worker effects cannot be reset
 as a preparation retry. Missing immutable image content is a technical refusal,
 not administrator approval or permission to substitute image identities.
+
+Database restoration fingerprints run in the independently pinned native tool
+through single-statement prepared PostgreSQL execution inside an established
+READ ONLY snapshot. This observer cannot apply migrations or metadata-supplied
+SQL writes. Database identity, schema, roles/ACL/data and protocol checks precede
+provider/application startup; the owned observer is bounded and removed.

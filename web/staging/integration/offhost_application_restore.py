@@ -150,8 +150,6 @@ def restore(run_id):
         interfaces=json.loads(command(['ip','-json','address','show','dev',bridge]))
         if len(interfaces)!=1 or any(a.get('family')=='inet' for a in interfaces[0].get('addr_info',[])):
             raise RuntimeError('offhost_test_host_gateway_exposed')
-        def sql(query):
-            return command(['docker','exec','-i',owner['containers']['database'],'psql','-XqAt','-v','ON_ERROR_STOP=1','-U','supabase_admin','-d','postgres'],data=query.encode(),timeout=45).decode().strip()
         def create(role):
             row=app['containers'][role];name='madar-recovery-'+enrollment['receiver_id'][:12]+'-'+role
             config=row['Config'];host=row['HostConfig']
@@ -202,16 +200,39 @@ def restore(run_id):
             command(['docker','start',identity]);return identity
         create('database');deadline=time.monotonic()+90
         while True:
-            try:
-                if sql('SELECT system_identifier::text FROM pg_control_system()')!=app['database_system_identifier']:raise RuntimeError('offhost_test_restored_database_identity_changed')
-                break
-            except RuntimeError:
-                if time.monotonic()>deadline:raise
-                time.sleep(1)
-        for label,record in app['fingerprints'].items():
-            actual=sql(record['query'])
-            if hashlib.sha256(actual.encode()).hexdigest()!=record['sha256']:raise RuntimeError('offhost_test_restored_fingerprint_changed:'+label)
-        if sql("select schema_version::text||':'||notification_delivery_protocol()||':'||notification_outbox_protocol()||':'||data_deletion_ownership_protocol() from public.application_schema_state where contract_key='core'")!=str(app['schema'])+':2:2:2':raise RuntimeError('offhost_test_schema_protocols_changed')
+            probe=subprocess.run(['docker','--host','unix:///var/run/docker.sock','exec',owner['containers']['database'],'pg_isready','-U','supabase_admin','-d','postgres'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=10)
+            if probe.returncode==0:break
+            if time.monotonic()>deadline:raise RuntimeError('offhost_test_restored_database_unready')
+            time.sleep(1)
+        password=[v.split('=',1)[1] for v in app['containers']['database']['Config']['Env'] if v.startswith('POSTGRES_PASSWORD=')]
+        if len(password)!=1:raise RuntimeError('offhost_test_database_configuration_ambiguous')
+        # Existing independently pinned native tool, NOT candidate-supplied
+        # PASS or a second migration executor. Extended-protocol single prepared
+        # statements and an established READ ONLY snapshot prevent SQL escape.
+        observer="""import json,sys,hashlib,psycopg
+p=json.load(sys.stdin)
+with psycopg.connect(host='database',dbname='postgres',user='supabase_admin',password=p['password']) as db:
+ with db.transaction():
+  db.execute('SET TRANSACTION READ ONLY')
+  db.execute("SET LOCAL statement_timeout='10s';SET LOCAL lock_timeout='2s'")
+  identity=db.execute("SELECT system_identifier::text,schema_version FROM pg_control_system(),public.application_schema_state WHERE contract_key='core'").fetchone()
+  assert identity==(p['system_identifier'],p['schema']), 'restored_database_identity_changed'
+  for label,record in p['fingerprints'].items():
+   value=db.execute(record['query'],prepare=True).fetchone()[0]
+   raw='' if value is None else str(value).strip()
+   assert hashlib.sha256(raw.encode()).hexdigest()==record['sha256'], 'restored_fingerprint_changed:'+label
+  protocols=db.execute('SELECT notification_delivery_protocol(),notification_outbox_protocol(),data_deletion_ownership_protocol()').fetchone()
+  assert protocols==(2,2,2), 'restored_protocols_changed'
+print(json.dumps({'system_identifier':identity[0],'schema':identity[1],'protocols':list(protocols),'fingerprints':len(p['fingerprints']),'read_only':True,'single_statement_prepared_observation':True}))
+"""
+        payload={'password':password[0],'fingerprints':app['fingerprints'],'schema':app['schema'],'system_identifier':app['database_system_identifier']}
+        tool='sha256:3b7e1b0cd406712c50cfbc777c97a0188c9d0239b6a79c53a28862e4278b2dca'
+        observed=command(['docker','run','--rm','-i','--name','madar-recovery-'+enrollment['receiver_id'][:12]+'-observe',
+            '--label','com.madar.test.receiver='+enrollment['receiver_id'],'--network',network,'--dns','127.0.0.1',
+            '--read-only','--user','65534:65534','--cap-drop','ALL','--security-opt','no-new-privileges',
+            '--memory','128m','--memory-swap','128m','--cpus','.1','--pids-limit','64','--entrypoint','python',tool,'-B','-c',observer],
+            data=json.dumps(payload).encode(),timeout=180)
+        observation=json.loads(observed);atomic_json(root/'database-observation.json',observation,exclusive=True)
         phase('database_roles_acls_data_and_history_restored',fingerprints=len(app['fingerprints']),schema=app['schema'])
         recover_metadata(app['storage_objects'],root/'objects')
         for path in (root/'objects',*(root/'objects').rglob('*')):os.chown(path,1000,1000)
@@ -248,9 +269,9 @@ def cleanup(run_id):
     current=command(['docker','ps','-aq','--no-trunc']).decode().split()
     rows=json.loads(command(['docker','inspect',*current])) if current else []
     expected=set(owner['containers'].values());present={r['Id']:r for r in rows}
-    verifier='madar-recovery-'+enrollment['receiver_id'][:12]+'-verify'
+    transient={'madar-recovery-'+enrollment['receiver_id'][:12]+'-'+role for role in ('verify','observe','accept')}
     for row in rows:
-        if row['Name']=='/'+verifier and row['Config'].get('Labels',{}).get('com.madar.test.receiver')==enrollment['receiver_id']:expected.add(row['Id'])
+        if row['Name'].lstrip('/') in transient and row['Config'].get('Labels',{}).get('com.madar.test.receiver')==enrollment['receiver_id']:expected.add(row['Id'])
     if (root/'cleanup.json').exists():
         if expected & set(present):raise RuntimeError('offhost_cleanup_actor_reappeared')
         return strict_json(protected(root/'cleanup.json',private=True).read_bytes())
