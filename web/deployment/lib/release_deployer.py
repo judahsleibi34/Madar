@@ -559,6 +559,9 @@ class ReleaseDeployer:
                 return release
             except Exception as error:
                 if exceptional_maintenance:
+                    code=str(error)
+                    import re
+                    release.update(failure_phase=release['phase'],failure_code=code if re.fullmatch('[a-z0-9_:,]{1,200}',code) else 'bounded_execution_failed')
                     self.operations.fence_exceptional_failure()
                     self._set_worker_authority(state,release,'NONE',expected={'OLD','NONE','CANDIDATE'})
                     release.update(status='recovery_required',phase='exceptional_maintenance_fenced',failure_reason=type(error).__name__)

@@ -62,6 +62,7 @@ class ApprovalJournalTests(unittest.TestCase):
         self.system=MagicMock();self.system.authenticate_operator.return_value=self.operator
         self.system.reobserve_automatic_admission.return_value=self.value
         self.enterContext(patch.object(a,'policy',return_value=(self.policy,self.key)))
+        self.enterContext(patch.object(a,'audit_policy',return_value=(self.policy,self.key)))
         self.enterContext(patch.object(a,'root',return_value=self.path))
         self.enterContext(patch.object(a,'protected',side_effect=lambda p,**_:p))
         @contextmanager
@@ -89,6 +90,12 @@ class ApprovalJournalTests(unittest.TestCase):
         self.system.authenticate_operator.assert_called_once_with('secret-not-in-journal')
         self.system.reobserve_automatic_admission.assert_called_once_with(self.value)
         self.assertNotIn('secret-not-in-journal',json.dumps(out))
+
+    def test_failed_live_inventory_does_not_hide_audit_or_allow_approval(self):
+        with patch.object(a,'policy',side_effect=RuntimeError('isolated_release_runtime_inventory_changed')):
+            self.assertEqual(a.inspect(self.system,self.request_id)['state'],'AWAITING_ADMIN_APPROVAL')
+            with self.assertRaisesRegex(RuntimeError,'inventory_changed'):self.approve()
+        self.assertFalse((self.folder/'approval.json').exists())
 
     def test_bad_confirmation_or_foreign_runtime_cannot_silently_replace_scope(self):
         original=(self.folder/'request.json').read_bytes()
@@ -214,6 +221,18 @@ class ExceptionalCliTests(unittest.TestCase):
                 self.assertEqual(audit.call_count,int(acquired))
                 self.assertIsNone(system.exceptional_operator_token)
                 self.assertFalse(system.exceptional_execution_lock_acquired)
+
+    def test_audit_error_cannot_mask_the_original_execution_failure(self):
+        from deployment.lib import control_plane_upgrade as c,automatic_release_execution as execution,environment_file
+        web=Path(os.environ.get('MADAR_TEST_REPOSITORY_ROOT',Path(__file__).resolve().parents[2]))
+        with tempfile.TemporaryDirectory() as tmp,patch.dict(os.environ):
+            system=c.SystemOperations.__new__(c.SystemOperations)
+            system.repo=Path(tmp);system.state_root=Path(tmp);system.interlock_file=Path(tmp)/'interlock'
+            system.control_root=web/'deployment';system.prepare_upgrade_roots=MagicMock()
+            status={'request':{'admission':{}},'request_sha256':'d'*64,'state':'APPROVED','consumed':False}
+            with patch.object(admission,'execution_policy'),patch.object(admission,'require_no_pending_operation'),patch.object(a,'inspect',side_effect=[status,RuntimeError('audit_unavailable')]),patch.object(environment_file,'load_environment_file'),patch.object(execution,'execute',side_effect=RuntimeError('candidate_core_readiness_failed:database')):
+                with self.assertRaisesRegex(RuntimeError,'candidate_core_readiness_failed:database'):
+                    system.exceptional_release_action('execute',request_id=str(uuid.uuid4()),token='stdin-only',confirmation='d'*64)
 
     def test_display_never_reads_operator_secret_or_executes_release(self):
         from deployment.lib import control_plane_upgrade as c

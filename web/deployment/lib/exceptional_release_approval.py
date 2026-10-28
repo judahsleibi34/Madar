@@ -45,6 +45,27 @@ def identifier(value):
 def policy(system):
     from .automatic_release_admission import execution_policy
     execution,environment=execution_policy(system)
+    return _policy_material(execution,environment['database_system_identifier'])
+
+
+def audit_policy(system):
+    """Read authenticated journals despite a failed runtime. Never issue authority.
+
+    The independent configuration/controller and enrolled scope remain pinned.
+    All admission, approval and consumption paths still use policy(), including
+    its mandatory live observation. An audit must not mask the original error.
+    """
+    from .automatic_release_admission import execution_policy_configuration
+    from .isolated_release_environment import POLICY as environment_policy
+    execution=execution_policy_configuration(system)
+    environment=strict_json(protected(environment_policy,private=True).read_bytes())
+    if (environment.get('version')!=2 or execution['environment_id']!='isolated-'+environment.get('realm_id','')
+            or environment.get('database_system_identifier') in execution['denied_database_identifiers']):
+        raise RuntimeError('exceptional_audit_enrollment_changed')
+    return _policy_material(execution,environment.get('database_system_identifier'))
+
+
+def _policy_material(execution,database_system_identifier):
     raw=protected(POLICY,private=True).read_bytes()
     if not 0<len(raw)<=32768:raise RuntimeError('exceptional_policy_size')
     p=strict_json(raw)
@@ -54,7 +75,7 @@ def policy(system):
     if (not isinstance(p,dict) or set(p)!=fields or type(p['version']) is not int or p['version']!=1
             or p['enabled'] is not True or not re.fullmatch('[a-zA-Z0-9_-]{1,128}',str(p['policy_id']))
             or p['environment_id']!=execution['environment_id']
-            or p['database_system_identifier']!=environment['database_system_identifier']
+            or p['database_system_identifier']!=database_system_identifier
             or p['controller_sha']!=execution['controller_sha']
             or not isinstance(p['contracts'],list) or not p['contracts']
             or any(c not in CONTRACTS for c in p['contracts']) or len(set(p['contracts']))!=len(p['contracts'])
@@ -253,7 +274,7 @@ def create(system,source):
 
 
 def inspect(system,request_id):
-    _,key=policy(system)
+    _,key=audit_policy(system)
     with journal_lock(request_id) as path:
         entries=history(path,key)
         if not entries:raise RuntimeError('exceptional_request_unknown')
@@ -352,10 +373,12 @@ def verify_execution(value,system,*,consume=False,token=None):
 
 
 def execution_event(system,value,state,detail):
-    p,key=policy(system)
+    p,key=audit_policy(system)
     if digest(p)!=validate_extension(value)['policy_sha256']:
         raise RuntimeError('exceptional_policy_changed')
     with journal_lock(validate_extension(value)['request_id']) as path:
+        if _request(path,key)['admission']!=value:
+            raise RuntimeError('exceptional_audit_admission_changed')
         return event(path,key,state,detail)
 
 

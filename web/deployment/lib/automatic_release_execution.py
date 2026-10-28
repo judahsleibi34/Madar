@@ -193,7 +193,7 @@ def operations_adapter(base,system,value):
             super().__init__(system.repo,system.state_root,Path('/etc/madar/production.env'),compatibility)
             self.automatic_release_admission=value;self._issuer=system;self._credential_root=None
             self._origin_fenced=[];self._model=None;self._candidate_rows=None;self._expected_route=value['origin']['slot'];self._migration_completed=False
-            self._maintenance=False;self._private_providers=[]
+            self._maintenance=False;self._private_providers=[];self._private_gateway=None
             self._initial_scope=strict_json(protected(Path('/etc/madar/isolated-release-test.json'),private=True).read_bytes())['runtime_scope']
 
         def verify_actor_scope(self,*,enforce_maintenance=True):
@@ -221,7 +221,7 @@ def operations_adapter(base,system,value):
             verify_runtime_scope(expected,[r for r in rows if r['Id'] in self._initial_scope])
             if self._maintenance and enforce_maintenance:
                 stopped={'/madar-'+value['origin']['slot']+'-'+r for r in ROLES if r not in {'frontend','redis'}}
-                if not self._migration_completed:stopped|={'/supabase-auth','/supabase-rest','/supabase-storage'}
+                if not self._migration_completed:stopped|={'/supabase-auth','/supabase-rest','/supabase-storage','/supabase-envoy'}
                 if any(r['Name'] in stopped and r['State']['Running'] for r in rows):
                     raise RuntimeError('exceptional_original_writer_restarted')
             for row in rows:
@@ -267,12 +267,19 @@ def operations_adapter(base,system,value):
             names={'/supabase-auth','/supabase-rest','/supabase-storage'}
             self._private_providers=[r['Id'] for r in rows if r['Name'] in names]
             if len(self._private_providers)!=3:raise RuntimeError('exceptional_provider_inventory_incomplete')
+            gateways=[r['Id'] for r in rows if r['Name']=='/supabase-envoy']
+            if len(gateways)!=1:raise RuntimeError('exceptional_gateway_inventory_incomplete')
+            self._private_gateway=gateways[0]
+            # Close gateway ingress and its cached provider addresses before
+            # stopping providers. Docker can assign new IPs to the same IDs.
+            self.run(['/usr/bin/docker','stop','--time','15',self._private_gateway])
             self.run(['/usr/bin/docker','stop','--time','15',*self._private_providers])
             self._maintenance=True
             self.verify_actor_scope()
             from .exceptional_release_approval import execution_event
             execution_event(system,value,'EXECUTING',{'origin_writer_ids':self._origin_fenced,
-                'private_provider_ids':self._private_providers,'public_write_ingress':'origin-backend-stopped'})
+                'private_provider_ids':self._private_providers,'private_gateway_id':self._private_gateway,
+                'public_write_ingress':'origin-backend-stopped'})
             return True
 
         def validate_fenced_rollback_target(self,origin,schema):
@@ -304,6 +311,16 @@ def operations_adapter(base,system,value):
             self._migration_completed=True
             if self._maintenance:
                 self.run(['/usr/bin/docker','start',*self._private_providers])
+                deadline=time.monotonic()+60
+                while True:
+                    self.guard();rows={r['Id']:r for r in self.verify_actor_scope()}
+                    states=[rows[i]['State'] for i in self._private_providers]
+                    if all(s['Running'] and s.get('Health',{}).get('Status','healthy')=='healthy' for s in states):break
+                    if time.monotonic()>=deadline:raise RuntimeError('exceptional_private_provider_readiness_failed')
+                    time.sleep(1)
+                # This restarts the SAME sealed gateway/configuration only
+                # after provider attachment, refreshing its loaded DNS safely.
+                self.run(['/usr/bin/docker','start',self._private_gateway])
             self.guard()
             return receipt
 

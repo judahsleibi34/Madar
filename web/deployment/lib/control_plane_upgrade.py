@@ -2747,13 +2747,13 @@ print(hashlib.sha256(keys[0].encode()).hexdigest())
     def exceptional_release_action(self,action,*,source=None,request_id=None,token=None,confirmation=None):
         from deployment.lib import exceptional_release_approval as approval
         from deployment.lib.automatic_release_admission import execution_policy,require_no_pending_operation
-        execution_policy(self) # Currently independently enrolled isolation only.
-        if action=='prepare':return approval.create(self,source)
         if action=='list':
-            approval.policy(self)
+            approval.audit_policy(self)
             if not approval.root().exists():return []
             return [approval.inspect(self,p.name) for p in sorted(approval.root().iterdir()) if p.is_dir()]
         if action=='inspect':return approval.inspect(self,request_id)
+        execution_policy(self) # Mandatory live isolation for every effectful action.
+        if action=='prepare':return approval.create(self,source)
         if action in {'approve','reject','revoke'}:
             return approval.decide(self,request_id,action,token,confirmation)
         if action!='execute':raise UpgradeError('exceptional_action_invalid')
@@ -2780,10 +2780,14 @@ print(hashlib.sha256(keys[0].encode()).hexdigest())
         except BaseException as error:
             # A consumed attempt is never made reusable after a crash/failure.
             # SIGKILL leaves its durable journal for boot/recovery inspection.
-            status=approval.inspect(self,request_id)
-            target='RECOVERY_REQUIRED' if status['consumed'] else 'FAILED'
-            if self.exceptional_execution_lock_acquired is True and status['state'] in {'APPROVED','REVALIDATING','AUTHORIZED_FOR_EXECUTION','EXECUTING','VERIFYING'}:
-                approval.execution_event(self,value,target,{'error_type':type(error).__name__})
+            try:
+                status=approval.inspect(self,request_id)
+                target='RECOVERY_REQUIRED' if status['consumed'] else 'FAILED'
+                if self.exceptional_execution_lock_acquired is True and status['state'] in {'APPROVED','REVALIDATING','AUTHORIZED_FOR_EXECUTION','EXECUTING','VERIFYING','RECOVERY_REQUIRED'}:
+                    code=str(error) if re.fullmatch('[a-z0-9_:,]{1,200}',str(error)) else 'bounded_execution_failed'
+                    approval.execution_event(self,value,target,{'error_type':type(error).__name__,'error_code':code})
+            except Exception:
+                pass # Existing durable attempt remains fenced; preserve ORIGINAL failure.
             raise
         finally:
             self.exceptional_operator_token=None

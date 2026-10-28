@@ -140,8 +140,8 @@ EVIDENCE=Path('/var/lib/madar-control-plane/automatic-evidence')
 DATABASE_DSN=Path('/etc/madar/automatic-database.dsn')
 
 
-def execution_policy(operations):
-    """Fixed independent operational input; no repo/CLI policy override."""
+def execution_policy_configuration(operations):
+    """Authenticate configuration only. This cannot admit or authorize effects."""
     if os.geteuid()!=0:raise RuntimeError('automatic_policy_root_reader_required')
     body=protected(EXECUTION_POLICY,private=True).read_bytes()
     if not 0<len(body)<=32768:raise RuntimeError('automatic_policy_size')
@@ -162,6 +162,12 @@ def execution_policy(operations):
     from .active_recovery_inputs import controller_tree_digest
     if controller_tree_digest()!=p['controller_tree_sha256']:
         raise RuntimeError('automatic_installed_controller_bytes_changed')
+    return p
+
+
+def execution_policy(operations):
+    """Fixed operational input AND live environment; mandatory for admission."""
+    p=execution_policy_configuration(operations)
     from .isolated_release_environment import observe
     environment=observe()
     if (environment['version']!=2 or p['environment_id']!='isolated-'+environment['realm_id']

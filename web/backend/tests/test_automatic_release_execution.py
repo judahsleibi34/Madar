@@ -212,3 +212,42 @@ class FencedOriginRouteTests(unittest.TestCase):
     def test_wrong_loaded_upstream_missing_nonce_unfenced_backend_or_foreign_frontend_refuses(self):
         for change in ({'port':8201},{'log':False},{'status':200},{'running':True},{'frontend':b'foreign'}):
             with self.subTest(change=change),self.assertRaises(RuntimeError):self.probe(**change)
+
+
+class ExceptionalProviderLifecycleTests(unittest.TestCase):
+    adapter=SealedOriginRestoreTests.adapter
+    def prepare(self):
+        instance,value=self.adapter();value['exceptional']={'request_id':'model'};value['plan']['migrations']=[{'number':161}]
+        rows=[{'Id':r,'Name':'/supabase-'+r,'State':{'Running':True,'Health':{'Status':'healthy'}}} for r in ('auth','rest','storage','envoy')]
+        instance.verify_actor_scope=lambda **kw:rows
+        instance.authority_guard=lambda:None
+        instance.deactivate_workers=lambda origin:None
+        return instance,value,rows
+
+    def test_sealed_gateway_is_fenced_first_and_restarted_after_provider_attachment(self):
+        from unittest.mock import patch
+        instance,value,rows=self.prepare()
+        with patch('deployment.lib.exceptional_release_approval.execution_event'),patch('deployment.lib.automatic_release_migration.execute',return_value={'status':'completed'}) as executor:
+            self.assertTrue(instance.begin_exceptional_maintenance(value['origin']))
+            self.assertEqual(instance.apply_selected_migrations(value['source_sha']),{'status':'completed'})
+        executor.assert_called_once()
+        self.assertEqual(instance.commands,[
+            ['/usr/bin/docker','stop','--time','15','envoy'],
+            ['/usr/bin/docker','stop','--time','15','auth','rest','storage'],
+            ['/usr/bin/docker','start','auth','rest','storage'],
+            ['/usr/bin/docker','start','envoy']])
+
+    def test_missing_gateway_is_not_ignored_or_substituted(self):
+        instance,value,rows=self.prepare();rows.pop()
+        with self.assertRaisesRegex(RuntimeError,'gateway_inventory_incomplete'):
+            instance.begin_exceptional_maintenance(value['origin'])
+        self.assertEqual(instance.commands,[])
+
+    def test_unready_provider_cannot_start_gateway_or_grant_target_authority(self):
+        from unittest.mock import patch
+        instance,value,rows=self.prepare()
+        with patch('deployment.lib.exceptional_release_approval.execution_event'),patch('deployment.lib.automatic_release_migration.execute',return_value={'status':'completed'}):
+            instance.begin_exceptional_maintenance(value['origin']);rows[0]['State']['Health']['Status']='unhealthy'
+            with patch('deployment.lib.automatic_release_execution.time.monotonic',side_effect=[0,61]),self.assertRaisesRegex(RuntimeError,'provider_readiness_failed'):
+                instance.apply_selected_migrations(value['source_sha'])
+        self.assertNotIn(['/usr/bin/docker','start','envoy'],instance.commands)
