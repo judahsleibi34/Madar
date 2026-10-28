@@ -275,6 +275,16 @@ class NativeExceptionalContractTests(unittest.TestCase):
         self.db.execute('CREATE TABLE public.'+self.foreign+'(id bigint REFERENCES public.'+self.table+'(id))')
         with self.assertRaisesRegex(RuntimeError,'not_independent'):self.inspect()
 
+    def test_native_inherited_owner_privilege_is_not_mistaken_for_private_acl(self):
+        role='exceptional_login_'+uuid.uuid4().hex[:10]
+        self.db.execute('CREATE ROLE '+role+' LOGIN')
+        try:
+            self.db.execute('GRANT postgres TO '+role)
+            with self.assertRaisesRegex(RuntimeError,'application_grants'):self.inspect()
+        finally:
+            self.db.execute('REVOKE postgres FROM '+role)
+            self.db.execute('DROP ROLE '+role)
+
     def test_real_data_drift_and_measurement_limits_cannot_reuse_reviewed_impact(self):
         before=self.inspect();self.db.execute('UPDATE public.'+self.table+" SET payload='changed' WHERE id=1")
         self.assertNotEqual(self.inspect()['data_sha256'],before['data_sha256'])

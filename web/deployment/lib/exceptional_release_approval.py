@@ -132,7 +132,8 @@ def inspect_contract(plan,inventory,db,p,*,locked=False):
             or row[5]>p['max_table_bytes']):raise RuntimeError('exceptional_relation_not_independent_or_budget')
     # Explicit ACL entries other than the owner are forbidden, including PUBLIC.
     grants=db.execute("SELECT count(*) FROM pg_class c,LATERAL aclexplode(COALESCE(c.relacl,acldefault('r',c.relowner))) a WHERE c.oid=%s AND a.grantee<>c.relowner",(row[0],)).fetchone()[0]
-    if grants:raise RuntimeError('exceptional_relation_application_grants')
+    effective=db.execute("SELECT count(*) FROM pg_roles WHERE rolname<>%s AND NOT rolsuper AND (rolcanlogin OR rolname IN ('anon','authenticated','service_role')) AND has_table_privilege(oid,%s,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')",(p['relation_owner'],row[0])).fetchone()[0]
+    if grants or effective:raise RuntimeError('exceptional_relation_application_grants')
     data=db.execute(sql.SQL('SELECT row_to_json(t)::text FROM {}.{} t LIMIT %s').format(sql.Identifier(operation['schema']),sql.Identifier(operation['table'])),(p['max_table_rows']+1,)).fetchall()
     if len(data)>p['max_table_rows'] or sum(len(x[0]) for x in data)>p['max_table_bytes']:
         raise RuntimeError('exceptional_relation_data_budget')
