@@ -121,9 +121,9 @@ def restore(run_id,*,continuation=False):
         stage=strict_json(protected(root/'restoration-fenced_failed_restoration.json',private=True).read_bytes())
         if (owner['receiver_id']!=enrollment['receiver_id'] or owner['run_id']!=run_id or set(owner['containers'])!={'database'}
                 or owner['containers']['database']!=authorization['database_container_id'] or digest(owner)!=authorization['runtime_sha256']
-                or digest(stage)!=authorization['stage_sha256'] or (root/'database-observation.json').exists()):
+                or digest(stage)!=authorization['stage_sha256']):
             raise RuntimeError('offhost_test_continuation_stage_not_supported')
-        previous=strict_json(protected(root/'restore-authorization.json',private=True).read_bytes())
+        previous=strict_json(protected(root/'restore-consumed.json',private=True).read_bytes())
         if previous['attempt_id']!=authorization['previous_attempt_id'] or not (root/'attempts'/previous['attempt_id']/'consumed.json').exists():
             raise RuntimeError('offhost_test_continuation_origin_unconsumed')
         actual=json.loads(command(['docker','inspect',owner['containers']['database']]))
@@ -273,9 +273,13 @@ print(json.dumps({'system_identifier':identity[0],'schema':identity[1],'protocol
             '--read-only','--mount','type=bind,src='+str(Path(__file__).resolve().parents[3])+',dst=/source,readonly','--user','65534:65534','--cap-drop','ALL','--security-opt','no-new-privileges',
             '--memory','128m','--memory-swap','128m','--cpus','.1','--pids-limit','64','--entrypoint','python',tool,'-B','-c',observer],
             data=json.dumps(payload).encode(),timeout=180)
-        observation=json.loads(observed);atomic_json(root/'database-observation.json',observation,exclusive=True)
+        observation=json.loads(observed)
+        if (root/'database-observation.json').exists():
+            if strict_json(protected(root/'database-observation.json',private=True).read_bytes())!=observation:raise RuntimeError('offhost_test_reverification_changed')
+        else:atomic_json(root/'database-observation.json',observation,exclusive=True)
         phase('database_roles_acls_data_and_history_restored',fingerprints=len(app['fingerprints']),schema=app['schema'])
-        recover_metadata(app['storage_objects'],root/'objects')
+        storage_env=dict(v.split('=',1) for v in app['containers']['storage']['Config']['Env'])
+        recover_metadata(app['storage_objects'],root/'objects',namespace=(storage_env.get('TENANT_ID'),storage_env.get('GLOBAL_S3_BUCKET')))
         for path in (root/'objects',*(root/'objects').rglob('*')):os.chown(path,1000,1000)
         for role in ('auth','rest','storage','gateway','redis','parser-worker','remote-ingestion-worker','backend','frontend','notification-worker','calendar-sync-worker','data-deletion-worker','proxy'):create(role)
         deadline=time.monotonic()+240

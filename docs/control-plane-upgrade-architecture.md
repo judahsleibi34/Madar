@@ -2246,3 +2246,9 @@ failed stage, prior consumed attempt and new implementation. Existing database
 bytes are not restored again. Verification unwraps only the exact trusted
 historical catalog observer; all other inputs remain single prepared statements
 in READ ONLY. Unknown runtime/provider effects remain refused.
+
+Native Storage recovery binds its two-component namespace to authenticated
+original provider configuration; the historical default remains `stub/stub`.
+Traversal and unknown namespace shapes are refused. Database-only continuation
+can reverify a matching prior read-only observation without replacing that
+receipt or restoring database bytes again. Each continuation has fresh authority.
