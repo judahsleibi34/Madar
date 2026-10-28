@@ -230,7 +230,47 @@ def cleanup(run_id):
     atomic_json(root/'cleanup.json',result,exclusive=True);return result
 
 
+def retire_scope(run_id):
+    """Bounded owned-run retirement; independent of expired restore authority."""
+    import shutil
+    root,enrollment=root_for(run_id,allow_expired=True)
+    before=strict_json(protected(root/'baseline.json',private=True).read_bytes())
+    stat=root.lstat()
+    if root.is_symlink() or stat.st_uid!=0 or (stat.st_dev,stat.st_ino)!=(before['directory_device'],before['directory_inode']):
+        raise RuntimeError('offhost_retirement_scope_replaced')
+    result=cleanup(run_id)
+    ids=command(['docker','ps','-aq','--no-trunc']).decode().split()
+    rows=json.loads(command(['docker','inspect',*ids])) if ids else []
+    if any(any(m.get('Source','').startswith(str(root)+'/') for m in r.get('Mounts',[])) for r in rows):
+        raise RuntimeError('offhost_retirement_live_reference')
+    images=[];retained=[]
+    if (root/'images-imported.json').exists():
+        imported=strict_json(protected(root/'images-imported.json',private=True).read_bytes())
+        for image in imported['new_ids']:
+            if image in before['images'] or not re.fullmatch('sha256:[a-f0-9]{64}',image):raise RuntimeError('offhost_retirement_image_ownership_invalid')
+            if command(['docker','ps','-aq','--filter','ancestor='+image]).strip():retained.append(image);continue
+            try:command(['docker','image','rm',image]);images.append(image)
+            except RuntimeError:retained.append(image)
+    event_command=['docker','events','--since',str(int(before['start_time'])),'--until',str(int(time.time())),
+        '--filter','label=com.madar.test.receiver='+enrollment['receiver_id'],'--format','{{json .}}']
+    events=[json.loads(line) for line in command(event_command).decode().splitlines()]
+    # No archive, credential, DB, VM or foreign path can survive inside a
+    # retired owned scope. shutil.rmtree uses descriptor-based symlink defence.
+    size=sum(p.stat().st_size for p in root.rglob('*') if p.is_file() and not p.is_symlink())
+    result.update(images_removed=images,images_retained_by_reference=retained,owned_directory_bytes_removed=size,
+        events=events,receiver_id=enrollment['receiver_id'],run_id=run_id,source_and_receiver_production_modified=False)
+    shutil.rmtree(root)
+    result['directory_removed']=not root.exists()
+    result['disk_after']=shutil.disk_usage('/')._asdict()
+    return result
+
+
 if __name__=='__main__':
-    try:print(json.dumps(cleanup(sys.argv[2]) if len(sys.argv)==3 and sys.argv[1]=='--cleanup' else restore(sys.argv[1]),sort_keys=True))
+    try:
+        if len(sys.argv)==3 and sys.argv[1]=='--retire':result=retire_scope(sys.argv[2])
+        elif len(sys.argv)==3 and sys.argv[1]=='--cleanup':result=cleanup(sys.argv[2])
+        elif len(sys.argv)==2:result=restore(sys.argv[1])
+        else:raise RuntimeError('offhost_test_operation_invalid')
+        print(json.dumps(result,sort_keys=True))
     except Exception as error:
         print(json.dumps({'operation':'independent-application-restoration','status':'failed','error_type':type(error).__name__,'error_code':str(error) if isinstance(error,RuntimeError) else 'bounded_restore_effect_failed'}));raise SystemExit(1)
