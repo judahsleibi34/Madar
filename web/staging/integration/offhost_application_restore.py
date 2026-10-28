@@ -6,7 +6,7 @@ migration, release promotion or a new write-authority issuer. Root enrollment
 and actual receive receipts are prerequisites. Original grants are preserved
 only with their physical database identity while the source guest is OFF.
 """
-import hashlib,json,os,re,subprocess,sys,time
+import base64,hashlib,json,os,re,subprocess,sys,time
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[2]))
 from deployment.lib.provider_recovery_runtime import protected
