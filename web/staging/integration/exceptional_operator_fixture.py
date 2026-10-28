@@ -23,7 +23,7 @@ def prepare():
     realm=environment['realm_id'];root=Path('/opt/madar-test/operator-fixture')
     root.mkdir(mode=0o700) # no overwriting an existing fixture/identity
     label='com.madar.operator-fixture';prefix='madar-operator-'+realm[:12]
-    created=[];network=None
+    created=[];network=None;volume=None
     def command(args,*,data=None):
         p=subprocess.run(args,input=data,capture_output=True,timeout=90,
             env={'PATH':os.defpath,'HOME':'/nonexistent','DOCKER_HOST':'unix:///var/run/docker.sock','DOCKER_CONFIG':'/nonexistent'})
@@ -53,10 +53,11 @@ def prepare():
             '--label',label+'='+realm,prefix])
         password=secrets.token_hex(32);key=secrets.token_hex(32)
         pg_env=file('database.env','POSTGRES_PASSWORD='+password+'\nPOSTGRES_DB=operators\n')
+        volume=command(['docker','volume','create','--label',REALM_LABEL+'='+realm,'--label',label+'='+realm,prefix+'-database'])
         pg=command(['docker','run','-d','--name',prefix+'-database','--label',REALM_LABEL+'='+realm,
             '--label',label+'='+realm,'--network',prefix,'--network-alias','operator-db',
             '--restart=no','--memory','256m','--cpus','.25','--pids-limit','96',
-            '--tmpfs','/var/lib/postgresql/data:rw,noexec,nosuid,size=192m','--env-file',pg_env,
+            '--mount','type=volume,src='+volume+',dst=/var/lib/postgresql/data','--env-file',pg_env,
             pg_image,'postgres','-c','max_connections=16','-c','shared_buffers=16MB'])
         created.append(pg)
         for _ in range(60):
@@ -69,7 +70,7 @@ def prepare():
         issuer='http://infrastructure-operator.invalid/auth/v1'
         values={'GOTRUE_API_HOST':'0.0.0.0','GOTRUE_API_PORT':'9999','API_EXTERNAL_URL':issuer,
             'GOTRUE_DB_DRIVER':'postgres','GOTRUE_DB_DATABASE_URL':'postgres://supabase_auth_admin:'+password+'@operator-db:5432/operators',
-            'GOTRUE_DB_NAMESPACE':'auth','GOTRUE_SITE_URL':'http://infrastructure-operator.invalid',
+            'GOTRUE_DB_NAMESPACE':'auth','GOTRUE_DB_MAX_POOL_SIZE':'4','GOTRUE_SITE_URL':'http://infrastructure-operator.invalid',
             'GOTRUE_JWT_SECRET':key,'GOTRUE_JWT_ADMIN_ROLES':'service_role','GOTRUE_JWT_AUD':'authenticated',
             'GOTRUE_JWT_DEFAULT_GROUP_NAME':'authenticated','GOTRUE_JWT_EXP':'3600','GOTRUE_JWT_ISSUER':issuer,
             'GOTRUE_EXTERNAL_EMAIL_ENABLED':'true','GOTRUE_MAILER_AUTOCONFIRM':'true','GOTRUE_DISABLE_SIGNUP':'true',
@@ -99,7 +100,7 @@ def prepare():
         facts={'realm_id':realm,'operator_auth_id':user['id'],'issuer':issuer,'auth_user_url':url+'/user',
             'auth_service':{'id':auth,'image':row['Image'],'spec_sha256':measured_spec(row)},
             'authentication_key_sha256':hashlib.sha256(key.encode()).hexdigest(),'root':str(root),
-            'created_container_ids':created,'network_id':network,'production_authority':False,
+            'created_container_ids':created,'network_id':network,'volume_name':volume,'production_authority':False,
             'role':'synthetic infrastructure operator; no human or production approval claimed'}
         atomic_json(root/'facts.json',facts)
         return facts
@@ -113,6 +114,10 @@ def prepare():
             row=json.loads(command(['docker','network','inspect',network]))[0]
             if row['Labels'].get(label)!=realm or row['Containers']:raise RuntimeError('exceptional_operator_fixture_cleanup_network_changed')
             command(['docker','network','rm',network])
+        if volume is not None:
+            row=json.loads(command(['docker','volume','inspect',volume]))[0]
+            if row['Labels'].get(label)!=realm or command(['docker','ps','-aq','--filter','volume='+volume]):raise RuntimeError('exceptional_operator_fixture_cleanup_volume_changed')
+            command(['docker','volume','rm',volume])
         for name in ('database.env','auth.env','authentication.key','private-session.json'):(root/name).unlink(missing_ok=True)
         raise
 
