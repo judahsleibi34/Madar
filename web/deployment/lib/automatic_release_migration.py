@@ -78,6 +78,11 @@ def prepared(value,system):
             or value['policy_sha256']!=digest({'routine':routine,'execution':policy})
             or value['evidence'].get('migration')!=digest(proof.get('migration'))):
         raise RuntimeError('automatic_migration_selected_scope_changed')
+    if 'exceptional' in value:
+        from .exceptional_release_approval import policy as exceptional_policy,verify_independent_recovery
+        ep,_=exceptional_policy(system)
+        if digest(ep)!=value['exceptional']['policy_sha256']:raise RuntimeError('exceptional_policy_changed')
+        verify_independent_recovery(ep,policy,proof,now=int(time.time()))
     record=proof_scope(value,proof)
     backup=verify_backup(value,proof,record)
     if routine['version']!=2:
@@ -120,6 +125,9 @@ def execute(value,system,guard):
         structure=local_boundaries[migration.from_schema]
         observed=observe(cursor.connection,required_protocols=document['compatibility_intent']['worker_protocols'],expected_structure_sha256=structure)
         if observed.system_identifier!=value['database']['system_identifier']:raise RuntimeError('automatic_migration_executor_database_changed')
+        if 'exceptional' in value:
+            cursor.execute("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid() AND backend_type='client backend'")
+            if cursor.fetchone()!=(0,):raise RuntimeError('exceptional_unexpected_database_writer_session')
         # Conservative A budgets use the same independently protected ceilings.
         # B permission itself remains operation-specific and independently checked.
         apply_transaction_limits(cursor,policy,expected_schema=migration.from_schema)
@@ -127,6 +135,13 @@ def execute(value,system,guard):
     def transaction(cursor,migration):
         row=next(r for r in document['migrations'] if r['number']==migration.number)
         if row['risk']['class']=='A':return
+        if 'exceptional' in value:
+            from .exceptional_release_approval import inspect_contract,policy as exceptional_policy
+            ep,_=exceptional_policy(system)
+            if inspect_contract(plan,inventory,cursor,ep,locked=True)!=value['exceptional']['contract']:
+                raise RuntimeError('exceptional_locked_impact_changed')
+            atomic_json(directory/'locked-exceptional-impact.json',value['exceptional']['contract'],exclusive=True)
+            return
         ops=row['measurable_operations'];limits=policy['class_b']
         if row['risk']['class']!='B' or 'B' not in policy['risk_classes'] or not ops:
             raise RuntimeError('automatic_class_b_operation_not_approved')

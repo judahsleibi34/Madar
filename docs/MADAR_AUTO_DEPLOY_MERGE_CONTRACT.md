@@ -2040,3 +2040,38 @@ a durable fenced boot record. Any existing pending candidate grant must remain
 READ_ONLY even before candidate creation. CI's live-owner test uses a bounded
 real child process because its test runner can be PID1; host-owner validation
 is not relaxed to accommodate a container test runner.
+
+
+### Exact exceptional review and isolated execution (Milestone B, 2026-10-28)
+
+The existing root controller exposes `--exceptional prepare|list|inspect|approve|reject|revoke|execute`,
+with immutable request UUIDs and explicit request-digest confirmation. Fresh
+infrastructure AAL2 enters only through protected stdin/terminal input; identity
+verification is not approval. The independently root-protected exceptional
+policy and separate approval signing key cannot be selected or widened by a
+candidate. Requests, signed audit transitions, approval, revocation and durable
+single-use consumption live beneath the existing automatic-admissions journal.
+
+Only an exact reviewed PostgreSQL AST contract for one private, ordinary,
+ungranted, dependency-free leaf table is supported here: DROP TABLE RESTRICT
+(Class D), or enable RLS (Class C). Unknown SQL, CASCADE, critical/provider
+objects, protocol changes and source-controlled verifier/policy changes refuse.
+No Class C/D permission is added to routine policy. Technical CI, staging,
+compatibility, actual backup bytes, separately root-pinned fresh physical
+full-application restoration, live identity/history and resource gates remain
+mandatory. Approval does not override a failed gate.
+
+Execution converges on the existing ReleaseDeployer/Docker operations and
+LockedMigrationExecutor under both existing locks. Original write ingress and
+providers/consumers are quiesced before SQL; exact table impact is reobserved
+under ACCESS EXCLUSIVE with finite PostgreSQL17 budgets. Candidate authority
+remains READ_ONLY until the existing exclusive worker handoff. Committed or
+uncertain failures retain maintenance and durable consumption; no blind SQL
+rollback, automatic replay or old-worker restoration follows. Completion links
+the existing genuine release receipt into the separately authenticated approval
+audit. Accepted known-good boot recovery remains a distinct operation.
+
+This implementation path currently requires independently enrolled isolated-test
+execution policy. Source/unit/native results are not privileged acceptance.
+Production execution/enrollment, schema160 registration and automatic timers
+remain unchanged and closed until their separate operational gates pass.

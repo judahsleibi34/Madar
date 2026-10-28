@@ -29,7 +29,7 @@ def image_identities(images):
 
 def validate(value,*,now=None):
     now=int(time.time()) if now is None else now
-    if (not isinstance(value,dict) or set(value)!=FIELDS or type(value['version']) is not int or value['version']!=1
+    if (not isinstance(value,dict) or set(value)!=(FIELDS|({'exceptional'} if 'exceptional' in value else set())) or type(value['version']) is not int or value['version']!=1
             or value['operation']!=OPERATION or value['environment'] not in {'isolated-test','production'}
             or any(not re.fullmatch('[a-f0-9]{40}',str(value[k])) for k in ('source_sha','controller_sha'))
             or any(not re.fullmatch('[a-f0-9]{64}',str(value[k])) for k in ('policy_sha256',))
@@ -42,7 +42,7 @@ def validate(value,*,now=None):
     plan=value['plan']
     if (not isinstance(plan,dict) or plan.get('source_sha')!=value['source_sha']
             or plan.get('repository')!='judahsleibi34/Madar' or plan.get('operation_id')!=value['operation_id']
-            or plan.get('risk_class') not in {'A','B'} or plan.get('execution_class')!='transactional'
+            or plan.get('risk_class') not in ({'C','D'} if 'exceptional' in value else {'A','B'}) or plan.get('execution_class')!='transactional'
             or plan.get('compatibility_covers_path') is not True or plan.get('protected_control_plane_changed') is not False
             or not isinstance(value['database'],dict) or set(value['database'])!={'system_identifier','origin_schema','target_schema','structure_sha256'}
             or not re.fullmatch('[1-9][0-9]{0,31}',str(value['database']['system_identifier']))
@@ -66,6 +66,9 @@ def validate(value,*,now=None):
     if (not isinstance(evidence,dict) or set(evidence)!=(GATES|({'migration'} if plan.get('migrations') else set()))
             or any(not re.fullmatch('[a-f0-9]{64}',str(v)) for v in evidence.values())):
         raise RuntimeError('automatic_admission_independent_evidence_required')
+    if 'exceptional' in value:
+        from .exceptional_release_approval import validate_extension
+        validate_extension(value)
     return value
 
 
@@ -109,6 +112,9 @@ def require_issue(value,operations):
     require_owned_lock(operations.deploy_lock_descriptor,operations.state_root/'deploy.lock')
     observed=operations.reobserve_automatic_admission(value)
     if observed!=value:raise RuntimeError('automatic_admission_observations_changed')
+    if 'exceptional' in value:
+        from .exceptional_release_approval import verify_execution
+        verify_execution(value,operations)
     if value['plan'].get('migrations'):
         from .automatic_release_migration import prepared
         prepared(value,operations)
@@ -361,7 +367,7 @@ def assess_current_evidence(plan,routine,observation,source,policy,proof):
     return now,assess(plan,routine,observation,now=now)
 
 
-def observe_admission(operations,source,*,attempt_id=None,created_at=None,expires_at=None):
+def observe_admission(operations,source,*,attempt_id=None,created_at=None,expires_at=None,exceptional_request_id=None):
     """Concrete root observer used both for preparation AND locked issuance."""
     from .migration_policy import load_policy
     from .migration_inventory import discover,GitSource
@@ -407,6 +413,12 @@ def observe_admission(operations,source,*,attempt_id=None,created_at=None,expire
         if selection is not None and selection['plan_sha256']!=plan.sha256:
             raise RuntimeError('automatic_selected_plan_changed')
         value=plan.document()
+        exceptional=None
+        if exceptional_request_id is not None:
+            from .exceptional_release_approval import policy as exceptional_policy,inspect_contract
+            ep,_=exceptional_policy(operations)
+            exceptional={'request_id':exceptional_request_id,'policy_sha256':digest(ep),
+                'contract':inspect_contract(plan,inventory,db,ep)}
         measurements=measure_class_b(db,plan,expected_system_identifier=catalog.system_identifier,
             expected_structure_sha256=catalog.structure_sha256) if value['risk_class']=='B' else None
     if value['migrations']:
@@ -468,7 +480,14 @@ def observe_admission(operations,source,*,attempt_id=None,created_at=None,expire
     # and direct live observations above; they are never CLI/candidate inputs.
     if measurements is not None:observation['class_b_measurements']=measurements
     now,result=assess_current_evidence(plan,routine,observation,source,policy,proof)
-    if not result['policy_match']:raise RuntimeError('automatic_policy_refused:'+','.join(result['reasons']))
+    if exceptional is not None:
+        # Only the independent review reason can defer to the approval issuer.
+        # All technical/compatibility/source/policy/resource reasons still block.
+        if result['reasons']!=['risk_requires_independent_review']:
+            raise RuntimeError('exceptional_technical_policy_refused:'+','.join(result['reasons']))
+        from .exceptional_release_approval import verify_independent_recovery
+        verify_independent_recovery(ep,policy,proof,now=now)
+    elif not result['policy_match']:raise RuntimeError('automatic_policy_refused:'+','.join(result['reasons']))
     start=now if created_at is None else created_at
     end=min(start+policy['operation_max_seconds'],proof['expires_at'],routine['expires_at']) if expires_at is None else expires_at
     if end>routine['expires_at']:raise RuntimeError('automatic_scope_exceeds_policy_expiry')
@@ -485,6 +504,7 @@ def observe_admission(operations,source,*,attempt_id=None,created_at=None,expire
             'compatible_min':compat['candidate_range'][0],'compatible_max':compat['candidate_range'][1],
             'configuration_sha256':proof['candidate_configuration_sha256']},
         'evidence':{gate:digest(proof['gates'][gate]) for gate in GATES},'created_at':start,'expires_at':end}
+    if exceptional is not None:output['exceptional']=exceptional
     if value['migrations']:output['evidence']['migration']=digest(proof['migration'])
     return validate(output,now=now)
 

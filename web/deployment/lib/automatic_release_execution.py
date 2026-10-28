@@ -142,6 +142,7 @@ def operations_adapter(base,system,value):
             super().__init__(system.repo,system.state_root,Path('/etc/madar/production.env'),compatibility)
             self.automatic_release_admission=value;self._issuer=system;self._credential_root=None
             self._origin_fenced=[];self._model=None;self._candidate_rows=None;self._expected_route=value['origin']['slot'];self._migration_completed=False
+            self._maintenance=False;self._private_providers=[]
             self._initial_scope=strict_json(protected(Path('/etc/madar/isolated-release-test.json'),private=True).read_bytes())['runtime_scope']
 
         def verify_actor_scope(self):
@@ -203,6 +204,39 @@ def operations_adapter(base,system,value):
                 if observed!=(value['database']['system_identifier'],expected):
                     raise RuntimeError('automatic_live_execution_database_changed')
 
+        def begin_exceptional_maintenance(self,origin):
+            if 'exceptional' not in value:return False
+            self.authority_guard();rows=self.verify_actor_scope()
+            self.deactivate_workers(origin)
+            names={'/supabase-auth','/supabase-rest','/supabase-storage'}
+            self._private_providers=[r['Id'] for r in rows if r['Name'] in names]
+            if len(self._private_providers)!=3:raise RuntimeError('exceptional_provider_inventory_incomplete')
+            self.run(['/usr/bin/docker','stop','--time','15',*self._private_providers])
+            self._maintenance=True
+            self.verify_actor_scope()
+            from .exceptional_release_approval import execution_event
+            execution_event(system,value,'EXECUTING',{'origin_writer_ids':self._origin_fenced,
+                'private_provider_ids':self._private_providers,'public_write_ingress':'origin-backend-stopped'})
+            return True
+
+        def validate_fenced_rollback_target(self,origin,schema):
+            if not self._maintenance or schema!=value['database']['target_schema']:
+                raise RuntimeError('exceptional_origin_validation_state_invalid')
+            # Only the independently measured private leaf-table contract uses
+            # this path. No application role could access the removed object.
+            self.guard();self.verify_actor_scope()
+            if not value['origin']['compatible_min']<=schema<=value['origin']['compatible_max']:
+                raise RuntimeError('exceptional_origin_target_incompatible')
+            return {'compatible_min':value['origin']['compatible_min'],'compatible_max':value['origin']['compatible_max']}
+
+        def fence_exceptional_failure(self):
+            if 'exceptional' not in value:return
+            rows=self.verify_actor_scope()
+            stop=[r['Id'] for r in rows if r['Name'] in {'/madar-'+slot+'-'+role
+                for slot in ('blue','green') for role in ROLES if role not in {'frontend','redis'}} and r['State']['Running']]
+            if stop:self.run(['/usr/bin/docker','stop','--time','15',*stop])
+            publish_candidate_grant(value,'READ_ONLY')
+
         def apply_selected_migrations(self,sha):
             self.guard();self.verify_actor_scope()
             if sha!=value['source_sha']:raise RuntimeError('automatic_migration_source_changed')
@@ -212,12 +246,17 @@ def operations_adapter(base,system,value):
                 self.authority_guard();self.verify_actor_scope()
             receipt=apply_sql(value,system,parent_guard)
             self._migration_completed=True
+            if self._maintenance:
+                self.run(['/usr/bin/docker','start',*self._private_providers])
             self.guard()
             return receipt
 
         def admit_deployment(self,sha,state,descriptor):
             if sha!=value['source_sha']:raise RuntimeError('automatic_execution_source_changed')
             system.deploy_lock_descriptor=descriptor # borrowed, owned by ReleaseDeployer
+            if 'exceptional' in value:
+                from .exceptional_release_approval import verify_execution
+                verify_execution(value,system,consume=True,token=system.exceptional_operator_token)
             admission.reserve(value,system)
             admission.arm_operation(value)
             system.arm_interlock(sha)
@@ -381,6 +420,8 @@ def operations_adapter(base,system,value):
             verify_traffic_driver_access()
 
         def deactivate_workers(self,release):
+            if self._maintenance and release.get('slot')==value['origin']['slot']:
+                self.verify_actor_scope();return
             super().deactivate_workers(release)
             if release.get('slot')==value['origin']['slot']:
                 # An ungoverned bootstrap cannot acquire a fake old grant. Fence
@@ -491,9 +532,14 @@ def execute(system,value,base_operations,*,manual_retry=False):
         receipt={'operation':admission.OPERATION,'admission_sha256':digest(value),'attempt_id':value['attempt_id'],
             'source_sha':value['source_sha'],'database':value['database'],'release':result,
             'manual_retry_requested':manual_retry,'completed_at':int(time.time())}
+        if 'exceptional' in value:
+            from .exceptional_release_approval import execution_event
+            execution_event(system,value,'VERIFYING',{'release_sha':value['source_sha'],'status':result['status']})
         adapter.accept_runtime_inventory()
         atomic_json(admission.ROOT/'attempts'/value['attempt_id']/'completion.json',receipt,exclusive=True)
         completed=True
+        if 'exceptional' in value:
+            execution_event(system,value,'COMPLETED',{'completion_sha256':digest(receipt),'approval_request_id':value['exceptional']['request_id']})
         from .automatic_release_recovery import seal_known_good
         from .runtime_authority import open_deployment_lock
         import fcntl

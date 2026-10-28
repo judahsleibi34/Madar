@@ -426,6 +426,7 @@ class ReleaseDeployer:
             known_good = state.get("known_good_release")
             switched = False
             workers_cut_over = False
+            exceptional_maintenance = False
             self._checkpoint(state, release)
             try:
                 self.operations.verify_source(sha)
@@ -460,6 +461,13 @@ class ReleaseDeployer:
                 release["phase"] = "preflight"
                 self._checkpoint(state, release)
                 self.operations.preflight(sha, candidate_slot, images, schema)
+                maintenance = getattr(self.operations, 'begin_exceptional_maintenance', None)
+                if callable(maintenance) and 'exceptional' in getattr(self.operations,'automatic_release_admission',{}):
+                    self._set_worker_authority(state, release, 'OLD', expected={'OLD','CANDIDATE'})
+                    self._set_worker_authority(state, release, 'NONE', expected={'OLD'})
+                    exceptional_maintenance = True # An interrupted fencing effect is never an ordinary rollback.
+                    if maintenance(known_good) is not True:raise RuntimeError('exceptional_maintenance_not_established')
+                    self._checkpoint(state, release)
                 selected_migration = getattr(self.operations, "apply_selected_migrations", None)
                 if callable(selected_migration):
                     release["phase"] = "database_migration"
@@ -472,7 +480,9 @@ class ReleaseDeployer:
                             raise RuntimeError("migration_target_not_observed")
                         release["schema"]["observed"] = schema
                         if known_good:
-                            self.operations.validate_rollback_target(known_good, schema)
+                            if exceptional_maintenance:
+                                self.operations.validate_fenced_rollback_target(known_good, schema)
+                            else:self.operations.validate_rollback_target(known_good, schema)
                             # Retain the operation's origin preimage; current
                             # serving state must describe the committed schema.
                             known_good = dict(known_good, schema=schema)
@@ -491,7 +501,10 @@ class ReleaseDeployer:
                 release["phase"] = "worker_cutover"
                 self._checkpoint(state, release)
                 candidate_identity = {"sha": sha, "slot": candidate_slot, "images": images}
-                if known_good:
+                if known_good and exceptional_maintenance:
+                    if self.operations.worker_ownership(known_good,candidate_identity)!='none':
+                        raise RuntimeError('exceptional_fenced_worker_owner_changed')
+                elif known_good:
                     if self.operations.worker_ownership(known_good, candidate_identity) != "old":
                         raise RuntimeError("worker_ownership_initial_invalid")
                     self._set_worker_authority(state, release, "OLD", expected={"OLD", "CANDIDATE"})
@@ -508,6 +521,7 @@ class ReleaseDeployer:
                     release["workers_cut_over"] = True
                     self._checkpoint(state, release)
                 except Exception:
+                    if exceptional_maintenance:raise
                     if known_good:
                         self._set_worker_authority(
                             state, release, "NONE", expected={"CANDIDATE", "NONE"}
@@ -544,6 +558,12 @@ class ReleaseDeployer:
                 self._record(state, release)
                 return release
             except Exception as error:
+                if exceptional_maintenance:
+                    self.operations.fence_exceptional_failure()
+                    self._set_worker_authority(state,release,'NONE',expected={'OLD','NONE','CANDIDATE'})
+                    release.update(status='recovery_required',phase='exceptional_maintenance_fenced',failure_reason=type(error).__name__)
+                    self._checkpoint(state,release)
+                    raise
                 release.update(
                     status="failed", completed_at=utc_now().isoformat(),
                     failure_reason=type(error).__name__, failure_code=str(error)[:200],

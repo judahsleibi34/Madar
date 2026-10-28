@@ -2744,6 +2744,46 @@ print(hashlib.sha256(keys[0].encode()).hexdigest())
         module=importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name,loader));loader.exec_module(module)
         return execute(self,admitted,module.DockerGitOperations,manual_retry=manual_retry)
 
+    def exceptional_release_action(self,action,*,source=None,request_id=None,token=None,confirmation=None):
+        from deployment.lib import exceptional_release_approval as approval
+        from deployment.lib.automatic_release_admission import execution_policy,require_no_pending_operation
+        execution_policy(self) # Currently independently enrolled isolation only.
+        if action=='prepare':return approval.create(self,source)
+        if action=='list':
+            approval.policy(self)
+            if not approval.root().exists():return []
+            return [approval.inspect(self,p.name) for p in sorted(approval.root().iterdir()) if p.is_dir()]
+        if action=='inspect':return approval.inspect(self,request_id)
+        if action in {'approve','reject','revoke'}:
+            return approval.decide(self,request_id,action,token,confirmation)
+        if action!='execute':raise UpgradeError('exceptional_action_invalid')
+        status=approval.inspect(self,request_id);value=status['request']['admission']
+        if confirmation!=status['request_sha256']:raise UpgradeError('exceptional_explicit_confirmation_required')
+        if status['state']!='APPROVED' or status['consumed']:raise UpgradeError('exceptional_approval_not_executable')
+        require_no_pending_operation()
+        if self.interlock_file.exists() or self.interlock_file.is_symlink():raise UpgradeError('exceptional_existing_interlock_requires_recovery')
+        self.prepare_upgrade_roots()
+        from deployment.lib.environment_file import load_environment_file
+        from deployment.lib.automatic_release_execution import execute
+        import importlib.machinery,importlib.util
+        load_environment_file(Path('/etc/madar/production.env'))
+        for key,name in (('MADAR_PRODUCTION_REPO',self.repo),('MADAR_DEPLOY_STATE_ROOT',self.state_root),
+                         ('MADAR_ENV_FILE',Path('/etc/madar/production.env'))):os.environ[key]=str(name)
+        entry=self.control_root/'bin/madar-release-deploy'
+        loader=importlib.machinery.SourceFileLoader('madar_trusted_exceptional_release',str(entry))
+        module=importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name,loader));loader.exec_module(module)
+        self.exceptional_operator_token=token
+        try:return execute(self,value,module.DockerGitOperations)
+        except BaseException as error:
+            # A consumed attempt is never made reusable after a crash/failure.
+            # SIGKILL leaves its durable journal for boot/recovery inspection.
+            status=approval.inspect(self,request_id)
+            target='RECOVERY_REQUIRED' if status['consumed'] else 'FAILED'
+            if status['state'] in {'APPROVED','REVALIDATING','AUTHORIZED_FOR_EXECUTION','EXECUTING','VERIFYING'}:
+                approval.execution_event(self,value,target,{'error_type':type(error).__name__})
+            raise
+        finally:self.exceptional_operator_token=None
+
     def recover_automatic_known_good(self):
         # Boot recovery verifies existing completed authority; it deliberately
         # does not enter automatic admission, reserve a release or issue grants.
@@ -2763,7 +2803,8 @@ print(hashlib.sha256(keys[0].encode()).hexdigest())
     def reobserve_automatic_admission(self, admitted):
         from deployment.lib.automatic_release_admission import observe_admission
         return observe_admission(self,admitted['source_sha'],attempt_id=admitted['attempt_id'],
-            created_at=admitted['created_at'],expires_at=admitted['expires_at'])
+            created_at=admitted['created_at'],expires_at=admitted['expires_at'],
+            exceptional_request_id=admitted.get('exceptional',{}).get('request_id'))
 
     def write_authorization(
         self, approved_sha: str, *, recovery: bool = False,
@@ -3665,6 +3706,9 @@ def main(argv: list[str] | None = None) -> int:
         help='Discover eligible main source and execute an independently admitted routine release')
     parser.add_argument('--automatic-retry-failed-source',action='store_true',
         help='Explicit retry suppression override; all automatic admission/authority gates still apply')
+    parser.add_argument('--exceptional',choices=('prepare','list','inspect','approve','reject','revoke','execute'),help='Exact exceptional review/approval lifecycle; never an automatic policy override')
+    parser.add_argument('--request-id',help='Immutable exceptional request UUID')
+    parser.add_argument('--confirm-request-digest',help='Explicit confirmation of the displayed immutable request digest')
     parser.add_argument('--authenticate-operator',action='store_true',
         help='Authenticate independent infrastructure AAL2 from stdin/terminal; does not approve or execute a release')
     parser.add_argument(
@@ -3687,6 +3731,35 @@ def main(argv: list[str] | None = None) -> int:
     if os.geteuid() != 0:
         print("CONTROL-PLANE UPGRADE: FAILED\nerror: effective_root_required", file=sys.stderr)
         return 1
+    if args.exceptional:
+        if any((args.dry_run,args.automatic_release,args.automatic_poll,args.automatic_retry_failed_source,args.authenticate_operator,
+                args.restore_isolated_fence,args.recover_known_good,args.install_isolated_recovery,args.recover_current_schema,args.rehearsal_attestation)):
+            parser.error('exceptional release review and execution cannot mix with other operations')
+        if args.exceptional=='prepare':
+            if not args.sha or args.request_id or args.confirm_request_digest:parser.error('prepare requires only an exact source SHA')
+        elif args.sha:parser.error('exceptional operations use an immutable request UUID, not a new source SHA')
+        if args.exceptional in {'list','prepare'}:
+            if args.request_id:parser.error('this action does not take a request UUID')
+        elif not args.request_id:parser.error('a request UUID is required')
+        mutation=args.exceptional in {'approve','reject','revoke','execute'}
+        if mutation and not args.confirm_request_digest:parser.error('explicit request-digest confirmation is required')
+        if not mutation and args.confirm_request_digest:parser.error('display actions cannot confirm execution')
+        try:
+            token=None
+            if mutation:
+                if sys.stdin.isatty():
+                    import getpass
+                    token=getpass.getpass('Fresh infrastructure AAL2 access token: ')
+                else:token=sys.stdin.read(16385).strip()
+                if len(token)>16384:raise RuntimeError('release_operator_credential_invalid')
+            result=SystemOperations().exceptional_release_action(args.exceptional,
+                source=normalize_sha(args.sha) if args.sha else None,request_id=args.request_id,
+                token=token,confirmation=args.confirm_request_digest)
+            print(json.dumps(result,sort_keys=True));return 0
+        except (RuntimeError,ValueError,OSError,TypeError,subprocess.SubprocessError) as error:
+            code=str(error) if re.fullmatch('[a-z0-9_:,]{1,200}',str(error)) else 'exceptional_execution_failed'
+            print('EXCEPTIONAL RELEASE: REFUSED; error: '+code,file=sys.stderr);return 1
+    if args.request_id or args.confirm_request_digest:parser.error('request arguments require an exceptional action')
     recovery_modes=(args.restore_isolated_fence,args.recover_known_good,args.install_isolated_recovery)
     if any(recovery_modes):
         if sum(recovery_modes)!=1 or any((args.sha,args.dry_run,args.automatic_release,args.automatic_poll,args.automatic_retry_failed_source,args.authenticate_operator,args.recover_current_schema,args.rehearsal_attestation)):

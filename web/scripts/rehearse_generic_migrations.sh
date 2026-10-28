@@ -5,7 +5,7 @@ docker() { /usr/bin/docker --host unix:///var/run/docker.sock "$@"; }
 # REHEARSE only. No published ports, persistent DB volume or production target.
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 WEB_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
-modules=(test_generic_migration_source test_generic_migration_plan test_migration_candidate_rehearsal test_generic_migrations_database test_measured_migration_policy test_schema150_quiescence_scope_database)
+modules=(test_generic_migration_source test_generic_migration_plan test_migration_candidate_rehearsal test_generic_migrations_database test_measured_migration_policy test_schema150_quiescence_scope_database test_exceptional_release_approval)
 if [[ "$#" -gt 0 ]]; then
   if [[ "$#" -ne 1 || "$1" != --measured-only ]]; then echo 'ERROR: generic_rehearsal_arguments_invalid' >&2; exit 2; fi
   modules=(test_measured_migration_policy)
