@@ -254,8 +254,19 @@ def inspect(system,request_id):
         request=_request(path,key)
         approval=verified(path/'approval.json',key) if (path/'approval.json').exists() else None
         if state in {'APPROVED','AWAITING_ADMIN_APPROVAL'} and min(request['expires_at'],(approval or {}).get('expires_at',request['expires_at']))<=int(time.time()):state='EXPIRED'
+        consumed=(path/'approval-consumed.json').exists()
+        if consumed:
+            owner=verified(path/'approval-consumed.json',key)
+            if state in {'REVALIDATING','AUTHORIZED_FOR_EXECUTION','EXECUTING','VERIFYING'}:
+                try:
+                    process=Path('/proc')/str(owner['pid'])
+                    live=(owner['boot_id']==Path('/proc/sys/kernel/random/boot_id').read_text().strip()
+                        and process.stat().st_uid==0
+                        and process.joinpath('stat').read_text().split(') ',1)[1].split()[19]==owner['process_start'])
+                except (FileNotFoundError,ProcessLookupError,KeyError,IndexError):live=False
+                if not live:state='RECOVERY_REQUIRED'
         return {'request':request,'request_sha256':digest(request),'state':state,
-            'approval':approval,'consumed':(path/'approval-consumed.json').exists(),'audit':entries}
+            'approval':approval,'consumed':consumed,'audit':entries}
 
 
 def decide(system,request_id,action,token,confirmation):

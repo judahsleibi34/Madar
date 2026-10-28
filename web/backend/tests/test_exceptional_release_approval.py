@@ -161,6 +161,15 @@ class ApprovalJournalTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'backup_corrupt'):a.verify_execution(self.value,self.system,consume=True,token='token')
         self.assertFalse((self.folder/'approval-consumed.json').exists())
 
+    def test_consumed_interrupted_owner_is_visible_as_recovery_required_without_reauthorizing(self):
+        self.approve();a.verify_execution(self.value,self.system,consume=True,token='token')
+        path=self.folder/'approval-consumed.json';owner=a.verified(path,self.key);owner['boot_id']='foreign-boot'
+        path.write_text(json.dumps(a.sign(owner,self.key)))
+        before=path.read_bytes();out=a.inspect(self.system,self.request_id)
+        self.assertEqual(out['state'],'RECOVERY_REQUIRED');self.assertTrue(out['consumed'])
+        self.assertEqual(before,path.read_bytes())
+        with self.assertRaises(RuntimeError):a.verify_execution(self.value,self.system,consume=True,token='token')
+
     def test_failed_preflight_without_request_remains_visible_to_operator(self):
         (self.folder/'request.json').unlink()
         a.event(self.folder,self.key,'FAILED',{'error_type':'RuntimeError'})
