@@ -2647,3 +2647,13 @@ application compatibility. The owner authorized preparation ONLY of an unselecte
 forward repair under deployment/proposals/schema165-deletion-compatibility. It is
 outside canonical inventories/manifests. No proposal execution or expansion of
 Milestone C's accepted target164 is authorized.
+
+Historical enrollment additionally fingerprints public business rows/sequences
+and stable original Auth/MFA/Storage identities through a bounded native READ
+ONLY snapshot; only documented probe challenge/access timestamps are normalized.
+Application, backup and database-transport configurations are separately hashed.
+The original backend's actual bootstrap history reports no protected migration
+completion: serving preflight returns not_requested only after reattesting the
+distinct enrolled origin, and rejects any conflicting migration directory or
+fabricated completed marker. Account acceptance probes create only their
+explicitly enrolled synthetic Auth sessions; they issue no SQL/write authority.

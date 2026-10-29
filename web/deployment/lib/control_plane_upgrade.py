@@ -762,6 +762,16 @@ class SystemOperations:
             if binding['application_sha']!=sha or binding['schema']!=schema:
                 raise UpgradeError('completed_compatible_migration_changed')
             return 'completed'
+        if 'historical_origin' in known_good:
+            binding=self.historical_origin_binding(release_state)
+            if (binding.get('origin_kind')!='independently-enrolled-historical-bootstrap-origin'
+                    or binding.get('application_sha')!=sha or schema!=146 or binding.get('schema')!=146):
+                raise UpgradeError('historical_origin_migration_identity_changed')
+            prior=self.state_root/'migrations'/sha
+            if prior.exists() or prior.is_symlink():
+                raise UpgradeError('historical_origin_migration_history_conflict')
+            # Truthful genesis/bootstrap, not a prior protected SQL completion.
+            return 'not_requested'
         if known_good.get("sha") == sha and known_good.get("runtime_only_rollback") is True:
             # A completed NORMAL continuation has a protected execution contract,
             # not an ordinary immutable release checkout. Re-attest that exact

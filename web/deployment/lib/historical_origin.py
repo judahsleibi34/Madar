@@ -8,7 +8,7 @@ from __future__ import annotations
 import hashlib, os, re, time, uuid
 from contextlib import contextmanager
 from pathlib import Path
-from .migration_inventory import canonical, digest, strict_json
+from .migration_inventory import digest, strict_json
 from .provider_recovery_runtime import protected, readonly_configuration
 from .migration_executor import atomic_json
 from .exceptional_release_approval import journal_lock, sign, verified, identifier
@@ -17,6 +17,48 @@ POLICY=Path('/etc/madar/historical-origin-policy.json')
 KIND='independently-enrolled-historical-bootstrap-origin'
 ROLES=('backend','frontend','redis','parser-worker','remote-ingestion-worker',
        'notification-worker','calendar-sync-worker','data-deletion-worker')
+
+
+def preservation_roots(db):
+    """Bounded native READ ONLY snapshot; customer values never leave as text.
+
+    Auth challenge/access timestamps legitimately change during these probes;
+    identities, password/MFA material, memberships and all public business rows
+    remain fingerprinted. This is not a claim to freeze changing live sessions.
+    """
+    from psycopg import sql
+    roots={};deadline=time.monotonic()+45
+    if not db.autocommit:raise RuntimeError('historical_origin_readonly_connection_required')
+    db.execute('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY')
+    try:
+        db.execute("SET LOCAL statement_timeout='5s'")
+        db.execute("SET LOCAL lock_timeout='1s'")
+        tables=db.execute("""SELECT n.nspname,c.relname FROM pg_catalog.pg_class c
+          JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+          WHERE c.relkind IN ('r','p') AND (n.nspname='public' OR
+          (n.nspname='auth' AND c.relname IN ('users','identities','mfa_factors')) OR
+          (n.nspname='storage' AND c.relname IN ('objects','buckets')))
+          ORDER BY n.nspname,c.relname""").fetchall()
+        if not 1<=len(tables)<=512:raise RuntimeError('historical_origin_table_budget')
+        for schema,table in tables:
+            if time.monotonic()>deadline:raise RuntimeError('historical_origin_snapshot_deadline')
+            relation=sql.SQL('{}.{}').format(sql.Identifier(schema),sql.Identifier(table))
+            count=db.execute(sql.SQL('SELECT count(*) FROM {}').format(relation)).fetchone()[0]
+            if not 0<=count<=100000:raise RuntimeError('historical_origin_row_budget')
+            ignored=(['last_sign_in_at','updated_at'] if (schema,table)==('auth','users') else
+                ['last_challenged_at','updated_at'] if (schema,table)==('auth','mfa_factors') else
+                ['last_accessed_at','updated_at'] if (schema,table)==('storage','objects') else [])
+            value=sql.SQL('to_jsonb(t) - {}::text[]').format(sql.Literal(ignored))
+            checksum=db.execute(sql.SQL("""SELECT encode(sha256(convert_to(
+              coalesce(string_agg(h,'' ORDER BY h COLLATE "C"),''),'UTF8')),'hex')
+              FROM (SELECT encode(sha256(convert_to(({})::text,'UTF8')),'hex') AS h
+                    FROM {} AS t) AS rows""").format(value,relation)).fetchone()[0]
+            roots[schema+'.'+table]={'rows':count,'sha256':checksum,'ignored_probe_timestamps':ignored}
+        sequences=db.execute("""SELECT schemaname,sequencename,last_value,start_value,
+            increment_by,min_value,max_value,cache_size,cycle FROM pg_catalog.pg_sequences
+            WHERE schemaname='public' ORDER BY sequencename""").fetchall()
+        return {'tables':roots,'public_sequences_sha256':digest(sequences)}
+    finally:db.execute('ROLLBACK')
 
 
 def policy(system):
@@ -56,8 +98,9 @@ def policy(system):
 def observe(system,p,environment):
     """Measure actual original state, never accept caller-provided PASS fields.
 
-    This observer is read-only. The identity, provider, data, mount and object
-    probes are independent of the candidate's SQL and cannot issue authority.
+    No SQL or application write authority is issued. The explicitly enrolled
+    account probes create Auth sessions while verifying real password/MFA and
+    private objects; their credentials cannot select foreign provider endpoints.
     """
     from .automatic_release_recovery import inspect_all
     from .completed_normal_resources import measured_spec
@@ -118,6 +161,7 @@ def observe(system,p,environment):
             raise RuntimeError('historical_origin_database_changed')
         marker=db.execute("SELECT shobj_description(oid,'pg_database') FROM pg_database WHERE datname=current_database()").fetchone()[0]
         if marker!='madar-isolated-'+environment['realm_id']:raise RuntimeError('historical_origin_database_realm_changed')
+        preserved=preservation_roots(db)
     for r in rows:
         name=r['Name'].lstrip('/')
         if (r['State']['Running'] and name.startswith('madar-') and name not in
@@ -129,7 +173,12 @@ def observe(system,p,environment):
         'bootstrap_sha256':digest(bootstrap),'known_good':known,'worker_authority':owner,
         'runtime':{r['Name']:{'id':r['Id'],'image':r['Image'],'spec_sha256':measured_spec(r)} for r in rows},
         'runtime_scope_sha256':digest(environment['runtime_scope']),
+        'configuration_sha256':{
+            'application':hashlib.sha256(readonly_configuration(Path('/etc/madar/production.env'),private=True).read_bytes()).hexdigest(),
+            'backup':hashlib.sha256(protected(Path('/etc/madar/backup.env'),private=True).read_bytes()).hexdigest(),
+            'database_transport':hashlib.sha256(protected(Path('/etc/madar/automatic-database.dsn'),private=True).read_bytes()).hexdigest()},
         'database':catalog.document(),'history_sha256':history_digest(inventory,146),
+        'original_data':preserved,
         'original_account_observations':accounts,'probe_configuration_sha256':hashlib.sha256(raw).hexdigest(),
         'protected_completion_claimed':False,'migration_authority_issued':False}
 
