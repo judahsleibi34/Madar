@@ -2442,3 +2442,8 @@ pinned in both receiver policy and authenticated backup manifest. No source
 issuer key is copied. Historical146 requires native absence of successor
 protocol functions, not a numeric schema allowlist or fabricated completion.
 Ordinary receiver/completed-release and production contracts are unchanged.
+
+Physical test proxy restoration derives upstream ports from exact authenticated
+source loopback bindings. It refuses missing, ambiguous or public bindings and
+preserves historical frontend8080 as well as reviewed frontend80 configurations.
+A guessed frontend80 is not compatible restoration evidence.

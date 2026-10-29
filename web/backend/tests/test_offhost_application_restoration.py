@@ -110,3 +110,20 @@ class HistoricalSourceContextTests(unittest.TestCase):
             app['release_context']['source_binding']['enrollment_sha256']=self.digest(record)
             enrollment=dict(self.enrollment,source_origin_sha256=self.digest(app['release_context']))
             with self.assertRaisesRegex(RuntimeError,'source_changed'):receiver.verify_release_context(app,enrollment)
+
+
+class SourceProxyBindingTests(unittest.TestCase):
+    def app(self,frontend=8080):
+        return {'slot':'green','containers':{role:{'HostConfig':{'PortBindings':{str(target)+'/tcp':[{'HostIp':'127.0.0.1','HostPort':str(port)}]}}} for role,target,port in [('backend',8000,8201),('frontend',frontend,3200)]}}
+    def test_actual_historical_frontend_port_is_preserved(self):
+        body='listen 127.0.0.1:3000; server 127.0.0.1:8201; server 127.0.0.1:3200;'
+        self.assertEqual(receiver.restored_proxy_configuration(body,self.app()),'listen 3000; server backend:8000; server frontend:8080;')
+        self.assertIn('frontend:80;',receiver.restored_proxy_configuration(body,self.app(80)))
+    def test_missing_public_or_ambiguous_binding_refuses(self):
+        import copy
+        for fault in ('missing','public','duplicate'):
+            app=self.app();bindings=app['containers']['frontend']['HostConfig']['PortBindings']
+            if fault=='missing':bindings.clear()
+            elif fault=='public':bindings['8080/tcp'][0]['HostIp']='0.0.0.0'
+            else:bindings['80/tcp']=[{'HostIp':'127.0.0.1','HostPort':'3200'}]
+            with self.assertRaisesRegex(RuntimeError,'source_proxy_binding'):receiver.restored_proxy_configuration('127.0.0.1:3200',app)

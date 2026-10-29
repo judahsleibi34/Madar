@@ -38,6 +38,26 @@ def storage_identity(configuration):
     return uid,gid
 
 
+def restored_proxy_configuration(body,app):
+    """Use authenticated source port bindings, not a guessed image port."""
+    slot=app['slot']
+    if slot not in {'blue','green'}:raise RuntimeError('offhost_test_proxy_slot_invalid')
+    body=body.replace('listen 127.0.0.1:','listen ')
+    for role,host_port in (('backend',8101 if slot=='blue' else 8201),
+                           ('frontend',3100 if slot=='blue' else 3200)):
+        found=[]
+        for target,bindings in (app['containers'][role]['HostConfig'].get('PortBindings') or {}).items():
+            for binding in bindings or []:
+                if binding.get('HostPort')!=str(host_port):continue
+                if (binding.get('HostIp') not in {'127.0.0.1','::1'} or not re.fullmatch('[0-9]{1,5}/tcp',target)
+                        or not 1<=int(target.split('/')[0])<=65535):
+                    raise RuntimeError('offhost_test_source_proxy_binding_invalid')
+                found.append(int(target.split('/')[0]))
+        if len(found)!=1:raise RuntimeError('offhost_test_source_proxy_binding_ambiguous')
+        body=body.replace('127.0.0.1:'+str(host_port),role+':'+str(found[0]))
+    return body
+
+
 def command(args,*,data=None,timeout=30):
     result=subprocess.run(args,input=data,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=timeout,env={'PATH':'/usr/sbin:/usr/bin:/sbin:/bin','HOME':'/root','LANG':'C.UTF-8','DOCKER_HOST':'unix:///var/run/docker.sock','DOCKER_CONFIG':'/nonexistent'})
     if result.returncode:
@@ -277,9 +297,7 @@ def restore(run_id,*,continuation=False):
                     if role=='proxy':
                         for f in source.rglob('*') if source.is_dir() else [source]:
                             if f.is_file():
-                                text=f.read_text();text=text.replace('listen 127.0.0.1:','listen ')
-                                text=text.replace('127.0.0.1:'+str(8101 if app['slot']=='blue' else 8201),'backend:8000')
-                                text=text.replace('127.0.0.1:'+str(3100 if app['slot']=='blue' else 3200),'frontend:80');f.write_text(text)
+                                f.write_text(restored_proxy_configuration(f.read_text(),app))
                 args+=['--mount','type=bind,src='+str(source)+',dst='+destination+(',readonly' if not mount['RW'] else '')]
             entry=config.get('Entrypoint') or []
             if entry:args+=['--entrypoint',entry[0]]
