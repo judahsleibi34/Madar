@@ -108,8 +108,10 @@ def receive_enrolled_test(run_id, packet, *, stream=None):
     fields={'version','kind','run_id','receiver_id','machine_id','product_uuid','filesystem_uuid',
         'source_guest_uuid','source_product_uuid','source_database_system_identifier','denied_database_identifiers',
         'source_sha','backup_operation_id','manifest_sha256','source_public_key','expires_at','max_transfer_bytes'}
+    bootstrap=isinstance(enrollment,dict) and enrollment.get('version')==2 and type(enrollment.get('version')) is int
+    if bootstrap:fields|={'source_origin_kind','source_origin_sha256'}
     now=int(time.time())
-    if (not isinstance(enrollment,dict) or set(enrollment)!=fields or enrollment['version']!=1
+    if (not isinstance(enrollment,dict) or set(enrollment)!=fields or type(enrollment['version']) is not int or enrollment['version'] not in {1,2}
             or enrollment['kind']!='independent-physical-test-receiver' or enrollment['run_id']!=run_id
             or type(enrollment['expires_at']) is not int or not now<enrollment['expires_at']<=now+14400
             or type(enrollment['max_transfer_bytes']) is not int or not 0<enrollment['max_transfer_bytes']<=2*1024**3
@@ -119,6 +121,9 @@ def receive_enrolled_test(run_id, packet, *, stream=None):
             or not re.fullmatch('[a-f0-9]{40}',str(enrollment['source_sha']))
             or not re.fullmatch('[a-f0-9]{64}',str(enrollment['manifest_sha256']))):
         raise RuntimeError('test_receiver_enrollment_invalid')
+    if bootstrap and (enrollment['source_origin_kind']!='independently-enrolled-historical-bootstrap-origin'
+            or not re.fullmatch('[a-f0-9]{64}',str(enrollment['source_origin_sha256']))):
+        raise RuntimeError('test_receiver_historical_origin_invalid')
     for key in ('receiver_id','source_guest_uuid','product_uuid','source_product_uuid','filesystem_uuid','backup_operation_id'):
         if str(uuid.UUID(enrollment[key]))!=enrollment[key]:raise RuntimeError('test_receiver_identity_invalid')
     if (Path('/etc/machine-id').read_text().strip()!=enrollment['machine_id']
@@ -132,6 +137,9 @@ def receive_enrolled_test(run_id, packet, *, stream=None):
     value=packet['payload']
     try:Ed25519PublicKey.from_public_bytes(base64.b64decode(enrollment['source_public_key'],validate=True)).verify(base64.b64decode(packet['signature'],validate=True),canonical(value))
     except Exception:raise RuntimeError('test_receiver_source_signature_invalid') from None
+    if bootstrap and (value.get('source_origin_kind')!=enrollment['source_origin_kind']
+            or value.get('source_origin_sha256')!=enrollment['source_origin_sha256']):
+        raise RuntimeError('test_receiver_historical_origin_changed')
     if (digest(value)!=enrollment['manifest_sha256']
             or value.get('operation')!='independent-synthetic-application-restoration'
             or value.get('operation_id')!=enrollment['backup_operation_id']

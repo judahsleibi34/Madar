@@ -70,6 +70,51 @@ def consume_restore_authority(root,authorization,*,continuation=False):
     return consumed
 
 
+def verify_release_context(app,enrollment):
+    """Root-enrolled exact source DATA, never fabricated prior completion.
+
+    The independent parent verifies the source issuer locally before pinning
+    this entire context in receiver enrollment and the signed backup manifest.
+    The receiver does not receive or claim possession of source issuer keys.
+    Ordinary completed-release restoration retains its original strict shape.
+    """
+    context=app['release_context'];kind='independently-enrolled-historical-bootstrap-origin'
+    if enrollment.get('version')!=2:
+        if (context.get('history',{}).get('system_identifier')!=app['database_system_identifier']
+                or context['history'].get('schema')!=app['schema']
+                or any(not re.fullmatch('[a-f0-9]{64}',str(context.get(k))) for k in
+                    ('admission_sha256','plan_sha256','completion_sha256','recovery_manifest_sha256'))):
+            raise RuntimeError('offhost_test_release_context_invalid')
+        return 'completed-release'
+    if (enrollment.get('source_origin_kind')!=kind or context.get('kind')!=kind
+            or digest(context)!=enrollment.get('source_origin_sha256')
+            or set(context)!={'kind','source_binding','request_record','enrollment_record','history'}):
+        raise RuntimeError('offhost_test_historical_context_unenrolled')
+    from deployment.lib.historical_origin import validate_source_binding
+    binding=context['source_binding'];path=validate_source_binding(binding)
+    request=context['request_record'];receipt=context['enrollment_record']
+    if (not isinstance(request,dict) or not isinstance(receipt,dict)
+            or set(request)!={'payload','signature'} or set(receipt)!={'payload','signature'}):
+        raise RuntimeError('offhost_test_historical_record_invalid')
+    request=request['payload'];receipt=receipt['payload'];observed=request.get('observation',{})
+    history=context['history']
+    if (request.get('kind')!=kind or receipt.get('kind')!=kind
+            or request.get('request_id')!=path.name or receipt.get('request_id')!=path.name
+            or digest(receipt)!=binding['enrollment_sha256'] or receipt.get('request_sha256')!=digest(request)
+            or receipt.get('policy_sha256')!=request.get('policy_sha256')
+            or receipt.get('observation_sha256')!=digest(observed)
+            or receipt.get('successor_intent_sha256')!=binding['successor_intent_sha256']
+            or receipt.get('protected_completion_claimed') is not False or receipt.get('migration_authority_issued') is not False
+            or type(receipt.get('expires_at')) is not int or not time.time()<enrollment['expires_at']<=receipt['expires_at']
+            or observed.get('source_sha')!=binding['application_sha'] or app['source_sha']!=binding['application_sha']
+            or observed.get('controller_sha')!=binding['controller_sha']
+            or observed.get('database')!=history or history.get('system_identifier')!=app['database_system_identifier']
+            or type(app['schema']) is not int or app['schema']!=146 or history.get('schema')!=146
+            or observed.get('legacy_protocols')!={'delivery':1,'outbox':1,'deletion':0,'native_successor_function_absence_verified':True}):
+        raise RuntimeError('offhost_test_historical_source_changed')
+    return kind
+
+
 def restore(run_id,*,continuation=False):
     global DIAGNOSTIC_ROOT
     root,enrollment=root_for(run_id);DIAGNOSTIC_ROOT=root
@@ -86,10 +131,7 @@ def restore(run_id,*,continuation=False):
             or set(app['containers'])!=set(ROLE_BUDGET) or app['slot'] not in {'blue','green'}
             or not re.fullmatch('[a-f0-9]{64}',str(app['source_poweroff_sha256']))):
         raise RuntimeError('offhost_test_application_contract_invalid')
-    context=app['release_context']
-    if (context.get('history',{}).get('system_identifier')!=app['database_system_identifier'] or context['history'].get('schema')!=app['schema']
-            or any(not re.fullmatch('[a-f0-9]{64}',str(context.get(k))) for k in ('admission_sha256','plan_sha256','completion_sha256','recovery_manifest_sha256'))):
-        raise RuntimeError('offhost_test_release_context_invalid')
+    origin_kind=verify_release_context(app,enrollment)
     # The independent parent publishes this only after the exact source QEMU
     # process has exited. Candidate code cannot publish a receiver root receipt.
     stopped=strict_json(protected(root/'source-powered-off.json',private=True).read_bytes())
@@ -275,11 +317,16 @@ with psycopg.connect(host='database',dbname='postgres',user='supabase_admin',pas
    value=db.execute(query,prepare=True).fetchone()[0]
    raw='' if value is None else str(value).strip()
    assert hashlib.sha256(raw.encode()).hexdigest()==record['sha256'], 'restored_fingerprint_changed:'+label
-  protocols=db.execute('SELECT public.notification_delivery_protocol(),public.notification_outbox_protocol(),public.data_deletion_ownership_protocol()').fetchone()
-  assert protocols==(2,2,2), 'restored_protocols_changed'
+  if p['origin_kind']=='independently-enrolled-historical-bootstrap-origin':
+   absent=db.execute("SELECT to_regprocedure('public.notification_delivery_protocol()') IS NULL,to_regprocedure('public.notification_outbox_protocol()') IS NULL,to_regprocedure('public.data_deletion_ownership_protocol()') IS NULL").fetchone()
+   assert absent==(True,True,True) and identity[1]==146, 'restored_historical_protocol_history_changed'
+   protocols=(1,1,0)
+  else:
+   protocols=db.execute('SELECT public.notification_delivery_protocol(),public.notification_outbox_protocol(),public.data_deletion_ownership_protocol()').fetchone()
+   assert protocols==(2,2,2), 'restored_protocols_changed'
 print(json.dumps({'system_identifier':identity[0],'schema':identity[1],'protocols':list(protocols),'fingerprints':len(p['fingerprints']),'read_only':True,'single_statement_prepared_observation':True}))
 """
-        payload={'password':password[0],'fingerprints':app['fingerprints'],'schema':app['schema'],'system_identifier':app['database_system_identifier']}
+        payload={'password':password[0],'fingerprints':app['fingerprints'],'schema':app['schema'],'system_identifier':app['database_system_identifier'],'origin_kind':origin_kind}
         tool='sha256:3b7e1b0cd406712c50cfbc777c97a0188c9d0239b6a79c53a28862e4278b2dca'
         observed=command(['docker','run','--rm','-i','--name','madar-recovery-'+enrollment['receiver_id'][:12]+'-observe',
             '--label','com.madar.test.receiver='+enrollment['receiver_id'],'--network',network,'--dns','127.0.0.1',

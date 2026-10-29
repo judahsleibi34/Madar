@@ -2435,3 +2435,10 @@ authority from a completed origin grant. The former requires the exact signed
 enrollment digest, actual ungoverned historical runtime configuration and no
 fabricated grant file or mount; the ordinary completed grant checks remain
 mandatory. This source preparation support does not authorize maintenance.
+
+Physical test restoration accepts a separately root-enrolled v2 historical
+source context only when the exact locally verified source enrollment DATA is
+pinned in both receiver policy and authenticated backup manifest. No source
+issuer key is copied. Historical146 requires native absence of successor
+protocol functions, not a numeric schema allowlist or fabricated completion.
+Ordinary receiver/completed-release and production contracts are unchanged.

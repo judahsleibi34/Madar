@@ -74,3 +74,39 @@ class ProviderOwnershipTests(unittest.TestCase):
         for user in ('node','1000','0:root','-1:0','2147483648:0'):
             with self.subTest(user=user),self.assertRaisesRegex(RuntimeError,'requires_review'):
                 receiver.storage_identity({'User':user})
+
+
+class HistoricalSourceContextTests(unittest.TestCase):
+    def setUp(self):
+        import time,uuid
+        from deployment.lib.migration_inventory import digest
+        from deployment.lib.historical_origin import KIND
+        self.kind=KIND;self.digest=digest;request_id=str(uuid.uuid4())
+        binding={'origin_kind':KIND,'enrollment_root':'/var/lib/madar-control-plane/upgrades/automatic-admissions/historical-origins/'+request_id,'enrollment_sha256':'0'*64,'application_sha':'a'*40,'controller_sha':'b'*40,'schema':146,'successor_intent_sha256':'c'*64}
+        history={'schema':146,'system_identifier':'123456789'}
+        observed={'source_sha':'a'*40,'controller_sha':'b'*40,'database':history,'legacy_protocols':{'delivery':1,'outbox':1,'deletion':0,'native_successor_function_absence_verified':True}}
+        request={'kind':KIND,'request_id':request_id,'observation':observed,'policy_sha256':'d'*64}
+        receipt={'kind':KIND,'request_id':request_id,'request_sha256':digest(request),'policy_sha256':'d'*64,'observation_sha256':digest(observed),'successor_intent_sha256':'c'*64,'protected_completion_claimed':False,'migration_authority_issued':False,'expires_at':int(time.time())+3600}
+        binding['enrollment_sha256']=digest(receipt)
+        self.context={'kind':KIND,'source_binding':binding,'request_record':{'payload':request,'signature':'root-parent-verified-source-data'},'enrollment_record':{'payload':receipt,'signature':'root-parent-verified-source-data'},'history':history}
+        self.app={'release_context':self.context,'schema':146,'source_sha':'a'*40,'database_system_identifier':'123456789'}
+        self.enrollment={'version':2,'source_origin_kind':KIND,'source_origin_sha256':digest(self.context),'expires_at':int(time.time())+600}
+    def test_independently_pinned_bootstrap_requires_no_fabricated_completion(self):
+        self.assertEqual(receiver.verify_release_context(self.app,self.enrollment),self.kind)
+    def test_unenrolled_or_changed_origin_refuses(self):
+        import copy
+        for field,value in [('source_origin_sha256','f'*64),('source_origin_kind','completed-release'),('version',1)]:
+            changed=dict(self.enrollment,**{field:value})
+            with self.assertRaises(RuntimeError):receiver.verify_release_context(self.app,changed)
+        for field,value in [('source_sha','f'*40),('schema',160),('database_system_identifier','9999999')]:
+            with self.assertRaises(RuntimeError):receiver.verify_release_context(dict(self.app,**{field:value}),self.enrollment)
+    def test_root_pin_is_mandatory_even_for_a_well_formed_enrollment_record(self):
+        self.context['enrollment_record']['signature']='substituted'
+        with self.assertRaisesRegex(RuntimeError,'context_unenrolled'):receiver.verify_release_context(self.app,self.enrollment)
+    def test_bootstrap_cannot_claim_completed_or_migration_authority(self):
+        import copy
+        for field in ('protected_completion_claimed','migration_authority_issued'):
+            app=copy.deepcopy(self.app);record=app['release_context']['enrollment_record']['payload'];record[field]=True
+            app['release_context']['source_binding']['enrollment_sha256']=self.digest(record)
+            enrollment=dict(self.enrollment,source_origin_sha256=self.digest(app['release_context']))
+            with self.assertRaisesRegex(RuntimeError,'source_changed'):receiver.verify_release_context(app,enrollment)
