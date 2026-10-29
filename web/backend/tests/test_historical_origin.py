@@ -304,3 +304,22 @@ class IndependentOperatorScopeTests(unittest.TestCase):
         for sid in ['123456789','987654321']:
             self.native.return_value=canonical(['operators',sid])
             with self.assertRaisesRegex(RuntimeError,'database_not_independent'):self.observe()
+
+
+class HistoricalBootstrapDataTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp=tempfile.TemporaryDirectory(dir=Path.cwd());self.addCleanup(self.tmp.cleanup)
+        self.path=Path(self.tmp.name)/'original-bootstrap.json'
+        self.value={'phase':'bootstrap_adopted','status':'known_good','schema':{'observed':146}}
+        self.path.write_bytes(canonical(self.value));self.path.chmod(0o600)
+    def test_real_operator_owned_record_is_data_without_root_receipt_reclassification(self):
+        self.assertEqual(origin.bootstrap_record(self.path),self.value)
+    def test_shared_bootstrap_record_refuses(self):
+        self.path.chmod(0o644)
+        with self.assertRaisesRegex(RuntimeError,'bootstrap_data_untrusted'):origin.bootstrap_record(self.path)
+    def test_symlink_bootstrap_refuses(self):
+        link=self.path.with_name('link.json');link.symlink_to(self.path)
+        with self.assertRaises(OSError):origin.bootstrap_record(link)
+    def test_unbounded_original_record_refuses(self):
+        self.path.write_bytes(b' '*65537)
+        with self.assertRaisesRegex(RuntimeError,'bootstrap_data_untrusted'):origin.bootstrap_record(self.path)

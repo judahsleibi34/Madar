@@ -4462,3 +4462,9 @@ transport and a native PostgreSQL system identifier distinct from the origin
 and production. It remains in the full runtime inventory; it cannot be hidden
 behind a broad writer-name exclusion. Legacy origin successor-protocol function
 absence is observed natively rather than inferred solely from schema146.
+
+Historical bootstrap adoption records are operator-owned original lifecycle DATA,
+read through a separate bounded, private, nonsymlink path check. Only native
+verification and an independently pinned root-policy digest can enroll them.
+This does not relax root-only trust for signed enrollment, authorization or
+protected completion records, and issues no migration authority.

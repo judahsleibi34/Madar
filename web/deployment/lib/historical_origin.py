@@ -21,6 +21,33 @@ ROLES=('backend','frontend','redis','parser-worker','remote-ingestion-worker',
        'notification-worker','calendar-sync-worker','data-deletion-worker')
 
 
+def bootstrap_record(path):
+    """Read original operator lifecycle DATA, never a trusted issuer receipt.
+
+    Historical bootstrap was written by the application operator. Its bytes
+    become useful only after live verification and independent root digest
+    pinning. Do not relax protected() for signed enrollments or completions.
+    """
+    import pwd, stat
+    path=Path(path);operator=pwd.getpwnam('madar').pw_uid
+    if not path.is_absolute():raise RuntimeError('historical_origin_bootstrap_path_invalid')
+    for item in path.parents:
+        metadata=item.lstat()
+        if (not stat.S_ISDIR(metadata.st_mode) or metadata.st_uid not in {0,operator}
+                or metadata.st_mode&0o002 or metadata.st_mode&0o020 and metadata.st_uid!=operator):
+            raise RuntimeError('historical_origin_bootstrap_parent_untrusted')
+    descriptor=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+    try:
+        metadata=os.fstat(descriptor)
+        if (not stat.S_ISREG(metadata.st_mode) or metadata.st_uid not in {0,operator}
+                or metadata.st_mode&0o077 or not 0<metadata.st_size<=65536):
+            raise RuntimeError('historical_origin_bootstrap_data_untrusted')
+        with os.fdopen(descriptor,'rb',closefd=False) as stream:body=stream.read(65537)
+        if len(body)!=metadata.st_size:raise RuntimeError('historical_origin_bootstrap_data_changed')
+        return strict_json(body)
+    finally:os.close(descriptor)
+
+
 def preservation_roots(db):
     """Bounded native READ ONLY snapshot; customer values never leave as text.
 
@@ -162,7 +189,7 @@ def observe(system,p,environment):
             or known.get('schema_compatible_min')!=144 or known.get('schema_compatible_max')!=146
             or 'completed_normal_upgrade' in known):
         raise RuntimeError('historical_origin_running146_required')
-    bootstrap=strict_json(protected(system.state_root/'origin-bootstrap-adopted.json',private=True).read_bytes())
+    bootstrap=bootstrap_record(system.state_root/'origin-bootstrap-adopted.json')
     if (bootstrap not in state.get('history',[]) or bootstrap.get('phase')!='bootstrap_adopted'
             or bootstrap.get('status')!='known_good' or bootstrap.get('release_sha')!=p['source_sha']
             or bootstrap.get('candidate_slot')!=known['slot'] or bootstrap.get('traffic_target')!=known['slot']
