@@ -161,6 +161,9 @@ class LockedMigrationExecutor:
         migration_guard: Callable[[Any, Migration], None] | None = None,
         completion_guard: Callable[[Any], None] | None = None,
         expected_origin: int | None = None,
+        transaction_guard: Callable[[Any, Migration], None] | None = None,
+        boundary_guard: Callable[[Any, Migration], None] | None = None,
+        exceptional_contract: dict | None = None,
     ):
         self.connection_factory = connection_factory
         self.manifest = manifest
@@ -177,6 +180,16 @@ class LockedMigrationExecutor:
         if expected_origin is not None and (type(expected_origin) is not int or not manifest.accepts_schema(expected_origin)):
             raise RuntimeError('migration_expected_origin_invalid')
         self.expected_origin = expected_origin
+        if transaction_guard is not None and not callable(transaction_guard):
+            raise RuntimeError('migration_transaction_guard_invalid')
+        self.transaction_guard = transaction_guard
+        if exceptional_contract is not None and (not manifest.coordinated or transaction_guard is None
+                or len(manifest.migrations)!=1 or manifest.migrations[0].compatibility!='forward-compatible'):
+            raise RuntimeError('migration_exceptional_contract_requires_coordinated_guard')
+        self.exceptional_contract = exceptional_contract
+        if boundary_guard is not None and not callable(boundary_guard):
+            raise RuntimeError('migration_boundary_guard_invalid')
+        self.boundary_guard = boundary_guard
 
     @staticmethod
     def _schema(cursor: Any) -> int:
@@ -287,10 +300,33 @@ class LockedMigrationExecutor:
                     state["phase"] = f"migration_{migration.number}"
                     state["migrations"].append(record)
                     atomic_json(self.state_file, state)
-                    cursor.execute(statement)
+                    if self.transaction_guard is None:
+                        cursor.execute(statement)
+                    else:
+                        # Only audited automatic envelopes use this hook. Parse
+                        # PostgreSQL statement boundaries, never split on ';'
+                        # inside dollar-quoted guards. Locks/measurements taken
+                        # here survive until the original authenticated COMMIT.
+                        from .migration_risk import analyze
+                        from pglast import parser
+                        risk=analyze(statement.encode(),origin=migration.from_schema,target=migration.to_schema)
+                        allowed=risk.classification in {'A','B'}
+                        if not allowed and self.exceptional_contract is not None:
+                            from .exceptional_release_approval import supported
+                            allowed=supported(statement.encode(),origin=migration.from_schema,target=migration.to_schema)==self.exceptional_contract
+                        if not allowed or not risk.schema_envelope_verified:
+                            raise RuntimeError('migration_guarded_transaction_envelope_required')
+                        rows=json.loads(parser.parse_sql_json(statement))['stmts']
+                        end=rows[0].get('stmt_location',0)+rows[0]['stmt_len']
+                        raw=statement.encode('utf-8')
+                        cursor.execute(raw[:end].decode('utf-8'))
+                        self.transaction_guard(cursor,migration)
+                        cursor.execute(raw[end:].decode('utf-8'))
                     current = self._schema(cursor)
                     if current != migration.to_schema:
                         raise RuntimeError(f"migration_schema_not_advanced:{migration.number}")
+                    if self.boundary_guard is not None:
+                        self.boundary_guard(cursor,migration)
                     record.update(status="applied", completed_at=utc_now())
                     state["observed_schema"] = current
                     atomic_json(self.state_file, state)

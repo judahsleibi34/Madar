@@ -13,7 +13,7 @@ WEB=Path(os.getenv('MADAR_TEST_REPOSITORY_ROOT') or Path(__file__).resolve().par
 sys.path.insert(0,str(WEB))
 from deployment.lib import completed_normal_runtime as m
 from deployment.lib.completed_normal_admission import digest
-from deployment.lib.completed_normal_resources import allocation,ROLES
+from deployment.lib.completed_normal_resources import allocation,ROLES,candidate_roles
 from test_completed_normal_admission import fixture_contract
 from test_completed_normal_manual_profile import manual_contract
 
@@ -53,11 +53,13 @@ class RuntimeModelTests(unittest.TestCase):
         fixture=self
         class Runtime:
             def budget(_,maximum):return maximum
-            def inspect(_,names):return {name:fixture.rows[name] for name in names if name in fixture.rows}
+            def inspect(_,names):
+                return {row['Name'].lstrip('/'):row for row in fixture.rows.values()
+                    if row['Name'].lstrip('/') in names or row['Id'] in names}
             def command(_,args):
                 if args[:3]==['docker','image','inspect']:return json.dumps([fixture.images[args[3]]])
                 if args[:3]==['docker','network','inspect']:return json.dumps([{'Id':'network-id','Name':args[3],
-                    'Driver':'bridge','Internal':True,'IPAM':{'Config':[{'Subnet':'10.249.4.0/24','Gateway':'10.249.4.1'}]}}])
+                    'Driver':'bridge','Internal':args[3]!='madar-local-supabase_default','IPAM':{'Config':[{'Subnet':'10.249.4.0/24','Gateway':'10.249.4.1'}]}}])
                 raise AssertionError(args)
         self.runtime=Runtime()
     def validate(self):return m.validate_model(self.contract,self.model,self.runtime)
@@ -89,6 +91,54 @@ class RuntimeModelTests(unittest.TestCase):
                 row['Config']['Env']=['PATH=/fixture',*(k+'='+v for k,v in service['environment'].items())]
             rows[name]=row
         self.rows=rows
+        if self.contract.get('operation')=='completed-normal-schema146-160-coordinated-release':
+            from test_schema160_private_parser import parser_row,gateway_row
+            scope={'context_sha256':digest(self.contract),'source_sha':self.contract['candidate']['source_sha']}
+            old=self.rows[self.selected['containers']['parser-worker']]
+            row=parser_row(scope,name=old['Name'].lstrip('/'),identifier=old['Id'])
+            row['Image']=old['Image'];row['Config']['Labels'].update(old['Config']['Labels'])
+            row['Config']['Entrypoint']=[]
+            row['Config']['Healthcheck']=old['Config']['Healthcheck']
+            row['State']=old['State'];row['Config']['Env'][3]='PATH=/fixture'
+            self.rows[row['Name'].lstrip('/')]=row
+            network=self.selected['networks']['parser']
+            endpoint=row['NetworkSettings']['Networks'][network]
+            endpoint.update(NetworkID='network-id',IPAddress='10.249.4.2',Aliases=[row['Name'].lstrip('/'),'parser-worker'])
+            self.model['networks']['parser_internal']={'name':network,'internal':True,
+                'ipam':{'config':[{'subnet':'10.249.4.0/24'}]}}
+            service=self.model['services']['parser-worker']
+            service.update(user='65534:65534',working_dir='/app',entrypoint=[],command=row['Config']['Cmd'],
+                environment={k:v for k,v in m._environment(row['Config']['Env']).items() if k!='PATH'},
+                mem_limit=768*1024*1024,cpus=.75,pids_limit=64,
+                tmpfs=['/tmp:rw,noexec,nosuid,size=256m,uid=65534,gid=65534'],networks={'parser_internal':{}},
+                volumes=[{'type':'bind','source':'/synthetic-owned/private_uploads',
+                    'target':'/app/private_uploads','read_only':True}])
+            gateway=gateway_row(scope);name=self.selected['containers']['provider-gateway']
+            gateway.update(Name='/'+name,Image=self.contract['candidate']['images']['frontend'])
+            gateway['Config'].update(Env=['PATH=/fixture'],WorkingDir='/app',
+                Healthcheck={'Test':['CMD','true'],'Interval':1_000_000_000})
+            gateway['Config']['Labels'].update({'com.docker.compose.service':'provider-gateway',
+                'com.docker.compose.project':self.selected['project']})
+            gateway['State']={'Running':True,'Restarting':False,'Status':'running','Health':{'Status':'healthy'}}
+            for endpoint in gateway['NetworkSettings']['Networks'].values():
+                endpoint.update(NetworkID='network-id',IPAddress='10.249.4.2',Aliases=[name,'provider-gateway'])
+            self.rows[name]=gateway
+            self.model['networks'].update(provider_native={'name':'madar-local-supabase_default','external':True},
+                supabase_client={'name':'madar-supabase-client','external':True})
+            self.model['services']['provider-gateway']={'container_name':name,'restart':'no',
+                'environment':{},'volumes':[],'networks':{'provider_native':{},'supabase_client':{}},
+                'user':'nginx','entrypoint':['nginx'],'command':gateway['Config']['Cmd'],'working_dir':'/app',
+                'mem_limit':128*1024**2,'cpus':.25,'pids_limit':64,'init':True,
+                'tmpfs':['/tmp:rw,noexec,nosuid,size=16m,mode=1777'],
+                'healthcheck':{'test':['CMD','true'],'interval':'1s'}}
+            backend=self.model['services']['backend'];backend['networks']['supabase_client']={}
+            backend['environment'].update(SUPABASE_URL='http://'+name+':8000',
+                MADAR_CALENDAR_DATABASE_DSN='postgresql://authenticator:synthetic@'+name+':5432/postgres?sslmode=disable',
+                MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER=self.contract['database']['system_identifier'])
+            actual=self.rows[self.selected['containers']['backend']]
+            actual['Config']['Env']=['PATH=/fixture',*(k+'='+v for k,v in backend['environment'].items())]
+            actual['NetworkSettings']['Networks']['madar-supabase-client']={'NetworkID':'network-id','IPAddress':'10.249.4.2',
+                'Aliases':[self.selected['containers']['backend'],'backend']}
 
     def test_manual_profile_accepts_exact_136_144_excluding_142(self):
         self.use_manual_contract();self.validate()
@@ -252,7 +302,7 @@ class RuntimeModelTests(unittest.TestCase):
             proof=m.seal_candidate_stage(self.contract,source_guard=lambda:None,model_loader=lambda:self.model,
                 runtime=self.runtime,state_root=root,admissions=admissions)
             self.assertEqual(proof['preparation_mode'],'created-fenced')
-            self.assertEqual(set(proof['runtimes']),set(ROLES))
+            self.assertEqual(set(proof['runtimes']),set(candidate_roles(self.contract)))
             self.assertEqual(json.loads((context/'candidate-staged-runtime.json').read_text()),proof)
             authority.assert_called()
             with self.assertRaises(FileExistsError):
@@ -294,6 +344,65 @@ class RuntimeModelTests(unittest.TestCase):
                     state_root=directory,admissions=Path(directory))
             self.assertEqual(list(Path(directory).iterdir()),[])
             lock.assert_not_called()
+
+    def test_canonical_parser_cannot_be_redefined_as_a_consumer_in_the_approved_model(self):
+        from test_schema160_release import reconciled_contract
+        self.use_manual_contract(reconciled_contract(),preparation150=True)
+        for row in self.rows.values():
+            row['State']={'Running':False,'Restarting':False,'Status':'created'}
+            for endpoint in row['NetworkSettings']['Networks'].values():endpoint.update(NetworkID='',IPAddress='',EndpointID='')
+        service=self.model['services']['parser-worker'];row=self.rows[self.selected['containers']['parser-worker']]
+        service['environment']['SUPABASE_SERVICE_KEY']='synthetic-forbidden'
+        row['Config']['Env'].append('SUPABASE_SERVICE_KEY=synthetic-forbidden')
+        with self.assertRaisesRegex(RuntimeError,'private_parser_configuration_invalid'):
+            m.validate_model(self.contract,self.model,self.runtime,phase='provisional')
+
+    def test_canonical_parser_requires_internal_network_even_if_model_and_daemon_agree_on_egress(self):
+        from test_schema160_release import reconciled_contract
+        self.use_manual_contract(reconciled_contract(),preparation150=True)
+        self.model['networks']['parser_internal']['internal']=False
+        original=self.runtime.command
+        def command(args):
+            result=original(args)
+            if args[:3]==['docker','network','inspect'] and args[3]==self.selected['networks']['parser']:
+                values=json.loads(result);values[0]['Internal']=False;return json.dumps(values)
+            return result
+        self.runtime.command=command
+        with self.assertRaisesRegex(RuntimeError,'private_parser_network_invalid'):
+            m.validate_model(self.contract,self.model,self.runtime,phase='provisional')
+
+    def test_canonical_created_seals_survive_native_oom_defaults_for_all_started_roles(self):
+        from test_schema160_release import reconciled_contract
+        from deployment.lib.completed_normal_resources import verify_runtime_resources,measured_spec
+        self.use_manual_contract(reconciled_contract(),preparation150=True)
+        for item in self.rows.values():
+            item['State']['Status']='running';item['HostConfig']['OomKillDisable']=False
+        publication={'context_sha256':digest(self.contract),'source_sha':self.contract['candidate']['source_sha'],
+            'images':self.contract['candidate']['images'],'runtimes':{},
+            'networks':{value['name']:'network-id' for value in self.model['networks'].values()}}
+        for role in candidate_roles(self.contract):
+            item=self.rows[self.selected['containers'][role]];networks=item['NetworkSettings']['Networks']
+            publication['runtimes'][role]={'id':item['Id'],'image':item['Image'],'spec_sha256':measured_spec(item),
+                'networks':{k:v['NetworkID'] for k,v in networks.items()},
+                'network_aliases':{k:v['Aliases'] for k,v in networks.items()}}
+        # Observed on the real Docker engine: CREATED false becomes running
+        # null. No configured true value or other field can be normalized.
+        for item in self.rows.values():item['HostConfig']['OomKillDisable']=None
+        verify_runtime_resources(self.contract,publication,self.runtime)
+        for row in self.rows.values():
+            row['HostConfig']['OomKillDisable']=True
+            with self.subTest(role=row['Name']),self.assertRaisesRegex(RuntimeError,'identity_changed'):
+                verify_runtime_resources(self.contract,publication,self.runtime)
+            row['HostConfig']['OomKillDisable']=None;row['HostConfig']['Memory']+=1
+            with self.assertRaisesRegex(RuntimeError,'identity_changed'):
+                verify_runtime_resources(self.contract,publication,self.runtime)
+            row['HostConfig']['Memory']-=1
+        from deployment.lib.completed_normal_profile import DELETION
+        self.contract['operation']=DELETION.operation
+        publication['context_sha256']=digest(self.contract)
+        publication['runtimes'].pop('provider-gateway')
+        with self.assertRaisesRegex(RuntimeError,'identity_changed'):
+            verify_runtime_resources(self.contract,publication,self.runtime)
 
     def test_exact160_normal_seal_requires_handoff_and_retains_accepted_container_ids(self):
         """Actual model comparison/publication; authority and ownership modeled."""

@@ -1,5 +1,50 @@
 # Dedicated native integration staging
 
+## Private canonical160 transport on synthetic schema146
+
+`private_provider_transport.py` runs only in an otherwise empty disposable
+guest, not in the accepted staging application. It requires an expiring,
+root-owned mode0600 `/etc/madar-disposable-test.json` matching its measured DMI
+UUID, with `disposable: true`, `production_authority: false`, and `expires_at`
+(UTC ISO8601), plus an active `codex-test-isolation.service`. Provision and
+independently bound the guest lifetime before running it. The marker grants no
+release or write authority. The canonical repository must be at the exact SHA;
+download its authenticated CI artifact package to
+`/opt/madar-development/evidence/integration/artifacts-<first12-of-SHA>`.
+
+```bash
+python3 web/staging/integration/private_provider_transport.py \
+  --source-sha <exact-40-character-commit> \
+  --guest-uuid <owned-disposable-guest-DMI-UUID> \
+  --artifacts /opt/madar-development/evidence/integration/artifacts-<first12-of-SHA>
+```
+
+The fixture initializes only an empty, marked schema146 database from captured
+Git SQL. It never executes migrations147–160. Real Auth/REST/Storage, Redis,
+parser, backend and the accepted frontend image's private gateway have bounded
+resources and no published host ports. PostgreSQL is reachable from the backend
+only through that gateway. Synthetic login, TOTP/AAL2, token rotation, private
+object bytes/anonymous denial, REST, calendar grants and wrong-cluster refusal
+are tested inside the accepted backend image. The actual gateway runtime must
+also pass the controller's strict configuration verifier.
+
+The fixture also creates two designated tenant/account/private-object fixtures,
+then exercises the source-owned installed observer's actual account probes and
+PostgreSQL material digest before and after restarting the native providers.
+The same original passwords, verified factors, relationships and private bytes
+must survive; the backend must regain private gateway/calendar connectivity.
+Native addresses are measured again after restart. Its compact receipt binds
+the harness/observer bytes separately from the accepted application image SHA.
+
+Every exit unwinds owned containers, networks and disposable data volumes,
+including ordinary termination signals. Failure logs are private; compact
+receipts distinguish this connectivity fixture from a protected upgrade.
+Imported/pinned images are explicitly retained only within the expiring guest
+for reuse; the provisioning owner must remove its disk after testing. SIGKILL
+or guest loss relies on that independent host watchdog and teardown. No result
+from this fixture establishes original-state migration preservation, independent
+recovery, write handoff, public activation or schema160 operational admission.
+
 This separate harness runs **only on `madar-staging`** and never reads production
 environment files. It uses native GoTrue, PostgREST and Storage with PostgreSQL17,
 Redis and the candidate API/notification worker. It is distinct from the retained
@@ -139,3 +184,11 @@ API/worker. Run smoke.py and worker_recovery.py against the actual native provid
 Restore evidence reads the observed schema instead of a hardcoded146. A fresh
 `prepare`/`schema` initializes to148 directly; production still requires its separate
 reviewed controller admission, maintenance/backup gates and approval.
+
+
+Retained staging repair and PostgREST capacity (2026-10-26): generated fixtures
+reserve256MiB for PostgREST after a retained128MiB instance was OOM-killed.
+A data-preserving repair records the exact container/image, memory/swap preimage
+and original DB/Auth/MFA/storage roots before starting that same instance.
+It neither resets data nor relabels historical source acceptance. Other workers
+should be observed for recovery before considering any restart.

@@ -15,6 +15,17 @@ NETWORK_KEYS = ('default','parser','remote_internal','remote_egress')
 PORTS = {'blue': {'backend':'8101','frontend':'3100','redis':'6383'},
          'green': {'backend':'8201','frontend':'3200','redis':'6382'}}
 
+def candidate_roles(contract):
+    """Deterministic inventory, not operation admission or start permission."""
+    from deployment.lib.completed_normal_profile import RECONCILED
+    return ROLES+('provider-gateway',) if contract.get('operation')==RECONCILED.operation else ROLES
+
+
+def candidate_image(contract,role):
+    if role not in candidate_roles(contract):raise RuntimeError('completed_normal_candidate_role_invalid')
+    return (contract['candidate']['redis_image'] if role=='redis' else
+        contract['candidate']['images']['frontend' if role in {'frontend','provider-gateway'} else 'backend'])
+
 def measured_spec(row):
     """New admission hashes bind mount objects independently of Docker order.
 
@@ -77,7 +88,7 @@ def allocation(contract,slot, *, preparation150=False):
     prefix='madar-schema'+str(selected.target)+'-'+digest(contract)[:16]
     resource=contract['resources'][slot]
     return {'prefix':prefix,'project':prefix+'-'+slot,
-            'containers':{r:prefix+'-'+slot+'-'+r for r in ROLES},
+            'containers':{r:prefix+'-'+slot+'-'+r for r in candidate_roles(contract)},
             'networks':{k:prefix+'-'+slot+'-'+k.replace('_','-') for k in NETWORK_KEYS},
             'ports':dict(PORTS[slot]),'subnets':dict(resource['subnets']),
             'retired_port_declarations':resource['retired_port_declarations']}
@@ -153,7 +164,7 @@ def verify_runtime_binding(contract,publication,runtime,state_root):
             or publication['operation']!=profile(contract).operation or publication['context_sha256']!=digest(contract)
             or publication['source_sha']!=contract['candidate']['source_sha']
             or publication['images']!=contract['candidate']['images']
-            or set(publication['runtimes'])!=set(ROLES) or len(publication['origin_workers'])!=3):
+            or set(publication['runtimes'])!=set(candidate_roles(contract)) or len(publication['origin_workers'])!=3):
         raise RuntimeError('compatible_boot_publication_changed')
     authority=load_worker_authority(state_root)
     if (authority is None or authority['owner']!='CANDIDATE'
@@ -176,19 +187,27 @@ def verify_runtime_resources(contract,publication,runtime):
     if (publication.get('context_sha256')!=digest(contract)
             or publication.get('source_sha')!=contract['candidate']['source_sha']
             or publication.get('images')!=contract['candidate']['images']
-            or set(publication.get('runtimes',{}))!=set(ROLES)):
+            or set(publication.get('runtimes',{}))!=set(candidate_roles(contract))):
         raise RuntimeError('compatible_boot_publication_changed')
     rows=runtime.inspect([p['id'] for p in publication['runtimes'].values()])
-    if len(rows)!=len(ROLES):raise RuntimeError('compatible_boot_inventory_changed')
+    if len(rows)!=len(candidate_roles(contract)):raise RuntimeError('compatible_boot_inventory_changed')
+    from deployment.lib.completed_normal_profile import RECONCILED
+    started_roles={'notification-worker','calendar-sync-worker','data-deletion-worker'}
+    if contract.get('operation')==RECONCILED.operation:
+        # Native Docker changes only its default OomKillDisable false to null
+        # on start. Canonical maintenance seals ALL roles while CREATED, unlike
+        # historical bridges whose core services are sealed already running.
+        # Preserve every other measured field and historical profile behavior.
+        started_roles.update(candidate_roles(contract))
     selected={}
     for kind,expected in publication['runtimes'].items():
         row=next((r for r in rows.values() if r['Id']==expected['id']),None)
         if (row is None or row['Image']!=expected['image'] or not measured_spec_matches(row,expected['spec_sha256'],
-                started_worker=kind in {'notification-worker','calendar-sync-worker','data-deletion-worker'}
+                started_worker=kind in started_roles
                     and row['State'].get('Status') in {'running','exited'})
                 or row['HostConfig']['RestartPolicy']['Name']!='no'):
             raise RuntimeError('compatible_boot_runtime_identity_changed')
-        image=contract['candidate']['redis_image'] if kind=='redis' else publication['images']['frontend' if kind=='frontend' else 'backend']
+        image=candidate_image(contract,kind)
         if row['Image']!=image:raise RuntimeError('compatible_boot_runtime_image_changed')
         attached=row['NetworkSettings']['Networks']
         if set(attached)!=set(expected['networks']):raise RuntimeError('compatible_boot_network_changed')

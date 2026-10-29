@@ -16,7 +16,7 @@ from pathlib import Path
 import re
 
 from deployment.lib.control_plane_upgrade_authorization import require_upgrade_authorization
-from deployment.lib.completed_normal_profile import profile, LEGACY, MANUAL, APPLICATION, COMMERCIAL, FENCED, OUTBOX, DELETION, RECONCILED
+from deployment.lib.completed_normal_profile import profile, maintenance_role, LEGACY, MANUAL, APPLICATION, COMMERCIAL, FENCED, OUTBOX, DELETION, RECONCILED
 
 OPERATION = "completed-normal-schema115-136-upgrade"
 ADMISSIONS = Path("/var/lib/madar-control-plane/upgrades/completed-normal-admissions")
@@ -101,16 +101,24 @@ def _validate_contract(value: dict, selected) -> None:
             for key in ('provider_maintenance_sha256','writer_inventory_sha256')):
         raise RuntimeError('schema149_provider_binding_invalid')
     roles = value["source_roles"]
+    bootstrap=(selected is RECONCILED and isinstance(roles,dict)
+        and roles.get('origin_kind')=='independently-enrolled-historical-bootstrap-origin')
     role_keys = ({'application_sha', 'controller_sha', 'completion_root', 'original_plan_sha256', 'completion_sha256'}
         if selected is LEGACY else {'application_sha', 'controller_sha', 'completion_root', 'completion_sha256', 'completed_compatible_upgrade', 'schema'})
+    if bootstrap:
+        from deployment.lib.historical_origin import SOURCE_FIELDS,validate_source_binding
+        role_keys=SOURCE_FIELDS
     if not isinstance(roles, dict) or set(roles) != role_keys:
         raise RuntimeError("completed_normal_admission_origin_invalid")
     from deployment.lib.active_recovery_resumption import ROOT
-    origin_root = Path(roles['completion_root'])
-    valid_root = (roles['completion_root'] == str(ROOT / roles['original_plan_sha256'])
-        if selected is LEGACY else origin_root.parent == ADMISSIONS
-        and re.fullmatch('[0-9a-f]{64}', origin_root.name)
-        and roles['completed_compatible_upgrade'] is True and type(roles['schema']) is int and roles['schema'] == selected.source)
+    if bootstrap:
+        origin_root=validate_source_binding(roles);valid_root=True
+    else:
+        origin_root = Path(roles['completion_root'])
+        valid_root = (roles['completion_root'] == str(ROOT / roles['original_plan_sha256'])
+            if selected is LEGACY else origin_root.parent == ADMISSIONS
+            and re.fullmatch('[0-9a-f]{64}', origin_root.name)
+            and roles['completed_compatible_upgrade'] is True and type(roles['schema']) is int and roles['schema'] == selected.source)
     if not valid_root:
         raise RuntimeError("completed_normal_admission_origin_invalid")
     origin, candidate, database = value["origin"], value["candidate"], value["database"]
@@ -122,10 +130,11 @@ def _validate_contract(value: dict, selected) -> None:
             or type(candidate["compatible_min"]) is not int or candidate["compatible_min"] != selected.minimum
             or type(candidate["compatible_max"]) is not int or candidate["compatible_max"] != selected.target
             or not isinstance(database, dict) or set(database) != {
-                "container_id", "image", "system_identifier", "schema", "spec_sha256", "network_name", "network_id", "backup_configuration_sha256"}
+                "container_id", "image", "system_identifier", "schema", "spec_sha256", "network_name", "network_id", "backup_configuration_sha256"} | ({'maintenance_role'} if selected is RECONCILED and 'maintenance_role' in database else set())
             or type(database["schema"]) is not int or database["schema"] != selected.source
             or not re.fullmatch(r"[0-9]+", str(database["system_identifier"]))):
         raise RuntimeError("completed_normal_admission_runtime_invalid")
+    maintenance_role(value)
     for images in (origin["images"], candidate["images"]):
         if not isinstance(images, dict) or set(images) != {"backend", "frontend"} or any(
                 not re.fullmatch(r"sha256:[0-9a-f]{64}", str(v)) for v in images.values()):
@@ -135,7 +144,8 @@ def _validate_contract(value: dict, selected) -> None:
     for sha in (roles["application_sha"], roles["controller_sha"], candidate["source_sha"], candidate["controller_sha"]):
         if not re.fullmatch(r"[0-9a-f]{40}", str(sha)):
             raise RuntimeError("completed_normal_admission_source_invalid")
-    hashes = [origin_root.name, roles["completion_sha256"], origin["worker_generation"], origin["write_contract_digest"],
+    hashes = ([roles['enrollment_sha256'],roles['successor_intent_sha256']] if bootstrap else
+              [origin_root.name,roles['completion_sha256']]) + [origin["worker_generation"], origin["write_contract_digest"],
               database["container_id"], value["migration_manifest_sha256"], value["rehearsal_sha256"], value["plan_sha256"],
               database['spec_sha256'], database['network_id'], database['backup_configuration_sha256'],
               value["provider_record_sha256"], candidate["controller_tree_sha256"],
@@ -147,17 +157,24 @@ def _validate_contract(value: dict, selected) -> None:
     files = value["historical_files"]
     if not isinstance(files, dict) or not files:
         raise RuntimeError("completed_normal_admission_history_missing")
-    names = HISTORICAL_NAMES if selected is LEGACY else COMPATIBLE_HISTORICAL_NAMES
+    names = ('bootstrap-origin-request.json','bootstrap-origin-consumed.json') if bootstrap else HISTORICAL_NAMES if selected is LEGACY else COMPATIBLE_HISTORICAL_NAMES
     required = {str(origin_root / name) for name in names}
     # These are historical protected records only, never arbitrary executable or
     # operator-selected paths. The retained provider record is checked separately.
     application_required = {str(origin_root / name) for name in APPLICATION_HISTORICAL_NAMES}
-    if set(files) != required and not (selected in (APPLICATION, COMMERCIAL, FENCED, OUTBOX, DELETION, RECONCILED) and set(files) == application_required):
+    if set(files) != required and not (not bootstrap and selected in (APPLICATION, COMMERCIAL, FENCED, OUTBOX, DELETION, RECONCILED) and set(files) == application_required):
         raise RuntimeError("completed_normal_admission_history_invalid")
     if selected in (COMMERCIAL,FENCED,OUTBOX,DELETION,RECONCILED):hashes.append(value["database_structure_sha256"])
     hashes.extend(files.values())
     if any(not re.fullmatch(r"[0-9a-f]{64}", str(v)) for v in hashes):
         raise RuntimeError("completed_normal_admission_digest_invalid")
+    if bootstrap:
+        from deployment.lib.historical_origin import successor_intent
+        from deployment.lib.migration_inventory import digest as intent_digest
+        if intent_digest(successor_intent(value))!=roles['successor_intent_sha256']:
+            raise RuntimeError('historical_origin_successor_scope_changed')
+        if origin['write_contract_digest']!=roles['enrollment_sha256']:
+            raise RuntimeError('historical_origin_authority_kind_changed')
     resources=value['resources']
     if not isinstance(resources,dict) or set(resources)!={'blue','green'}:
         raise RuntimeError('completed_normal_admission_resources_invalid')
@@ -228,6 +245,21 @@ def credential_witness(name: str, hash_key: str) -> dict:
 
 def verify_history(contract: dict, *, _visited=frozenset()) -> None:
     from deployment.lib.provider_recovery_runtime import protected, file_digest
+    if contract.get('source_roles',{}).get('origin_kind')=='independently-enrolled-historical-bootstrap-origin':
+        # Verify truthful original DATA, not a completion, grant or SQL approval.
+        # Operational validate_contract/profile admission remains mandatory at
+        # every effectful caller and still refuses unaccepted canonical160.
+        validate_provider_preparation(contract)
+        from deployment.lib.historical_origin import recorded_observation
+        observed=recorded_observation(contract['source_roles'])
+        for name,expected in contract['historical_files'].items():
+            if file_digest(protected(Path(name),private=True))!=expected:
+                raise RuntimeError('completed_normal_admission_historical_evidence_changed')
+        if (observed['database']['system_identifier']!=contract['database']['system_identifier']
+                or observed['database']['schema']!=146 or observed['known_good']['slot']!=contract['origin']['slot']
+                or observed['worker_authority']['generation']!=contract['origin']['worker_generation']):
+            raise RuntimeError('historical_origin_contract_observation_changed')
+        return
     for name, expected in contract["historical_files"].items():
         nonsecret_admission=(profile(contract) is not LEGACY and Path(name)==Path(contract['source_roles']['completion_root'])/'admission.json')
         if file_digest(protected(Path(name), private=not nonsecret_admission)) != expected:
@@ -423,7 +455,7 @@ def publish_admission(contract: dict, operations, state_root: Path, *, admission
             or not rows[0]["State"]["Running"] or rows[0]["State"].get("Health", {}).get("Status") != "healthy"):
         raise RuntimeError("completed_normal_admission_database_changed")
     result = operations.command("completed_normal_admission_database_schema", [
-        "docker", "exec", db["container_id"], "psql", "-XAt", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", "postgres",
+        "docker", "exec", db["container_id"], "psql", "-XAt", "-v", "ON_ERROR_STOP=1", "-U", maintenance_role(contract), "-d", "postgres",
         "-c", "BEGIN READ ONLY; SELECT system_identifier::text || ':' || schema_version::text FROM pg_control_system(), public.application_schema_state WHERE contract_key='core'; COMMIT;",
     ])
     # -q suppresses transaction tags on some client versions; accept neither

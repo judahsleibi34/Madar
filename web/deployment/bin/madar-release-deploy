@@ -41,6 +41,7 @@ from deployment.lib.migration_executor import (  # noqa: E402
     MigrationManifest,
 )
 from deployment.lib.runtime_authority import (  # noqa: E402
+    open_deployment_lock,
     load_worker_authority,
     runtime_mutation_lock,
     write_worker_authority,
@@ -234,7 +235,9 @@ class DockerGitOperations:
         ):
             raise RuntimeError("release_worktree_dirty")
         attached = subprocess.run(
-            ["git", "symbolic-ref", "-q", "HEAD"],
+            ["/usr/bin/git", "-c", "safe.directory=" + str(release_root),
+             "-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false",
+             "symbolic-ref", "-q", "HEAD"],
             cwd=release_root,
             check=False,
             stdout=subprocess.DEVNULL,
@@ -242,6 +245,8 @@ class DockerGitOperations:
         )
         if attached.returncode == 0:
             raise RuntimeError("release_worktree_not_detached")
+        if attached.returncode != 1:
+            raise RuntimeError("release_worktree_ref_observation_failed")
         self.release_root = release_root
 
     def _digest(self, tag: str) -> str:
@@ -616,12 +621,18 @@ class DockerGitOperations:
         admission = rendering if rendering is not None else getattr(self, "completed_normal_admission", None)
         if admission is not None:
             from deployment.lib.completed_normal_admission import ADMISSIONS, digest, require_admission, require_candidate_authority, validate_contract
-            if rendering is not None:validate_contract(rendering)
+            from deployment.lib.completed_normal_profile import RECONCILED
+            if rendering is not None and rendering.get('operation')==RECONCILED.operation:
+                from deployment.lib.completed_normal_admission import validate_provider_preparation
+                selected_profile=validate_provider_preparation(rendering)
+            elif rendering is not None:
+                validate_contract(rendering);selected_profile=profile(admission)
             elif require_admission(self.state_root, sha) != admission:
                 raise RuntimeError("completed_normal_admission_changed")
+            else:selected_profile=profile(admission)
             if (self.compatibility.schema_min != admission['candidate']['compatible_min']
                     or self.compatibility.schema_max != admission['candidate']['compatible_max']
-                    or self.compatibility.excluded_schemas != profile(admission).excluded):
+                    or self.compatibility.excluded_schemas != selected_profile.excluded):
                 # A historical115..136 admission cannot supply an authority
                 # mount or grant for a differently selected release contract.
                 raise RuntimeError('completed_normal_compatibility_changed')
@@ -630,14 +641,13 @@ class DockerGitOperations:
                            for key in ("backend", "frontend"))
                     or str(images.get("worker", "")).split("@", 1)[-1] != admission["candidate"]["images"]["backend"]):
                 raise RuntimeError("completed_normal_accepted_artifact_changed")
-            from deployment.lib.completed_normal_profile import RECONCILED
-            if profile(admission) is RECONCILED:
+            if selected_profile is RECONCILED:
                 env['MADAR_RELEASE_CONTROLLER_SHA']=admission['candidate']['controller_sha']
                 env['MADAR_RELEASE_MIGRATION_MANIFEST_SHA256']=admission['migration_manifest_sha256']
             context = digest(admission)
             if rendering is None:require_candidate_authority(admission)
             from deployment.lib.completed_normal_resources import allocation
-            selected = allocation(admission,slot)
+            selected = allocation(admission,slot,preparation150=rendering is not None and selected_profile is RECONCILED)
             env.update({
                 # Accepted artifacts are immutable inputs, including Redis.
                 # Do not resolve mutable tags again at the create boundary.
@@ -663,6 +673,14 @@ class DockerGitOperations:
                 "MADAR_ALLOCATION_REMOTE_INTERNAL_NETWORK":selected['networks']['remote_internal'],
                 "MADAR_ALLOCATION_REMOTE_EGRESS_NETWORK":selected['networks']['remote_egress'],
             })
+            if selected_profile is RECONCILED:
+                # Candidate-only URL; the original gateway/configuration is
+                # retained. Credentials and TLS choice remain protected inputs.
+                from deployment.lib.completed_normal_private_provider import require_calendar_environment
+                gateway=selected['containers']['provider-gateway']
+                env['SUPABASE_URL']='http://'+gateway+':8000'
+                require_calendar_environment(env,gateway_name=gateway,
+                    system_identifier=admission['database']['system_identifier'])
         return env
 
     def _supabase_client_files(self) -> list[str]:
@@ -710,7 +728,17 @@ class DockerGitOperations:
             files.extend(["-f", str(Path(override).resolve())])
         elif self.compose_file is None:
             files.extend(["-f", str(WEB_ROOT / "deployment" / "docker-compose.release.yml")])
+        # Installed subclasses may add independently sealed operational inputs.
+        # Keep the normal slot/network overlay when adding an authority mount.
+        for additional in self.additional_compose_files():
+            files.extend(["-f", str(additional)])
         files.extend(self._supabase_client_files())
+        contract=rendering or getattr(self,'completed_normal_admission',None)
+        from deployment.lib.completed_normal_profile import RECONCILED
+        if contract is not None and contract.get('operation')==RECONCILED.operation:
+            client=str(web/'precutover/docker-compose.supabase-client.yml')
+            if client not in files:files.extend(['-f',client])
+            files.extend(['-f',str(WEB_ROOT/'deployment/docker-compose.schema160-private-provider.yml')])
         if rendering is not None or getattr(self, "completed_normal_admission", None) is not None:
             files.extend(["-f", str(WEB_ROOT / "deployment/docker-compose.write-authority.yml")])
         profiles = ["--profile", "workers"]
@@ -719,12 +747,15 @@ class DockerGitOperations:
         project=f"{self.project_prefix}-{slot}"
         if rendering is not None or getattr(self,"completed_normal_admission",None) is not None:
             from deployment.lib.completed_normal_resources import allocation
-            project=allocation(rendering or self.completed_normal_admission,slot)['project']
+            project=allocation(contract,slot,preparation150=rendering is not None and contract.get('operation')==RECONCILED.operation)['project']
         self.run([
             "docker", "compose", "--project-name", project,
             "--project-directory", str(web), "--env-file", str(self.env_file),
             *files, *profiles, *args,
         ], cwd=web, env=self._environment(sha, slot, images, workers_active=workers_active))
+
+    def additional_compose_files(self) -> tuple[Path, ...]:
+        return ()
 
     def preflight(self, sha: str, slot: str, images: dict[str, str], schema: int) -> None:
         if self.release_root is None:
@@ -778,10 +809,10 @@ class DockerGitOperations:
             if maintenance_preparation(self):
                 self._maintenance_creation_guard(sha,slot)
                 self.verify_completed_normal_allocation(slot)
-                from deployment.lib.completed_normal_resources import ROLES
+                from deployment.lib.completed_normal_resources import candidate_roles
                 # No public health dependency: both ingress and original
                 # providers have already been fenced by the protected parent.
-                self._compose(sha,slot,images,'create','--no-build','--no-recreate',*ROLES,workers_active=True)
+                self._compose(sha,slot,images,'create','--no-build','--no-recreate',*candidate_roles(self.completed_normal_admission),workers_active=True)
                 return
             if self._loaded_serving_slot() == slot:
                 raise RuntimeError("runtime_mutation_target_is_serving")
@@ -836,16 +867,15 @@ class DockerGitOperations:
 
     def validate_created_candidate(self, sha: str, slot: str) -> None:
         """Observe creation only; the root model seal is required for acceptance."""
-        from deployment.lib.completed_normal_resources import allocation,ROLES
+        from deployment.lib.completed_normal_resources import allocation,candidate_roles,candidate_image
         from deployment.lib.emergency_routing_repair import Runtime
         contract=self._maintenance_creation_guard(sha,slot)
         selected=allocation(contract,slot,preparation150=True)
         rows=Runtime().inspect(list(selected['containers'].values()))
         if set(rows)!=set(selected['containers'].values()):raise RuntimeError('maintenance_preparation_incomplete')
-        for role in ROLES:
+        for role in candidate_roles(contract):
             row=rows[selected['containers'][role]]
-            expected=(contract['candidate']['redis_image'] if role=='redis'
-                else contract['candidate']['images']['frontend' if role=='frontend' else 'backend'])
+            expected=candidate_image(contract,role)
             if (row['Name']!='/'+selected['containers'][role] or row['Image']!=expected
                     or row['State'].get('Status')!='created' or row['State'].get('Running') is not False
                     or row['State'].get('Restarting') is not False
@@ -1606,7 +1636,7 @@ def plan_release_migrations(
         raise RuntimeError("candidate_migration_manifest_release_mismatch")
     source = manifest.migrations[0].from_schema
     target = manifest.migrations[-1].to_schema
-    if source != schema or target != compatibility.target_schema:
+    if target != compatibility.target_schema or schema not in {source, target}:
         raise RuntimeError("candidate_migration_path_mismatch")
     if not compatibility.schema_min <= source <= target <= compatibility.schema_max:
         raise RuntimeError("candidate_migration_bridge_range_invalid")
@@ -1615,13 +1645,18 @@ def plan_release_migrations(
         state_file=Path("/nonexistent/rehearsal-execution.json"),
         backup_dir=Path("/nonexistent"), backup_verifier=lambda _path: None,
     ).verify_migrations()
+    # A compatible application can be bootstrapped/replaced on an already
+    # migrated database. Authenticate the entire manifest first; never replay
+    # its committed SQL or reinterpret an intermediate schema as complete.
+    if schema == target:
+        return []
     return [[migration.from_schema, migration.to_schema] for migration in manifest.migrations]
 
 
 @contextmanager
 def deployment_lock(state_root: Path):
     state_root.mkdir(parents=True, exist_ok=True, mode=0o700)
-    with (state_root / "deploy.lock").open("a+", encoding="utf-8") as lock:
+    with open_deployment_lock(state_root / "deploy.lock") as lock:
         try:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as error:
@@ -1769,7 +1804,19 @@ def accept_maintenance_worker_owner(*,sha,slot,state_root,operations,record):
                 or operations.worker_ownership(known,{'sha':sha,'slot':slot})!='none'):
             raise RuntimeError('completed_maintenance_owner_not_quiescent')
         rows=verify_runtime_resources(contract,stage,runtime)
-        consumers=('parser-worker','remote-ingestion-worker','notification-worker','calendar-sync-worker','data-deletion-worker')
+        # Canonical160's parser is an independently sealed, credential-free
+        # private HTTP sidecar. The private handoff already accepted it; do not
+        # demand it be CREATED while backend parser readiness requires it live.
+        # Every actual consuming worker still must be CREATED and stopped.
+        parser=rows['parser-worker']['State']
+        if (parser.get('Running') is not True or parser.get('Restarting') is not False
+                or parser.get('Status')!='running' or parser.get('Health',{}).get('Status')!='healthy'):
+            raise RuntimeError('completed_maintenance_owner_parser_unready')
+        gateway=rows['provider-gateway']['State']
+        if (gateway.get('Running') is not True or gateway.get('Restarting') is not False
+                or gateway.get('Status')!='running' or gateway.get('Health',{}).get('Status')!='healthy'):
+            raise RuntimeError('completed_maintenance_owner_gateway_unready')
+        consumers=('remote-ingestion-worker','notification-worker','calendar-sync-worker','data-deletion-worker')
         if any(rows[k]['State'].get('Running') is not False or rows[k]['State'].get('Restarting') is not False
                 or rows[k]['State'].get('Status')!='created' for k in consumers):
             raise RuntimeError('completed_maintenance_owner_consumer_started')

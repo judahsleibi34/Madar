@@ -165,9 +165,8 @@ class ConcreteAdapterTests(unittest.TestCase):
         stack.enter_context(patch.object(retained, 'require_root_directory', lambda path: None))
         (data, scope), rows = fixture(candidates=candidates)
         if target==160:
-            from deployment.lib.completed_normal_profile import RECONCILED
-            scope=dict(scope,operation=RECONCILED.operation,target_schema=160)
-            data,scope=repin(data,scope)
+            from test_schema160_private_parser import canonical_parser
+            data,scope=canonical_parser(data,scope,rows)
         actor = adapter.Schema150ProviderAdapter.__new__(adapter.Schema150ProviderAdapter)
         actor.binding, actor.inventory, actor.root = scope, data, root
         actor.original_inventory=data
@@ -223,14 +222,14 @@ class ConcreteAdapterTests(unittest.TestCase):
                     ('id','image','spec_sha256','networks')},'network_aliases':{
                         k:v.get('Aliases') or [] for k,v in next(r for r in observed
                             if r['Id']==data['containers']['candidate:'+role]['id'])['NetworkSettings']['Networks'].items()}}
-                    for role in inventory.APP_ROLES},
+                    for role in (k.split(':',1)[1] for k in data['containers'] if k.startswith('candidate:'))},
                 'networks':{},'worker_generation':'f'*64,'origin_workers':[]}
             (root/'candidate-staged-runtime.json').write_text(json.dumps(candidate_stage))
             stack.enter_context(patch('deployment.lib.completed_normal_admission.credential_witness',return_value=copy.deepcopy(candidate_stage)))
         return actor, scope, preimage, journal
 
-    def candidate_extension(self, *, phase='fenced'):
-        actor,scope,preimage,journal=self.component(stage='fenced',candidates=True)
+    def candidate_extension(self, *, phase='fenced', target=150):
+        actor,scope,preimage,journal=self.component(stage='fenced',candidates=True,target=target)
         stage_path=actor.root/'candidate-staged-runtime.json'
         stage=json.loads(stage_path.read_text())
         stage['preparation_mode']='created-fenced'
@@ -269,6 +268,42 @@ class ConcreteAdapterTests(unittest.TestCase):
         self.assertEqual(actor.inventory['containers'],identities)
         actor.verify_candidate_stage()
         actor.runtime.command.assert_not_called()
+
+    def test_canonical_created_stage_derives_private_parser_without_mutating_original_inventory(self):
+        actor,scope,stage,_,_=self.candidate_extension(phase='private',target=160)
+        original=copy.deepcopy(actor.original_inventory)
+        actor._attest('private')
+        self.assertTrue(actor.inventory['containers']['candidate:parser-worker']['states']['private']['running'])
+        self.assertEqual(actor.original_inventory,original)
+        self.assertEqual(inventory.inventory_digest(original),scope['inventory_sha256'])
+        actor.inventory=copy.deepcopy(original)
+        actor._attest('private')
+        self.assertEqual(actor.verify_candidate_stage(phase='private'),stage)
+        actor.runtime.command.assert_not_called()
+
+    def test_canonical_private_core_keeps_created_seals_after_native_start_defaults_change(self):
+        from deployment.lib.completed_normal_resources import measured_spec
+        actor,scope,_,_=self.component(stage='private',candidates=True,target=160)
+        path=actor.root/'candidate-staged-runtime.json';stage=json.loads(path.read_text())
+        stage['preparation_mode']='created-fenced'
+        for logical,record in actor.inventory['containers'].items():
+            if not logical.startswith('candidate:'):continue
+            role=logical.split(':',1)[1];stage['runtimes'][role]['name']=record['name']
+            row=next(r for r in actor._rows.return_value if r['Id']==record['id'])
+            row['HostConfig']['OomKillDisable']=False
+            record['spec_sha256']=stage['runtimes'][role]['spec_sha256']=measured_spec(row)
+            if row['State']['Running']:
+                row['State']['Status']='running';row['HostConfig']['OomKillDisable']=None
+        actor.inventory,actor.binding=repin(actor.inventory,scope)
+        actor.original_inventory=actor.inventory
+        path.write_text(json.dumps(stage))
+        with patch('deployment.lib.completed_normal_admission.credential_witness',return_value=stage):
+            actor._attest('private')
+            for role in ('redis','backend','frontend','parser-worker'):
+                row=next(r for r in actor._rows.return_value if r['Id']==stage['runtimes'][role]['id'])
+                row['HostConfig']['OomKillDisable']=True
+                with self.subTest(role=role),self.assertRaises(RuntimeError):actor._attest('private')
+                row['HostConfig']['OomKillDisable']=None
 
     def test_candidate_extension_rejects_missing_stale_or_unmarked_stage(self):
         for fault in ('missing','stale','unmarked'):
@@ -418,9 +453,23 @@ class ConcreteAdapterTests(unittest.TestCase):
             if 'pg_prepared_xacts' in body:return '0'
             raise AssertionError('Unexpected SQL')
         actor._sql=Mock(side_effect=query)
-        observed=actor.observe_private_boundary(scope)
+        with patch('deployment.lib.completed_normal_admission.require_candidate_authority',
+                return_value={'mode':'READ_ONLY'}) as grant:
+            observed=actor.observe_private_boundary(scope)
+        grant.assert_called_once_with(actor.contract,mode='READ_ONLY')
+        actor.activation_guard.assert_not_called()
         self.assertEqual(observed['unknown_writers'],1)
         self.assertEqual(observed['unknown_client_sessions'],0)
+
+    def test_private_boundary_cannot_replace_missing_root_grant_with_callback_flags(self):
+        actor,scope,_,_=self.component(stage='private')
+        actor._supervisors_stopped=Mock();actor._sessions=Mock(return_value=[])
+        actor.activation_guard.return_value={'target_write_authority':False,'candidate_read_only':True}
+        with patch('deployment.lib.completed_normal_admission.require_candidate_authority',
+                side_effect=RuntimeError('synthetic_missing_root_grant')):
+            with self.assertRaisesRegex(RuntimeError,'missing_root_grant'):
+                actor.observe_private_boundary(scope)
+        actor.activation_guard.assert_not_called()
 
 
     def test_default_fresh_credential_validator_refuses_before_transport(self):
@@ -768,6 +817,31 @@ class ConcreteAdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'provider_start_failed'):actor.resume_providers_private(scope,preimage)
         self.assertEqual(actor.runtime.command.call_count,1)
 
+    def test_canonical_private_resume_starts_bounded_parser_before_backend_and_no_consumers(self):
+        actor,scope,preimage,_=self.component(stage='fenced',candidates=True,target=160)
+        actor._roles=Mock(return_value={});actor._expected_roles=Mock(return_value={})
+        by_id={r['Id']:r for r in actor._rows.return_value}
+        def start(arguments):
+            self.assertEqual(arguments[:2],['docker','start']);by_id[arguments[2]]['State']['Running']=True
+        actor.runtime.command.side_effect=start
+        actor.resume_providers_private(scope,preimage)
+        expected=['native:auth','native:rest','native:storage','candidate:redis','candidate:parser-worker','candidate:provider-gateway',
+            'candidate:backend','candidate:frontend']
+        self.assertEqual([c.args[0][2] for c in actor.runtime.command.call_args_list],
+            [actor.inventory['containers'][key]['id'] for key in expected])
+        actor._attest('private')
+        for role in inventory.consuming_worker_roles(scope):
+            self.assertFalse(by_id[actor.inventory['containers']['candidate:'+role]['id']]['State']['Running'])
+        self.assertFalse(by_id[actor.inventory['containers']['proxy']['id']]['State']['Running'])
+
+    def test_canonical_private_resume_refuses_credentialed_parser_before_any_provider_start(self):
+        actor,scope,preimage,_=self.component(stage='fenced',candidates=True,target=160)
+        row=next(r for r in actor._rows.return_value
+            if r['Id']==actor.inventory['containers']['candidate:parser-worker']['id'])
+        row['Config']['Env'].append('SUPABASE_SERVICE_KEY=synthetic-forbidden')
+        with self.assertRaises(RuntimeError):actor.resume_providers_private(scope,preimage)
+        actor.runtime.command.assert_not_called()
+
     def test_activation_starts_only_workers_then_supporting_native_actors_and_proxy_last(self):
         actor,scope,preimage,_=self.component(stage='private',candidates=True)
         actor.require_authority=Mock();actor.activation_guard.return_value={'target_write_authority':True}
@@ -881,6 +955,26 @@ class ConcreteAdapterTests(unittest.TestCase):
         value=json.loads(record.read_bytes());value['candidate_stage_sha256']='0'*64
         record.write_text(json.dumps(value))
         with self.assertRaisesRegex(RuntimeError,'publication_changed'):actor.clear_boot_interlock(scope,preimage)
+        self.assertTrue(actor.barrier.exists())
+
+    def test_public_acceptance_is_measured_without_unvalidated_callback_flag(self):
+        actor,scope,preimage,_,_=self.route_component()
+        # Full activation evidence has a strict lifecycle schema that contains
+        # neither public_acceptance nor candidate_read_only. These properties
+        # must come from actual route probes / protected authority instead.
+        actor.activation_guard.return_value={'target_write_authority':True}
+        actor.restore_ingress(scope,preimage)
+        self.assertIs(actor.verify_effect('restore_ingress',scope,preimage),True)
+        actor.barrier.write_text(json.dumps({'binding':scope,'preimage_sha256':lifecycle.digest(preimage)}))
+        actor.clear_boot_interlock(scope,preimage)
+        self.assertFalse(actor.barrier.exists())
+
+    def test_public_pass_flag_cannot_replace_failed_live_readiness(self):
+        actor,scope,preimage,_,_=self.route_component()
+        actor.restore_ingress(scope,preimage)
+        actor.runtime.json_http.side_effect=lambda url:(actor.public_version
+            if url.endswith('/health/version') else {'ready':False})
+        with self.assertRaises(RuntimeError):actor.clear_boot_interlock(scope,preimage)
         self.assertTrue(actor.barrier.exists())
 
     def test_target_authority_alone_cannot_open_ingress_before_workers_are_running(self):

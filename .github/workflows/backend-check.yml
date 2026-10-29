@@ -40,6 +40,11 @@ jobs:
       - name: Validate loopback notification alert inspection
         run: python3 web/staging/integration/test_notification_observer.py
 
+      - name: Render protected private provider topology without authority
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=web:web/backend/tests python3 -m unittest \
+            test_schema160_private_provider.PrivateProviderTests.test_real_preauthorization_compose_contains_the_gateway_and_private_calendar_without_a_grant -v
+
       - name: Run backend tests
         run: |
           docker run --rm \
@@ -63,6 +68,9 @@ jobs:
             --volume "$PWD/web/supabase:/app/supabase:ro" \
             --volume "$PWD/web/scripts:/test-repository/scripts:ro" \
             --volume "$PWD/web/deployment:/test-repository/deployment:ro" \
+            --volume "$PWD/web/deployment:/web/deployment:ro" \
+            --volume "$PWD/web/database:/web/database:ro" \
+            --volume "$PWD/web/supabase:/web/supabase:ro" \
             --volume "$PWD/web/precutover:/test-repository/precutover:ro" \
             --volume "$PWD/web/staging:/test-repository/staging:ro" \
             --volume "$PWD/web/database:/workspace/database:ro" \

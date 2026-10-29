@@ -169,8 +169,8 @@ class RecoveryTransport(httpx.BaseTransport):
 def validate_configuration() -> None:
     from services.business_write_authority import read_authority
     authority = read_authority()
-    minimum = str(authority["compatible_min"]) if authority is not None and authority["version"] == 2 else "115"
-    maximum = str(authority["compatible_max"]) if authority is not None and authority["version"] == 2 else "115"
+    minimum = str(authority["compatible_min"]) if authority is not None and authority["version"] in {2, 3, 4} else "115"
+    maximum = str(authority["compatible_max"]) if authority is not None and authority["version"] in {2, 3, 4} else "115"
     if authority is not None and (
             os.getenv("SUPABASE_URL") != "http://madar-supabase:8000" or
             os.getenv("MADAR_SUPABASE_CLIENT_NETWORK") != "madar-supabase-client" or

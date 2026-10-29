@@ -80,6 +80,56 @@ class BusinessWriteAuthorityTests(unittest.TestCase):
             self.data['version']=2;self.write()
             with self.assertRaises(RuntimeError):authority.read_authority()
 
+    def test_generic_exact_operation_grant_requires_root_pins_and_final_schema(self):
+        import uuid
+        self.data.update(version=4,schema=160,target_schema=160,compatible_min=160,compatible_max=162,
+            operation='policy-governed-automatic-release',operation_id='migration-plan-'+'d'*64,
+            attempt_id=str(uuid.uuid4()),controller_sha='c'*40,database_system_identifier='123456789',plan_sha256='e'*64)
+        env={'SCHEMA_COMPATIBLE_MIN':'160','SCHEMA_COMPATIBLE_MAX':'162','SCHEMA_EXCLUDED_VERSIONS':'',
+            'MADAR_RELEASE_CONTROLLER_SHA':'c'*40,'MADAR_RELEASE_DATABASE_SYSTEM_IDENTIFIER':'123456789'}
+        with patch.dict(os.environ,env):
+            self.write();self.assertTrue(authority.restricted())
+            self.data['mode']='NORMAL';self.write();self.assertFalse(authority.restricted())
+            original=dict(self.data)
+            for key,value in (('schema',161),('target_schema',163),('version',3),('compatible_max',999),
+                    ('controller_sha','f'*40),('database_system_identifier','987654321'),
+                    ('attempt_id','../foreign'),('operation_id','unknown'),('plan_sha256',True),('unexpected',1)):
+                self.data=dict(original,**{key:value});self.write()
+                with self.subTest(key=key),self.assertRaises(RuntimeError):authority.read_authority()
+            self.data=original;self.write()
+            # A separately authorized future operation can refresh a compatible
+            # process through its actual RO root mount, not a widened old grant.
+            self.data.update(schema=161,target_schema=161,plan_sha256='f'*64);self.write()
+            self.assertFalse(authority.restricted())
+            with patch.dict(os.environ,{'SCHEMA_COMPATIBLE_MAX':'160'}),self.assertRaises(RuntimeError):authority.read_authority()
+
+    def test_validated_v3_v4_authority_runtime_configuration_keeps_exact_bounds(self):
+        import uuid
+        common=dict(self.data)
+        endpoint={'SUPABASE_URL':'http://madar-supabase:8000',
+            'MADAR_SUPABASE_CLIENT_NETWORK':'madar-supabase-client','SCHEMA_EXCLUDED_VERSIONS':''}
+        for version in (3,4):
+            self.data=dict(common,version=version,schema=160,compatible_min=146 if version==3 else 160,compatible_max=160)
+            if version==3:
+                self.data.update(operation='completed-normal-schema146-160-coordinated-release',origin_schema=146,
+                    controller_sha='c'*40,migration_manifest_sha256='7633a15a9f531874409577fb9696e472631d3bbde63ae2603be0a4d23ef7c08f')
+            else:
+                self.data.update(operation='policy-governed-automatic-release',operation_id='migration-plan-'+'d'*64,
+                    attempt_id=str(uuid.uuid4()),controller_sha='c'*40,database_system_identifier='123456789',
+                    plan_sha256='e'*64,target_schema=160)
+            self.write()
+            env=dict(endpoint,SCHEMA_COMPATIBLE_MIN=str(self.data['compatible_min']),SCHEMA_COMPATIBLE_MAX='160',
+                MADAR_RELEASE_CONTROLLER_SHA='c'*40,MADAR_RELEASE_DATABASE_SYSTEM_IDENTIFIER='123456789',
+                MADAR_RELEASE_MIGRATION_MANIFEST_SHA256=self.data.get('migration_manifest_sha256',''))
+            with self.subTest(version=version),patch.dict(os.environ,env):
+                recovery.validate_configuration()
+                for bad in ({'SCHEMA_COMPATIBLE_MAX':'161'},{'SUPABASE_URL':'http://foreign:8000'},
+                        {'MADAR_SUPABASE_CLIENT_NETWORK':'foreign'},{'MADAR_RELEASE_CONTROLLER_SHA':'f'*40}):
+                    with patch.dict(os.environ,bad),self.assertRaises(RuntimeError):recovery.validate_configuration()
+                with patch.dict(os.environ,{'MADAR_RECOVERY_PROFILE':recovery.PROFILE}):
+                    # A valid new authority cannot widen the historical recovery profile.
+                    with self.assertRaises(RuntimeError):recovery.validate_configuration()
+
     def test_read_only_authority_uses_existing_request_and_provider_fences(self):
         self.assertTrue(authority.restricted() and recovery.restricted())
         response = self.client.post("/auth/signup", json={})

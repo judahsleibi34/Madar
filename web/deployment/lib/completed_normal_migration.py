@@ -15,6 +15,8 @@ import subprocess
 import sys
 import time
 
+from deployment.lib.completed_normal_profile import maintenance_role
+
 from deployment.lib.completed_normal_admission import (
     ADMISSIONS,OPERATION,digest,encoded,require_fresh_authorization,require_candidate_authority,credential_witness,
 )
@@ -90,7 +92,7 @@ def issue_database_lease(contract):
     if file_digest(config_path)!=contract['database']['backup_configuration_sha256']:
         raise RuntimeError('completed_migration_backup_configuration_changed')
     load_environment_file(config_path,environ=configuration)
-    if (any(configuration.get(k)!=v for k,v in {'PGHOST':'supabase-db','PGPORT':'5432','PGUSER':'postgres',
+    if (any(configuration.get(k)!=v for k,v in {'PGHOST':'supabase-db','PGPORT':'5432','PGUSER':maintenance_role(contract),
             'PGDATABASE':'postgres','PGSSLMODE':'disable'}.items()) or not configuration.get('PGPASSWORD')):
         raise RuntimeError('completed_migration_native_credentials_invalid')
     return {'context_sha256':digest(contract),'database':contract['database'],'address':str(address),
@@ -130,7 +132,7 @@ def connection_factory(contract):
     import psycopg
     connection=None
     try:
-        connection=psycopg.connect(host=str(address),port=5432,user='postgres',dbname='postgres',
+        connection=psycopg.connect(host=str(address),port=5432,user=maintenance_role(contract),dbname='postgres',
             password=lease['password'],sslmode='disable',connect_timeout=5,application_name='madar-governed-schema'+str(profile(contract).target),
             options='-c search_path=pg_catalog,public,extensions')
         connection.autocommit=True
@@ -141,6 +143,10 @@ def connection_factory(contract):
             row=cursor.fetchone()
             if row is None or str(row[0])!=contract['database']['system_identifier'] or not profile(contract).supports(row[1]):
                 raise RuntimeError('completed_migration_connected_database_changed')
+            if maintenance_role(contract)=='supabase_admin':
+                cursor.execute("SELECT current_user,session_user,rolsuper FROM pg_catalog.pg_roles WHERE rolname=current_user")
+                if cursor.fetchone()!=('supabase_admin','supabase_admin',True):
+                    raise RuntimeError('completed_migration_maintenance_identity_changed')
         connection.rollback()
         return connection
     except Exception as error:
@@ -198,7 +204,7 @@ def _private_migration_candidate(parent,provider,contract,state_root,witness):
     from deployment.lib.completed_normal_runtime import validate_model
     from deployment.lib.schema150_provider_lifecycle import (ProviderMaintenance150,
         ProtectedProviderJournal,FENCE_STEPS)
-    from deployment.lib.completed_normal_resources import ROLES,allocation
+    from deployment.lib.completed_normal_resources import candidate_roles,allocation
     parent.actor.guard()
     require_candidate_authority(contract,mode='READ_ONLY')
     provider.require_authority(provider.binding,purpose='observe_quiescence')
@@ -218,7 +224,7 @@ def _private_migration_candidate(parent,provider,contract,state_root,witness):
             or stage.get('preparation_mode')!='created-fenced'
             or stage['operation']!=parent.profile.operation or stage['context_sha256']!=digest(contract)
             or stage['source_sha']!=contract['candidate']['source_sha'] or stage['images']!=contract['candidate']['images']
-            or not isinstance(stage['runtimes'],dict) or set(stage['runtimes'])!=set(ROLES)):
+            or not isinstance(stage['runtimes'],dict) or set(stage['runtimes'])!=set(candidate_roles(contract))):
         raise RuntimeError('completed_migration_private_stage_changed')
     runtimes,networks=validate_model(contract,parent.model_loader(),provider.runtime,phase='provisional')
     names=allocation(contract,contract['candidate']['slot'],preparation150=True)['containers']

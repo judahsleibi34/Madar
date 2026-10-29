@@ -1,44 +1,24 @@
 # Madar release-safety instructions
 
-## Permanent development workspace
+## Permanent development workspace (owner instruction 2026-10-25)
 
-Use `/opt/madar-development` for all Madar development. Reuse the canonical
-architecture worktree at `/opt/madar-development/worktrees/architecture`.
-Do not create Madar clones, worktrees, evidence or scratch directories under
-`/home/madar`. Do not create a new worktree or PR merely for another phase.
+Use `/opt/madar-development/repository` on `Saliba-Branch` for development.
+Do not create named feature branches or new `codex/*` branches. Integrate main
+without rewriting published history. New author and committer name must be
+`Saliba-codes`, using its GitHub-recognized noreply address configured locally.
+Preserve the fifteen untracked historical documents and their inventory hashes.
+The previous architecture worktree and archived phase checkouts are historical;
+read-only inspection does not make them active development branches.
 
-The existing `/opt/madar-development/repository` checkout is separate and may
-contain uncommitted work and active runtime dependencies. Preserve it.
-If an isolated worktree is necessary, first inspect `git worktree list` from
-the canonical worktree, then use `/opt/madar-development/worktrees/<purpose>`.
-Keep names descriptive and collision-free; preserve published branches/history.
-
-Keep current private evidence in `/opt/madar-development/evidence/integration`,
-historical evidence in `evidence/historical`, checkpoints in
-`archives/checkpoints`, historical worktrees in `archives/worktrees`, and
-temporary development files in `scratch`, all relative to that development root.
-Use restricted permissions for private evidence and keep it out of Git.
-Record relocation and integrity manifests under the root's `inventory` directory.
-
-Before moving or retiring anything, inspect Git state, ignored/untracked files,
-active process/service/container references and resource ownership. Prefer
-Git-aware relocation and reversible archival. Never discard dirty work, remove
-unknown data, delete branches or use broad Git/Docker cleanup. Preserve production,
-backup, recovery and unrelated-project paths and dependencies. Historical paths
-in old reports describe their original test environments; consult the private
-relocation manifests rather than rewriting historical evidence.
-
-Start subsequent sessions with:
-
-```bash
-cd /opt/madar-development/worktrees/architecture
-codex
-```
-
-Workspace consolidation and passing CI grant no production authority. Keep the
-canonical architecture PR draft until independent review permits otherwise;
-do not merge, enable auto-deploy or perform production mutations without separate
-authorization. The protected schema-150 operation remains blocked/incomplete.
+Use bounded run-specific scratch under `/opt/madar-development/scratch/codex-runs`.
+Compact private evidence belongs in `evidence/integration`, checkpoints in
+`archives/checkpoints`, and inventories in `inventory`. Never create home-directory
+worktrees or evidence trees. Every disposable run needs explicit ownership,
+teardown and retention; never prune globally or remove unknown/recovery resources.
+Preserve the accepted `madar-full-provider-fa27b773514b` staging application until
+explicitly superseded. Production remains read-only until exact-scope independent
+release authorization; no timer activation or migration follows from source CI.
+Schema160 registration remains closed pending actual protected acceptance.
 
 ## Release constraints
 

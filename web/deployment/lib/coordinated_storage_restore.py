@@ -6,6 +6,7 @@ unknown objects/attributes or divergent versions fail closed. A separate reader
 compares every derived attribute and byte with the current restricted source.
 """
 import os
+import re
 from pathlib import Path
 from deployment.lib.coordinated_checkpoint import relative,digest_file
 
@@ -21,7 +22,9 @@ def checked_file(path,root):
     return path
 
 
-def recover_metadata(objects,restored_root,*,source_root=None):
+def recover_metadata(objects,restored_root,*,source_root=None,namespace=("stub","stub")):
+    if (not isinstance(namespace,tuple) or len(namespace)!=2 or any(not isinstance(v,str) or not re.fullmatch('[a-zA-Z0-9_-]{1,63}',v) for v in namespace)):
+        raise RuntimeError('storage_restore_namespace_invalid')
     restored_root=Path(restored_root)
     if restored_root.is_symlink() or not restored_root.is_dir():raise RuntimeError('storage_restore_root_invalid')
     if source_root is not None:source_root=Path(source_root)
@@ -29,7 +32,7 @@ def recover_metadata(objects,restored_root,*,source_root=None):
     for row in objects:
         bucket=relative(row['bucket']).as_posix();name=relative(row['name']).as_posix();version=relative(row['version']).as_posix()
         if '/' in bucket or '/' in version:raise RuntimeError('storage_restore_identity_invalid')
-        base=restored_root/'stub/stub'/bucket/name
+        base=restored_root.joinpath(*namespace)/bucket/name
         current=checked_file(base/version,restored_root);current_digest=digest_file(current)
         attributes={key:row['metadata'].get(field) for key,field in ATTRIBUTES.items()}
         if any(not isinstance(value,str) or not value or len(value.encode())>4096 or '\r' in value or '\n' in value for value in attributes.values()):

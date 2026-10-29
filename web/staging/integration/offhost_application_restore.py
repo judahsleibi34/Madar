@@ -1,0 +1,463 @@
+#!/usr/bin/env python3
+"""Bounded physical receiver adapter for the existing append-only test receiver.
+
+This is a disposable restoration test, never production installation, SQL
+migration, release promotion or a new write-authority issuer. Root enrollment
+and actual receive receipts are prerequisites. Original grants are preserved
+only with their physical database identity while the source guest is OFF.
+"""
+import base64,hashlib,json,os,re,subprocess,sys,time
+from pathlib import Path
+sys.path.insert(0,str(Path(__file__).resolve().parents[2]))
+from deployment.lib.provider_recovery_runtime import protected
+from deployment.lib.migration_inventory import digest,strict_json
+from deployment.lib.migration_executor import atomic_json
+from deployment.lib.coordinated_archive_restore import restore_archive,verify_restored_archive
+from deployment.lib.coordinated_storage_restore import recover_metadata
+from deployment.lib.coordinated_checkpoint import digest_file
+
+DIAGNOSTIC_ROOT=None
+ROLE_BUDGET={'database':384,'auth':128,'rest':128,'storage':192,'gateway':32,'redis':64,
+    'frontend':64,'backend':768,'parser-worker':384,'remote-ingestion-worker':96,
+    'notification-worker':128,'calendar-sync-worker':128,'data-deletion-worker':128,'proxy':32}
+ROLE_CPU={'database':.35,'auth':.15,'rest':.1,'storage':.1,'gateway':.05,'redis':.1,
+    'frontend':.05,'backend':.35,'parser-worker':.2,'remote-ingestion-worker':.1,
+    'notification-worker':.2,'calendar-sync-worker':.1,'data-deletion-worker':.1,'proxy':.05}
+
+
+def storage_identity(configuration):
+    """Keep object ownership aligned with the authenticated provider process.
+
+    An omitted Docker user is root. Named users or an implicit primary group
+    need an image-specific observation; do not guess a service UID.
+    """
+    user=configuration.get('User') or '0:0'
+    if not re.fullmatch('[0-9]+:[0-9]+',user):raise RuntimeError('offhost_test_storage_user_requires_review')
+    uid,gid=map(int,user.split(':'))
+    if max(uid,gid)>2147483647:raise RuntimeError('offhost_test_storage_user_requires_review')
+    return uid,gid
+
+
+def restored_proxy_configuration(body,app):
+    """Use authenticated source port bindings, not a guessed image port."""
+    slot=app['slot']
+    if slot not in {'blue','green'}:raise RuntimeError('offhost_test_proxy_slot_invalid')
+    body=body.replace('listen 127.0.0.1:','listen ')
+    for role,host_port in (('backend',8101 if slot=='blue' else 8201),
+                           ('frontend',3100 if slot=='blue' else 3200)):
+        found=[]
+        for target,bindings in (app['containers'][role]['HostConfig'].get('PortBindings') or {}).items():
+            for binding in bindings or []:
+                if binding.get('HostPort')!=str(host_port):continue
+                if (binding.get('HostIp') not in {'127.0.0.1','::1'} or not re.fullmatch('[0-9]{1,5}/tcp',target)
+                        or not 1<=int(target.split('/')[0])<=65535):
+                    raise RuntimeError('offhost_test_source_proxy_binding_invalid')
+                found.append(int(target.split('/')[0]))
+        if len(found)!=1:raise RuntimeError('offhost_test_source_proxy_binding_ambiguous')
+        body=body.replace('127.0.0.1:'+str(host_port),role+':'+str(found[0]))
+    return body
+
+
+def command(args,*,data=None,timeout=30):
+    result=subprocess.run(args,input=data,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=timeout,env={'PATH':'/usr/sbin:/usr/bin:/sbin:/bin','HOME':'/root','LANG':'C.UTF-8','DOCKER_HOST':'unix:///var/run/docker.sock','DOCKER_CONFIG':'/nonexistent'})
+    if result.returncode:
+        if DIAGNOSTIC_ROOT is not None:
+            p=DIAGNOSTIC_ROOT/'private-effect-error.log';p.write_bytes((result.stdout+result.stderr)[-65536:]);p.chmod(0o600)
+        raise RuntimeError('offhost_test_effect_failed:'+Path(args[0]).name)
+    return result.stdout
+
+
+def root_for(run_id,*,allow_expired=False):
+    if os.geteuid()!=0 or not re.fullmatch(r'codex-[0-9]{8}T[0-9]{6}Z-automatic-execution-[a-f0-9]{8}',run_id):raise RuntimeError('offhost_test_root_scope_required')
+    root=Path('/opt/madar-recovery-tests')/run_id
+    enrollment=strict_json(protected(root/'enrollment.json',private=True).read_bytes())
+    if (enrollment['run_id']!=run_id or not allow_expired and enrollment['expires_at']<=time.time()
+            or Path('/etc/machine-id').read_text().strip()!=enrollment['machine_id']
+            or Path('/sys/class/dmi/id/product_uuid').read_text().strip().lower()!=enrollment['product_uuid']):
+        raise RuntimeError('offhost_test_receiver_identity_changed')
+    fs=command(['findmnt','-n','-o','FSTYPE,UUID','-T',str(root)]).decode().split()
+    if fs!=['ext4',enrollment['filesystem_uuid']]:raise RuntimeError('offhost_test_filesystem_changed')
+    return root,enrollment
+
+
+def consume_restore_authority(root,authorization,*,continuation=False):
+    if str(__import__('uuid').UUID(authorization['attempt_id']))!=authorization['attempt_id']:
+        raise RuntimeError('offhost_test_restore_attempt_invalid')
+    if (root/'restore-owned.json').exists() and not continuation:raise RuntimeError('offhost_test_existing_restore_effects_require_recovery')
+    consumed={'authorization_sha256':digest(authorization),'attempt_id':authorization['attempt_id'],'consumed_at':int(time.time())}
+    atomic_json(root/'attempts'/authorization['attempt_id']/'consumed.json',consumed,exclusive=True)
+    atomic_json(root/'restore-consumed.json',consumed)
+    return consumed
+
+
+def verify_release_context(app,enrollment):
+    """Root-enrolled exact source DATA, never fabricated prior completion.
+
+    The independent parent verifies the source issuer locally before pinning
+    this entire context in receiver enrollment and the signed backup manifest.
+    The receiver does not receive or claim possession of source issuer keys.
+    Ordinary completed-release restoration retains its original strict shape.
+    """
+    context=app['release_context'];kind='independently-enrolled-historical-bootstrap-origin'
+    if enrollment.get('version')!=2:
+        if (context.get('history',{}).get('system_identifier')!=app['database_system_identifier']
+                or context['history'].get('schema')!=app['schema']
+                or any(not re.fullmatch('[a-f0-9]{64}',str(context.get(k))) for k in
+                    ('admission_sha256','plan_sha256','completion_sha256','recovery_manifest_sha256'))):
+            raise RuntimeError('offhost_test_release_context_invalid')
+        return 'completed-release'
+    if (enrollment.get('source_origin_kind')!=kind or context.get('kind')!=kind
+            or digest(context)!=enrollment.get('source_origin_sha256')
+            or set(context)!={'kind','source_binding','request_record','enrollment_record','history'}):
+        raise RuntimeError('offhost_test_historical_context_unenrolled')
+    from deployment.lib.historical_origin import validate_source_binding
+    binding=context['source_binding'];path=validate_source_binding(binding)
+    request=context['request_record'];receipt=context['enrollment_record']
+    if (not isinstance(request,dict) or not isinstance(receipt,dict)
+            or set(request)!={'payload','signature'} or set(receipt)!={'payload','signature'}):
+        raise RuntimeError('offhost_test_historical_record_invalid')
+    request=request['payload'];receipt=receipt['payload'];observed=request.get('observation',{})
+    history=context['history']
+    if (request.get('kind')!=kind or receipt.get('kind')!=kind
+            or request.get('request_id')!=path.name or receipt.get('request_id')!=path.name
+            or digest(receipt)!=binding['enrollment_sha256'] or receipt.get('request_sha256')!=digest(request)
+            or receipt.get('policy_sha256')!=request.get('policy_sha256')
+            or receipt.get('observation_sha256')!=digest(observed)
+            or receipt.get('successor_intent_sha256')!=binding['successor_intent_sha256']
+            or receipt.get('protected_completion_claimed') is not False or receipt.get('migration_authority_issued') is not False
+            or type(receipt.get('expires_at')) is not int or not time.time()<enrollment['expires_at']<=receipt['expires_at']
+            or observed.get('source_sha')!=binding['application_sha'] or app['source_sha']!=binding['application_sha']
+            or observed.get('controller_sha')!=binding['controller_sha']
+            or observed.get('database')!=history or history.get('system_identifier')!=app['database_system_identifier']
+            or type(app['schema']) is not int or app['schema']!=146 or history.get('schema')!=146
+            or observed.get('legacy_protocols')!={'delivery':1,'outbox':1,'deletion':0,'native_successor_function_absence_verified':True}):
+        raise RuntimeError('offhost_test_historical_source_changed')
+    return kind
+
+
+def restore(run_id,*,continuation=False):
+    global DIAGNOSTIC_ROOT
+    root,enrollment=root_for(run_id);DIAGNOSTIC_ROOT=root
+    received=strict_json(protected(root/'received.json',private=True).read_bytes())
+    if received['manifest_sha256']!=enrollment['manifest_sha256'] or received['receiver_id']!=enrollment['receiver_id']:
+        raise RuntimeError('offhost_test_received_scope_changed')
+    incoming=root/'incoming'
+    for name,sha in received['files'].items():
+        if digest_file(protected(incoming/name,private=True))!=sha:raise RuntimeError('offhost_test_received_bytes_changed')
+    app=strict_json(protected(incoming/'application.json',private=True).read_bytes())
+    required={'version','source_sha','database_system_identifier','schema','slot','containers','binds','fingerprints','storage_objects','original_fixture','source_poweroff_sha256','redis_snapshot','release_context'}
+    if (set(app)!=required or app['version']!=1 or app['source_sha']!=enrollment['source_sha']
+            or app['database_system_identifier']!=enrollment['source_database_system_identifier']
+            or set(app['containers'])!=set(ROLE_BUDGET) or app['slot'] not in {'blue','green'}
+            or not re.fullmatch('[a-f0-9]{64}',str(app['source_poweroff_sha256']))):
+        raise RuntimeError('offhost_test_application_contract_invalid')
+    origin_kind=verify_release_context(app,enrollment)
+    # The independent parent publishes this only after the exact source QEMU
+    # process has exited. Candidate code cannot publish a receiver root receipt.
+    stopped=strict_json(protected(root/'source-powered-off.json',private=True).read_bytes())
+    if (digest(stopped)!=app['source_poweroff_sha256'] or stopped.get('source_guest_uuid')!=enrollment['source_guest_uuid']
+            or stopped.get('source_sha')!=app['source_sha'] or stopped.get('qemu_exited') is not True):
+        raise RuntimeError('offhost_test_source_not_independently_fenced')
+    authorization=strict_json(protected(root/('continuation-authorization.json' if continuation else 'restore-authorization.json'),private=True).read_bytes())
+    required_authority={'version','operation','operation_id','receiver_id','manifest_sha256','received_sha256',
+        'source_poweroff_sha256','implementation_sha256','source_sha','database_system_identifier','expires_at','attempt_id'}
+    if continuation:required_authority|={'runtime_sha256','previous_attempt_id','stage_sha256','database_container_id'}
+    expected_operation='isolated-physical-application-restoration-continuation' if continuation else 'isolated-physical-application-restoration'
+    if (set(authorization)!=required_authority or authorization['version']!=1
+            or authorization['operation']!=expected_operation
+            or authorization['operation_id']!=enrollment['backup_operation_id'] or authorization['receiver_id']!=enrollment['receiver_id']
+            or authorization['manifest_sha256']!=enrollment['manifest_sha256']
+            or authorization['received_sha256']!=digest(received) or authorization['source_sha']!=app['source_sha']
+            or authorization['database_system_identifier']!=app['database_system_identifier']
+            or authorization['source_poweroff_sha256']!=digest(stopped)
+            or authorization['implementation_sha256']!=digest_file(Path(__file__))
+            or type(authorization['expires_at']) is not int or not time.time()<authorization['expires_at']<=enrollment['expires_at']
+            or not re.fullmatch('[a-f0-9-]{36}',str(authorization['attempt_id']))):
+        raise RuntimeError('offhost_test_independent_restore_authority_invalid')
+    for row in app['containers'].values():
+        if not re.fullmatch('sha256:[a-f0-9]{64}',str(row['Image'])):raise RuntimeError('offhost_test_image_not_immutable')
+        inspected=json.loads(command(['docker','image','inspect',row['Image']]))
+        if len(inspected)!=1 or inspected[0]['Id']!=row['Image']:raise RuntimeError('offhost_test_image_unavailable')
+    # Metadata existence alone does not prove imported OCI content is complete.
+    # Export selected immutable platform content read-only before consuming any
+    # restore authority or creating a database. Never retag or fall back to tags.
+    for image in sorted({r['Image'] for r in app['containers'].values()}):
+        probe=subprocess.run(['docker','--host','unix:///var/run/docker.sock','image','save','--platform','linux/amd64',image],
+            stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,timeout=120,
+            env={'PATH':'/usr/sbin:/usr/bin:/sbin:/bin','HOME':'/root','DOCKER_CONFIG':'/nonexistent'})
+        if probe.returncode:raise RuntimeError('offhost_test_immutable_image_content_incomplete')
+    if sum(ROLE_BUDGET.values())>2800 or sum(ROLE_CPU.values())>2.01:raise RuntimeError('offhost_test_resource_budget_exceeded')
+    memory=int(next(v.split()[1] for v in Path('/proc/meminfo').read_text().splitlines() if v.startswith('MemAvailable:')))*1024
+    if memory<(sum(ROLE_BUDGET.values())+768)*1024**2:raise RuntimeError('offhost_test_memory_headroom_insufficient')
+    # No published ports, host-network actors or host-addressed gateway.
+    # Application acceptance executes inside this exact isolated bridge.
+    if continuation:
+        owner=strict_json(protected(root/'restore-owned.json',private=True).read_bytes())
+        stage=strict_json(protected(root/'restoration-fenced_failed_restoration.json',private=True).read_bytes())
+        if (owner['receiver_id']!=enrollment['receiver_id'] or owner['run_id']!=run_id or set(owner['containers'])!={'database'}
+                or owner['containers']['database']!=authorization['database_container_id'] or digest(owner)!=authorization['runtime_sha256']
+                or digest(stage)!=authorization['stage_sha256']):
+            raise RuntimeError('offhost_test_continuation_stage_not_supported')
+        previous=strict_json(protected(root/'restore-consumed.json',private=True).read_bytes())
+        if previous['attempt_id']!=authorization['previous_attempt_id'] or not (root/'attempts'/previous['attempt_id']/'consumed.json').exists():
+            raise RuntimeError('offhost_test_continuation_origin_unconsumed')
+        actual=json.loads(command(['docker','inspect',owner['containers']['database']]))
+        all_owned=command(['docker','ps','-aq','--no-trunc','--filter','label=com.madar.test.receiver='+enrollment['receiver_id']]).decode().split()
+        if (len(actual)!=1 or set(all_owned)!={owner['containers']['database']} or actual[0]['State']['Running']
+                or actual[0]['Image']!=app['containers']['database']['Image']
+                or actual[0]['Config']['Labels'].get('com.madar.test.receiver')!=enrollment['receiver_id']):
+            raise RuntimeError('offhost_test_continuation_runtime_ambiguous')
+        consume_restore_authority(root,authorization,continuation=True)
+    else:
+        owner={'run_id':run_id,'receiver_id':enrollment['receiver_id'],'containers':{},'network':None,'volumes':[], 'images_imported':[]}
+        consume_restore_authority(root,authorization)
+        atomic_json(root/'restore-owned.json',owner,exclusive=True)
+    def checkpoint():atomic_json(root/'restore-owned.json',owner)
+    def phase(name,**details):atomic_json(root/('restoration-'+name+'.json'),{'operation':'independent-application-restoration','operation_id':enrollment['backup_operation_id'],'receiver_id':enrollment['receiver_id'],'source_sha':app['source_sha'],'source_database_system_identifier':app['database_system_identifier'],'phase':name,**details})
+    try:
+        if continuation:phase('continuation_of_existing_database',database_container_id=owner['containers']['database'],attempt_id=authorization['attempt_id'])
+        else:
+            phase('authenticated_backup_received')
+        if not continuation:
+            for name in ('postgres','objects'):
+                source=incoming/(name+'.tar.gz');target=root/name
+                restore_archive(source,target,max_bytes=1024**3,max_members=100000)
+                verify_restored_archive(source,target,max_bytes=1024**3,max_members=100000)
+            for path in (root/'postgres',*(root/'postgres').rglob('*')):
+                os.chown(path,70,70);path.chmod(0o700 if path.is_dir() else 0o600)
+            command(['docker','run','--name','madar-recovery-'+enrollment['receiver_id'][:12]+'-verify','--label','com.madar.test.receiver='+enrollment['receiver_id'],'--rm','--network','none','--read-only','--user','70:70','--cap-drop','ALL','--security-opt','no-new-privileges','--memory','384m','--memory-swap','384m','--cpus','.5','--pids-limit','64','--mount','type=bind,src='+str(root/'postgres')+',dst=/restore,readonly','--entrypoint','pg_verifybackup',app['containers']['database']['Image'],'/restore'],timeout=120)
+            phase('postgres_physical_backup_independently_verified')
+        redis_bytes=__import__('base64').b64decode(app['redis_snapshot']['body'],validate=True)
+        if len(redis_bytes)>8*1024**2 or hashlib.sha256(redis_bytes).hexdigest()!=app['redis_snapshot']['sha256']:
+            raise RuntimeError('offhost_test_redis_snapshot_changed')
+        (root/'redis.rdb').write_bytes(redis_bytes);(root/'redis.rdb').chmod(0o444)
+        mounts={}
+        for key,record in app['binds'].items():
+            if not re.fullmatch('[a-f0-9]{64}',key) or set(record)!={'files','mutable'}:raise RuntimeError('offhost_test_bind_inventory_invalid')
+            dest=root/'binds'/key
+            if not continuation:dest.mkdir(parents=True,mode=0o755)
+            for relative,row in record['files'].items():
+                parts=Path(relative)
+                if parts.is_absolute() or '..' in parts.parts or str(parts)=='.' or set(row)!={'body','mode'}:raise RuntimeError('offhost_test_bind_path_invalid')
+                body=base64.b64decode(row['body'],validate=True)
+                if len(body)>16*1024**2 or row['mode'] not in {0o400,0o444,0o600,0o644,0o755}:raise RuntimeError('offhost_test_bind_bytes_or_permissions_invalid')
+                target=dest/parts
+                if continuation:
+                    if target.is_symlink() or target.read_bytes()!=body:raise RuntimeError('offhost_test_continuation_binding_changed')
+                else:target.parent.mkdir(parents=True,exist_ok=True,mode=0o755);target.write_bytes(body);target.chmod(row['mode'])
+            if record['mutable'] and not continuation:
+                for path in (dest,*dest.rglob('*')):os.chown(path,65534,65534)
+            mounts[key]=dest
+        network='madar-recovery-'+enrollment['receiver_id']
+        if not continuation:owner['network']=command(['docker','network','create','--internal','--opt','com.docker.network.bridge.gateway_mode_ipv4=isolated','--label','com.madar.test.receiver='+enrollment['receiver_id'],network]).decode().strip();checkpoint()
+        measured_network=json.loads(command(['docker','network','inspect',owner['network']]))[0]
+        if (measured_network['Driver']!='bridge' or measured_network['Internal'] is not True
+                or measured_network.get('EnableIPv6') or measured_network['Options'].get('com.docker.network.bridge.gateway_mode_ipv4')!='isolated'):
+            raise RuntimeError('offhost_test_network_isolation_invalid')
+        bridge='br-'+owner['network'][:12]
+        interfaces=json.loads(command(['ip','-json','address','show','dev',bridge]))
+        if len(interfaces)!=1 or any(a.get('family')=='inet' for a in interfaces[0].get('addr_info',[])):
+            raise RuntimeError('offhost_test_host_gateway_exposed')
+        def create(role):
+            row=app['containers'][role];name='madar-recovery-'+enrollment['receiver_id'][:12]+'-'+role
+            config=row['Config'];host=row['HostConfig']
+            args=['docker','create','--name',name,'--label','com.madar.test.receiver='+enrollment['receiver_id'],'--network',network,
+                '--restart=no','--dns','127.0.0.1','--memory',str(ROLE_BUDGET[role])+'m','--memory-swap',str(ROLE_BUDGET[role])+'m','--cpus',str(ROLE_CPU[role]),'--pids-limit','128','--cap-drop','ALL','--security-opt','no-new-privileges',
+                '--log-opt','max-size=1m','--log-opt','max-file=2']
+            aliases={row['Name'].lstrip('/'),role}
+            for endpoint in row['NetworkSettings']['Networks'].values():aliases.update(v for v in (endpoint.get('Aliases') or []) if v)
+            for alias in sorted(aliases):
+                if re.fullmatch('[a-zA-Z0-9_.-]{1,128}',alias):args+=['--network-alias',alias]
+            for env in config.get('Env',[]):args+=['--env',env]
+            if host.get('ReadonlyRootfs'):args+=['--read-only']
+            if host.get('Init'):args+=['--init']
+            health=config.get('Healthcheck') or {};test=health.get('Test') or []
+            if test==['NONE']:args+=['--no-healthcheck']
+            elif test:
+                if test[0] not in {'CMD','CMD-SHELL'}:raise RuntimeError('offhost_test_healthcheck_contract_invalid')
+                shell=__import__('shlex').join(test[1:]) if test[0]=='CMD' else test[1]
+                args+=['--health-cmd',shell]
+                for field,flag in (('Interval','--health-interval'),('Timeout','--health-timeout'),('StartPeriod','--health-start-period')):
+                    if health.get(field):args+=[flag,str(health[field])+'ns']
+                if health.get('Retries'):args+=['--health-retries',str(health['Retries'])]
+            user='70:70' if role=='database' else config.get('User')
+            if user:args+=['--user',user]
+            for target,options in (host.get('Tmpfs') or {}).items():args+=['--tmpfs',target+':'+options]
+            if role=='redis':args+=['--mount','type=bind,src='+str(root/'redis.rdb')+',dst=/data/dump.rdb,readonly']
+            for mount in row['Mounts']:
+                if mount['Type']=='tmpfs':continue
+                destination=mount['Destination']
+                if role=='database':
+                    if destination!='/var/lib/postgresql/data':continue # no bootstrap SQL on restore
+                    source=root/'postgres'
+                elif role=='storage' and destination=='/var/lib/storage':source=root/'objects'
+                else:
+                    source=mounts[mount['recovery_bind_key']]
+                    if mount.get('recovery_file'):source=source/mount['recovery_file']
+                    if role=='proxy':
+                        for f in source.rglob('*') if source.is_dir() else [source]:
+                            if f.is_file():
+                                f.write_text(restored_proxy_configuration(f.read_text(),app))
+                args+=['--mount','type=bind,src='+str(source)+',dst='+destination+(',readonly' if not mount['RW'] else '')]
+            entry=config.get('Entrypoint') or []
+            if entry:args+=['--entrypoint',entry[0]]
+            args+=[row['Image'],*entry[1:],*(config.get('Cmd') or [])]
+            identity=command(args).decode().strip();owner['containers'][role]=identity;checkpoint()
+            command(['docker','start',identity]);return identity
+        if continuation:command(['docker','start',owner['containers']['database']])
+        else:create('database')
+        deadline=time.monotonic()+90
+        while True:
+            probe=subprocess.run(['docker','--host','unix:///var/run/docker.sock','exec',owner['containers']['database'],'pg_isready','-U','supabase_admin','-d','postgres'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=10)
+            if probe.returncode==0:break
+            if time.monotonic()>deadline:raise RuntimeError('offhost_test_restored_database_unready')
+            time.sleep(1)
+        password=[v.split('=',1)[1] for v in app['containers']['database']['Config']['Env'] if v.startswith('POSTGRES_PASSWORD=')]
+        if len(password)!=1:raise RuntimeError('offhost_test_database_configuration_ambiguous')
+        # Existing independently pinned native tool, NOT candidate-supplied
+        # PASS or a second migration executor. Extended-protocol single prepared
+        # statements and an established READ ONLY snapshot prevent SQL escape.
+        observer="""import json,sys,hashlib,psycopg
+p=json.load(sys.stdin)
+sys.path.insert(0,'/source/web')
+from deployment.lib.completed_normal_database import STRUCTURE_SQL
+trusted_structure=STRUCTURE_SQL.split('SET LOCAL search_path=pg_catalog;',1)[1].rsplit('; COMMIT;',1)[0]
+with psycopg.connect(host='database',dbname='postgres',user='supabase_admin',password=p['password']) as db:
+ with db.transaction():
+  db.execute('SET TRANSACTION READ ONLY')
+  db.execute('SET LOCAL search_path=pg_catalog')
+  db.execute("SET LOCAL statement_timeout='10s'")
+  db.execute("SET LOCAL lock_timeout='2s'")
+  identity=db.execute("SELECT system_identifier::text,schema_version FROM pg_control_system(),public.application_schema_state WHERE contract_key='core'").fetchone()
+  assert identity==(p['system_identifier'],p['schema']), 'restored_database_identity_changed'
+  for label,record in p['fingerprints'].items():
+   query=trusted_structure if record['query']==STRUCTURE_SQL else record['query']
+   value=db.execute(query,prepare=True).fetchone()[0]
+   raw='' if value is None else str(value).strip()
+   assert hashlib.sha256(raw.encode()).hexdigest()==record['sha256'], 'restored_fingerprint_changed:'+label
+  if p['origin_kind']=='independently-enrolled-historical-bootstrap-origin':
+   absent=db.execute("SELECT to_regprocedure('public.notification_delivery_protocol()') IS NULL,to_regprocedure('public.notification_outbox_protocol()') IS NULL,to_regprocedure('public.data_deletion_ownership_protocol()') IS NULL").fetchone()
+   assert absent==(True,True,True) and identity[1]==146, 'restored_historical_protocol_history_changed'
+   protocols=(1,1,0)
+  else:
+   protocols=db.execute('SELECT public.notification_delivery_protocol(),public.notification_outbox_protocol(),public.data_deletion_ownership_protocol()').fetchone()
+   assert protocols==(2,2,2), 'restored_protocols_changed'
+print(json.dumps({'system_identifier':identity[0],'schema':identity[1],'protocols':list(protocols),'fingerprints':len(p['fingerprints']),'read_only':True,'single_statement_prepared_observation':True}))
+"""
+        payload={'password':password[0],'fingerprints':app['fingerprints'],'schema':app['schema'],'system_identifier':app['database_system_identifier'],'origin_kind':origin_kind}
+        tool='sha256:3b7e1b0cd406712c50cfbc777c97a0188c9d0239b6a79c53a28862e4278b2dca'
+        observed=command(['docker','run','--rm','-i','--name','madar-recovery-'+enrollment['receiver_id'][:12]+'-observe',
+            '--label','com.madar.test.receiver='+enrollment['receiver_id'],'--network',network,'--dns','127.0.0.1',
+            '--read-only','--mount','type=bind,src='+str(Path(__file__).resolve().parents[3])+',dst=/source,readonly','--user','65534:65534','--cap-drop','ALL','--security-opt','no-new-privileges',
+            '--memory','128m','--memory-swap','128m','--cpus','.1','--pids-limit','64','--entrypoint','python',tool,'-B','-c',observer],
+            data=json.dumps(payload).encode(),timeout=180)
+        observation=json.loads(observed)
+        if (root/'database-observation.json').exists():
+            if strict_json(protected(root/'database-observation.json',private=True).read_bytes())!=observation:raise RuntimeError('offhost_test_reverification_changed')
+        else:atomic_json(root/'database-observation.json',observation,exclusive=True)
+        phase('database_roles_acls_data_and_history_restored',fingerprints=len(app['fingerprints']),schema=app['schema'])
+        storage_env=dict(v.split('=',1) for v in app['containers']['storage']['Config']['Env'])
+        recover_metadata(app['storage_objects'],root/'objects',namespace=(storage_env.get('TENANT_ID'),storage_env.get('GLOBAL_S3_BUCKET')))
+        storage_uid,storage_gid=storage_identity(app['containers']['storage']['Config'])
+        for path in (root/'objects',*(root/'objects').rglob('*')):os.chown(path,storage_uid,storage_gid)
+        for role in ('auth','rest','storage','gateway','redis','parser-worker','remote-ingestion-worker','backend','frontend','notification-worker','calendar-sync-worker','data-deletion-worker','proxy'):create(role)
+        deadline=time.monotonic()+240
+        while True:
+            try:
+                probe=command(['docker','exec','-i',owner['containers']['backend'],'python','-'],data=b"import json;from urllib.request import urlopen;print(json.dumps([json.load(urlopen('http://proxy:8001/health/ready',timeout=5)),json.load(urlopen('http://proxy:8001/health/version',timeout=5))]))",timeout=15)
+                ready,identity=json.loads(probe)
+                if ready['ready'] is True and identity['release_sha']==app['source_sha']:break
+            except (OSError,ValueError,RuntimeError):pass
+            if time.monotonic()>deadline:raise RuntimeError('offhost_test_restored_application_unready')
+            time.sleep(2)
+        phase('application_running',schema=app['schema'],source_database_system_identifier=app['database_system_identifier'])
+        return {'operation':'independent-application-restoration','phase':'application_running','source_sha':app['source_sha'],'receiver_id':enrollment['receiver_id'],'operation_id':enrollment['backup_operation_id'],'fingerprints':len(app['fingerprints']),'functional_acceptance_pending':True,'deployment_authority_issued':False,'migration_sql_executed':False}
+    except BaseException:
+        # Exact owned actors only; preserve bounded inputs for diagnosis. Never
+        # silently resume the source while a restored writer could still run.
+        for identity in owner['containers'].values():
+            try:command(['docker','stop','--time','10',identity],timeout=20)
+            except Exception:pass
+        phase('fenced_failed_restoration');raise
+
+
+
+
+def cleanup(run_id):
+    """Explicit exact-owner teardown, including a partially failed restoration."""
+    root,enrollment=root_for(run_id,allow_expired=True)
+    owned=root/'restore-owned.json'
+    if not owned.exists():return {'containers_removed':[],'networks_removed':[],'volumes_removed':[]}
+    owner=strict_json(protected(owned,private=True).read_bytes())
+    if owner.get('receiver_id')!=enrollment['receiver_id'] or owner.get('run_id')!=run_id:raise RuntimeError('offhost_cleanup_owner_changed')
+    current=command(['docker','ps','-aq','--no-trunc']).decode().split()
+    rows=json.loads(command(['docker','inspect',*current])) if current else []
+    expected=set(owner['containers'].values());present={r['Id']:r for r in rows}
+    transient={'madar-recovery-'+enrollment['receiver_id'][:12]+'-'+role for role in ('verify','observe','accept')}
+    for row in rows:
+        if row['Name'].lstrip('/') in transient and row['Config'].get('Labels',{}).get('com.madar.test.receiver')==enrollment['receiver_id']:expected.add(row['Id'])
+    if (root/'cleanup.json').exists():
+        if expected & set(present):raise RuntimeError('offhost_cleanup_actor_reappeared')
+        return strict_json(protected(root/'cleanup.json',private=True).read_bytes())
+    if any(present[i]['Config'].get('Labels',{}).get('com.madar.test.receiver')!=enrollment['receiver_id'] for i in expected & set(present)):
+        raise RuntimeError('offhost_cleanup_foreign_actor')
+    if any(r['Id'] not in expected and any(m.get('Source','').startswith(str(root)+'/') for m in r.get('Mounts',[])) for r in rows):
+        raise RuntimeError('offhost_cleanup_foreign_reference')
+    removed=[]
+    for identity in sorted(expected & set(present)):
+        command(['docker','stop','--time','10',identity],timeout=20);command(['docker','rm',identity]);removed.append(identity)
+    networks=[]
+    if owner['network']:
+        rows=json.loads(command(['docker','network','inspect',owner['network']]))
+        if len(rows)!=1 or rows[0]['Labels'].get('com.madar.test.receiver')!=enrollment['receiver_id'] or rows[0]['Containers']:
+            raise RuntimeError('offhost_cleanup_network_in_use_or_foreign')
+        command(['docker','network','rm',owner['network']]);networks=[owner['network']]
+    result={'containers_removed':removed,'networks_removed':networks,'volumes_removed':[],'protected_resources_modified':False}
+    atomic_json(root/'cleanup.json',result,exclusive=True);return result
+
+
+def retire_scope(run_id):
+    """Bounded owned-run retirement; independent of expired restore authority."""
+    import shutil
+    root,enrollment=root_for(run_id,allow_expired=True)
+    before=strict_json(protected(root/'baseline.json',private=True).read_bytes())
+    stat=root.lstat()
+    if root.is_symlink() or stat.st_uid!=0 or (stat.st_dev,stat.st_ino)!=(before['directory_device'],before['directory_inode']):
+        raise RuntimeError('offhost_retirement_scope_replaced')
+    result=cleanup(run_id)
+    ids=command(['docker','ps','-aq','--no-trunc']).decode().split()
+    rows=json.loads(command(['docker','inspect',*ids])) if ids else []
+    if any(any(m.get('Source','').startswith(str(root)+'/') for m in r.get('Mounts',[])) for r in rows):
+        raise RuntimeError('offhost_retirement_live_reference')
+    images=[];retained=[]
+    if (root/'images-imported.json').exists():
+        imported=strict_json(protected(root/'images-imported.json',private=True).read_bytes())
+        for image in imported['new_ids']:
+            if image in before['images'] or not re.fullmatch('sha256:[a-f0-9]{64}',image):raise RuntimeError('offhost_retirement_image_ownership_invalid')
+            if command(['docker','ps','-aq','--filter','ancestor='+image]).strip():retained.append(image);continue
+            try:command(['docker','image','rm',image]);images.append(image)
+            except RuntimeError:retained.append(image)
+    event_command=['docker','events','--since',str(int(before['start_time'])),'--until',str(int(time.time())+2),
+        '--filter','label=com.madar.test.receiver='+enrollment['receiver_id'],'--format','{{json .}}']
+    events=[json.loads(line) for line in command(event_command).decode().splitlines()]
+    # No archive, credential, DB, VM or foreign path can survive inside a
+    # retired owned scope. shutil.rmtree uses descriptor-based symlink defence.
+    size=sum(p.stat().st_size for p in root.rglob('*') if p.is_file() and not p.is_symlink())
+    result.update(images_removed=images,images_retained_by_reference=retained,owned_directory_bytes_removed=size,
+        events=events,receiver_id=enrollment['receiver_id'],run_id=run_id,source_and_receiver_production_modified=False)
+    shutil.rmtree(root)
+    result['directory_removed']=not root.exists()
+    result['disk_after']=shutil.disk_usage('/')._asdict()
+    return result
+
+
+if __name__=='__main__':
+    try:
+        if len(sys.argv)==3 and sys.argv[1]=='--retire':result=retire_scope(sys.argv[2])
+        elif len(sys.argv)==3 and sys.argv[1]=='--continue':result=restore(sys.argv[2],continuation=True)
+        elif len(sys.argv)==3 and sys.argv[1]=='--cleanup':result=cleanup(sys.argv[2])
+        elif len(sys.argv)==2:result=restore(sys.argv[1])
+        else:raise RuntimeError('offhost_test_operation_invalid')
+        print(json.dumps(result,sort_keys=True))
+    except Exception as error:
+        print(json.dumps({'operation':'independent-application-restoration','status':'failed','error_type':type(error).__name__,'error_code':str(error) if isinstance(error,RuntimeError) else 'bounded_restore_effect_failed'}));raise SystemExit(1)

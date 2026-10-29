@@ -390,3 +390,73 @@ class MigrationExecutorTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class TransactionGuardTests(unittest.TestCase):
+    def test_guard_is_inside_original_transaction_and_dollar_quoted_sql_is_not_split(self):
+        from deployment.lib.migration_executor import Migration
+        from deployment.lib.migration_risk import scaffold
+        import importlib.util
+        if importlib.util.find_spec('pglast') is None:self.skipTest('locked PostgreSQL parser required')
+        calls=[]
+        class Cursor:
+            def __enter__(self):return self
+            def __exit__(self,*args):pass
+            def execute(self,query,params=None):
+                calls.append(str(query))
+                self.query=str(query)
+            def fetchone(self):
+                if 'pg_try_advisory' in self.query:return (True,)
+                if 'schema_version from' in self.query:return (2 if any('CREATE TABLE' in q for q in calls) else 1,)
+                return (True,)
+        class Connection:
+            autocommit=True
+            def cursor(self):return Cursor()
+            def rollback(self):pass
+            def close(self):pass
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);body=scaffold(1,2,'CREATE TABLE public.test_table (id pg_catalog.int8);')
+            path=root/'migration.sql';path.write_bytes(body)
+            m=Migration(2,path,hashlib.sha256(body).hexdigest(),1,2,'expand-only')
+            def guard(cursor,migration):
+                self.assertEqual(calls[-1],'BEGIN');calls.append('GUARDED')
+            result=LockedMigrationExecutor(connection_factory=Connection,
+                manifest=MigrationManifest('a'*40,(m,)),state_file=root/'state.json',backup_dir=root,
+                backup_verifier=lambda _:None,transaction_guard=guard).run()
+            self.assertEqual(result['status'],'completed')
+            self.assertLess(calls.index('GUARDED'),next(i for i,q in enumerate(calls) if 'DO $madar_guard$' in q))
+
+    def test_exceptional_sql_requires_exact_contract_and_coordinated_forward_guard(self):
+        from deployment.lib.migration_executor import Migration
+        from deployment.lib.migration_risk import scaffold
+        calls=[]
+        class Cursor:
+            def __enter__(self):return self
+            def __exit__(self,*args):pass
+            def execute(self,query,params=None):calls.append(str(query));self.query=str(query)
+            def fetchone(self):
+                if 'pg_try_advisory' in self.query:return (True,)
+                if 'schema_version from' in self.query:return (2 if any('DROP TABLE' in q for q in calls) else 1,)
+                return (True,)
+        class Connection:
+            autocommit=True
+            def cursor(self):return Cursor()
+            def rollback(self):pass
+            def close(self):pass
+        body=scaffold(1,2,'DROP TABLE public.retired_items;')
+        contract={'contract':'drop-independent-table-v1','schema':'public','table':'retired_items'}
+        for candidate,coordinated in ((None,True),(dict(contract,table='foreign'),True),(contract,False),(contract,True)):
+            calls.clear()
+            with self.subTest(contract=candidate,coordinated=coordinated),tempfile.TemporaryDirectory() as directory:
+                root=Path(directory);path=root/'migration.sql';path.write_bytes(body)
+                m=Migration(2,path,hashlib.sha256(body).hexdigest(),1,2,'forward-compatible')
+                def run():
+                    return LockedMigrationExecutor(connection_factory=Connection,
+                        manifest=MigrationManifest('a'*40,(m,),coordinated=coordinated),state_file=root/'state.json',
+                        backup_dir=root,backup_verifier=lambda _:None,migration_guard=lambda *_:None,
+                        transaction_guard=lambda *_:calls.append('LOCKED_IMPACT'),exceptional_contract=candidate).run()
+                if candidate==contract and coordinated:
+                    self.assertEqual(run()['status'],'completed')
+                    self.assertLess(calls.index('LOCKED_IMPACT'),next(i for i,q in enumerate(calls) if 'DROP TABLE' in q))
+                else:
+                    with self.assertRaises(RuntimeError):run()
+                    self.assertFalse(any('DROP TABLE' in q for q in calls))

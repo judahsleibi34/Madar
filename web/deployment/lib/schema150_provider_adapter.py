@@ -18,6 +18,8 @@ from urllib.parse import urlsplit, unquote, parse_qs
 from urllib.error import HTTPError
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
+from deployment.lib.completed_normal_profile import maintenance_role
+
 from deployment.lib.completed_normal_admission import (ADMISSIONS, digest as contract_digest,
     validate_provider_preparation)
 from deployment.lib.completed_normal_profile import DELETION, RECONCILED, provider_preparation_profile
@@ -168,6 +170,95 @@ def role_measurements(snapshot):
     return result
 
 
+def capture_original_inventory(package, contract, runtime, *, source_guard):
+    """Publish independently reobserved preparation, never operation authority.
+
+    The expected inventory is root-private and already pinned by the approved
+    contract. Only fixed read-only probes run. No adapter effects, credentials,
+    candidate creation or operation registration occur at this boundary.
+    """
+    from deployment.lib.completed_normal_baseline import BASE
+    from deployment.lib.completed_normal_admission import encoded as admission_encoded
+    from deployment.lib.schema150_actor_inventory import validate_inventory, attest_containers
+    from deployment.lib.schema150_object_inventory import measure_roots
+    selected = validate_provider_preparation(contract)
+    package = Path(package)
+    if (os.geteuid() != 0 or package.parent != BASE
+            or not re.fullmatch('normal-source-[0-9a-f]{64}', package.name)):
+        raise RuntimeError('schema160_inventory_capture_root_package_required')
+    if selected is not RECONCILED:
+        raise RuntimeError('schema160_original_capture_profile_required')
+    destination = package / 'provider-inventory.json'
+    if destination.exists() or destination.is_symlink():
+        raise RuntimeError('schema160_inventory_capture_already_published')
+    source_guard()
+    binding = {'operation': selected.operation, 'context_sha256': contract_digest(contract),
+        'source_sha': contract['candidate']['source_sha'], 'controller_sha': contract['candidate']['controller_sha'],
+        'inventory_sha256': contract['writer_inventory_sha256'],
+        'system_identifier': contract['database']['system_identifier'],
+        'source_schema': selected.source, 'target_schema': selected.target}
+    inventory = validate_inventory(private_json(package / 'provider-inventory-input.json'), binding)
+    if inventory['session_scope']['maintenance_role']!=maintenance_role(contract):
+        raise RuntimeError('schema160_inventory_maintenance_role_changed')
+    if inventory['exclusions'] or any(k.startswith('candidate:') for k in inventory['containers']):
+        raise RuntimeError('schema160_original_inventory_scope_not_proven')
+    database = inventory['containers']['native:db']
+    if (database['id'] != contract['database']['container_id']
+            or database['image'] != contract['database']['image']):
+        raise RuntimeError('schema160_inventory_database_substitution')
+
+    def containers():
+        identifiers = runtime.command(['docker', 'ps', '-aq', '--no-trunc']).split()
+        if (not identifiers or len(identifiers) > 1024 or len(set(identifiers)) != len(identifiers)
+                or any(not re.fullmatch('[0-9a-f]{64}', x) for x in identifiers)):
+            raise RuntimeError('schema160_inventory_snapshot_unbounded')
+        rows = json.loads(runtime.command(['docker', 'inspect', *identifiers]))
+        if {r.get('Id') for r in rows} != set(identifiers):
+            raise RuntimeError('schema160_inventory_snapshot_incomplete')
+        attest_containers(inventory, rows, phase='prepared', binding=binding)
+        return set(identifiers)
+
+    def sql(body):
+        # Database ID is independently bound above; SQL is source-owned only.
+        return runtime.command(['docker', 'exec', '-i', database['id'], 'psql', '-XqAt',
+            '-v', 'ON_ERROR_STOP=1', '-U', maintenance_role(contract), '-d', 'postgres'],
+            input="SET search_path=pg_catalog,public,extensions; SET statement_timeout='10s'; "
+                  "BEGIN READ ONLY; " + body + ' COMMIT;')
+
+    def observe():
+        ids = containers()
+        identity = json.loads(sql("SELECT json_build_array((SELECT system_identifier::text FROM pg_control_system()),"
+            "(SELECT schema_version FROM public.application_schema_state WHERE contract_key='core'));"))
+        if identity != [binding['system_identifier'], selected.source]:
+            raise RuntimeError('schema160_inventory_database_origin_changed')
+        if role_measurements(json.loads(sql(ROLE_SQL))) != inventory['roles']:
+            raise RuntimeError('schema160_inventory_original_roles_changed')
+        for name, expected in inventory['supervisors'].items():
+            text = runtime.command(['systemctl', 'show', name,
+                '--property=FragmentPath,DropInPaths,UnitFileState,ActiveState,SubState,Job,ExecMainPID,ControlPID', '--no-pager'])
+            fields = dict(line.split('=', 1) for line in text.splitlines() if '=' in line)
+            fragment = Path(fields.get('FragmentPath', ''))
+            if not fragment.is_absolute():
+                raise RuntimeError('schema160_inventory_supervisor_unmeasurable')
+            dropins = {path: hashlib.sha256(protected(Path(path)).read_bytes()).hexdigest()
+                for path in fields.get('DropInPaths', '').split()}
+            if (hashlib.sha256(protected(fragment).read_bytes()).hexdigest() != expected['fragment_sha256']
+                    or digest(dropins) != expected['dropins_sha256'] or fields.get('UnitFileState') != expected['enabled']
+                    or fields.get('Job') != '' or fields.get('ControlPID') != '0'):
+                raise RuntimeError('schema160_inventory_supervisor_changed_or_pending')
+        return ids, measure_roots(inventory['object_roots'], phase='identity')
+
+    first = observe()
+    source_guard()
+    if observe() != first:
+        raise RuntimeError('schema160_inventory_capture_changed')
+    source_guard()
+    exclusive(destination, admission_encoded(inventory))
+    return {'operation': selected.operation, 'inventory_sha256': binding['inventory_sha256'],
+        'containers': len(inventory['containers']), 'schema': selected.source,
+        'authority_issued': False, 'writers_fenced': False, 'object_bytes_backed_up': False}
+
+
 class Schema150ProviderAdapter:
     """Actual Docker/systemd/PostgreSQL effects using immutable accepted identities.
 
@@ -196,6 +287,8 @@ class Schema150ProviderAdapter:
         self.root = ADMISSIONS / self.binding['context_sha256']
         from deployment.lib.schema150_actor_inventory import validate_inventory
         self.inventory = validate_inventory(private_json(self.root / 'provider-inventory.json'), self.binding)
+        if self.inventory['session_scope']['maintenance_role']!=maintenance_role(contract):
+            raise RuntimeError('schema160_inventory_maintenance_role_changed')
         self.original_inventory = json.loads(json.dumps(self.inventory))
         if self.inventory['exclusions']:
             raise RuntimeError('schema150_provider_live_exclusion_proofs_required')
@@ -294,7 +387,7 @@ class Schema150ProviderAdapter:
         # Only internal constants and validated original preimages reach this method.
         identifier = self.contract['database']['container_id']
         return self.runtime.command(['docker', 'exec', '-i', identifier, 'psql', '-XqAt',
-            '-v', 'ON_ERROR_STOP=1', '-U', 'postgres', '-d', 'postgres'],
+            '-v', 'ON_ERROR_STOP=1', '-U', maintenance_role(self.contract), '-d', 'postgres'],
             input="SET search_path=pg_catalog,public,extensions; SET statement_timeout='10s'; SET lock_timeout='2s';\n" + body)
 
     def _database_identity(self):
@@ -318,7 +411,7 @@ class Schema150ProviderAdapter:
         if phase in ('private','private-boundary','active','active-boundary') and any(
                 key.startswith('candidate:') for key in self.inventory['containers']):
             self.verify_candidate_stage(rows=rows,phase=phase)
-        proof=attest_containers(self.inventory, rows, phase=phase)
+        proof=attest_containers(self.inventory, rows, phase=phase, binding=self.binding)
         if phase in ('private','private-boundary'):
             for row in rows:
                 if row.get('Name','').lstrip('/') in PROVIDER_NAMES:self._private_ports(row)
@@ -333,7 +426,7 @@ class Schema150ProviderAdapter:
         grant authority, accept health, or permit any worker to consume.
         """
         from deployment.lib.completed_normal_admission import credential_witness
-        from deployment.lib.completed_normal_resources import ROLES,measured_spec_matches
+        from deployment.lib.completed_normal_resources import candidate_roles,candidate_image,measured_spec_matches
         path=self.root/'candidate-staged-runtime.json'
         if not path.exists() or path.is_symlink():
             raise RuntimeError('schema150_private_candidate_stage_required')
@@ -347,7 +440,7 @@ class Schema150ProviderAdapter:
                 or stage['context_sha256']!=self.binding['context_sha256']
                 or stage['source_sha']!=self.binding['source_sha']
                 or stage['images']!=self.contract['candidate']['images']
-                or not isinstance(stage['runtimes'],dict) or set(stage['runtimes'])!=set(ROLES)):
+                or not isinstance(stage['runtimes'],dict) or set(stage['runtimes'])!=set(candidate_roles(self.contract))):
             raise RuntimeError('schema150_private_candidate_stage_changed')
         rows=self._rows() if rows is None else rows
         inventory=self.inventory
@@ -355,11 +448,10 @@ class Schema150ProviderAdapter:
             from deployment.lib.schema150_actor_inventory import bind_staged_candidates
             inventory=bind_staged_candidates(inventory,self.binding,stage,rows,phase=phase)
         actual={row['Id']:row for row in rows}
-        for role in ROLES:
+        for role in candidate_roles(self.contract):
             record=inventory['containers'].get('candidate:'+role)
             sealed=stage['runtimes'][role]
-            expected_image=(self.contract['candidate']['redis_image'] if role=='redis'
-                else self.contract['candidate']['images']['frontend' if role=='frontend' else 'backend'])
+            expected_image=candidate_image(self.contract,role)
             runtime_keys={'id','image','spec_sha256','networks','network_aliases'}
             if stage.get('preparation_mode')=='created-fenced':runtime_keys.add('name')
             if (record is None or not isinstance(sealed,dict)
@@ -369,9 +461,13 @@ class Schema150ProviderAdapter:
                     or any(sealed[k]!=record[k] for k in ('id','image','spec_sha256','networks'))):
                 raise RuntimeError('schema150_private_candidate_identity_changed')
             row=actual.get(record['id'])
+            canonical_started = (self.binding['target_schema']==160
+                and stage.get('preparation_mode')=='created-fenced' and row is not None
+                and row.get('State',{}).get('Status') in {'running','exited'})
             if (row is None or row.get('Image')!=sealed['image']
                     or 'name' in sealed and row.get('Name')!='/'+sealed['name']
-                    or not measured_spec_matches(row,sealed['spec_sha256'],started_worker=role.endswith('-worker'))
+                    or not measured_spec_matches(row,sealed['spec_sha256'],
+                        started_worker=canonical_started or role.endswith('-worker'))
                     or {k:sorted(v.get('Aliases') or []) for k,v in row['NetworkSettings']['Networks'].items()}
                         !={k:sorted(v) for k,v in sealed['network_aliases'].items()}):
                 raise RuntimeError('schema150_private_candidate_identity_changed')
@@ -470,7 +566,7 @@ class Schema150ProviderAdapter:
         if role_measurements(roles) != self.inventory['roles']:
             raise RuntimeError('schema150_provider_measured_role_scope_changed')
         if not self._known_sessions(sessions): raise RuntimeError('schema150_provider_unknown_session')
-        allowed = set(self.inventory['session_scope']['writer_roles']) | {'postgres'}
+        allowed = set(self.inventory['session_scope']['writer_roles']) | {maintenance_role(self.contract)}
         if any(r['rolcanlogin'] and name not in allowed and not name.startswith('pg_') for name,r in roles['roles'].items()):
             raise RuntimeError('schema150_provider_unknown_login_role')
         if int(self._sql('BEGIN READ ONLY;'+BACKGROUND_WRITER_SQL+';COMMIT;'))!=0:
@@ -480,7 +576,7 @@ class Schema150ProviderAdapter:
         states={r['Id']:{'running':r['State']['Running'],'restart':r['HostConfig']['RestartPolicy']['Name']}
                 for r in rows if r['Id'] in known}
         archive = self.runtime.command(['docker','exec',self.contract['database']['container_id'],
-            'pg_dumpall','-U','postgres','--roles-only'])
+            'pg_dumpall','-U',maintenance_role(self.contract),'--roles-only'])
         if not archive.startswith('--') or len(archive.encode())>1024*1024:
             raise RuntimeError('schema150_provider_role_archive_invalid')
         return {'ingress':{'containers':states},'supervisors':{'units':units,'sessions':sessions},
@@ -617,7 +713,7 @@ class Schema150ProviderAdapter:
         if step=='restore_ingress':
             self._attest('active')
             self.verify_target_route()
-            return self.activation_guard(binding,private=False).get('public_acceptance') is True
+            return True
         if step=='clear_boot_interlock':
             if self.barrier.exists():return False
             self.verify_target_route()
@@ -705,8 +801,10 @@ class Schema150ProviderAdapter:
                 or any(type(value.get(k)) is not int or value[k]!=0 for k in DATABASE_COUNTERS)):
             raise RuntimeError('schema150_provider_database_not_quiescent')
         self._object_preservation(binding,preimage,capture=True)
+        from deployment.lib.completed_normal_admission import require_candidate_authority
+        grant=require_candidate_authority(self.contract,mode='READ_ONLY')
         value.update(ingress_fenced=True,supervisors_fenced=True,objects_fenced=True,
-            roles_fenced=True,boot_interlock_armed=self.barrier.exists(),candidate_read_only=self.activation_guard(binding,private=True).get('candidate_read_only') is True)
+            roles_fenced=True,boot_interlock_armed=self.barrier.exists(),candidate_read_only=grant['mode']=='READ_ONLY')
         return value
 
     def backup_role_archive(self, binding):
@@ -815,8 +913,10 @@ class Schema150ProviderAdapter:
         self._attest('private-boundary')
         self._supervisors_stopped()
         sessions=self._sessions()
+        from deployment.lib.completed_normal_admission import require_candidate_authority
+        grant=require_candidate_authority(self.contract,mode='READ_ONLY')
         return {'binding_sha256':digest(binding),'ingress_fenced':True,'workers_fenced':True,
-            'boot_interlock_armed':self.barrier.exists(),'candidate_read_only':self.activation_guard(binding,private=True).get('target_write_authority') is False,
+            'boot_interlock_armed':self.barrier.exists(),'candidate_read_only':grant['mode']=='READ_ONLY',
             'unknown_writers':int(self._sql('BEGIN READ ONLY;'+BACKGROUND_WRITER_SQL+';COMMIT;')),
             'unknown_client_sessions':0 if self._known_sessions(sessions) else len(sessions),
             'prepared_transactions':int(self._sql('SELECT count(*) FROM pg_prepared_xacts;'))}
@@ -837,10 +937,10 @@ class Schema150ProviderAdapter:
             row=self._row(name)
             self._private_ports(row)
             self.runtime.command(['docker','start',row['Id']])
-        from deployment.lib.schema150_actor_inventory import PRIVATE_CANDIDATE_ROLES
+        from deployment.lib.schema150_actor_inventory import private_candidate_roles
         if any(key.startswith('candidate:') for key in self.inventory['containers']):
             self.verify_candidate_stage()
-            for logical in PRIVATE_CANDIDATE_ROLES:
+            for logical in private_candidate_roles(binding):
                 self.runtime.command(['docker','start',self.inventory['containers'][logical]['id']])
 
     def verify_native_acceptance(self,binding,preimage):
@@ -861,9 +961,9 @@ class Schema150ProviderAdapter:
                 or owner['old']!={'sha':self.contract['source_roles']['application_sha'],'slot':self.contract['origin']['slot']}
                 or owner['candidate']!={'sha':self.binding['source_sha'],'slot':self.contract['candidate']['slot']}):
             raise RuntimeError('schema150_provider_accepted_worker_owner_required')
-        from deployment.lib.schema150_actor_inventory import WORKER_ROLES
+        from deployment.lib.schema150_actor_inventory import consuming_worker_roles
         for logical,record in self.inventory['containers'].items():
-            if logical.startswith('candidate:') and logical.split(':',1)[1] in WORKER_ROLES:
+            if logical.startswith('candidate:') and logical.split(':',1)[1] in consuming_worker_roles(binding):
                 self.runtime.command(['docker','start',record['id']])
 
     def restore_ingress(self,binding,preimage):
@@ -967,8 +1067,6 @@ class Schema150ProviderAdapter:
     def clear_boot_interlock(self,binding,preimage):
         self.require_authority(binding,purpose='clear_boot_interlock');self._attest('active')
         self.verify_target_route()
-        if self.activation_guard(binding,private=False).get('public_acceptance') is not True:
-            raise RuntimeError('schema150_provider_public_acceptance_required')
         if private_json(self.barrier)!={'binding':binding,'preimage_sha256':digest(preimage)}:
             raise RuntimeError('schema150_provider_barrier_identity_changed')
         self.barrier.unlink()

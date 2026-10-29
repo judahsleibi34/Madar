@@ -122,6 +122,12 @@ class QuiescenceScopeDatabaseTests(unittest.TestCase):
         stack.enter_context(patch.object(retained,'protected',lambda p,**kw:Path(p)))
         stack.enter_context(patch.object(adapter,'private_json',lambda p:__import__('json').loads(Path(p).read_bytes())))
         stack.enter_context(patch('deployment.lib.schema149_consumers.verify_host_processes'))
+        # This fixture models host/root authority explicitly; only PostgreSQL,
+        # journal/flock and the executor's advisory-locked cursor are native.
+        # The adapter now reads the real grant boundary instead of a callback
+        # PASS. Supplying that modeled boundary does not register historical150.
+        stack.enter_context(patch('deployment.lib.completed_normal_admission.require_candidate_authority',
+            return_value={'mode':'READ_ONLY','schema':146}))
         binding={'operation':DELETION.operation,'context_sha256':'a'*64,'source_sha':'b'*40,'controller_sha':'c'*40,
             'inventory_sha256':'d'*64,'system_identifier':self.identifier,'source_schema':146,'target_schema':150}
         actor=adapter.Schema150ProviderAdapter.__new__(adapter.Schema150ProviderAdapter)
@@ -161,6 +167,17 @@ class QuiescenceScopeDatabaseTests(unittest.TestCase):
         with self.db.cursor() as cursor,self.assertRaisesRegex(RuntimeError,'migration_lock_required'):
             actor.migration_guard(cursor,migration)
         self.assertEqual(journal.read(),before)
+
+    def test_migration_callback_refuses_missing_root_grant_despite_callback_pass(self):
+        actor,journal,migration=self.migration_hook_fixture();self.acquire_migration_lock()
+        before=journal.read()
+        with patch('deployment.lib.completed_normal_admission.require_candidate_authority',
+                side_effect=RuntimeError('synthetic_missing_root_grant')):
+            with self.db.cursor() as cursor,self.assertRaisesRegex(RuntimeError,'missing_root_grant'):
+                actor.migration_guard(cursor,migration)
+        self.assertEqual(journal.read(),before)
+        self.assertEqual(self.db.execute("select schema_version from public.application_schema_state where contract_key='core'").fetchone()[0],149)
+        actor.activation_guard.assert_not_called();actor._sql.assert_not_called()
 
     def test_migration_callback_does_not_exempt_another_client(self):
         actor,journal,migration=self.migration_hook_fixture();self.acquire_migration_lock();self.other_database()

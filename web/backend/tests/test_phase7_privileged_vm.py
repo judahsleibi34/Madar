@@ -327,4 +327,31 @@ class PrivilegedVmSafetyTests(unittest.TestCase):
                 self.assertNotEqual(image.read_bytes(), original)
 
 
+class AutomaticGuestCleanupTests(unittest.TestCase):
+    def guest(self,root):
+        from unittest.mock import Mock
+        g=vm.AutomaticReleaseGuest.__new__(vm.AutomaticReleaseGuest)
+        g.run_id='owned-test-run';parent=root/g.run_id;parent.mkdir()
+        g.directory=parent/'guest';g.directory.mkdir();(g.directory/'guest.qcow2').write_bytes(b'owned fixture')
+        g.evidence=root/'evidence';g.evidence.mkdir();g.pid=None;g.process=None
+        g.record={'resources_removed':False};g.save=Mock();return g
+    def test_explicit_and_atexit_cleanup_are_idempotent_after_verified_removal(self):
+        with tempfile.TemporaryDirectory() as raw:
+            g=self.guest(Path(raw))
+            g.save.side_effect=lambda:self.assertFalse(g.directory.exists())
+            g.close();g.close()
+            self.assertTrue(g.record['resources_removed']);g.save.assert_called_once()
+    def test_failed_removal_never_publishes_success(self):
+        with tempfile.TemporaryDirectory() as raw:
+            g=self.guest(Path(raw))
+            with patch.object(vm.shutil,'rmtree',side_effect=OSError('bounded deletion failure')):
+                with self.assertRaises(OSError):g.close()
+            self.assertFalse(g.record['resources_removed']);g.save.assert_not_called();self.assertTrue(g.directory.exists())
+    def test_missing_scope_without_previous_verified_receipt_refuses(self):
+        with tempfile.TemporaryDirectory() as raw:
+            g=self.guest(Path(raw));(g.directory/'guest.qcow2').unlink();g.directory.rmdir()
+            with self.assertRaisesRegex(RuntimeError,'missing_without_receipt'):g.close()
+            g.save.assert_not_called()
+
+
 if __name__ == '__main__': unittest.main()

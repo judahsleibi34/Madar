@@ -91,6 +91,9 @@ REQUIRED_PRODUCTION_READINESS = {
 }
 PROTECTED_PATHS = (
     "web/deployment",
+    "web/scripts/prepare_completed_normal_package.py",
+    "web/scripts/continue_completed_normal_upgrade.py",
+    "web/frontend/private-provider160.conf",
     "web/scripts/madar_alert_hook.sh",
     "web/scripts/backup_madar.sh",
     "web/scripts/verify_backup.sh",
@@ -708,6 +711,18 @@ class SystemOperations:
         except (RuntimeError,ValueError,KeyError,IndexError,OSError) as error:
             raise UpgradeError('completed_compatible_runtime_invalid') from error
 
+    def historical_origin_binding(self,state):
+        # Distinct truthful enrollment; never call this a completed upgrade.
+        from deployment.lib.historical_origin import attest
+        return attest(self,state)
+
+    def historical_origin_action(self,action,*,request_id=None,token=None,confirmation=None):
+        from deployment.lib import historical_origin as origin
+        if action=='prepare':return origin.prepare(self)
+        if action=='inspect':return origin.inspect(self,request_id)
+        if action=='enroll':return origin.enroll(self,request_id,token,confirmation)
+        raise UpgradeError('historical_origin_action_invalid')
+
     def live_schema(self, slot: str) -> int:
         if slot not in SLOT_PORTS:
             raise UpgradeError("active_slot_invalid")
@@ -747,6 +762,16 @@ class SystemOperations:
             if binding['application_sha']!=sha or binding['schema']!=schema:
                 raise UpgradeError('completed_compatible_migration_changed')
             return 'completed'
+        if 'historical_origin' in known_good:
+            binding=self.historical_origin_binding(release_state)
+            if (binding.get('origin_kind')!='independently-enrolled-historical-bootstrap-origin'
+                    or binding.get('application_sha')!=sha or schema!=146 or binding.get('schema')!=146):
+                raise UpgradeError('historical_origin_migration_identity_changed')
+            prior=self.state_root/'migrations'/sha
+            if prior.exists() or prior.is_symlink():
+                raise UpgradeError('historical_origin_migration_history_conflict')
+            # Truthful genesis/bootstrap, not a prior protected SQL completion.
+            return 'not_requested'
         if known_good.get("sha") == sha and known_good.get("runtime_only_rollback") is True:
             # A completed NORMAL continuation has a protected execution contract,
             # not an ordinary immutable release checkout. Re-attest that exact
@@ -1645,6 +1670,8 @@ class SystemOperations:
         if (state.get('known_good_release') or {}).get('sha')!=production_sha:
             if 'completed_normal_upgrade' in (state.get('known_good_release') or {}):
                 source_roles=self.completed_compatible_binding(state)
+            elif 'historical_origin' in (state.get('known_good_release') or {}):
+                source_roles=self.historical_origin_binding(state)
             else:
                 from deployment.lib.completed_normal_baseline import discover_split
                 try:source_roles=discover_split(self,state,production_sha,installed_sha)
@@ -2697,12 +2724,128 @@ class SystemOperations:
             cwd=backup,
         )
 
+    def authenticate_operator(self, token: str) -> dict:
+        """Identity observation for the existing issuer; never release approval.
+
+        Project only the business signing-key digest in a fixed trusted child
+        so the command audit cannot retain its raw Docker environment. A
+        tenant/business auth key must never be the infrastructure trust root.
+        """
+        from deployment.lib.migration_policy import load_policy
+        from deployment.lib.control_plane_upgrade_authorization import authenticate_release_operator
+        policy=load_policy()
+        code="""import hashlib,json,subprocess
+rows=json.loads(subprocess.check_output(['/usr/bin/docker','inspect','supabase-auth'],timeout=10))
+if len(rows)!=1 or rows[0]['Name']!='/supabase-auth':raise RuntimeError('business_auth_identity_missing')
+keys=[entry.split('=',1)[1] for entry in rows[0]['Config'].get('Env',[]) if entry.startswith('GOTRUE_JWT_SECRET=')]
+if len(keys)!=1 or not keys[0]:raise RuntimeError('business_auth_key_missing')
+print(hashlib.sha256(keys[0].encode()).hexdigest())
+"""
+        business_digest=self.command('operator_business_realm_digest',
+            ['/usr/bin/python3','-I','-B','-c',code],timeout=15).stdout
+        if not re.fullmatch('[0-9a-f]{64}',business_digest):raise UpgradeError('release_operator_business_realm_unverified')
+        return authenticate_release_operator(token,environment_id=policy['environment_id'],
+            database_system_identifier=policy['database_system_identifier'],controller_sha=self.installed_sha(),
+            business_auth_key_sha256=business_digest)
+
+    def execute_automatic_release(self,sha,*,manual_retry=False):
+        from deployment.lib.automatic_release_execution import execute
+        from deployment.lib.automatic_release_admission import execution_policy,require_no_pending_operation
+        from deployment.lib.environment_file import load_environment_file
+        import importlib.machinery,importlib.util
+        require_no_pending_operation()
+        execution_policy(self) # Refuse unsupported production BEFORE any effects.
+        if self.interlock_file.exists() or self.interlock_file.is_symlink():
+            raise UpgradeError('automatic_existing_interlock_requires_recovery')
+        self.prepare_upgrade_roots()
+        load_environment_file(Path('/etc/madar/production.env'))
+        for key,name in (('MADAR_PRODUCTION_REPO',self.repo),('MADAR_DEPLOY_STATE_ROOT',self.state_root),
+                         ('MADAR_ENV_FILE',Path('/etc/madar/production.env'))):
+            os.environ[key]=str(name)
+        admitted=self.prepare_automatic_release(sha)
+        entry=self.control_root/'bin/madar-release-deploy'
+        loader=importlib.machinery.SourceFileLoader('madar_trusted_automatic_release',str(entry))
+        module=importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name,loader));loader.exec_module(module)
+        return execute(self,admitted,module.DockerGitOperations,manual_retry=manual_retry)
+
+    def exceptional_release_action(self,action,*,source=None,request_id=None,token=None,confirmation=None):
+        from deployment.lib import exceptional_release_approval as approval
+        from deployment.lib.automatic_release_admission import execution_policy,require_no_pending_operation
+        if action=='list':
+            approval.audit_policy(self)
+            if not approval.root().exists():return []
+            return [approval.inspect(self,p.name) for p in sorted(approval.root().iterdir()) if p.is_dir()]
+        if action=='inspect':return approval.inspect(self,request_id)
+        execution_policy(self) # Mandatory live isolation for every effectful action.
+        if action=='prepare':return approval.create(self,source)
+        if action in {'approve','reject','revoke'}:
+            return approval.decide(self,request_id,action,token,confirmation)
+        if action!='execute':raise UpgradeError('exceptional_action_invalid')
+        status=approval.inspect(self,request_id)
+        if status['request'] is None:raise UpgradeError('exceptional_request_unaccepted')
+        value=status['request']['admission']
+        if confirmation!=status['request_sha256']:raise UpgradeError('exceptional_explicit_confirmation_required')
+        if status['state']!='APPROVED' or status['consumed']:raise UpgradeError('exceptional_approval_not_executable')
+        require_no_pending_operation()
+        if self.interlock_file.exists() or self.interlock_file.is_symlink():raise UpgradeError('exceptional_existing_interlock_requires_recovery')
+        self.prepare_upgrade_roots()
+        from deployment.lib.environment_file import load_environment_file
+        from deployment.lib.automatic_release_execution import execute
+        import importlib.machinery,importlib.util
+        load_environment_file(Path('/etc/madar/production.env'))
+        for key,name in (('MADAR_PRODUCTION_REPO',self.repo),('MADAR_DEPLOY_STATE_ROOT',self.state_root),
+                         ('MADAR_ENV_FILE',Path('/etc/madar/production.env'))):os.environ[key]=str(name)
+        entry=self.control_root/'bin/madar-release-deploy'
+        loader=importlib.machinery.SourceFileLoader('madar_trusted_exceptional_release',str(entry))
+        module=importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name,loader));loader.exec_module(module)
+        self.exceptional_operator_token=token
+        self.exceptional_execution_lock_acquired=False
+        try:return execute(self,value,module.DockerGitOperations)
+        except BaseException as error:
+            # A consumed attempt is never made reusable after a crash/failure.
+            # SIGKILL leaves its durable journal for boot/recovery inspection.
+            try:
+                status=approval.inspect(self,request_id)
+                target='RECOVERY_REQUIRED' if status['consumed'] else 'FAILED'
+                if self.exceptional_execution_lock_acquired is True and status['state'] in {'APPROVED','REVALIDATING','AUTHORIZED_FOR_EXECUTION','EXECUTING','VERIFYING','RECOVERY_REQUIRED'}:
+                    code=str(error) if re.fullmatch('[a-z0-9_:,]{1,200}',str(error)) else 'bounded_execution_failed'
+                    approval.execution_event(self,value,target,{'error_type':type(error).__name__,'error_code':code})
+            except Exception:
+                pass # Existing durable attempt remains fenced; preserve ORIGINAL failure.
+            raise
+        finally:
+            self.exceptional_operator_token=None
+            self.exceptional_execution_lock_acquired=False
+
+    def recover_automatic_known_good(self):
+        # Boot recovery verifies existing completed authority; it deliberately
+        # does not enter automatic admission, reserve a release or issue grants.
+        from deployment.lib.automatic_release_recovery import recover
+        import importlib.machinery,importlib.util
+        entry=self.control_root/'bin/madar-release-deploy'
+        loader=importlib.machinery.SourceFileLoader('madar_trusted_boot_release',str(entry))
+        module=importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name,loader));loader.exec_module(module)
+        return recover(self,module.DockerGitOperations)
+
+    def prepare_automatic_release(self,sha):
+        from deployment.lib.automatic_release_admission import observe_admission,publish
+        admitted=observe_admission(self,sha)
+        publish(admitted)
+        return admitted
+
+    def reobserve_automatic_admission(self, admitted):
+        from deployment.lib.automatic_release_admission import observe_admission
+        return observe_admission(self,admitted['source_sha'],attempt_id=admitted['attempt_id'],
+            created_at=admitted['created_at'],expires_at=admitted['expires_at'],
+            exceptional_request_id=admitted.get('exceptional',{}).get('request_id'))
+
     def write_authorization(
         self, approved_sha: str, *, recovery: bool = False,
         schema: int | None = None, rehearsal_sha256: str | None = None,
         completed_normal_contract: dict | None = None,
         migration_resumption: dict | None = None,
         completed_normal_mode: str | None = None,
+        automatic_release_admission: dict | None = None,
     ) -> None:
         if completed_normal_mode is not None and completed_normal_contract is None:
             raise UpgradeError('completed_normal_deploy_contract_required')
@@ -2781,6 +2924,19 @@ class SystemOperations:
                     if completed_normal_mode is None:
                         witnesses['migration_database']=issue_database_lease(completed_normal_contract)
                         witness_hashes['migration_database_sha256']=digest(witnesses['migration_database'])
+        if automatic_release_admission is not None:
+            if recovery or completed_normal_contract is not None or migration_resumption is not None or completed_normal_mode is not None:
+                raise UpgradeError('automatic_authorization_scope_mixed')
+            from deployment.lib.automatic_release_admission import require_issue,require_reserved,OPERATION
+            from deployment.lib.migration_inventory import digest as automatic_digest
+            from deployment.lib.completed_normal_admission import digest as witness_digest
+            admitted=require_issue(automatic_release_admission,self)
+            require_reserved(admitted)
+            if admitted['source_sha']!=approved_sha:
+                raise UpgradeError('automatic_authorization_source_changed')
+            operation=OPERATION;schema=admitted['database']['origin_schema'];context=automatic_digest(admitted)
+            witnesses['automatic_release_admission']=admitted
+            witness_hashes['automatic_release_admission_sha256']=witness_digest(admitted)
         if migration_resumption is not None:
             if completed_normal_contract is None:
                 raise UpgradeError('completed_forward_parent_contract_required')
@@ -3574,6 +3730,21 @@ def main(argv: list[str] | None = None) -> int:
             "installed controller"
         ),
     )
+    parser.add_argument('--restore-isolated-fence',action='store_true',help='Restore the independently enrolled disposable guest fence before networking')
+    parser.add_argument('--recover-known-good',action='store_true',help='Recover the exact independently sealed known-good application; never migrate')
+    parser.add_argument('--install-isolated-recovery',action='store_true',help='Install boot dependencies only in a positively enrolled disposable guest')
+    parser.add_argument('--automatic-release',action='store_true',
+        help='Execute an independently admitted routine release through the existing deployer')
+    parser.add_argument('--automatic-poll',action='store_true',
+        help='Discover eligible main source and execute an independently admitted routine release')
+    parser.add_argument('--automatic-retry-failed-source',action='store_true',
+        help='Explicit retry suppression override; all automatic admission/authority gates still apply')
+    parser.add_argument('--exceptional',choices=('prepare','list','inspect','approve','reject','revoke','execute'),help='Exact exceptional review/approval lifecycle; never an automatic policy override')
+    parser.add_argument('--historical-origin',choices=('prepare','inspect','enroll'),help='Truthful isolated historical bootstrap enrollment; not migration approval or completion')
+    parser.add_argument('--request-id',help='Immutable exceptional request UUID')
+    parser.add_argument('--confirm-request-digest',help='Explicit confirmation of the displayed immutable request digest')
+    parser.add_argument('--authenticate-operator',action='store_true',
+        help='Authenticate independent infrastructure AAL2 from stdin/terminal; does not approve or execute a release')
     parser.add_argument(
         "--recover-current-schema", action="store_true",
         help=(
@@ -3585,7 +3756,7 @@ def main(argv: list[str] | None = None) -> int:
         "--rehearsal-attestation", type=Path,
         help="Root-owned mode-0600 exact-SHA schema-recovery rehearsal attestation",
     )
-    parser.add_argument("sha", help="Exact 40-character origin/main commit SHA")
+    parser.add_argument("sha", nargs="?", help="Exact 40-character origin/main commit SHA")
     args = parser.parse_args(argv)
     if bool(args.rehearsal_attestation) != bool(args.recover_current_schema):
         parser.error(
@@ -3594,6 +3765,114 @@ def main(argv: list[str] | None = None) -> int:
     if os.geteuid() != 0:
         print("CONTROL-PLANE UPGRADE: FAILED\nerror: effective_root_required", file=sys.stderr)
         return 1
+    if args.historical_origin:
+        if any((args.sha,args.exceptional,args.dry_run,args.automatic_release,args.automatic_poll,
+                args.automatic_retry_failed_source,args.authenticate_operator,args.restore_isolated_fence,
+                args.recover_known_good,args.install_isolated_recovery,args.recover_current_schema,args.rehearsal_attestation)):
+            parser.error('historical enrollment cannot mix with release execution or source selection')
+        if args.historical_origin=='prepare':
+            if args.request_id or args.confirm_request_digest:parser.error('prepare uses only independently pinned origin policy')
+        elif not args.request_id:parser.error('historical enrollment request UUID required')
+        if (args.historical_origin=='enroll')!=bool(args.confirm_request_digest):
+            parser.error('only enrollment requires explicit request-digest confirmation')
+        try:
+            token=None
+            if args.historical_origin=='enroll':
+                if sys.stdin.isatty():
+                    import getpass
+                    token=getpass.getpass('Fresh infrastructure AAL2 access token: ')
+                else:token=sys.stdin.read(16385).strip()
+                if len(token)>16384:raise RuntimeError('release_operator_credential_invalid')
+            result=SystemOperations().historical_origin_action(args.historical_origin,
+                request_id=args.request_id,token=token,confirmation=args.confirm_request_digest)
+            print(json.dumps(result,sort_keys=True));return 0
+        except (RuntimeError,ValueError,OSError,TypeError,subprocess.SubprocessError) as error:
+            code=str(error) if re.fullmatch('[a-z0-9_]{1,160}',str(error)) else 'historical_origin_enrollment_failed'
+            print('HISTORICAL ORIGIN: REFUSED; error: '+code,file=sys.stderr);return 1
+    if args.exceptional:
+        if any((args.dry_run,args.automatic_release,args.automatic_poll,args.automatic_retry_failed_source,args.authenticate_operator,
+                args.restore_isolated_fence,args.recover_known_good,args.install_isolated_recovery,args.recover_current_schema,args.rehearsal_attestation)):
+            parser.error('exceptional release review and execution cannot mix with other operations')
+        if args.exceptional=='prepare':
+            if not args.sha or args.request_id or args.confirm_request_digest:parser.error('prepare requires only an exact source SHA')
+        elif args.sha:parser.error('exceptional operations use an immutable request UUID, not a new source SHA')
+        if args.exceptional in {'list','prepare'}:
+            if args.request_id:parser.error('this action does not take a request UUID')
+        elif not args.request_id:parser.error('a request UUID is required')
+        mutation=args.exceptional in {'approve','reject','revoke','execute'}
+        if mutation and not args.confirm_request_digest:parser.error('explicit request-digest confirmation is required')
+        if not mutation and args.confirm_request_digest:parser.error('display actions cannot confirm execution')
+        try:
+            token=None
+            if mutation:
+                if sys.stdin.isatty():
+                    import getpass
+                    token=getpass.getpass('Fresh infrastructure AAL2 access token: ')
+                else:token=sys.stdin.read(16385).strip()
+                if len(token)>16384:raise RuntimeError('release_operator_credential_invalid')
+            result=SystemOperations().exceptional_release_action(args.exceptional,
+                source=normalize_sha(args.sha) if args.sha else None,request_id=args.request_id,
+                token=token,confirmation=args.confirm_request_digest)
+            print(json.dumps(result,sort_keys=True));return 0
+        except (RuntimeError,ValueError,OSError,TypeError,subprocess.SubprocessError) as error:
+            code=str(error) if re.fullmatch('[a-z0-9_:,]{1,200}',str(error)) else 'exceptional_execution_failed'
+            print('EXCEPTIONAL RELEASE: REFUSED; error: '+code,file=sys.stderr);return 1
+    if args.request_id or args.confirm_request_digest:parser.error('request arguments require an exceptional action')
+    recovery_modes=(args.restore_isolated_fence,args.recover_known_good,args.install_isolated_recovery)
+    if any(recovery_modes):
+        if sum(recovery_modes)!=1 or any((args.sha,args.dry_run,args.automatic_release,args.automatic_poll,args.automatic_retry_failed_source,args.authenticate_operator,args.recover_current_schema,args.rehearsal_attestation)):
+            parser.error('recovery is a separate lifecycle operation')
+        try:
+            from deployment.lib.automatic_release_recovery import restore_isolation,install
+            operations=SystemOperations()
+            result=(restore_isolation(operations) if args.restore_isolated_fence else
+                    install(operations) if args.install_isolated_recovery else operations.recover_automatic_known_good())
+            print(json.dumps(result,sort_keys=True));return 0
+        except (RuntimeError,ValueError,OSError,TypeError,subprocess.SubprocessError):
+            print('KNOWN-GOOD RECOVERY: REFUSED; inspect the root recovery journal and systemd log',file=sys.stderr);return 1
+    if args.automatic_retry_failed_source and not (args.automatic_release or args.automatic_poll):
+        parser.error('automatic retry requires an automatic release mode')
+    if args.automatic_release or args.automatic_poll:
+        if args.automatic_release and args.automatic_poll or args.dry_run or args.recover_current_schema or args.authenticate_operator:
+            parser.error('automatic release modes cannot mix with other operations')
+        try:
+            operations=SystemOperations()
+            from deployment.lib.automatic_release_admission import execution_policy,require_no_pending_operation
+            require_no_pending_operation()
+            execution_policy(operations)
+            if args.automatic_poll:
+                if args.sha:parser.error('--automatic-poll does not accept a caller SHA')
+                source=normalize_sha(operations.root_git('automatic_main','rev-parse','refs/remotes/origin/main',cwd=operations.repo).stdout)
+                state=json_file(operations.state_root/'state.json','release_state_invalid')
+                if (state.get('known_good_release') or {}).get('sha')==source and not state.get('in_progress_release'):
+                    print(json.dumps({'operation':'automatic-poll','status':'already_deployed','source_sha':source}));return 0
+            else:source=normalize_sha(args.sha)
+            print(json.dumps(operations.execute_automatic_release(source,manual_retry=args.automatic_retry_failed_source),sort_keys=True));return 0
+        except (RuntimeError,ValueError,OSError,TypeError) as error:
+            code=str(error) if isinstance(error,RuntimeError) and re.fullmatch('[a-z0-9_:,]{1,200}',str(error)) else 'automatic_execution_failed'
+            if code=='automatic_execution_failed' and re.fullmatch(r'root_protected_[a-z_]+:[/a-z0-9_.-]{1,200}',str(error)):
+                code=str(error).split(':',1)[0] # actionable code, no private path/values
+            print('AUTOMATIC RELEASE: REFUSED; error: '+code,file=sys.stderr);return 1
+    if not args.sha:parser.error('an exact SHA is required')
+    if args.authenticate_operator:
+        if args.dry_run or args.recover_current_schema or args.rehearsal_attestation:
+            parser.error('--authenticate-operator is an identity-only operation')
+        try:
+            normalize_sha(args.sha)
+            if sys.stdin.isatty():
+                import getpass
+                token=getpass.getpass('Infrastructure AAL2 access token: ')
+            else:
+                token=sys.stdin.read(16385).strip()
+            if len(token)>16384:raise RuntimeError('release_operator_credential_invalid')
+            result=SystemOperations().authenticate_operator(token)
+            print(json.dumps({'operation':'release-operator-authentication','identity':result,
+                'release_approved':False,'authority_issued':False},sort_keys=True))
+            return 0
+        except (RuntimeError,ValueError,OSError) as error:
+            code=str(error) if re.fullmatch('[a-z_]+',str(error)) else 'release_operator_authentication_failed'
+            print('RELEASE OPERATOR: REFUSED\nerror: '+code,file=sys.stderr)
+            return 1
     try:
         approved_sha = normalize_sha(args.sha)
         operations = SystemOperations()

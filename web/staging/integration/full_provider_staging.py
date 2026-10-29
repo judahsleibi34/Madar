@@ -21,6 +21,7 @@ import sys
 import time
 
 import manage
+import run_cleanup
 import smoke
 import tenant_smoke
 import schema150_acceptance as application
@@ -116,13 +117,19 @@ def target(source,schema,*,calendar=False):
         SERVICES=original_services
 
 
-def source_plan(source,baseline):
+def source_plan(source,baseline,*,fresh=False):
     git=GitSource(manage.REPOSITORY)
     if git.command('rev-parse','HEAD').strip().decode()!=source or git.command('status','--porcelain','--untracked-files=normal').strip():
         raise RuntimeError('full_staging_clean_exact_source_required')
-    origin=discover(manage.REPOSITORY,source_sha=baseline,history_base_sha=baseline).target
+    baseline_inventory=discover(manage.REPOSITORY,source_sha=baseline,history_base_sha=baseline)
     inventory=discover(manage.REPOSITORY,source_sha=source,history_base_sha=baseline)
-    plan=generate(manage.REPOSITORY,inventory,origin=origin)
+    # Publication is not target selection. Fresh acceptance still exercises the
+    # reviewed schema160 application, even when main publishes later unselected
+    # candidates. Authenticate their bytes too, but never apply them implicitly.
+    # The 146->160 plan describes the canonical exceptional path; fresh genesis
+    # is not acceptance or authorization of that existing-database upgrade.
+    plan=generate(manage.REPOSITORY,inventory,origin=146 if fresh else baseline_inventory.target,
+        target=160 if fresh else None)
     if plan.document()['execution_class']!='transactional':raise RuntimeError('full_staging_transactional_path_required')
     return inventory,plan
 
@@ -219,13 +226,16 @@ def browser_acceptance(source):
 
 
 def main(mode,directory,source,baseline,*,keep_running=False):
-    if mode not in ('INSPECT','REHEARSE','FRESH_APPLICATION'):raise RuntimeError('full_staging_explicit_mode_required')
+    if mode not in ('INSPECT','REHEARSE','FRESH_APPLICATION','CLEANUP'):raise RuntimeError('full_staging_explicit_mode_required')
     project=identity(source);runtime=runtime_parent()/project
     require_host(runtime)
-    inventory,plan=source_plan(source,baseline);value=plan.document();schema=value['target_schema']
+    if mode == 'CLEANUP':
+        with lease(), target(source,160,calendar=True):
+            return run_cleanup.stop_and_teardown(runtime, services=SERVICES)
+    fresh = mode == 'FRESH_APPLICATION'
+    inventory,plan=source_plan(source,baseline,fresh=fresh);value=plan.document();schema=value['target_schema']
     if mode=='REHEARSE' and value['risk_class']=='D':
         raise RuntimeError('full_staging_exceptional_sql_requires_separate_review')
-    fresh = mode == 'FRESH_APPLICATION'
     if fresh and schema != 160:
         raise RuntimeError('full_staging_fresh_canonical160_required')
     if keep_running and (not fresh or socket.gethostname() != 'madar-staging'):
@@ -260,6 +270,8 @@ def main(mode,directory,source,baseline,*,keep_running=False):
         configuration.generate(runtime,source,images,receipt,
             {'DATABASE_PASSWORD':secrets.token_hex(32),'JWT_SECRET':secrets.token_hex(32)},project,project,
             target_schema=schema,fresh_database=True,calendar=fresh)
+        if fresh:
+            run_cleanup.reserve(runtime, source=source, retain=keep_running)
         manage.private_write('release-plan.json',plan.encoded.decode())
         manage.private_write('migration-inventory.json',canonical(inventory.document()).decode())
         try:
@@ -311,6 +323,8 @@ def main(mode,directory,source,baseline,*,keep_running=False):
                 raise RuntimeError('full_staging_component_not_healthy')
             report={'version':1,'status':'PASS','scope':'fresh-synthetic-genesis-full-provider-application-acceptance',
                 'source_sha':source,'history_base_sha':baseline,'project':project,'schema':schema,
+                'authenticated_inventory_target':inventory.target,
+                'unselected_migrations':[m.record() for m in inventory.migrations if m.number>schema],
                 'origin_schema':None if fresh else value['origin_schema'],'plan_sha256':plan.sha256,'risk_class':value['risk_class'],
                 'acceptance_kind':'fresh_application' if fresh else 'ordinary_migration_rehearsal',
                 'existing_database_upgrade_accepted':False,
@@ -336,6 +350,8 @@ def main(mode,directory,source,baseline,*,keep_running=False):
                 manage.compose('stop','--timeout','15')
                 if any(row['running'] for row in actors(images,complete=True).values()):
                     raise RuntimeError('full_staging_stop_not_observed')
+            if fresh and not keep_running:
+                report['cleanup'] = run_cleanup.teardown(runtime, services=SERVICES, apply=True)
             manage.private_write('full-provider-acceptance.json',json.dumps(report,sort_keys=True,indent=2)+'\n')
             return report
         except BaseException as error:
@@ -352,12 +368,18 @@ def main(mode,directory,source,baseline,*,keep_running=False):
                 manage.compose('stop','--timeout','15')
             except Exception as cleanup:failure['cleanup_exception_type']=type(cleanup).__name__
             manage.private_write('full-provider-failure.json',json.dumps(failure,sort_keys=True)+'\n')
+            if fresh and not keep_running:
+                try:run_cleanup.stop_and_teardown(runtime, services=SERVICES)
+                except Exception as cleanup:
+                    failure['cleanup_exception_type']=type(cleanup).__name__
+                    failure['resources_retained_for_review']=True
+                    manage.private_write('full-provider-failure.json',json.dumps(failure,sort_keys=True)+'\n')
             raise
 
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('mode',choices=('INSPECT','REHEARSE','FRESH_APPLICATION'))
+    parser.add_argument('mode',choices=('INSPECT','REHEARSE','FRESH_APPLICATION','CLEANUP'))
     parser.add_argument('--artifacts',type=Path,required=True)
     parser.add_argument('--source-sha',required=True);parser.add_argument('--history-base-sha',required=True)
     parser.add_argument('--keep-running',action='store_true',help='Keep an accepted fresh review stack on madar-staging only')

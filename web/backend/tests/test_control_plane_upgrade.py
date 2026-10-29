@@ -786,6 +786,9 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             layout = self.filesystem_layout(root)
             layout.state_root.mkdir(mode=0o755)
+            # sitecustomize intentionally sets umask077. Exercise an actual
+            # insecure0755 state directory, not a request masked back to0700.
+            layout.state_root.chmod(0o755)
             with self.assertRaisesRegex(
                 filesystem.FilesystemPreflightError,
                 "root_protected_directory_mode_invalid",
@@ -2402,3 +2405,13 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AutomaticExecutionPendingIntegrationTests(unittest.TestCase):
+    def test_installed_execution_method_reaches_pending_guard_before_runtime_or_effects(self):
+        from unittest.mock import patch
+        from deployment.lib.control_plane_upgrade import SystemOperations
+        with patch('deployment.lib.automatic_release_admission.require_no_pending_operation',side_effect=RuntimeError('automatic_durable_operation_requires_recovery')) as pending,patch('deployment.lib.automatic_release_admission.execution_policy') as policy:
+            with self.assertRaisesRegex(RuntimeError,'automatic_durable_operation_requires_recovery'):
+                SystemOperations.execute_automatic_release(object(),'a'*40)
+            pending.assert_called_once_with();policy.assert_not_called()

@@ -249,7 +249,7 @@ class CompletedNormalUpgrade:
     summary or an old acceptance grant cannot substitute for these verifiers.
     """
     def __init__(self,actor,*,artifact_guard,model_loader,acceptance_guard,rehearsal_guard,
-                 maintenance_acceptance_guard=None,maintenance_activation_guard=None):
+                 maintenance_acceptance_guard=None,maintenance_activation_guard=None,maintenance_original_guard=None):
         if not all(callable(f) for f in (artifact_guard,model_loader,acceptance_guard,rehearsal_guard)):
             raise RuntimeError('completed_upgrade_independent_execution_guards_required')
         self.actor=actor;self.contract=actor.contract;self.document=actor.document
@@ -266,6 +266,8 @@ class CompletedNormalUpgrade:
         self.controller_installed=False;self.lock=None
         self.maintenance_acceptance_guard=maintenance_acceptance_guard
         self.maintenance_activation_guard=maintenance_activation_guard
+        self.maintenance_original_guard=maintenance_original_guard
+        self.provider_adapter=None
 
     def preparation_source(self):
         measured,_=self.actor.measure()
@@ -314,7 +316,10 @@ class CompletedNormalUpgrade:
             raise RuntimeError('completed_upgrade_interlock_reconciliation_already_consumed')
         observe_native(self.contract,self.actor.runtime)
         from deployment.lib.active_recovery_backup import verify_backup_execution_context
-        if self.profile is not LEGACY:
+        from deployment.lib.completed_normal_profile import RECONCILED
+        if self.profile is RECONCILED and 'maintenance_role' in self.contract['database']:
+            verify_backup_execution_context(self.package,expected_schema=self.profile.source,maintenance_contract=self.contract)
+        elif self.profile is not LEGACY:
             verify_backup_execution_context(self.package,expected_schema=self.profile.source)
         else:verify_backup_execution_context(self.package)
         baseline=customer_baseline(self.contract,self.actor.runtime)
@@ -703,7 +708,7 @@ class CompletedNormalUpgrade:
         if self.profile is DELETION:
             raise RuntimeError('schema150_superseded_release_contract_not_executable')
         if (self.profile not in (DELETION, RECONCILED) or not callable(self.maintenance_acceptance_guard)
-                or not callable(self.maintenance_activation_guard)):
+                or not callable(self.maintenance_activation_guard) or not callable(self.maintenance_original_guard)):
             raise RuntimeError('schema150_independent_private_verifiers_required')
         self.preflight()
         self.lock=acquire_lock(self.ops.upgrade_root/'upgrade.lock',create=False)
@@ -742,10 +747,12 @@ class CompletedNormalUpgrade:
                 provider=Schema150ProviderAdapter(self.contract,binding,self.actor.runtime,
                     source_guard=self.actor.guard,lock_descriptors=(self.lock,self.ops.deploy_lock_descriptor),
                     acceptance_guard=self.maintenance_acceptance_guard,activation_guard=self.maintenance_activation_guard)
+                self.provider_adapter=provider
                 lifecycle=ProviderMaintenance150(binding,ProtectedProviderJournal(self.root/'provider-journal'),provider)
                 kernel=self.actor.candidate()
                 handoff=CompletedNormalWriteHandoff(self.contract,kernel,source_guard=self.actor.source,
                     boot_guard=self.actor.installation.installed,artifact_guard=self.artifact_guard,provider_adapter=provider)
+                self.event('original_application_acceptance_pending');self.maintenance_original_guard(binding)
                 self.event('original_provider_preimage_pending');lifecycle.prepare()
                 self.event('origin_write_fence_pending');self.fenced=True;handoff.fence_origin()
                 self.event('provider_maintenance_fence_pending');lifecycle.fence()
@@ -782,6 +789,14 @@ class CompletedNormalUpgrade:
                 exclusive(self.root/'migration-customer-preservation.json',encoded(preservation))
                 seal_completion(self.contract,self.ops.state_root/'releases'/self.contract['candidate']['source_sha'],
                     self.ops.state_root,source_guard=self.actor.guard,runtime_guard=self.actor.native)
+                if self.profile is RECONCILED:
+                    # Capture the target checkpoint while every provider/writer
+                    # is still fenced. An ordinary online backup cannot replace
+                    # original-role and object-byte maintenance preservation.
+                    self.event('post_migration_backup_pending')
+                    final=CompletedNormalBackupContext(self.contract,self.document,self.package,kernel,
+                        stage='post-migration',source_guard=self.actor.guard,artifact_guard=self.artifact_guard,
+                        provider_adapter=provider).capture()
                 self.event('private_provider_recovery_pending');lifecycle.prepare_private_activation()
                 self.event('target_normal_grant_pending');handoff.grant(schema=self.profile.target)
             # Existing child owns the worker-generation transfer. Its historical
@@ -803,9 +818,10 @@ class CompletedNormalUpgrade:
             provider.lock_descriptors=(self.lock,self.ops.deploy_lock_descriptor)
             with self.root_credential():
                 self.acceptance_guard(schema=self.profile.target,normal=True)
-                self.event('post_migration_backup_pending')
-                final=CompletedNormalBackupContext(self.contract,self.document,self.package,kernel,
-                    stage='post-migration',source_guard=self.actor.guard,artifact_guard=self.artifact_guard).capture()
+                if self.profile is not RECONCILED:
+                    self.event('post_migration_backup_pending')
+                    final=CompletedNormalBackupContext(self.contract,self.document,self.package,kernel,
+                        stage='post-migration',source_guard=self.actor.guard,artifact_guard=self.artifact_guard).capture()
                 kernel.round(normal=True)
                 result={'operation':self.profile.operation,'context_sha256':digest(self.contract),'schema':self.profile.target,'mode':'NORMAL',
                     'application_sha':self.contract['candidate']['source_sha'],'controller_sha':self.controller,
