@@ -1094,6 +1094,23 @@ class ConcreteAdapterTests(unittest.TestCase):
                 r['Config']['Env']=[key+'=postgresql://'+role+':synthetic-fixture-password@db:5432/postgres?sslmode=disable']
         return rows,database['Id']
 
+    def test_historical_control_network_never_becomes_provider_database_dns_authority(self):
+        rows,identifier=self.native_database_rows()
+        database=next(r for r in rows if r['Id']==identifier)
+        database['NetworkSettings']['Networks']['historical-control']={'NetworkID':'8'*64,'IPAddress':'10.8.0.2','Aliases':['control-db']}
+        with self.assertRaisesRegex(RuntimeError,'database_uri_scope_invalid'):
+            adapter.require_provider_database_bindings(rows,identifier)
+        enrolled={k:v['NetworkID'] for k,v in database['NetworkSettings']['Networks'].items()}
+        self.assertTrue(adapter.require_provider_database_bindings(rows,identifier,enrolled_database_networks=enrolled))
+        rest=next(r for r in rows if r['Name']=='/supabase-rest')
+        rest['Config']['Env']=['PGRST_DB_URI=postgresql://authenticator:synthetic@control-db:5432/postgres']
+        with self.assertRaisesRegex(RuntimeError,'database_uri_scope_invalid'):
+            adapter.require_provider_database_bindings(rows,identifier,enrolled_database_networks=enrolled)
+        rest['Config']['Env']=['PGRST_DB_URI=postgresql://authenticator:synthetic@db:5432/postgres']
+        database['NetworkSettings']['Networks']['historical-control']['NetworkID']='9'*64
+        with self.assertRaisesRegex(RuntimeError,'database_uri_scope_invalid'):
+            adapter.require_provider_database_bindings(rows,identifier,enrolled_database_networks=enrolled)
+
     def test_provider_database_uri_binds_exact_cluster_network_alias_role_and_database(self):
         rows,identifier=self.native_database_rows()
         self.assertIs(adapter.require_provider_database_bindings(rows,identifier),True)

@@ -632,3 +632,89 @@ def require_fence(contract,runtime,root):
         raise RuntimeError('historical_origin_fence_journal_changed')
     stopped_originals(contract,runtime,original)
     return value
+
+
+def verify_actor_inventory(contract,inventory,rows):
+    """Authenticate v2 historical topology against the enrolled ALL-daemon view.
+
+    Absent modern slots are not invented. The only exclusions are the separately
+    authenticated operator provider/database pair; ordinary unrelated-container
+    exclusion machinery is deliberately not enabled by this adapter.
+    """
+    from .schema150_provider_lifecycle import digest as inventory_digest
+    source=contract['source_roles'];observed=recorded_observation(source)
+    if inventory.get('version')!=2 or inventory.get('historical_origin')!=source:
+        raise RuntimeError('historical_origin_inventory_enrollment_changed')
+    actors=inventory['containers'];excluded=inventory['exclusions']
+    all_original=observed['runtime'];by_id={v['id']:(name,v) for name,v in all_original.items()}
+    if len(by_id)!=len(all_original) or {a['id'] for a in actors.values()}|set(excluded)!=set(by_id):
+        raise RuntimeError('historical_origin_inventory_actor_universe_changed')
+    expected=original_runtime(contract)
+    for role,value in expected['runtimes'].items():
+        if any(actors.get('origin:'+role,{}).get(k)!=v for k,v in value.items()):
+            raise RuntimeError('historical_origin_inventory_original_changed')
+    for actor in actors.values():
+        name,pinned=by_id[actor['id']]
+        if (name!='/'+actor['name'] or any(actor.get(k)!=v for k,v in pinned.items())):
+            raise RuntimeError('historical_origin_inventory_actor_changed')
+    scope=observed['independent_operator_scope']
+    from .isolated_release_environment import observe_host,observe_effect_fence
+    environment=observe_host()
+    observe_effect_fence(execution=True)
+    if (environment['version']!=2 or observed['environment_id']!='isolated-'+environment['realm_id']
+            or observed['database']['system_identifier']!=environment['database_system_identifier']
+            or observed['host']!={k:environment[k] for k in ('guest_uuid','machine_id','root_filesystem_uuid','realm_id')}):
+        raise RuntimeError('historical_origin_inventory_host_changed')
+    if (set(excluded)!=set(scope['actor_ids']) or independent_operator_scope(rows,environment)!=scope):
+        raise RuntimeError('historical_origin_inventory_operator_changed')
+    for identifier,exclusion in excluded.items():
+        pinned=by_id[identifier][1]
+        if exclusion!={'image':pinned['image'],'spec_sha256':pinned['spec_sha256'],'proof_sha256':inventory_digest(scope)}:
+            raise RuntimeError('historical_origin_inventory_exclusion_changed')
+    controls=observed['boot_controls']
+    if set(inventory['supervisors'])!=set(controls['units']):
+        raise RuntimeError('historical_origin_inventory_supervisor_universe_changed')
+    for name,unit in controls['units'].items():
+        actor=inventory['supervisors'][name]
+        if (actor['fragment_sha256']!=controls['files'][unit['fragment']]['sha256']
+                or actor['dropins_sha256']!=inventory_digest({p:controls['files'][p]['sha256'] for p in unit['dropins']})
+                or actor['enabled']!=unit['state']['enabled'] or actor['context_sha256'] is not None):
+            raise RuntimeError('historical_origin_inventory_supervisor_preimage_changed')
+    return scope
+
+
+def supervisor_controls(contract,name,root):
+    """Expected boot supersession DATA after the existing installer completes.
+
+    The adapter's mandatory source_guard first verifies the installed resources
+    against the immutable package. This projection additionally preserves the
+    signed origin preimage; it cannot excuse arbitrary or missing drop-ins.
+    """
+    from .completed_normal_admission import digest as context_digest
+    from .completed_normal_boot_installation import UNITS,PROXY
+    controls=recorded_observation(contract['source_roles'])['boot_controls']
+    if name not in controls['units']:raise RuntimeError('historical_origin_supervisor_not_enrolled')
+    unit=controls['units'][name]
+    original={p:controls['files'][p]['sha256'] for p in unit['dropins']}
+    installation=strict_json(protected(Path(root)/'boot-installation.json',private=True).read_bytes())
+    if (installation.get('operation')!=contract['operation']
+            or installation.get('context_sha256')!=context_digest(contract)
+            or installation.get('historical_units_deleted') is not False):
+        raise RuntimeError('historical_origin_boot_installation_changed')
+    original_paths=set(original)
+    for path,checksum in installation['superseded_proxy_dropins'].items():
+        if name==PROXY:
+            if path not in original_paths:raise RuntimeError('historical_origin_boot_replacement_not_enrolled')
+            preimage=Path(root)/'proxy-originals'/Path(path).name
+            if hashlib.sha256(protected(preimage,private=True).read_bytes()).hexdigest()!=original[path]:
+                raise RuntimeError('historical_origin_boot_replacement_preimage_changed')
+            original[path]=checksum
+    for path,checksum in installation['resources'].items():
+        destination=Path(path)
+        if destination.parent==UNITS/(name+'.d'):
+            if path in original:raise RuntimeError('historical_origin_boot_addition_overwrites_original')
+            original[path]=checksum
+    for path,checksum in original.items():
+        if hashlib.sha256(protected(Path(path)).read_bytes()).hexdigest()!=checksum:
+            raise RuntimeError('historical_origin_supervisor_controls_changed')
+    return original,'disabled' if name in installation['superseded_units'] else unit['state']['enabled']

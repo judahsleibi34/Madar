@@ -419,3 +419,98 @@ class HistoricalFenceRecordTests(HistoricalControllerConsumerTests):
     def test_old_grant_is_not_accepted_as_a_historical_fence(self):
         original=origin.original_runtime(self.contract)
         with self.assertRaisesRegex(RuntimeError,'fence_record_changed'):origin.validate_fence(self.contract,original,{'version':2,'mode':'READ_ONLY','schema':146})
+
+
+class HistoricalInventoryBindingTests(unittest.TestCase):
+    def setUp(self):
+        from test_schema150_actor_inventory import historical_fixture,row
+        from deployment.lib.completed_normal_resources import measured_spec
+        from deployment.lib.schema150_provider_lifecycle import digest as inventory_digest
+        (self.inventory,_),self.rows=historical_fixture()
+        self.contract={'source_roles':self.inventory['historical_origin']}
+        self.environment={'version':2,'realm_id':'test-realm','guest_uuid':'guest','machine_id':'machine',
+            'root_filesystem_uuid':'filesystem','database_system_identifier':'123456789'}
+        operator_rows=[row(f'{n:064x}','operator-'+str(n)) for n in (80,81)]
+        self.scope={'actor_ids':[r['Id'] for r in operator_rows],'network_id':'7'*64,'database_system_identifier':'987654321'}
+        self.rows+=operator_rows
+        for r in operator_rows:self.inventory['exclusions'][r['Id']]={'image':r['Image'],
+            'spec_sha256':measured_spec(r),'proof_sha256':inventory_digest(self.scope)}
+        unit=self.inventory['supervisors']['madar-release-proxy.service']
+        dropins={'/etc/systemd/system/madar-release-proxy.service.d/original.conf':'6'*64}
+        unit['dropins_sha256']=inventory_digest(dropins)
+        controls={'units':{'madar-release-proxy.service':{'fragment':'/etc/systemd/system/madar-release-proxy.service',
+            'dropins':list(dropins),'state':{'enabled':'enabled'}}},'files':{k:{'sha256':v} for k,v in dropins.items()}}
+        controls['files']['/etc/systemd/system/madar-release-proxy.service']={'sha256':unit['fragment_sha256']}
+        self.observed={'runtime':{r['Name']:{'id':r['Id'],'image':r['Image'],'spec_sha256':measured_spec(r)} for r in self.rows},
+            'independent_operator_scope':self.scope,'boot_controls':controls,'environment_id':'isolated-test-realm',
+            'host':{k:self.environment[k] for k in ('guest_uuid','machine_id','root_filesystem_uuid','realm_id')},
+            'database':{'system_identifier':'123456789'}}
+        self.enterContext(patch.object(origin,'recorded_observation',return_value=self.observed))
+        self.enterContext(patch.object(origin,'original_runtime',return_value={'runtimes':{
+            k.split(':',1)[1]:{n:v[n] for n in ('id','image','spec_sha256')} for k,v in self.inventory['containers'].items() if k.startswith('origin:')}}))
+        self.enterContext(patch.object(origin,'independent_operator_scope',return_value=self.scope))
+        self.enterContext(patch('deployment.lib.isolated_release_environment.observe_host',return_value=self.environment))
+        self.enterContext(patch('deployment.lib.isolated_release_environment.observe_effect_fence'))
+    def verify(self):return origin.verify_actor_inventory(self.contract,self.inventory,self.rows)
+    def test_root_projection_matches_entire_original_universe_and_separate_operator_scope(self):
+        self.assertEqual(self.verify(),self.scope)
+    def test_operator_exclusion_is_not_arbitrary_exclusion_authority(self):
+        self.inventory['exclusions'][self.scope['actor_ids'][0]]['proof_sha256']='0'*64
+        with self.assertRaisesRegex(RuntimeError,'exclusion_changed'):self.verify()
+    def test_missing_original_and_changed_supervisor_refuse(self):
+        actor=self.inventory['containers'].pop('native:storage')
+        with self.assertRaisesRegex(RuntimeError,'actor_universe_changed'):self.verify()
+        self.inventory['containers']['native:storage']=actor
+        self.inventory['supervisors']['madar-release-proxy.service']['fragment_sha256']='0'*64
+        with self.assertRaisesRegex(RuntimeError,'supervisor_preimage_changed'):self.verify()
+    def test_changed_physical_environment_and_origin_image_refuse(self):
+        self.environment['guest_uuid']='wrong-guest'
+        with self.assertRaisesRegex(RuntimeError,'inventory_host_changed'):self.verify()
+        self.environment['guest_uuid']='guest'
+        self.inventory['containers']['native:db']['image']='sha256:'+'0'*64
+        with self.assertRaisesRegex(RuntimeError,'inventory_actor_changed'):self.verify()
+    def test_changed_inventory_reference_cannot_substitute_enrollment(self):
+        self.inventory['historical_origin']=dict(self.contract['source_roles'],enrollment_sha256='0'*64)
+        with self.assertRaisesRegex(RuntimeError,'enrollment_changed'):self.verify()
+
+
+class HistoricalSupervisorProjectionTests(unittest.TestCase):
+    def setUp(self):
+        import hashlib
+        from deployment.lib.completed_normal_admission import digest as context_digest
+        self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
+        self.root=Path(self.tmp.name);self.units=self.root/'units';self.units.mkdir()
+        self.name='madar-release-proxy.service';self.directory=self.units/(self.name+'.d');self.directory.mkdir()
+        self.original=self.directory/'original.conf';self.original.write_bytes(b'original exact control')
+        self.gate=self.directory/'successor.conf';self.gate.write_bytes(b'exact successor gate')
+        self.checksum=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+        self.contract={'operation':'completed-normal-schema146-160-coordinated-release','source_roles':{}}
+        self.controls={'files':{str(self.original):{'sha256':self.checksum(self.original)}},'units':{
+            self.name:{'dropins':[str(self.original)],'state':{'enabled':'enabled'}}}}
+        self.record={'operation':self.contract['operation'],'context_sha256':context_digest(self.contract),
+            'historical_units_deleted':False,'superseded_units':[],'superseded_proxy_dropins':{},
+            'resources':{str(self.gate):self.checksum(self.gate)}}
+        self.path=self.root/'boot-installation.json';self.save()
+        self.enterContext(patch.object(origin,'recorded_observation',return_value=self.controls))
+        # recorded_observation normally returns the entire signed observation.
+        origin.recorded_observation.return_value={'boot_controls':self.controls}
+        self.enterContext(patch.object(origin,'protected',lambda p,**kw:Path(p)))
+        self.enterContext(patch('deployment.lib.completed_normal_boot_installation.UNITS',self.units))
+    def save(self):self.path.write_bytes(canonical(self.record))
+    def observe(self):return origin.supervisor_controls(self.contract,self.name,self.root)
+    def test_only_original_and_exact_installer_addition_are_projected(self):
+        result,enabled=self.observe();self.assertEqual(set(result),{str(self.original),str(self.gate)});self.assertEqual(enabled,'enabled')
+    def test_tampered_installed_bytes_or_context_refuse(self):
+        self.gate.write_bytes(b'changed')
+        with self.assertRaisesRegex(RuntimeError,'supervisor_controls_changed'):self.observe()
+        self.record['context_sha256']='0'*64;self.save()
+        with self.assertRaisesRegex(RuntimeError,'boot_installation_changed'):self.observe()
+    def test_replacement_requires_enrolled_original_and_real_preimage_bytes(self):
+        old=self.root/'proxy-originals';old.mkdir();(old/self.original.name).write_bytes(self.original.read_bytes())
+        self.original.write_bytes(b'exact replacement');self.record['superseded_proxy_dropins']={str(self.original):self.checksum(self.original)};self.save()
+        self.assertEqual(self.observe()[0][str(self.original)],self.checksum(self.original))
+        (old/self.original.name).write_bytes(b'not the enrolled preimage')
+        with self.assertRaisesRegex(RuntimeError,'replacement_preimage_changed'):self.observe()
+    def test_addition_cannot_overwrite_an_original(self):
+        self.record['resources'][str(self.original)]=self.checksum(self.original);self.save()
+        with self.assertRaisesRegex(RuntimeError,'addition_overwrites_original'):self.observe()

@@ -4511,3 +4511,12 @@ credentials carry the exact measured history projection to the deployment user.
 Original systemd fragments, drop-ins and unit states are captured at enrollment;
 boot installation must match that preimage before superseding its supervisors.
 These source-level integrations do not constitute protected operational acceptance.
+
+Historical provider inventory v2 binds the complete original Docker universe
+to signed enrollment data, eight actual origin roles and the actual native
+provider set. Missing historical slots are not invented. Only the separately
+verified operator-authentication pair may be excluded; shared target access
+and arbitrary exclusions still refuse. Original systemd controls are compared
+with the existing installer's exact supersession record, and native provider
+DNS remains restricted to the original bridge when the database also has an
+independently enrolled loopback control bridge. Version1 topology is unchanged.

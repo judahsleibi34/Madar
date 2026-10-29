@@ -50,6 +50,8 @@ CLIENT_APP_ROLES = frozenset({'backend', 'notification-worker', 'calendar-sync-w
 MINIMUM_ROLES = frozenset({'postgres', 'authenticator', 'supabase_auth_admin', 'supabase_storage_admin'})
 TOP_KEYS = {'version', 'binding_sha256', 'target_networks', 'target_credentials', 'containers',
             'roles', 'supervisors', 'object_roots', 'session_scope', 'exclusions'}
+HISTORICAL_CORE = frozenset({'native:db','native:auth','native:rest','native:storage','native:gateway','proxy'})
+HISTORICAL_ORIGIN_ROLES = frozenset('origin:'+role for role in APP_ROLES)
 CONTAINER_KEYS = {'name', 'id', 'image', 'generation', 'source_sha', 'spec_sha256', 'mounts', 'networks', 'states'}
 
 
@@ -138,7 +140,20 @@ def _mounts(rows):
 
 def _validate(inventory, binding=None, *, original=True):
     value = _detached(inventory)
-    _require(isinstance(value, dict) and set(value) == TOP_KEYS and type(value['version']) is int and value['version'] == 1)
+    _require(isinstance(value, dict) and type(value.get('version')) is int and value['version'] in (1,2))
+    historical=value['version']==2
+    _require(set(value)==TOP_KEYS | ({'historical_origin'} if historical else set()))
+    if historical:
+        from deployment.lib.historical_origin import SOURCE_FIELDS,KIND
+        source=value['historical_origin']
+        _require(isinstance(source,dict) and set(source)==SOURCE_FIELDS and source.get('origin_kind')==KIND
+            and source.get('schema')==146 and type(source['schema']) is int
+            and _hex(source.get('application_sha'),40) and _hex(source.get('controller_sha'),40)
+            and _hex(source.get('enrollment_sha256')) and _hex(source.get('successor_intent_sha256'))
+            and _path(source.get('enrollment_root')), 'schema160_historical_inventory_origin_invalid')
+        _require(binding is not None and binding.get('operation')=='completed-normal-schema146-160-coordinated-release'
+            and binding.get('source_schema')==146 and binding.get('target_schema')==160,
+            'schema160_historical_inventory_binding_required')
     _require(_hex(value['binding_sha256']))
     if binding is not None:
         binding = validate_binding(binding)
@@ -157,7 +172,9 @@ def _validate(inventory, binding=None, *, original=True):
     canonical = binding is not None and binding['target_schema']==160
     candidate_app_roles=APP_ROLES+('provider-gateway',) if canonical else APP_ROLES
     optional=OPTIONAL_ROLES | ({'candidate:provider-gateway'} if canonical else set())
-    _require(isinstance(actors, dict) and REQUIRED_ROLES <= set(actors) <= REQUIRED_ROLES | optional)
+    required=HISTORICAL_CORE | HISTORICAL_ORIGIN_ROLES if historical else REQUIRED_ROLES
+    allowed=required | frozenset(NATIVE_NAMES) | optional if historical else REQUIRED_ROLES | optional
+    _require(isinstance(actors, dict) and required <= set(actors) <= allowed)
     ids, names = [], []
     for logical, actor in actors.items():
         _require(isinstance(actor, dict) and set(actor) == CONTAINER_KEYS)
@@ -173,6 +190,10 @@ def _validate(inventory, binding=None, *, original=True):
         else:
             generation, role = logical.split(':', 1)
             _require(actor['generation'] == generation and actor['name'].startswith('madar-') and _hex(actor['source_sha'], 40))
+            if historical and generation=='origin':
+                _require(actor['name'] in {'madar-'+slot+'-'+role for slot in ('blue','green') for role in APP_ROLES}
+                    and actor['name'].endswith('-'+role) and actor['source_sha']==source['application_sha'],
+                    'schema160_historical_inventory_actor_changed')
             if generation == 'candidate' and binding is not None:
                 _require(actor['source_sha'] == binding['source_sha'], 'schema150_candidate_source_changed')
         actor['mounts'] = _mounts(actor['mounts'])
@@ -181,7 +202,9 @@ def _validate(inventory, binding=None, *, original=True):
         if logical in NATIVE_NAMES:
             _require(actor['networks'].get(DEFAULT_NETWORK) == networks[DEFAULT_NETWORK], 'schema150_native_network_scope_invalid')
         if logical == 'native:db':
-            _require(set(actor['networks']) == {DEFAULT_NETWORK}, 'schema150_native_database_network_invalid')
+            _require(set(actor['networks']) == {DEFAULT_NETWORK} if not historical else
+                DEFAULT_NETWORK in actor['networks'] and set(actor['networks'])<=set(networks),
+                'schema150_native_database_network_invalid')
         if (logical == 'native:gateway' or logical == 'fallback:backend'
                 or logical.split(':')[0] in {'origin', 'candidate'} and logical.split(':')[-1] in CLIENT_APP_ROLES):
             _require(actor['networks'].get(CLIENT_NETWORK) == networks[CLIENT_NETWORK], 'schema150_client_network_scope_invalid')
@@ -219,6 +242,9 @@ def _validate(inventory, binding=None, *, original=True):
         if private['running']:
             _require(active['running'],'schema150_active_state_not_reachable')
     _require(len(ids) == len(set(ids)) and len(names) == len(set(names)))
+    if historical:
+        _require(len({actors[logical]['name'].split('-')[1] for logical in HISTORICAL_ORIGIN_ROLES})==1,
+            'schema160_historical_inventory_mixed_slot')
     for generation in ('origin', 'candidate'):
         selected = {name for name in actors if name.startswith(generation+':')}
         expected=candidate_app_roles if generation=='candidate' else APP_ROLES
@@ -236,14 +262,18 @@ def _validate(inventory, binding=None, *, original=True):
              and isinstance(sessions['writer_roles'], list) and all(_name(name) for name in sessions['writer_roles']) and len(sessions['writer_roles']) == len(set(sessions['writer_roles']))
              and set(sessions['writer_roles']) == {name for name, role in roles.items() if role['login'] and name != maintenance})
     supervisors = value['supervisors']
-    _require(isinstance(supervisors, dict) and SUPERVISOR_UNITS <= set(supervisors) and len(supervisors) <= 32)
+    required_units={'madar-release-proxy.service'} if historical else SUPERVISOR_UNITS
+    _require(isinstance(supervisors, dict) and required_units <= set(supervisors) and len(supervisors) <= 64)
     for name, supervisor in supervisors.items():
         _require(isinstance(supervisor, dict) and set(supervisor) == {'fragment_sha256', 'dropins_sha256', 'container_ids', 'enabled', 'context_sha256'})
         _require(_hex(supervisor['fragment_sha256']) and _hex(supervisor['dropins_sha256'])
                  and isinstance(supervisor['enabled'], str) and supervisor['enabled'] in {'enabled', 'enabled-runtime', 'disabled', 'static', 'indirect', 'masked'}
                  and isinstance(supervisor['container_ids'], list) and all(_hex(item) for item in supervisor['container_ids']) and len(supervisor['container_ids']) == len(set(supervisor['container_ids']))
                  and set(supervisor['container_ids']) <= set(ids))
-        if name in SUPERVISOR_UNITS: _require(supervisor['context_sha256'] is None)
+        if historical:
+            _require(re.fullmatch(r'madar-[A-Za-z0-9-]+\.(service|timer)',name) is not None
+                and supervisor['context_sha256'] is None,'schema160_historical_supervisor_invalid')
+        elif name in SUPERVISOR_UNITS: _require(supervisor['context_sha256'] is None)
         else:
             context = supervisor['context_sha256']
             _require(_hex(context) and name == 'madar-compatible-normal-boot-'+context[:12]+'.service', 'schema150_supervisor_namespace_invalid')
@@ -425,7 +455,7 @@ def attest_containers(inventory, rows, *, phase, binding=None):
         # with this source through the sealed runtime rather than a fabricated
         # Madar image label. ID/image/spec/mount/network checks above still
         # apply; the concrete adapter also requires the approved Redis digest.
-        if actor['source_sha'] is not None and logical != 'candidate:redis':
+        if actor['source_sha'] is not None and logical!='candidate:redis' and not (value['version']==2 and logical=='origin:redis'):
             _require(row.get('Config', {}).get('Labels', {}).get('org.opencontainers.image.revision') == actor['source_sha'], 'schema150_actor_source_changed')
         if logical == 'candidate:parser-worker' and logical in private_runtime_roles:
             from deployment.lib.completed_normal_runtime import verify_private_parser

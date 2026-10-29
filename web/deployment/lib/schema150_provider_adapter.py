@@ -84,7 +84,7 @@ def _env(row):
     return values
 
 
-def require_provider_database_bindings(rows, database_id):
+def require_provider_database_bindings(rows, database_id, *, enrolled_database_networks=None):
     """Bind each measured native provider URI to the measured database network.
 
     URI text never becomes a SQL/command argument. Provider HTTP success at the
@@ -94,8 +94,20 @@ def require_provider_database_bindings(rows, database_id):
     if len(databases) != 1:
         raise RuntimeError('schema150_provider_database_binding_missing')
     database = databases[0]
-    if len(database.get('NetworkSettings',{}).get('Networks',{}))!=1:
-        raise RuntimeError('schema150_provider_database_uri_scope_invalid')
+    networks=database.get('NetworkSettings',{}).get('Networks',{})
+    if enrolled_database_networks is None:
+        if len(networks)!=1:raise RuntimeError('schema150_provider_database_uri_scope_invalid')
+        provider_networks=set(networks)
+    else:
+        # Only a root-authenticated historical inventory may supply this exact
+        # projection. Providers use the native bridge; a separately pinned
+        # loopback control bridge must never become an alternate DNS authority.
+        from .schema150_actor_inventory import DEFAULT_NETWORK
+        if (not isinstance(enrolled_database_networks,dict) or not 1<=len(enrolled_database_networks)<=16
+                or DEFAULT_NETWORK not in enrolled_database_networks or set(networks)!=set(enrolled_database_networks)
+                or any(v.get('NetworkID')!=enrolled_database_networks[k] for k,v in networks.items())):
+            raise RuntimeError('schema150_provider_database_uri_scope_invalid')
+        provider_networks={DEFAULT_NETWORK}
     expected = {'supabase-rest': ('PGRST_DB_URI','authenticator'),
         'supabase-auth': ('GOTRUE_DB_DATABASE_URL','supabase_auth_admin'),
         'supabase-storage': ('DATABASE_URL','supabase_storage_admin')}
@@ -104,7 +116,7 @@ def require_provider_database_bindings(rows, database_id):
         if len(services) != 1:
             raise RuntimeError('schema150_provider_database_binding_missing')
         service = services[0]
-        if set(service.get('NetworkSettings',{}).get('Networks',{}))!=set(database['NetworkSettings']['Networks']):
+        if set(service.get('NetworkSettings',{}).get('Networks',{}))!=provider_networks:
             raise RuntimeError('schema150_provider_database_uri_scope_invalid')
         host = service.get('HostConfig',{})
         if (host.get('ExtraHosts') or host.get('Dns') or host.get('DnsSearch')
@@ -130,6 +142,7 @@ def require_provider_database_bindings(rows, database_id):
                 raise ValueError('unexpected native database URI')
             targets = []
             for network, db in database['NetworkSettings']['Networks'].items():
+                if network not in provider_networks:continue
                 provider = service['NetworkSettings']['Networks'].get(network)
                 if not provider or provider['NetworkID'] != db['NetworkID']:
                     continue
@@ -200,7 +213,7 @@ def capture_original_inventory(package, contract, runtime, *, source_guard):
     inventory = validate_inventory(private_json(package / 'provider-inventory-input.json'), binding)
     if inventory['session_scope']['maintenance_role']!=maintenance_role(contract):
         raise RuntimeError('schema160_inventory_maintenance_role_changed')
-    if inventory['exclusions'] or any(k.startswith('candidate:') for k in inventory['containers']):
+    if (inventory['version']==1 and inventory['exclusions']) or any(k.startswith('candidate:') for k in inventory['containers']):
         raise RuntimeError('schema160_original_inventory_scope_not_proven')
     database = inventory['containers']['native:db']
     if (database['id'] != contract['database']['container_id']
@@ -216,6 +229,11 @@ def capture_original_inventory(package, contract, runtime, *, source_guard):
         if {r.get('Id') for r in rows} != set(identifiers):
             raise RuntimeError('schema160_inventory_snapshot_incomplete')
         attest_containers(inventory, rows, phase='prepared', binding=binding)
+        if inventory['version']==2:
+            from deployment.lib.historical_origin import verify_actor_inventory
+            verify_actor_inventory(contract,inventory,rows)
+        elif contract['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin':
+            raise RuntimeError('historical_origin_inventory_enrollment_required')
         return set(identifiers)
 
     def sql(body):
@@ -290,8 +308,13 @@ class Schema150ProviderAdapter:
         if self.inventory['session_scope']['maintenance_role']!=maintenance_role(contract):
             raise RuntimeError('schema160_inventory_maintenance_role_changed')
         self.original_inventory = json.loads(json.dumps(self.inventory))
-        if self.inventory['exclusions']:
+        if self.inventory['version']==2:
+            from deployment.lib.historical_origin import verify_actor_inventory
+            verify_actor_inventory(contract,self.inventory,self._rows())
+        elif self.inventory['exclusions']:
             raise RuntimeError('schema150_provider_live_exclusion_proofs_required')
+        elif contract['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin':
+            raise RuntimeError('historical_origin_inventory_enrollment_required')
         self.barrier = self.root / 'provider-barrier.json'
         self.dropin_name = '99zzzzzz-schema'+str(selected.target)+'-' + self.binding['context_sha256'][:12] + '.conf'
 
@@ -411,6 +434,9 @@ class Schema150ProviderAdapter:
         if phase in ('private','private-boundary','active','active-boundary') and any(
                 key.startswith('candidate:') for key in self.inventory['containers']):
             self.verify_candidate_stage(rows=rows,phase=phase)
+        if self.original_inventory['version']==2:
+            from deployment.lib.historical_origin import verify_actor_inventory
+            verify_actor_inventory(self.contract,self.original_inventory,rows)
         proof=attest_containers(self.inventory, rows, phase=phase, binding=self.binding)
         if phase in ('private','private-boundary'):
             for row in rows:
@@ -500,9 +526,14 @@ class Schema150ProviderAdapter:
         paths = fields.get('DropInPaths','').split()
         original = [p for p in paths if Path(p).name != self.dropin_name]
         actual = {p: hashlib.sha256(protected(Path(p)).read_bytes()).hexdigest() for p in original}
-        if fields.get('UnitFileState') != expected['enabled']:
+        enabled=expected['enabled'];dropins_digest=expected['dropins_sha256']
+        if self.inventory['version']==2:
+            from deployment.lib.historical_origin import supervisor_controls
+            controls,enabled=supervisor_controls(self.contract,name,self.root)
+            dropins_digest=digest(controls)
+        if fields.get('UnitFileState') != enabled:
             raise RuntimeError('schema150_provider_supervisor_enablement_changed')
-        if digest(actual) != expected['dropins_sha256']:
+        if digest(actual) != dropins_digest:
             raise RuntimeError('schema150_provider_supervisor_dropins_changed')
         return fields
 
@@ -534,7 +565,9 @@ class Schema150ProviderAdapter:
 
     def positive_identity_probes(self, binding):
         self.require_authority(binding, purpose='prepare'); self._attest('prepared')
-        require_provider_database_bindings(self._rows(),self.contract['database']['container_id'])
+        database_networks=self.inventory['containers']['native:db']['networks'] if self.inventory['version']==2 else None
+        require_provider_database_bindings(self._rows(),self.contract['database']['container_id'],
+            **({} if database_networks is None else {'enrolled_database_networks':database_networks}))
         rest = _env(self._row('supabase-rest'))
         auth = _env(self._row('supabase-auth'))
         storage = _env(self._row('supabase-storage'))

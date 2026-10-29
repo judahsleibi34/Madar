@@ -82,7 +82,7 @@ def validate_inputs(plan,inventory,probes,model):
         'inventory_sha256':contract['writer_inventory_sha256'],'system_identifier':contract['database']['system_identifier'],
         'source_schema':146,'target_schema':160}
     validate_inventory(inventory,binding)
-    if inventory['exclusions'] or any(k.startswith('candidate:') for k in inventory['containers']):
+    if (inventory['version']==1 and inventory['exclusions']) or any(k.startswith('candidate:') for k in inventory['containers']):
         raise RuntimeError('completed_package_original_inventory_required')
     from deployment.lib.completed_normal_private_acceptance import validate_subjects
     if (not isinstance(probes,dict) or set(probes)!={'version','system_identifier','subjects'}
