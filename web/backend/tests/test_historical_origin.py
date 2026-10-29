@@ -310,6 +310,14 @@ class HistoricalBootstrapDataTests(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory(dir=Path.cwd());self.addCleanup(self.tmp.cleanup)
         self.path=Path(self.tmp.name)/'original-bootstrap.json'
+        # The local sandbox projects host-root ancestors as nobody. Model only
+        # those two installation ancestors; exercise real file modes and opens.
+        original=Path.lstat
+        def installation_stat(path):
+            value=original(path)
+            return SimpleNamespace(st_uid=0,st_mode=value.st_mode) if str(path) in {'/','/opt'} else value
+        self.addCleanup(patch.stopall)
+        patch.object(Path,'lstat',installation_stat).start()
         self.value={'phase':'bootstrap_adopted','status':'known_good','schema':{'observed':146}}
         self.path.write_bytes(canonical(self.value));self.path.chmod(0o600)
     def test_real_operator_owned_record_is_data_without_root_receipt_reclassification(self):
