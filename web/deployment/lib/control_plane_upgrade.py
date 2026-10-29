@@ -2882,13 +2882,20 @@ print(hashlib.sha256(keys[0].encode()).hexdigest())
                 witnesses['completed_normal_admission'] = admission
                 witnesses['candidate_authority'] = require_candidate_authority(completed_normal_contract)
                 witnesses['provider_record_witness'] = measure_provider_record(
-                    self.state_root, completed_normal_contract['provider_record_sha256'])
+                    self.state_root, completed_normal_contract['provider_record_sha256'],
+                    **({'contract':completed_normal_contract} if completed_normal_contract['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin' else {}))
                 from deployment.lib.completed_normal_profile import LEGACY
                 if selected_profile is not LEGACY:
-                    origin_runtime_path=Path(completed_normal_contract['source_roles']['completion_root'])/'candidate-runtime.json'
-                    origin_runtime=json.loads(protected(origin_runtime_path,private=True).read_text())
-                    if (origin_runtime.get('context_sha256')!=origin_runtime_path.parent.name
-                            or origin_runtime.get('source_sha')!=completed_normal_contract['source_roles']['application_sha']
+                    if completed_normal_contract['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin':
+                        from deployment.lib.historical_origin import history_witness
+                        witnesses['historical_origin']=history_witness(completed_normal_contract)
+                        origin_runtime=witnesses['historical_origin']['original_runtime']
+                    else:
+                        origin_runtime_path=Path(completed_normal_contract['source_roles']['completion_root'])/'candidate-runtime.json'
+                        origin_runtime=json.loads(protected(origin_runtime_path,private=True).read_text())
+                        if origin_runtime.get('context_sha256')!=origin_runtime_path.parent.name:
+                            raise UpgradeError('completed_normal_authorization_origin_runtime_changed')
+                    if (origin_runtime.get('source_sha')!=completed_normal_contract['source_roles']['application_sha']
                             or origin_runtime.get('images')!=completed_normal_contract['origin']['images']
                             or origin_runtime.get('worker_generation')!=completed_normal_contract['origin']['worker_generation']):
                         raise UpgradeError('completed_normal_authorization_origin_runtime_changed')
@@ -2898,6 +2905,8 @@ print(hashlib.sha256(keys[0].encode()).hexdigest())
                     'provider_record_witness_sha256':digest(witnesses['provider_record_witness'])}
                 if 'origin_runtime' in witnesses:
                     witness_hashes['origin_runtime_sha256']=digest(witnesses['origin_runtime'])
+                if 'historical_origin' in witnesses:
+                    witness_hashes['historical_origin_sha256']=digest(witnesses['historical_origin'])
                 runtime_record=admission_path.parent/'candidate-runtime.json'
                 if runtime_record.exists():
                     witnesses['candidate_runtime']=json.loads(protected(runtime_record,private=True).read_text())

@@ -42,6 +42,22 @@ class Operations:
         return SimpleNamespace(stdout='')
 
 class CompletedBootInstallationTests(unittest.TestCase):
+    def test_historical_boot_has_truthful_measured_preimages_without_fake_prior_actor(self):
+        from test_historical_origin import HistoricalPreparationBindingTests
+        from deployment.lib.completed_normal_profile import RECONCILED
+        contract=HistoricalPreparationBindingTests().contract();document=copy.deepcopy(self.installer.document)
+        before=document['boot_resources'];proxy=str(m.UNITS/m.PROXY)
+        document['boot_resources']={'files':{proxy:before['files'][proxy]},'proxy_dropins':[],
+            'old_units':[],'old_unit_dropins':{},'unit_states':{m.PROXY:before['unit_states'][m.PROXY]}}
+        baseline=document['boot_resources'];contract['plan_sha256']=admission.digest(document)
+        observed={'boot_controls':{'files':dict(baseline['files']),'units':{m.PROXY:{'state':baseline['unit_states'][m.PROXY],'dropins':[]}}}}
+        with patch.object(m,'profile',return_value=RECONCILED),patch('deployment.lib.historical_origin.recorded_observation',return_value=observed):
+            instance=m.CompletedNormalBootInstallation(contract,document,self.installer.package,lambda:None,self.ops,units=self.units,admissions=self.path/'admissions')
+            self.assertEqual(instance.baseline['old_units'],[]);self.assertTrue(instance.proxy.name.startswith('99zzzzzzz-'))
+            observed['boot_controls']['files'][proxy]={'sha256':'f'*64}
+            with self.assertRaisesRegex(RuntimeError,'historical_preimage_changed'):
+                m.CompletedNormalBootInstallation(contract,document,self.installer.package,lambda:None,self.ops,units=self.units,admissions=self.path/'admissions')
+
     def test_application_successor_preserves_verified_older_compatible_boot_actor(self):
         from test_completed_normal_application_release import application_contract
         contract=application_contract();document=copy.deepcopy(self.installer.document)

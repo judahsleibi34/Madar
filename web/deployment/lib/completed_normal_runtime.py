@@ -311,8 +311,10 @@ def seal_candidate_runtime(contract, *, source_guard,model_loader,runtime,state_
                 raise RuntimeError('completed_runtime_private_candidate_substituted')
         owner=load_worker_authority(Path(state_root))
         legacy=profile(contract) is LEGACY
-        original=json.loads(protected(Path(contract['source_roles']['completion_root'])/
-            ('candidate-identities.json' if legacy else 'candidate-runtime.json'),private=True).read_text())
+        from deployment.lib.completed_normal_admission import origin_runtime
+        original=(origin_runtime(contract) if contract['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin' else
+            json.loads(protected(Path(contract['source_roles']['completion_root'])/
+                ('candidate-identities.json' if legacy else 'candidate-runtime.json'),private=True).read_text()))
         origin_workers=[original['runtimes'][role]['id'] for role in
             (('notification','calendar-sync','data-deletion') if legacy else BUSINESS)]
         publication={'operation':profile(contract).operation,'context_sha256':digest(contract),'source_sha':contract['candidate']['source_sha'],
@@ -360,8 +362,10 @@ def seal_candidate_stage(contract, *, source_guard,model_loader,runtime,state_ro
             raise RuntimeError('completed_runtime_origin_owner_changed')
         selected=maintenance_profile if maintenance else profile(contract)
         legacy=selected is LEGACY
-        original=json.loads(protected(Path(contract['source_roles']['completion_root'])/
-            ('candidate-identities.json' if legacy else 'candidate-runtime.json'),private=True).read_text())
+        from deployment.lib.completed_normal_admission import origin_runtime
+        original=(origin_runtime(contract) if contract['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin' else
+            json.loads(protected(Path(contract['source_roles']['completion_root'])/
+                ('candidate-identities.json' if legacy else 'candidate-runtime.json'),private=True).read_text()))
         origin_workers=[original['runtimes'][role]['id'] for role in
             (('notification','calendar-sync','data-deletion') if legacy else BUSINESS)]
         publication={'operation':selected.operation,'context_sha256':digest(contract),'source_sha':contract['candidate']['source_sha'],

@@ -157,12 +157,13 @@ class CompletedNormalBootActor:
             atomic_public_authority(self.root/'write-authority/authority.json',dict(value,mode='READ_ONLY'))
         except Exception as error:failures.append(type(error).__name__)
         try:
-            root=Path(self.contract['source_roles']['completion_root'])
-            value=json.loads(protected(root/'write-authority/authority.json').read_text())
-            expected=expected_origin_grant(self.contract,'READ_ONLY');expected.pop('mode')
-            if {k:v for k,v in value.items() if k!='mode'}!=expected or value.get('mode') not in {'READ_ONLY','NORMAL'}:
-                raise RuntimeError('completed_upgrade_boot_origin_authority_changed')
-            atomic_public_authority(root/'write-authority/authority.json',dict(value,mode='READ_ONLY'))
+            if self.contract['source_roles'].get('origin_kind')!='independently-enrolled-historical-bootstrap-origin':
+                root=Path(self.contract['source_roles']['completion_root'])
+                value=json.loads(protected(root/'write-authority/authority.json').read_text())
+                expected=expected_origin_grant(self.contract,'READ_ONLY');expected.pop('mode')
+                if {k:v for k,v in value.items() if k!='mode'}!=expected or value.get('mode') not in {'READ_ONLY','NORMAL'}:
+                    raise RuntimeError('completed_upgrade_boot_origin_authority_changed')
+                atomic_public_authority(root/'write-authority/authority.json',dict(value,mode='READ_ONLY'))
         except Exception as error:failures.append(type(error).__name__)
         try:
             self.event('compensation_pending')
@@ -235,8 +236,22 @@ class CompletedNormalBootActor:
                 from deployment.lib.completed_normal_profile import DELETION, RECONCILED
                 candidates=(self.root/'candidate-runtime.json',)
                 if self.profile in (DELETION, RECONCILED):candidates+=(self.root/'candidate-staged-runtime.json',)
-                for path in (*candidates,Path(self.contract['source_roles']['completion_root'])/
-                        ('candidate-runtime.json' if self.profile is not LEGACY else 'candidate-identities.json')):
+                historical=self.contract['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin'
+                original=() if historical else (Path(self.contract['source_roles']['completion_root'])/
+                    ('candidate-runtime.json' if self.profile is not LEGACY else 'candidate-identities.json'),)
+                if historical:
+                    try:
+                        from deployment.lib.completed_normal_admission import origin_runtime
+                        record=origin_runtime(self.contract)
+                        # Same exact actor stop loop below; no restart or grant.
+                        for identity in record['runtimes'].values():
+                            rows=self.runtime.inspect([identity['id']]);row=next(iter(rows.values())) if len(rows)==1 else None
+                            from deployment.lib.completed_normal_resources import measured_spec_matches
+                            if row is None or row['Image']!=identity['image'] or not measured_spec_matches(row,identity['spec_sha256'],started_worker=True):
+                                raise RuntimeError('historical_origin_compensation_actor_changed')
+                            if row['State']['Running']:self.runtime.command(['docker','stop',identity['id']])
+                    except Exception as error:failures.append(type(error).__name__)
+                for path in (*candidates,*original):
                     if not path.exists():continue
                     try:record=json.loads(protected(path,private=True).read_text())
                     except Exception as error:

@@ -141,6 +141,40 @@ def independent_operator_scope(rows,environment):
             'authentication_key_sha256':hashlib.sha256(key).hexdigest(),'network_id':facts['network_id']}
 
 
+def boot_controls(system):
+    """Measure original supervisors as DATA before any successor is admitted."""
+    names=[]
+    raw=system.command('historical_boot_units',['systemctl','list-unit-files','--no-legend','--no-pager',
+        'madar-*.service','madar-*.timer']).stdout
+    for line in raw.splitlines():
+        fields=line.split()
+        if not fields:continue
+        if not re.fullmatch(r'madar-[A-Za-z0-9-]+\.(service|timer)',fields[0]):
+            raise RuntimeError('historical_origin_boot_unit_inventory_invalid')
+        names.append(fields[0])
+    if not 1<=len(names)<=64 or len(names)!=len(set(names)):
+        raise RuntimeError('historical_origin_boot_unit_budget')
+    files={};units={}
+    for name in sorted(names):
+        raw=system.command('historical_boot_unit',['systemctl','show',name,
+            '--property=FragmentPath,DropInPaths,LoadState,ActiveState,UnitFileState']).stdout
+        fields=dict(line.split('=',1) for line in raw.splitlines() if '=' in line)
+        if (set(fields)!={'FragmentPath','DropInPaths','LoadState','ActiveState','UnitFileState'}
+                or fields['LoadState']!='loaded' or not fields['FragmentPath']):
+            raise RuntimeError('historical_origin_boot_unit_not_loaded')
+        paths=[fields['FragmentPath'],*fields['DropInPaths'].split()]
+        for raw_path in paths:
+            path=Path(raw_path)
+            if not path.is_relative_to('/etc/systemd/system') and not path.is_relative_to('/opt/madar/control-plane'):
+                raise RuntimeError('historical_origin_boot_fragment_scope_invalid')
+            metadata=protected(path).stat()
+            files[raw_path]={'sha256':hashlib.sha256(path.read_bytes()).hexdigest(),'uid':metadata.st_uid,'mode':metadata.st_mode&0o7777}
+        units[name]={'fragment':fields['FragmentPath'],'dropins':fields['DropInPaths'].split(),
+            'state':{'enabled':fields['UnitFileState'],'active':fields['ActiveState']}}
+    if 'madar-release-proxy.service' not in units:raise RuntimeError('historical_origin_proxy_boot_missing')
+    return {'files':files,'units':units}
+
+
 def policy(system):
     """Independent root inputs only; a candidate cannot select the trust root."""
     from .automatic_release_admission import execution_policy_configuration
@@ -258,6 +292,7 @@ def observe(system,p,environment):
         'bootstrap_sha256':digest(bootstrap),'known_good':known,'worker_authority':owner,
         'runtime':{r['Name']:{'id':r['Id'],'image':r['Image'],'spec_sha256':measured_spec(r)} for r in rows},
         'runtime_scope_sha256':digest(environment['runtime_scope']),
+        'boot_controls':boot_controls(system),
         'independent_operator_scope':operator_scope,
         'configuration_sha256':{
             'application':hashlib.sha256(readonly_configuration(Path('/etc/madar/production.env'),private=True).read_bytes()).hexdigest(),
@@ -465,3 +500,135 @@ def bind_successor(system,state,intent,context_sha256):
                 'migration_authority_issued':False}
             guard();atomic_json(path/'bootstrap-origin-release-use.json',sign(receipt,key),exclusive=True)
         return receipt
+
+
+def original_runtime(contract):
+    """Authenticated historical actors, without a completed-runtime alias."""
+    from .completed_normal_admission import validate_provider_preparation
+    validate_provider_preparation(contract)
+    binding=contract['source_roles'];validate_source_binding(binding)
+    observed=recorded_observation(binding);origin=contract['origin']
+    if (digest(successor_intent(contract))!=binding['successor_intent_sha256']
+            or observed['database']['system_identifier']!=contract['database']['system_identifier']
+            or observed['database']['schema']!=146 or observed['known_good']['slot']!=origin['slot']
+            or observed['worker_authority']['generation']!=origin['worker_generation']
+            or origin['write_contract_digest']!=binding['enrollment_sha256']):
+        raise RuntimeError('historical_origin_operation_scope_changed')
+    runtimes={role:observed['runtime']['/madar-'+origin['slot']+'-'+role] for role in ROLES}
+    images={role:runtimes[role]['image'] for role in ('backend','frontend')}
+    if images!=origin['images']:raise RuntimeError('historical_origin_images_changed')
+    return {'origin_kind':KIND,'source_sha':binding['application_sha'],'images':images,
+            'worker_generation':origin['worker_generation'],'runtimes':runtimes}
+
+
+def history_witness(contract):
+    """Nonsecret projection issued only by the existing root credential path."""
+    return {'source_roles':contract['source_roles'],'origin':contract['origin'],
+            'database':contract['database'],'historical_files':contract['historical_files'],
+            'original_runtime':original_runtime(contract)}
+
+
+def validate_history_witness(contract,value):
+    from .completed_normal_admission import validate_provider_preparation
+    validate_provider_preparation(contract)
+    if (not isinstance(value,dict) or set(value)!={'source_roles','origin','database','historical_files','original_runtime'}
+            or any(value[k]!=contract[k] for k in ('source_roles','origin','database','historical_files'))):
+        raise RuntimeError('historical_origin_child_history_changed')
+    runtime=value['original_runtime']
+    if (not isinstance(runtime,dict) or set(runtime)!={'origin_kind','source_sha','images','worker_generation','runtimes'}
+            or runtime['origin_kind']!=KIND or runtime['source_sha']!=contract['source_roles']['application_sha']
+            or runtime['images']!=contract['origin']['images'] or runtime['worker_generation']!=contract['origin']['worker_generation']
+            or set(runtime.get('runtimes',{}))!=set(ROLES)):
+        raise RuntimeError('historical_origin_child_runtime_changed')
+    for row in runtime['runtimes'].values():
+        if (not isinstance(row,dict) or set(row)!={'id','image','spec_sha256'}
+                or not re.fullmatch('[a-f0-9]{64}',str(row['id']))
+                or not re.fullmatch('sha256:[a-f0-9]{64}',str(row['image']))
+                or not re.fullmatch('[a-f0-9]{64}',str(row['spec_sha256']))):
+            raise RuntimeError('historical_origin_child_actor_invalid')
+    if len({r['id'] for r in runtime['runtimes'].values()})!=len(ROLES):
+        raise RuntimeError('historical_origin_child_actor_ambiguous')
+    return runtime
+
+
+def stopped_originals(contract,runtime,original):
+    """Native evidence that legacy writers cannot use their old credentials."""
+    from .completed_normal_resources import measured_spec_matches
+    rows=runtime.inspect([r['id'] for r in original['runtimes'].values()])
+    actual={r['Id']:r for r in rows.values()}
+    if set(actual)!={r['id'] for r in original['runtimes'].values()}:
+        raise RuntimeError('historical_origin_fence_actor_missing')
+    for role,identity in original['runtimes'].items():
+        row=actual[identity['id']]
+        environment=dict(e.split('=',1) for e in row['Config'].get('Env',[]) if '=' in e)
+        if (row['Image']!=identity['image'] or row['State']['Running'] or row['State'].get('Restarting')
+                or row['HostConfig']['RestartPolicy']['Name']!='no'
+                or not measured_spec_matches(row,identity['spec_sha256'],started_worker=role.endswith('-worker'))
+                or any(environment.get(k) for k in ('MADAR_BUSINESS_WRITE_AUTHORITY','MADAR_BUSINESS_WRITE_CONTRACT'))
+                or any(m['Destination']=='/run/madar' or m['Destination'].startswith('/run/madar/business-write-authority')
+                       for m in row.get('Mounts',[]))):
+            raise RuntimeError('historical_origin_writer_not_fenced')
+
+
+def validate_fence(contract,original,record):
+    from .completed_normal_admission import digest as context_digest
+    fields={'version','kind','operation','context_sha256','enrollment_sha256','original_runtime_sha256',
+            'original_actor_ids','database_system_identifier','source_schema','provider_journal_count',
+            'provider_journal_sha256','legacy_write_grant_existed'}
+    if (not isinstance(record,dict) or set(record)!=fields or type(record['version']) is not int or record['version']!=1
+            or record['kind']!='historical-origin-provider-fence' or record['operation']!=contract['operation']
+            or record['context_sha256']!=context_digest(contract)
+            or record['enrollment_sha256']!=contract['source_roles']['enrollment_sha256']
+            or record['original_runtime_sha256']!=context_digest(original)
+            or record['original_actor_ids']!={k:r['id'] for k,r in original['runtimes'].items()}
+            or record['database_system_identifier']!=contract['database']['system_identifier']
+            or type(record['source_schema']) is not int or record['source_schema']!=146
+            or record['legacy_write_grant_existed'] is not False
+            or type(record['provider_journal_count']) is not int or not 1<=record['provider_journal_count']<=4096
+            or not re.fullmatch('[a-f0-9]{64}',str(record['provider_journal_sha256']))):
+        raise RuntimeError('historical_origin_fence_record_changed')
+    return record
+
+
+def seal_fence(contract,provider):
+    """Record the EXISTING provider lifecycle's completed native fence.
+
+    No grant is created or downgraded. The coordinator must first fence ingress,
+    actors, roles and sessions through the concrete provider adapter.
+    """
+    from .completed_normal_admission import digest as context_digest,encoded
+    from .schema150_provider_adapter import Schema150ProviderAdapter
+    from .schema150_provider_lifecycle import ProviderMaintenance150,ProtectedProviderJournal,FENCE_STEPS
+    from .emergency_routing_repair import exclusive
+    if type(provider) is not Schema150ProviderAdapter or provider.contract!=contract:
+        raise RuntimeError('historical_origin_concrete_provider_required')
+    provider.require_authority(provider.binding,purpose='observe_quiescence')
+    lifecycle=ProviderMaintenance150(provider.binding,ProtectedProviderJournal(provider.root/'provider-journal'),provider)
+    with lifecycle._locked():
+        rows,completed,pending,ready=lifecycle._state()
+        if pending or ready or completed!=list(FENCE_STEPS):raise RuntimeError('historical_origin_provider_fence_incomplete')
+        quiescence=provider.observe_quiescence(provider.binding)
+        if quiescence['schema']!=146:raise RuntimeError('historical_origin_fence_source_changed')
+        original=original_runtime(contract);stopped_originals(contract,provider.runtime,original)
+        value={'version':1,'kind':'historical-origin-provider-fence','operation':contract['operation'],
+            'context_sha256':context_digest(contract),'enrollment_sha256':contract['source_roles']['enrollment_sha256'],
+            'original_runtime_sha256':context_digest(original),
+            'original_actor_ids':{k:r['id'] for k,r in original['runtimes'].items()},
+            'database_system_identifier':contract['database']['system_identifier'],'source_schema':146,
+            'provider_journal_count':len(rows),'provider_journal_sha256':context_digest(rows),
+            'legacy_write_grant_existed':False}
+        validate_fence(contract,original,value)
+        exclusive(provider.root/'historical-origin-fence.json',encoded(value))
+        return value
+
+
+def require_fence(contract,runtime,root):
+    from .completed_normal_admission import digest as context_digest
+    from .schema150_provider_lifecycle import ProtectedProviderJournal
+    original=original_runtime(contract)
+    value=validate_fence(contract,original,strict_json(protected(Path(root)/'historical-origin-fence.json',private=True).read_bytes()))
+    rows=ProtectedProviderJournal(Path(root)/'provider-journal').read()
+    if len(rows)<value['provider_journal_count'] or context_digest(rows[:value['provider_journal_count']])!=value['provider_journal_sha256']:
+        raise RuntimeError('historical_origin_fence_journal_changed')
+    stopped_originals(contract,runtime,original)
+    return value

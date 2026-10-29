@@ -2191,3 +2191,19 @@ A guessed frontend80 is not compatible restoration evidence.
 Original-data fingerprinting also requires native transaction status IDLE on
 an autocommit connection. A manually opened caller transaction is refused
 without BEGIN, COMMIT or ROLLBACK, preserving the caller-owned boundary.
+
+Historical canonical maintenance now consumes a distinct original-runtime
+projection through the existing root credential issuer. Grantless origins must
+first complete the concrete provider ingress/actor/role/session fence; only then
+may a root-private historical fence receipt be sealed. No prior grant or
+completion is synthesized. Runtime sealing, handoff and compensation consume
+that exact identity. Ordinary grant-backed paths remain unchanged; canonical
+operational registration and isolated exceptional admission remain closed until
+their complete integration and native acceptance are established.
+
+Historical provider provenance is the independently signed enrollment-consumption
+record, rather than an invented provider-recovery completion. Fresh root
+credentials carry the exact measured history projection to the deployment user.
+Original systemd fragments, drop-ins and unit states are captured at enrollment;
+boot installation must match that preimage before superseding its supervisors.
+These source-level integrations do not constitute protected operational acceptance.

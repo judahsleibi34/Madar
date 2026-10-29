@@ -754,8 +754,16 @@ class CompletedNormalUpgrade:
                     boot_guard=self.actor.installation.installed,artifact_guard=self.artifact_guard,provider_adapter=provider)
                 self.event('original_application_acceptance_pending');self.maintenance_original_guard(binding)
                 self.event('original_provider_preimage_pending');lifecycle.prepare()
-                self.event('origin_write_fence_pending');self.fenced=True;handoff.fence_origin()
-                self.event('provider_maintenance_fence_pending');lifecycle.fence()
+                self.fenced=True
+                if self.contract['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin':
+                    # Legacy actors have no mounted grant to revoke. The same
+                    # concrete ingress/actor/role/session fence precedes their
+                    # authenticated fence receipt; no old grant is invented.
+                    self.event('provider_maintenance_fence_pending');lifecycle.fence()
+                    self.event('origin_write_fence_pending');handoff.fence_origin()
+                else:
+                    self.event('origin_write_fence_pending');handoff.fence_origin()
+                    self.event('provider_maintenance_fence_pending');lifecycle.fence()
                 self.event('pre_migration_backup_pending')
                 backup=CompletedNormalBackupContext(self.contract,self.document,self.package,kernel,
                     stage='pre-migration',source_guard=self.actor.guard,artifact_guard=self.artifact_guard,provider_adapter=provider)

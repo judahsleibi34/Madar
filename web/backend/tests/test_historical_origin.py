@@ -155,6 +155,7 @@ class HistoricalPreparationBindingTests(unittest.TestCase):
         value['source_roles']['successor_intent_sha256']=digest(origin.successor_intent(value))
         value['origin']['write_contract_digest']=value['source_roles']['enrollment_sha256']
         value['historical_files']={str(path/name):'d'*64 for name in ('bootstrap-origin-request.json','bootstrap-origin-consumed.json')}
+        value['provider_record_sha256']=value['historical_files'][str(path/'bootstrap-origin-consumed.json')]
         return value
     def test_truthful_source_is_accepted_for_preparation_but_never_registers_execution(self):
         from deployment.lib.completed_normal_admission import validate_provider_preparation,validate_contract
@@ -356,3 +357,65 @@ class NativeOperatorPrivilegeTests(IndependentOperatorScopeTests):
     def test_colliding_private_alias_refuses(self):
         self.auth['NetworkSettings']['Networks']['operator']['Aliases']=['operator-db']
         with self.assertRaisesRegex(RuntimeError,'database_transport_changed'):self.observe()
+
+
+class HistoricalControllerConsumerTests(unittest.TestCase):
+    def setUp(self):
+        from test_schema150_actor_inventory import row
+        from deployment.lib.completed_normal_resources import measured_spec
+        self.contract=HistoricalPreparationBindingTests().contract();self.rows={}
+        runtimes={}
+        for n,role in enumerate(origin.ROLES,1):
+            r=row(f'{n:064x}','madar-'+self.contract['origin']['slot']+'-'+role,running=False,source=self.contract['source_roles']['application_sha'])
+            r['HostConfig']['RestartPolicy']['Name']='no';r['Image']=self.contract['origin']['images']['frontend' if role=='frontend' else 'backend']
+            self.rows[r['Id']]=r;runtimes['/madar-'+self.contract['origin']['slot']+'-'+role]={'id':r['Id'],'image':r['Image'],'spec_sha256':measured_spec(r)}
+        self.observed={'database':{'schema':146,'system_identifier':self.contract['database']['system_identifier']},
+            'known_good':{'slot':self.contract['origin']['slot']},'worker_authority':{'generation':self.contract['origin']['worker_generation']},'runtime':runtimes}
+        self.enterContext(patch.object(origin,'recorded_observation',return_value=self.observed))
+        self.runtime=Mock();self.runtime.inspect.side_effect=lambda ids:{i:self.rows[i] for i in ids if i in self.rows}
+    def test_original_actor_projection_is_not_a_previous_completed_runtime(self):
+        out=origin.original_runtime(self.contract)
+        self.assertEqual(set(out['runtimes']),set(origin.ROLES));self.assertEqual(out['origin_kind'],origin.KIND)
+        self.assertNotIn('context_sha256',out);self.assertNotIn('completion_root',out)
+        self.assertEqual(origin.validate_history_witness(self.contract,origin.history_witness(self.contract)),out)
+    def test_root_projection_cannot_change_source_database_or_actor_identity(self):
+        for key in ('source_roles','origin','database','historical_files'):
+            value=origin.history_witness(self.contract);value[key]={}
+            with self.assertRaisesRegex(RuntimeError,'child_history_changed'):origin.validate_history_witness(self.contract,value)
+        value=origin.history_witness(self.contract);roles=value['original_runtime']['runtimes'];roles['frontend']['id']=roles['backend']['id']
+        with self.assertRaisesRegex(RuntimeError,'actor_ambiguous'):origin.validate_history_witness(self.contract,value)
+    def test_old_writers_must_actually_be_stopped_without_a_synthetic_grant(self):
+        out=origin.original_runtime(self.contract);origin.stopped_originals(self.contract,self.runtime,out)
+        for role in ('backend','notification-worker','redis'):
+            identity=out['runtimes'][role]['id'];self.rows[identity]['State']['Running']=True
+            with self.assertRaisesRegex(RuntimeError,'writer_not_fenced'):origin.stopped_originals(self.contract,self.runtime,out)
+            self.rows[identity]['State']['Running']=False
+        self.rows[out['runtimes']['backend']['id']]['Config']['Env'].append('MADAR_BUSINESS_WRITE_CONTRACT='+'a'*64)
+        with self.assertRaisesRegex(RuntimeError,'writer_not_fenced'):origin.stopped_originals(self.contract,self.runtime,out)
+    def test_missing_original_is_not_evidence_of_successful_fencing(self):
+        out=origin.original_runtime(self.contract);del self.rows[out['runtimes']['backend']['id']]
+        with self.assertRaisesRegex(RuntimeError,'fence_actor_missing'):origin.stopped_originals(self.contract,self.runtime,out)
+    def test_child_uses_only_current_root_authenticated_projection(self):
+        from deployment.lib import completed_normal_admission as admission
+        value=origin.history_witness(self.contract)
+        with patch.object(admission.os,'geteuid',return_value=1000),patch.object(admission,'require_fresh_authorization') as authority,patch.object(admission,'credential_witness',return_value=value):
+            self.assertEqual(admission.origin_runtime(self.contract),value['original_runtime']);admission.verify_history(self.contract)
+            self.assertEqual(authority.call_count,2)
+
+
+class HistoricalFenceRecordTests(HistoricalControllerConsumerTests):
+    def fence(self,original):
+        from deployment.lib.completed_normal_admission import digest as context_digest
+        return {'version':1,'kind':'historical-origin-provider-fence','operation':self.contract['operation'],
+            'context_sha256':context_digest(self.contract),'enrollment_sha256':self.contract['source_roles']['enrollment_sha256'],
+            'original_runtime_sha256':context_digest(original),'original_actor_ids':{k:r['id'] for k,r in original['runtimes'].items()},
+            'database_system_identifier':self.contract['database']['system_identifier'],'source_schema':146,
+            'provider_journal_count':3,'provider_journal_sha256':'d'*64,'legacy_write_grant_existed':False}
+    def test_fence_binds_exact_original_operation_without_a_write_grant(self):
+        original=origin.original_runtime(self.contract);value=self.fence(original)
+        self.assertEqual(origin.validate_fence(self.contract,original,value),value)
+        for key,changed in [('context_sha256','f'*64),('enrollment_sha256','f'*64),('database_system_identifier','999999'),('source_schema',160),('legacy_write_grant_existed',True),('provider_journal_count',0),('original_actor_ids',{})]:
+            with self.subTest(key=key),self.assertRaisesRegex(RuntimeError,'fence_record_changed'):origin.validate_fence(self.contract,original,dict(value,**{key:changed}))
+    def test_old_grant_is_not_accepted_as_a_historical_fence(self):
+        original=origin.original_runtime(self.contract)
+        with self.assertRaisesRegex(RuntimeError,'fence_record_changed'):origin.validate_fence(self.contract,original,{'version':2,'mode':'READ_ONLY','schema':146})

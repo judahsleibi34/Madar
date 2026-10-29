@@ -170,6 +170,8 @@ def _validate_contract(value: dict, selected) -> None:
         raise RuntimeError("completed_normal_admission_digest_invalid")
     if bootstrap:
         from deployment.lib.historical_origin import successor_intent
+        if value['provider_record_sha256']!=files[str(origin_root/'bootstrap-origin-consumed.json')]:
+            raise RuntimeError('historical_origin_provider_provenance_changed')
         from deployment.lib.migration_inventory import digest as intent_digest
         if intent_digest(successor_intent(value))!=roles['successor_intent_sha256']:
             raise RuntimeError('historical_origin_successor_scope_changed')
@@ -250,6 +252,11 @@ def verify_history(contract: dict, *, _visited=frozenset()) -> None:
         # Operational validate_contract/profile admission remains mandatory at
         # every effectful caller and still refuses unaccepted canonical160.
         validate_provider_preparation(contract)
+        if os.geteuid()!=0:
+            require_fresh_authorization(contract)
+            from deployment.lib.historical_origin import validate_history_witness
+            validate_history_witness(contract,credential_witness('historical_origin','historical_origin_sha256'))
+            return
         from deployment.lib.historical_origin import recorded_observation
         observed=recorded_observation(contract['source_roles'])
         for name,expected in contract['historical_files'].items():
@@ -294,7 +301,19 @@ def verify_history(contract: dict, *, _visited=frozenset()) -> None:
         verify_history(previous, _visited=_visited | {root})
 
 
-def provider_record_metadata(state_root: Path) -> dict:
+def origin_runtime(contract):
+    """Original actor DATA through its genuine lifecycle, never a fake receipt."""
+    from deployment.lib.provider_recovery_runtime import protected
+    if contract.get('source_roles',{}).get('origin_kind')=='independently-enrolled-historical-bootstrap-origin':
+        from deployment.lib.historical_origin import original_runtime,validate_history_witness
+        if os.geteuid()==0:return original_runtime(contract)
+        require_fresh_authorization(contract)
+        return validate_history_witness(contract,credential_witness('historical_origin','historical_origin_sha256'))
+    root=Path(contract['source_roles']['completion_root'])
+    return json.loads(protected(root/('candidate-identities.json' if profile(contract) is LEGACY else 'candidate-runtime.json'),private=True).read_bytes())
+
+
+def provider_record_metadata(state_root: Path, *, contract=None) -> dict:
     """Nonsecret identity of the historical root-private record.
 
     The deployment user can stat this file but must not read its contents.
@@ -302,7 +321,11 @@ def provider_record_metadata(state_root: Path) -> dict:
     measurement with a different file while its child credential is active.
     """
     from deployment.lib.provider_recovery_runtime import readonly_configuration
-    path = readonly_configuration(Path(state_root) / 'provider-recovery.json', private=True)
+    if contract is not None and contract['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin':
+        from deployment.lib.historical_origin import validate_source_binding
+        from deployment.lib.provider_recovery_runtime import protected
+        path=protected(validate_source_binding(contract['source_roles'])/'bootstrap-origin-consumed.json',private=True)
+    else:path = readonly_configuration(Path(state_root) / 'provider-recovery.json', private=True)
     st = path.stat()
     if st.st_uid != 0 or st.st_mode & 0o077:
         raise RuntimeError('completed_normal_provider_record_identity_invalid')
@@ -311,14 +334,15 @@ def provider_record_metadata(state_root: Path) -> dict:
             'uid': st.st_uid, 'gid': st.st_gid, 'mode': st.st_mode & 0o7777}
 
 
-def measure_provider_record(state_root: Path, expected_sha256: str) -> dict:
+def measure_provider_record(state_root: Path, expected_sha256: str, *, contract=None) -> dict:
     """Root remeasures before issuing every fresh child credential."""
     from deployment.lib.provider_recovery_runtime import file_digest
     if os.geteuid() != 0:
         raise RuntimeError('completed_normal_provider_record_root_required')
-    before = provider_record_metadata(state_root)
+    before = provider_record_metadata(state_root) if contract is None else provider_record_metadata(state_root,contract=contract)
     actual = file_digest(Path(before['path']))
-    if actual != expected_sha256 or provider_record_metadata(state_root) != before:
+    after = provider_record_metadata(state_root) if contract is None else provider_record_metadata(state_root,contract=contract)
+    if actual != expected_sha256 or after != before:
         raise RuntimeError('completed_normal_admission_provider_record_changed')
     return dict(before, sha256=actual)
 
@@ -367,14 +391,20 @@ def require_maintenance_handoff(contract, *, admissions=ADMISSIONS):
     if profile(contract) is not RECONCILED:
         raise RuntimeError('completed_normal_maintenance_handoff_profile_invalid')
     grant=require_candidate_authority(contract,mode='NORMAL',admissions=admissions)
-    expected_origin=expected_origin_grant(contract,'READ_ONLY')
+    historical=contract['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin'
+    expected_origin=None if historical else expected_origin_grant(contract,'READ_ONLY')
     if os.geteuid()==0:
         root=Path(admissions)/digest(contract)
         record=json.loads(protected(root/'maintenance-write-handoff.json',private=True).read_bytes())
         stage=json.loads(protected(root/'candidate-staged-runtime.json',private=True).read_bytes())
-        origin=json.loads(protected(Path(contract['source_roles']['completion_root'])/'write-authority/authority.json').read_bytes())
-        if origin!=expected_origin:
-            raise RuntimeError('completed_normal_maintenance_origin_not_fenced')
+        if historical:
+            from deployment.lib.historical_origin import require_fence
+            from deployment.lib.emergency_routing_repair import Runtime
+            origin=require_fence(contract,Runtime(),root)
+        else:
+            origin=json.loads(protected(Path(contract['source_roles']['completion_root'])/'write-authority/authority.json').read_bytes())
+            if origin!=expected_origin:
+                raise RuntimeError('completed_normal_maintenance_origin_not_fenced')
         from deployment.lib.schema150_provider_lifecycle import ProviderMaintenance150,ProtectedProviderJournal
         binding={'operation':RECONCILED.operation,'context_sha256':digest(contract),
             'source_sha':contract['candidate']['source_sha'],'controller_sha':contract['candidate']['controller_sha'],
@@ -387,12 +417,16 @@ def require_maintenance_handoff(contract, *, admissions=ADMISSIONS):
         if not isinstance(record,dict) or record.get('provider_journal_sha256')!=digest(rows[:boundary]):
             raise RuntimeError('completed_normal_maintenance_private_journal_changed')
         value={'handoff':record,'origin_authority_sha256':digest(origin)}
+        if historical:value['historical_origin_fence']=origin
     else:
         require_fresh_authorization(contract)
         value=credential_witness('maintenance_handoff','maintenance_handoff_sha256')
         stage=credential_witness('candidate_stage','candidate_stage_sha256')
         record=value.get('handoff') if isinstance(value,dict) else None
-    if (not isinstance(value,dict) or set(value)!={'handoff','origin_authority_sha256'}
+    if historical:
+        from deployment.lib.historical_origin import validate_fence
+        expected_origin=validate_fence(contract,origin_runtime(contract),value.get('historical_origin_fence') if isinstance(value,dict) else None)
+    if (not isinstance(value,dict) or set(value)!={'handoff','origin_authority_sha256'}|({'historical_origin_fence'} if historical else set())
             or value['origin_authority_sha256']!=digest(expected_origin)
             or not isinstance(record,dict) or set(record)!={'operation','context_sha256','schema','mode',
                 'candidate_stage_sha256','provider_journal_sha256','write_authority_sha256','workers_started','ingress_restored'}
@@ -424,17 +458,22 @@ def publish_admission(contract: dict, operations, state_root: Path, *, admission
     require_fresh_authorization(contract)
     selected = profile(contract)
     state = json.loads(readonly_configuration(Path(state_root) / "state.json", private=True).read_text())
-    if selected is LEGACY:
+    historical=contract['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin'
+    if historical:
+        from deployment.lib.historical_origin import original_runtime
+        roles=operations.historical_origin_binding(state)
+        current_runtime=original_runtime(contract)
+    elif selected is LEGACY:
         roles = attest_runtime(operations, state)
     else:
         from deployment.lib.completed_normal_baseline import attest_compatible_runtime
         roles = attest_compatible_runtime(operations, state, operations.repository_head(), operations.installed_sha())
     known = state["known_good_release"]
-    grant=json.loads(protected(Path(roles['completion_root'])/'write-authority/authority.json').read_text())
-    origin_images = known['images'] if selected is LEGACY else {
+    grant=None if historical else json.loads(protected(Path(roles['completion_root'])/'write-authority/authority.json').read_text())
+    origin_images = current_runtime['images'] if historical else known['images'] if selected is LEGACY else {
         key: 'sha256:' + str(known['images'][key]).split('sha256:')[-1] for key in ('backend', 'frontend')}
     actual_origin = {"slot": state["active_slot"], "images": origin_images, "worker_generation": known["worker_generation"],
-                     "write_contract_digest":grant.get('contract_digest')}
+                     "write_contract_digest":roles['enrollment_sha256'] if historical else grant.get('contract_digest')}
     if roles != contract["source_roles"] or actual_origin != contract["origin"]:
         raise RuntimeError("completed_normal_admission_live_origin_changed")
     verify_history(contract)
@@ -462,13 +501,17 @@ def publish_admission(contract: dict, operations, state_root: Path, *, admission
     # ambiguous rows nor another schema. No credentials or customer rows emitted.
     if [line for line in result.stdout.splitlines() if line not in {"BEGIN", "COMMIT"}] != [db["system_identifier"] + ':' + str(selected.source)]:
         raise RuntimeError("completed_normal_admission_database_changed")
-    provider = Path(state_root) / "provider-recovery.json"
-    from deployment.lib.provider_recovery_runtime import readonly_configuration as read_config
-    provider_bytes = read_config(provider, private=True).read_bytes()
-    record = json.loads(provider_bytes)
-    if (record.get("profile") != "provider402-signin" or record.get("phase") != "local_rollback_active"
-            or hashlib.sha256(provider_bytes).hexdigest() != contract["provider_record_sha256"]):
-        raise RuntimeError("completed_normal_admission_provider_state_changed")
+    if historical:
+        metadata=measure_provider_record(state_root,contract['provider_record_sha256'],contract=contract)
+        provider_bytes=protected(Path(metadata['path']),private=True).read_bytes()
+    else:
+        provider = Path(state_root) / "provider-recovery.json"
+        from deployment.lib.provider_recovery_runtime import readonly_configuration as read_config
+        provider_bytes = read_config(provider, private=True).read_bytes()
+        record = json.loads(provider_bytes)
+        if (record.get("profile") != "provider402-signin" or record.get("phase") != "local_rollback_active"
+                or hashlib.sha256(provider_bytes).hexdigest() != contract["provider_record_sha256"]):
+            raise RuntimeError("completed_normal_admission_provider_state_changed")
     admissions.mkdir(mode=0o755, parents=True, exist_ok=True)
     # Do not create a root-issued receipt inside an operator-writable parent.
     for directory in (admissions, *admissions.parents):
@@ -511,7 +554,7 @@ def require_admission(state_root: Path, application_sha: str | None, *, admissio
         raise RuntimeError("provider_recovery_requires_separate_operator_exit")
     interlock = json.loads(protected(UPGRADE_INTERLOCK).read_text())
     context = str(interlock.get("context_sha256", ""))
-    if interlock.get("operation") not in {LEGACY.operation, MANUAL.operation, APPLICATION.operation, COMMERCIAL.operation, FENCED.operation, OUTBOX.operation} or not re.fullmatch(r"[0-9a-f]{64}", context):
+    if interlock.get("operation") not in {LEGACY.operation, MANUAL.operation, APPLICATION.operation, COMMERCIAL.operation, FENCED.operation, OUTBOX.operation, RECONCILED.operation} or not re.fullmatch(r"[0-9a-f]{64}", context):
         raise RuntimeError("provider_recovery_requires_separate_operator_exit")
     receipt = credential_witness('completed_normal_admission','admission_sha256')
     contract = receipt.get("contract")
@@ -524,8 +567,18 @@ def require_admission(state_root: Path, application_sha: str | None, *, admissio
         raise RuntimeError("completed_normal_admission_binding_changed")
     require_fresh_authorization(contract)
     provider = credential_witness('provider_record_witness', 'provider_record_witness_sha256')
-    if (receipt["provider_record_sha256"] != contract["provider_record_sha256"]
-            or provider != dict(provider_record_metadata(state_root), sha256=contract['provider_record_sha256'])):
+    historical=contract['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin'
+    if historical:
+        from deployment.lib.historical_origin import validate_source_binding
+        expected_path=str(validate_source_binding(contract['source_roles'])/'bootstrap-origin-consumed.json')
+        expected_fields={'path','device','inode','size','mtime_ns','ctime_ns','uid','gid','mode','sha256'}
+        verify_history(contract)
+        valid=(isinstance(provider,dict) and set(provider)==expected_fields and provider['path']==expected_path
+            and provider['sha256']==contract['historical_files'][expected_path] and provider['uid']==0
+            and provider['mode']==0o600 and all(type(provider[k]) is int and provider[k]>=0
+                for k in expected_fields-{'path','sha256'}))
+    else:valid=provider==dict(provider_record_metadata(state_root),sha256=contract['provider_record_sha256'])
+    if receipt["provider_record_sha256"] != contract["provider_record_sha256"] or not valid:
         raise RuntimeError("completed_normal_admission_provider_record_changed")
     # The root coordinator remeasures private historical evidence at each
     # privileged boundary. The madar child sees only this immutable root-issued

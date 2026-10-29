@@ -80,17 +80,28 @@ class CompletedNormalBootInstallation:
         self.profile=profile(contract)
         self.source_guard,self.ops=source_guard,operations;self.units=Path(units)
         self.root=Path(admissions)/digest(contract);self.name='madar-compatible-normal-boot-'+digest(contract)[:12]+'.service'
+        historical=contract['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin'
         # A completed136 origin already has a99-compatible-normal drop-in.
         # Its ExecStartPre reset must precede the successor's gate regardless
         # of the two context hashes; lexical hash order is not ownership.
-        prefix=('99zzzzz-compatible-normal-' if self.profile is OUTBOX else '99zzzz-compatible-normal-' if self.profile in (FENCED, OUTBOX) else
+        prefix=('99zzzzzzz-compatible-normal-' if historical else '99zzzzz-compatible-normal-' if self.profile is OUTBOX else '99zzzz-compatible-normal-' if self.profile in (FENCED, OUTBOX) else
             '99zzz-compatible-normal-' if self.profile is COMMERCIAL else
             '99zz-compatible-normal-' if self.profile is APPLICATION else
             '99z-compatible-normal-' if self.profile is MANUAL else '99-compatible-normal-')
         self.proxy=self.units/(PROXY+'.d')/(prefix+digest(contract)[:12]+'.conf')
         baseline=document['boot_resources']
-        compatible_origin='madar-compatible-normal-boot-'+Path(contract['source_roles']['completion_root']).name[:12]+'.service'
-        compatible_units={compatible_origin}
+        if historical:
+            from deployment.lib.historical_origin import recorded_observation
+            original=recorded_observation(contract['source_roles'])['boot_controls']
+            compatible_units={name for name in original['units'] if re.fullmatch(r'madar-(emergency-routing|normal-local-(boot|fallback)-[a-f0-9]{12}|compatible-normal-boot-[a-f0-9]{12})\.service',name)}
+            if (set(baseline['old_units'])!=compatible_units
+                    or any(original['files'].get(path)!=value for path,value in baseline['files'].items())
+                    or any(original['units'].get(name,{}).get('state')!=value for name,value in baseline['unit_states'].items())
+                    or baseline['proxy_dropins']!=original['units'][PROXY]['dropins']):
+                raise RuntimeError('completed_boot_historical_preimage_changed')
+        else:
+            compatible_origin='madar-compatible-normal-boot-'+Path(contract['source_roles']['completion_root']).name[:12]+'.service'
+            compatible_units={compatible_origin}
         if self.profile in (APPLICATION, COMMERCIAL, FENCED, OUTBOX):
             # Earlier compatible actors remain historical files. Only actors
             # already measured and superseded by the exact origin receipt may
@@ -102,7 +113,7 @@ class CompletedNormalBootInstallation:
             previous=json.loads(path.read_text())
             compatible_units.update(name for name in previous.get('old_units',[])
                 if re.fullmatch('madar-compatible-normal-boot-[0-9a-f]{12}\\.service',name))
-        if (set(baseline)!={'files','proxy_dropins','old_units','old_unit_dropins','unit_states'} or not baseline['old_units']
+        if (set(baseline)!={'files','proxy_dropins','old_units','old_unit_dropins','unit_states'} or not baseline['old_units'] and not historical
                 or any(not (name=='madar-emergency-routing.service' or re.fullmatch('madar-normal-local-(boot|fallback)-[0-9a-f]{12}\\.service',name)
                     or self.profile is not LEGACY and name in compatible_units) for name in baseline['old_units'])
                 or set(baseline['unit_states'])!={PROXY,*baseline['old_units']}):
