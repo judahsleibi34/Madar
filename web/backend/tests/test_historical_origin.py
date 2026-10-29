@@ -30,7 +30,7 @@ class HistoricalOriginTests(unittest.TestCase):
         for target,value in [
             ('policy',Mock(side_effect=lambda *_:(self.p,self.key,{}))),
             ('observe',Mock(side_effect=lambda *_:copy.deepcopy(self.observation))),
-            ('operation_locks',lambda *_:__import__('contextlib').nullcontext()),
+            ('operation_locks',lambda *_:__import__('contextlib').nullcontext(lambda:None)),
             ('journal_lock',locked),('readonly_configuration',lambda p,**k:Path(p))]:
             stack.enter_context(patch.object(origin,target,value))
         stack.enter_context(patch.object(approval,'protected',lambda p,**k:Path(p)))
@@ -49,7 +49,8 @@ class HistoricalOriginTests(unittest.TestCase):
         self.assertNotIn('completion_sha256',binding)
         self.assertNotIn('completed_normal_upgrade',state['known_good_release'])
         self.assertFalse(receipt['protected_completion_claimed']);self.assertFalse(receipt['migration_authority_issued'])
-        self.system.authenticate_operator.assert_called_once_with('secret-token')
+        self.assertEqual(self.system.authenticate_operator.call_count,2)
+        self.system.authenticate_operator.assert_called_with('secret-token')
         self.assertNotIn('secret-token',json.dumps(receipt))
 
     def test_prepare_never_enrolls_or_changes_original_state(self):
@@ -67,6 +68,12 @@ class HistoricalOriginTests(unittest.TestCase):
         r=self.prepared();self.system.authenticate_operator.side_effect=RuntimeError('operator_mfa_refused')
         with self.assertRaisesRegex(RuntimeError,'operator_mfa_refused'):
             origin.enroll(self.system,r['request_id'],'AAL1',r['request_sha256'])
+        self.assertFalse((self.journal/r['request_id']/'bootstrap-origin-consumed.json').exists())
+
+    def test_operator_revoked_during_native_observation_is_rechecked_before_consumption(self):
+        r=self.prepared();self.system.authenticate_operator.side_effect=[{'aal':'aal2','operator_auth_id':'separate-operator'},RuntimeError('operator_session_revoked')]
+        with self.assertRaisesRegex(RuntimeError,'operator_session_revoked'):
+            origin.enroll(self.system,r['request_id'],'token',r['request_sha256'])
         self.assertFalse((self.journal/r['request_id']/'bootstrap-origin-consumed.json').exists())
 
     def test_independent_observation_pin_is_not_caller_pass(self):

@@ -188,26 +188,32 @@ def operation_locks(system):
     """Same upgrade/deployment lock inodes as the existing execution issuer."""
     from .control_plane_upgrade import acquire_lock
     from .automatic_release_admission import require_no_pending_operation
+    from .schema150_provider_adapter import require_owned_lock
     upgrade=acquire_lock(system.upgrade_root/'upgrade.lock',create=False)
     try:
         deploy=acquire_lock(system.state_root/'deploy.lock',create=False)
         try:
-            require_no_pending_operation()
-            if system.interlock_file.exists() or system.interlock_file.is_symlink():
-                raise RuntimeError('historical_origin_conflicting_operation')
-            yield
+            def guard():
+                require_owned_lock(upgrade,system.upgrade_root/'upgrade.lock')
+                require_owned_lock(deploy,system.state_root/'deploy.lock')
+                require_no_pending_operation()
+                if system.interlock_file.exists() or system.interlock_file.is_symlink():
+                    raise RuntimeError('historical_origin_conflicting_operation')
+            guard();yield guard
         finally:os.close(deploy)
     finally:os.close(upgrade)
 
 
 def prepare(system):
-    with operation_locks(system):return _prepare(system)
+    with operation_locks(system) as guard:return _prepare(system,guard)
 
 
-def _prepare(system):
+def _prepare(system,guard):
     p,key,environment=policy(system);value=observe(system,p,environment)
     if digest(value)!=p['observation_sha256']:raise RuntimeError('historical_origin_observation_not_independently_pinned')
     request_id=str(uuid.uuid4());now=int(time.time())
+    guard()
+    if now>=p['expires_at']:raise RuntimeError('historical_origin_policy_expired_during_observation')
     request={'version':1,'kind':KIND,'request_id':request_id,'policy_sha256':digest(p),
         'observation':value,'created_at':now,'expires_at':min(p['expires_at'],now+p['max_request_seconds']),
         'successor_intent_sha256':p['successor_intent_sha256']}
@@ -217,10 +223,10 @@ def _prepare(system):
 
 
 def enroll(system,request_id,token,confirmation):
-    with operation_locks(system):return _enroll(system,request_id,token,confirmation)
+    with operation_locks(system) as guard:return _enroll(system,request_id,token,confirmation,guard)
 
 
-def _enroll(system,request_id,token,confirmation):
+def _enroll(system,request_id,token,confirmation,guard):
     p,key,environment=policy(system)
     with journal_lock(identifier(request_id),namespace='historical-origins') as path:
         request=verified(path/'bootstrap-origin-request.json',key)
@@ -232,6 +238,11 @@ def _enroll(system,request_id,token,confirmation):
         observed=observe(system,p,environment)
         if observed!=request['observation'] or digest(observed)!=p['observation_sha256']:
             raise RuntimeError('historical_origin_changed_before_enrollment')
+        current=system.authenticate_operator(token)
+        if any(current.get(k)!=operator.get(k) for k in
+                ('aal','operator_auth_id','policy_sha256','session_id_sha256','verification_key_sha256')):
+            raise RuntimeError('historical_origin_operator_changed_during_observation')
+        operator=current
         if int(time.time())>=request['expires_at']:raise RuntimeError('historical_origin_request_expired')
         receipt={'version':1,'kind':KIND,'request_id':request_id,'request_sha256':digest(request),
             'policy_sha256':digest(p),'operator':operator,'enrolled_at':int(time.time()),
@@ -240,7 +251,7 @@ def _enroll(system,request_id,token,confirmation):
             'protected_completion_claimed':False,'migration_authority_issued':False}
         # Atomic no-replace consumption precedes mutable linkage; an interrupted
         # issuer cannot silently reuse a request or fabricate a release completion.
-        atomic_json(path/'bootstrap-origin-consumed.json',sign(receipt,key),exclusive=True)
+        guard();atomic_json(path/'bootstrap-origin-consumed.json',sign(receipt,key),exclusive=True)
         state_path=system.state_root/'state.json';state=strict_json(readonly_configuration(state_path,private=True).read_bytes())
         known=state.get('known_good_release') or {}
         if (known!=observed['known_good'] or state.get('in_progress_release') or state.get('rollback_failure')):
@@ -249,7 +260,7 @@ def _enroll(system,request_id,token,confirmation):
         known['historical_origin']={'request_id':request_id,'enrollment_sha256':digest(receipt)}
         metadata=state_path.stat()
         from .control_plane_upgrade import atomic_json as write_state
-        write_state(state_path,state,owner=(metadata.st_uid,metadata.st_gid))
+        guard();write_state(state_path,state,owner=(metadata.st_uid,metadata.st_gid))
         return receipt
 
 
@@ -297,7 +308,7 @@ def bind_successor(system,state,intent,context_sha256):
     """
     if not re.fullmatch('[a-f0-9]{64}',str(context_sha256)):
         raise RuntimeError('historical_origin_successor_context_invalid')
-    with operation_locks(system):
+    with operation_locks(system) as guard:
         origin=attest(system,state);p,key,_=policy(system)
         if digest(intent)!=origin['successor_intent_sha256']:
             raise RuntimeError('historical_origin_successor_intent_changed')
@@ -308,5 +319,5 @@ def bind_successor(system,state,intent,context_sha256):
             receipt={'kind':'historical-origin-single-successor-binding','origin':origin,
                 'context_sha256':context_sha256,'intent_sha256':digest(intent),'bound_at':int(time.time()),
                 'migration_authority_issued':False}
-            atomic_json(path/'bootstrap-origin-release-use.json',sign(receipt,key),exclusive=True)
+            guard();atomic_json(path/'bootstrap-origin-release-use.json',sign(receipt,key),exclusive=True)
         return receipt

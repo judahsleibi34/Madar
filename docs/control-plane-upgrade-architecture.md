@@ -2398,3 +2398,8 @@ completion: serving preflight returns not_requested only after reattesting the
 distinct enrolled origin, and rejects any conflicting migration directory or
 fabricated completed marker. Account acceptance probes create only their
 explicitly enrolled synthetic Auth sessions; they issue no SQL/write authority.
+
+Historical enrollment holds and rechecks the existing upgrade and deployment
+lock inodes before durable effects. Infrastructure AAL2/current session identity
+is checked again after potentially lengthy native observations and before
+consumption; revocation during observation cannot create an enrollment.
