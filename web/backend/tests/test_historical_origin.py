@@ -271,10 +271,10 @@ class IndependentOperatorScopeTests(unittest.TestCase):
         self.key_file=self.root/'operator.key';self.key_file.write_bytes(self.key)
         self.auth={'Id':'a'*64,'Name':'/operator-auth','Image':'sha256:'+'b'*64,
             'Config':{'Labels':{'com.madar.operator-fixture':'realm'},'Env':['GOTRUE_JWT_SECRET='+self.key.decode(),
-                'GOTRUE_DB_DATABASE_URL=postgres://postgres:test@operator-database:5432/operators']},
+                'GOTRUE_DB_DATABASE_URL=postgres://supabase_auth_admin:test@operator-db:5432/operators']},
             'HostConfig':{'Privileged':False,'PortBindings':None,'CapAdd':None},
             'NetworkSettings':{'Networks':{'operator':{'NetworkID':'c'*64}}}}
-        self.database=copy.deepcopy(self.auth);self.database.update(Id='d'*64,Name='/operator-database')
+        self.database=copy.deepcopy(self.auth);self.database.update(Id='d'*64,Name='/operator-database');self.database['NetworkSettings']['Networks']['operator']['Aliases']=['operator-db']
         self.service={'id':self.auth['Id'],'image':self.auth['Image'],'spec_sha256':'e'*64}
         self.facts={'created_container_ids':[self.auth['Id'],self.database['Id']],'realm_id':'realm','auth_service':self.service,'network_id':'c'*64}
         self.environment={'realm_id':'realm','database_system_identifier':'123456789','denied_database_identifiers':['987654321']}
@@ -288,7 +288,7 @@ class IndependentOperatorScopeTests(unittest.TestCase):
         stack.enter_context(patch.object(auth,'RELEASE_OPERATOR_POLICY',self.policy_file))
         stack.enter_context(patch.object(auth,'RELEASE_OPERATOR_KEY',self.key_file))
         stack.enter_context(patch.object(resources,'measured_spec',lambda *_:'e'*64))
-        self.native=stack.enter_context(patch.object(environment,'run',return_value=canonical(['operators','246813579'])))
+        self.native=stack.enter_context(patch.object(environment,'run',return_value=canonical(['operators','246813579',True])))
     def observe(self):return origin.independent_operator_scope([self.auth,self.database],self.environment)
     def test_enrolled_operator_database_is_native_observed_and_separate(self):
         out=self.observe();self.assertEqual(out['database_system_identifier'],'246813579');self.assertEqual(len(out['actor_ids']),2)
@@ -302,7 +302,7 @@ class IndependentOperatorScopeTests(unittest.TestCase):
         self.native.assert_not_called()
     def test_source_or_production_database_identity_cannot_be_operator_database(self):
         for sid in ['123456789','987654321']:
-            self.native.return_value=canonical(['operators',sid])
+            self.native.return_value=canonical(['operators',sid,True])
             with self.assertRaisesRegex(RuntimeError,'database_not_independent'):self.observe()
 
 
@@ -316,8 +316,7 @@ class HistoricalBootstrapDataTests(unittest.TestCase):
         def installation_stat(path):
             value=original(path)
             return SimpleNamespace(st_uid=0,st_mode=value.st_mode) if str(path) in {'/','/opt'} else value
-        self.addCleanup(patch.stopall)
-        patch.object(Path,'lstat',installation_stat).start()
+        ancestor_patch=patch.object(Path,'lstat',installation_stat);ancestor_patch.start();self.addCleanup(ancestor_patch.stop)
         self.value={'phase':'bootstrap_adopted','status':'known_good','schema':{'observed':146}}
         self.path.write_bytes(canonical(self.value));self.path.chmod(0o600)
     def test_real_operator_owned_record_is_data_without_root_receipt_reclassification(self):
@@ -331,3 +330,15 @@ class HistoricalBootstrapDataTests(unittest.TestCase):
     def test_unbounded_original_record_refuses(self):
         self.path.write_bytes(b' '*65537)
         with self.assertRaisesRegex(RuntimeError,'bootstrap_data_untrusted'):origin.bootstrap_record(self.path)
+
+
+class NativeOperatorPrivilegeTests(IndependentOperatorScopeTests):
+    def test_operator_database_superuser_or_unbounded_connections_refuse(self):
+        self.native.return_value=canonical(['operators','246813579',False])
+        with self.assertRaisesRegex(RuntimeError,'database_not_independent'):self.observe()
+    def test_unbound_dns_alias_refuses(self):
+        self.database['NetworkSettings']['Networks']['operator']['Aliases']=[]
+        with self.assertRaisesRegex(RuntimeError,'database_transport_changed'):self.observe()
+    def test_colliding_private_alias_refuses(self):
+        self.auth['NetworkSettings']['Networks']['operator']['Aliases']=['operator-db']
+        with self.assertRaisesRegex(RuntimeError,'database_transport_changed'):self.observe()

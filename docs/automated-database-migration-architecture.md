@@ -2683,3 +2683,8 @@ read through a separate bounded, private, nonsymlink path check. Only native
 verification and an independently pinned root-policy digest can enroll them.
 This does not relax root-only trust for signed enrollment, authorization or
 protected completion records, and issues no migration authority.
+
+The enrolled native operator Auth transport uses its exact private database
+network alias and restricted supabase_auth_admin login, not the PostgreSQL
+superuser. Enrollment verifies alias ownership/no collision and actual native
+role privileges and connection bounds as well as its distinct system identity.

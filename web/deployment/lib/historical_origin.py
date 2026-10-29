@@ -114,17 +114,24 @@ def independent_operator_scope(rows,environment):
     if not auth or auth['Image']!=operator['auth_service']['image'] or measured_spec(auth)!=operator['auth_service']['spec_sha256']:
         raise RuntimeError('historical_origin_operator_runtime_changed')
     database=next(r for r in selected.values() if r['Id']!=auth['Id'])
+    database_endpoint=next(iter(database['NetworkSettings']['Networks'].values()))
+    auth_endpoint=next(iter(auth['NetworkSettings']['Networks'].values()))
+    database_names={database['Name'].lstrip('/'),*(database_endpoint.get('Aliases') or [])}
     config=dict(entry.split('=',1) for entry in auth['Config'].get('Env',[]) if '=' in entry)
     uri=urlsplit(config.get('GOTRUE_DB_DATABASE_URL',''))
-    if (uri.scheme not in {'postgres','postgresql'} or uri.hostname!=database['Name'].lstrip('/')
-            or uri.port!=5432 or uri.path!='/operators' or uri.username!='postgres' or uri.query or uri.fragment):
+    if (uri.scheme not in {'postgres','postgresql'} or uri.hostname not in database_names
+            or uri.hostname in (auth_endpoint.get('Aliases') or [])
+            or uri.port!=5432 or uri.path!='/operators' or uri.username!='supabase_auth_admin' or uri.query or uri.fragment):
         raise RuntimeError('historical_origin_operator_database_transport_changed')
     key=protected(RELEASE_OPERATOR_KEY,private=True).read_bytes()
     if hashlib.sha256(config.get('GOTRUE_JWT_SECRET','').encode()).hexdigest()!=hashlib.sha256(key).hexdigest():
         raise RuntimeError('historical_origin_operator_authentication_key_changed')
     observed=strict_json(run(['/usr/bin/docker','exec',database['Id'],'psql','-XqAt','-U','postgres','-d','operators','-c',
-        "SELECT json_build_array(current_database(),system_identifier::text) FROM pg_control_system()"] ))
-    if (not isinstance(observed,list) or len(observed)!=2 or observed[0]!='operators'
+        """SELECT json_build_array(current_database(),system_identifier::text,
+          EXISTS(SELECT 1 FROM pg_roles WHERE rolname='supabase_auth_admin'
+            AND NOT rolsuper AND NOT rolbypassrls AND rolconnlimit=8)
+          AND current_setting('max_connections')='16') FROM pg_control_system()"""] ))
+    if (not isinstance(observed,list) or len(observed)!=3 or observed[0]!='operators' or observed[2] is not True
             or not re.fullmatch('[1-9][0-9]{0,31}',str(observed[1]))
             or observed[1] in {environment['database_system_identifier'],*environment['denied_database_identifiers']}):
         raise RuntimeError('historical_origin_operator_database_not_independent')
