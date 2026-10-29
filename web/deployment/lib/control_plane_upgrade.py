@@ -711,6 +711,18 @@ class SystemOperations:
         except (RuntimeError,ValueError,KeyError,IndexError,OSError) as error:
             raise UpgradeError('completed_compatible_runtime_invalid') from error
 
+    def historical_origin_binding(self,state):
+        # Distinct truthful enrollment; never call this a completed upgrade.
+        from deployment.lib.historical_origin import attest
+        return attest(self,state)
+
+    def historical_origin_action(self,action,*,request_id=None,token=None,confirmation=None):
+        from deployment.lib import historical_origin as origin
+        if action=='prepare':return origin.prepare(self)
+        if action=='inspect':return origin.inspect(self,request_id)
+        if action=='enroll':return origin.enroll(self,request_id,token,confirmation)
+        raise UpgradeError('historical_origin_action_invalid')
+
     def live_schema(self, slot: str) -> int:
         if slot not in SLOT_PORTS:
             raise UpgradeError("active_slot_invalid")
@@ -1648,6 +1660,8 @@ class SystemOperations:
         if (state.get('known_good_release') or {}).get('sha')!=production_sha:
             if 'completed_normal_upgrade' in (state.get('known_good_release') or {}):
                 source_roles=self.completed_compatible_binding(state)
+            elif 'historical_origin' in (state.get('known_good_release') or {}):
+                source_roles=self.historical_origin_binding(state)
             else:
                 from deployment.lib.completed_normal_baseline import discover_split
                 try:source_roles=discover_split(self,state,production_sha,installed_sha)
@@ -3716,6 +3730,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--automatic-retry-failed-source',action='store_true',
         help='Explicit retry suppression override; all automatic admission/authority gates still apply')
     parser.add_argument('--exceptional',choices=('prepare','list','inspect','approve','reject','revoke','execute'),help='Exact exceptional review/approval lifecycle; never an automatic policy override')
+    parser.add_argument('--historical-origin',choices=('prepare','inspect','enroll'),help='Truthful isolated historical bootstrap enrollment; not migration approval or completion')
     parser.add_argument('--request-id',help='Immutable exceptional request UUID')
     parser.add_argument('--confirm-request-digest',help='Explicit confirmation of the displayed immutable request digest')
     parser.add_argument('--authenticate-operator',action='store_true',
@@ -3740,6 +3755,30 @@ def main(argv: list[str] | None = None) -> int:
     if os.geteuid() != 0:
         print("CONTROL-PLANE UPGRADE: FAILED\nerror: effective_root_required", file=sys.stderr)
         return 1
+    if args.historical_origin:
+        if any((args.sha,args.exceptional,args.dry_run,args.automatic_release,args.automatic_poll,
+                args.automatic_retry_failed_source,args.authenticate_operator,args.restore_isolated_fence,
+                args.recover_known_good,args.install_isolated_recovery,args.recover_current_schema,args.rehearsal_attestation)):
+            parser.error('historical enrollment cannot mix with release execution or source selection')
+        if args.historical_origin=='prepare':
+            if args.request_id or args.confirm_request_digest:parser.error('prepare uses only independently pinned origin policy')
+        elif not args.request_id:parser.error('historical enrollment request UUID required')
+        if (args.historical_origin=='enroll')!=bool(args.confirm_request_digest):
+            parser.error('only enrollment requires explicit request-digest confirmation')
+        try:
+            token=None
+            if args.historical_origin=='enroll':
+                if sys.stdin.isatty():
+                    import getpass
+                    token=getpass.getpass('Fresh infrastructure AAL2 access token: ')
+                else:token=sys.stdin.read(16385).strip()
+                if len(token)>16384:raise RuntimeError('release_operator_credential_invalid')
+            result=SystemOperations().historical_origin_action(args.historical_origin,
+                request_id=args.request_id,token=token,confirmation=args.confirm_request_digest)
+            print(json.dumps(result,sort_keys=True));return 0
+        except (RuntimeError,ValueError,OSError,TypeError,subprocess.SubprocessError) as error:
+            code=str(error) if re.fullmatch('[a-z0-9_]{1,160}',str(error)) else 'historical_origin_enrollment_failed'
+            print('HISTORICAL ORIGIN: REFUSED; error: '+code,file=sys.stderr);return 1
     if args.exceptional:
         if any((args.dry_run,args.automatic_release,args.automatic_poll,args.automatic_retry_failed_source,args.authenticate_operator,
                 args.restore_isolated_fence,args.recover_known_good,args.install_isolated_recovery,args.recover_current_schema,args.rehearsal_attestation)):

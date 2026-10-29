@@ -2100,3 +2100,31 @@ digest; no unknown actor or changed policy can be accepted by this ordering.
 Exceptional maintenance route observation (2026-10-28): candidate creation after a committed supported migration verifies the already fenced origin through a unique loaded-proxy upstream observation and immutable frontend bytes. It requires the exact sealed actor inventory and NONE worker authority; it never restarts the old writer to obtain a healthy-route probe. Routine and post-promotion route health verification remain mandatory. A failed observation preserves maintenance, consumed authority, and committed migration evidence.
 
 Exceptional provider maintenance and audit (2026-10-28): fence the sealed private gateway before Auth/REST/Storage, restore providers with bounded readiness, then restart the same gateway so its loaded provider addresses are refreshed. No original backend or consumer regains authority. Journal display and failure/completion auditing authenticate independent root configuration, controller bytes, enrolled scope and signed records without demanding the obsolete pre-candidate runtime inventory. This read/audit path issues no authority: prepare, approve, revoke and execution admission/consumption retain full live observation. Preserve the original safe failure code and phase even when secondary audit observation fails.
+
+
+### Historical bootstrap-origin enrollment (Milestone C, 2026-10-29)
+
+The existing root issuer now has an isolated-only historical-origin enrollment
+namespace and `--historical-origin prepare|inspect|enroll`. Independently
+protected policy pins the actual historical source/tree/images, database/guest,
+full observation and a successor intent. Real original accounts/MFA/private
+objects, current provider endpoints, eight healthy roles, bootstrap-adoption
+receipt, workers, route, canonical history and database catalog are independently
+reobserved. Fresh infrastructure AAL2 plus explicit request confirmation consumes
+the enrollment once before linking a distinct historical_origin state marker.
+This marker is never a completed_normal_upgrade marker and claims no historical
+protected completion or migration authority. Ordinary completed admission stays
+strict. A later exact context can bind the approved successor intent once; the
+release still requires its own approval and complete technical admission.
+
+Production enrollment/execution and schema160 operational registration remain
+closed. This source integration is not preserved146-to160 acceptance. The full
+maintenance, receiver, canonical execution, handoff and reboot tests remain
+required before the protected refusal can be replaced.
+
+Canonical160's deletion protocol function returns2 only at160; unchanged161–164
+therefore report0. Do not ignore that refusal, change historical SQL, or widen
+application compatibility. The owner authorized preparation ONLY of an unselected
+forward repair under deployment/proposals/schema165-deletion-compatibility. It is
+outside canonical inventories/manifests. No proposal execution or expansion of
+Milestone C's accepted target164 is authorized.

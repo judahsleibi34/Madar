@@ -193,13 +193,15 @@ def verified(path,key):
 
 
 @contextmanager
-def journal_lock(request_id):
+def journal_lock(request_id,*,namespace=None):
     from .control_plane_upgrade import acquire_lock,require_root_directory
     from .automatic_release_admission import ROOT
-    identifier(request_id);require_root_directory(ROOT,create=True);require_root_directory(root(),create=True)
-    path=root()/request_id;require_root_directory(path,create=True)
+    if namespace not in (None,'historical-origins'):raise RuntimeError('exceptional_journal_namespace_invalid')
+    journal_root=root() if namespace is None else ROOT/namespace
+    identifier(request_id);require_root_directory(ROOT,create=True);require_root_directory(journal_root,create=True)
+    path=journal_root/request_id;require_root_directory(path,create=True)
     # Persist new request and journal namespace entries, not just their files.
-    for parent in (ROOT.parent,ROOT,root()):
+    for parent in (ROOT.parent,ROOT,journal_root):
         directory=os.open(parent,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
         try:os.fsync(directory)
         finally:os.close(directory)
