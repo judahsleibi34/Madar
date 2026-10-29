@@ -566,6 +566,12 @@ class AutomaticReleaseGuest:
             raise RuntimeError('automatic_guest_pid_ownership_refused')
 
     def close(self):
+        if self.directory.is_symlink() or self.directory.parent.name!=self.run_id:
+            raise RuntimeError('automatic_guest_cleanup_path_changed')
+        if not self.directory.exists():
+            if self.record.get('resources_removed') is True and (self.process is None or self.process.poll() is not None):
+                return
+            raise RuntimeError('automatic_guest_cleanup_scope_missing_without_receipt')
         if self.pid is not None:
             try:
                 self.require_owned_pid();os.kill(self.pid,15)
@@ -584,5 +590,7 @@ class AutomaticReleaseGuest:
             p=self.directory/name
             if p.exists():
                 target=self.evidence/('private-guest-'+name);target.write_bytes(p.read_bytes()[-65536:]);target.chmod(0o600)
-        self.record['resources_removed']=True;self.record['remaining_disk_bytes']=0;self.save()
         shutil.rmtree(self.directory)
+        if self.directory.exists() or self.directory.is_symlink():
+            raise RuntimeError('automatic_guest_cleanup_incomplete')
+        self.record['resources_removed']=True;self.record['remaining_disk_bytes']=0;self.save()

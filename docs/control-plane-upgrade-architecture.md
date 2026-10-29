@@ -2451,3 +2451,7 @@ A guessed frontend80 is not compatible restoration evidence.
 Original-data fingerprinting also requires native transaction status IDLE on
 an autocommit connection. A manually opened caller transaction is refused
 without BEGIN, COMMIT or ROLLBACK, preserving the caller-owned boundary.
+
+Owned KVM teardown is idempotent across explicit/finally/atexit calls. Its
+removal receipt is published only after actual directory removal; an unrecorded
+missing scope or failed deletion cannot be reported as successful cleanup.
