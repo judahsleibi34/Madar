@@ -182,15 +182,20 @@ class PreservationBudgetTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'readonly_connection_required'):origin.preservation_roots(db)
         db.execute.assert_not_called()
 
+    def test_manual_transaction_on_an_autocommit_connection_is_not_touched(self):
+        db=Mock(autocommit=True);db.info.transaction_status=2
+        with self.assertRaisesRegex(RuntimeError,'readonly_connection_required'):origin.preservation_roots(db)
+        db.execute.assert_not_called()
+
     def test_native_snapshot_error_rolls_back_its_own_readonly_transaction(self):
-        db=Mock(autocommit=True);db.execute.return_value.fetchall.return_value=[]
+        db=Mock(autocommit=True);db.info.transaction_status=0;db.execute.return_value.fetchall.return_value=[]
         with self.assertRaisesRegex(RuntimeError,'table_budget'):origin.preservation_roots(db)
         self.assertEqual(db.execute.call_args_list[0].args,('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY',))
         self.assertEqual(db.execute.call_args_list[-1].args,('ROLLBACK',))
         self.assertFalse(any('COMMIT'==c.args[0] for c in db.execute.call_args_list))
 
     def test_oversize_relation_refuses_before_data_aggregation(self):
-        db=Mock(autocommit=True)
+        db=Mock(autocommit=True);db.info.transaction_status=0
         db.execute.return_value.fetchall.return_value=[('public','tenant_data')]
         db.execute.return_value.fetchone.return_value=[100001]
         with self.assertRaisesRegex(RuntimeError,'row_budget'):origin.preservation_roots(db)

@@ -2706,3 +2706,7 @@ Physical test proxy restoration derives upstream ports from exact authenticated
 source loopback bindings. It refuses missing, ambiguous or public bindings and
 preserves historical frontend8080 as well as reviewed frontend80 configurations.
 A guessed frontend80 is not compatible restoration evidence.
+
+Original-data fingerprinting also requires native transaction status IDLE on
+an autocommit connection. A manually opened caller transaction is refused
+without BEGIN, COMMIT or ROLLBACK, preserving the caller-owned boundary.

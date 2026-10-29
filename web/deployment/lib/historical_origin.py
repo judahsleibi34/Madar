@@ -56,8 +56,10 @@ def preservation_roots(db):
     remain fingerprinted. This is not a claim to freeze changing live sessions.
     """
     from psycopg import sql
+    from psycopg.pq import TransactionStatus
     roots={};deadline=time.monotonic()+45
-    if not db.autocommit:raise RuntimeError('historical_origin_readonly_connection_required')
+    if not db.autocommit or db.info.transaction_status!=TransactionStatus.IDLE:
+        raise RuntimeError('historical_origin_readonly_connection_required')
     db.execute('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY')
     try:
         db.execute("SET LOCAL statement_timeout='5s'")
