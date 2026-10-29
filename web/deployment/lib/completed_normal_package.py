@@ -148,10 +148,24 @@ def observe_origin(contract,runtime,state_root=Path('/var/lib/madar/releases')):
     if (owner is None or owner['owner']!='CANDIDATE' or owner['generation']!=origin['worker_generation']
             or owner['candidate']!={'sha':roles['application_sha'],'slot':origin['slot']}):
         raise RuntimeError('completed_package_origin_worker_owner_changed')
-    grant=strict_json(protected(root/'write-authority/authority.json').read_bytes())
-    if grant!={'version':2,'schema':146,'release_sha':roles['application_sha'],
-            'contract_digest':origin['write_contract_digest'],'mode':'NORMAL','compatible_min':144,'compatible_max':146}:
-        raise RuntimeError('completed_package_origin_authority_changed')
+    if bootstrap:
+        # Enrollment records actual pre-grant authority; it must never invent
+        # a historical positive grant merely to satisfy the completed path.
+        grant_path=root/'write-authority/authority.json'
+        if (origin['write_contract_digest']!=roles['enrollment_sha256']
+                or grant_path.exists() or grant_path.is_symlink()):
+            raise RuntimeError('completed_package_bootstrap_grant_not_historical')
+        for row in actual.values():
+            config=dict(item.split('=',1) for item in row['Config'].get('Env',[]) if '=' in item)
+            if (any(config.get(k) for k in ('MADAR_BUSINESS_WRITE_AUTHORITY','MADAR_BUSINESS_WRITE_CONTRACT'))
+                    or any(m['Destination']=='/run/madar' or m['Destination'].startswith('/run/madar/business-write-authority')
+                           for m in row.get('Mounts',[]))):
+                raise RuntimeError('completed_package_bootstrap_authority_runtime_changed')
+    else:
+        grant=strict_json(protected(root/'write-authority/authority.json').read_bytes())
+        if grant!={'version':2,'schema':146,'release_sha':roles['application_sha'],
+                'contract_digest':origin['write_contract_digest'],'mode':'NORMAL','compatible_min':144,'compatible_max':146}:
+            raise RuntimeError('completed_package_origin_authority_changed')
     observed=strict_json(runtime.command(['docker','exec',contract['database']['container_id'],
         'psql','-XqAt','-v','ON_ERROR_STOP=1','-U',maintenance_role(contract),'-d','postgres','-c',
         "BEGIN READ ONLY; SET LOCAL statement_timeout='3s'; SELECT json_build_array("

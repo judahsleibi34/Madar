@@ -247,3 +247,36 @@ class RunningOriginTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+class HistoricalOriginProducerTests(unittest.TestCase):
+    publish=RunningOriginTests.publish
+    def setUp(self):
+        RunningOriginTests.setUp(self)
+        from test_historical_origin import HistoricalPreparationBindingTests
+        from deployment.lib import historical_origin
+        self.contract=HistoricalPreparationBindingTests().contract()
+        self.record.update(source_sha=self.contract['source_roles']['application_sha'],images=self.contract['origin']['images'],worker_generation=self.contract['origin']['worker_generation'])
+        self.owner.update(generation=self.contract['origin']['worker_generation'],candidate={'sha':self.contract['source_roles']['application_sha'],'slot':self.contract['origin']['slot']})
+        value={'runtime':{'/madar-'+self.contract['origin']['slot']+'-'+role:row for role,row in self.record['runtimes'].items()},'worker_authority':self.owner}
+        self.enterContext(patch.object(historical_origin,'validate_source_binding',return_value=self.root))
+        self.enterContext(patch.object(historical_origin,'recorded_observation',return_value=value))
+        self.enterContext(patch.object(historical_origin,'attest',return_value=self.contract['source_roles']))
+        self.enterContext(patch('deployment.lib.control_plane_upgrade.SystemOperations',return_value=Mock()))
+        self.enterContext(patch('deployment.lib.provider_recovery_runtime.readonly_configuration',lambda p,**k:self.root/'state.json'))
+        (self.root/'state.json').write_text('{}')
+        for path in self.contract['historical_files']:(self.root/Path(path).name).write_bytes(b'synthetic enrollment data')
+        self.publish()
+    def test_truthful_bootstrap_never_reads_or_invents_a_previous_positive_grant(self):
+        (self.root/'authority.json').unlink()
+        self.assertEqual(producer.observe_origin(self.contract,self.runtime)['source_sha'],self.record['source_sha'])
+    def test_fabricated_grant_beside_enrollment_refuses(self):
+        (self.root/'write-authority').mkdir();(self.root/'write-authority/authority.json').write_text('{}')
+        with self.assertRaisesRegex(RuntimeError,'bootstrap_grant_not_historical'):producer.observe_origin(self.contract,self.runtime)
+    def test_actual_runtime_grant_or_mount_cannot_hide_behind_bootstrap(self):
+        for kind in ('environment','mount'):
+            actor=self.rows['backend'];saved=copy.deepcopy(actor)
+            if kind=='environment':actor['Config']['Env'].append('MADAR_BUSINESS_WRITE_AUTHORITY=/run/madar/business-write-authority/authority.json')
+            else:actor['Mounts']=[{'Destination':'/run/madar/business-write-authority'}]
+            with self.assertRaises(RuntimeError):producer.observe_origin(self.contract,self.runtime)
+            self.rows['backend']=saved

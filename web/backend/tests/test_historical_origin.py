@@ -308,14 +308,18 @@ class IndependentOperatorScopeTests(unittest.TestCase):
 
 class HistoricalBootstrapDataTests(unittest.TestCase):
     def setUp(self):
-        self.tmp=tempfile.TemporaryDirectory(dir=Path.cwd());self.addCleanup(self.tmp.cleanup)
+        self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
         self.path=Path(self.tmp.name)/'original-bootstrap.json'
-        # The local sandbox projects host-root ancestors as nobody. Model only
-        # those two installation ancestors; exercise real file modes and opens.
+        # CI runs without a host madar account or writable installation tree.
+        # Model installation ancestors only; exercise actual private-file modes,
+        # symlink opens and bounded contents in the writable test workspace.
+        operator_patch=patch('pwd.getpwnam',return_value=SimpleNamespace(pw_uid=__import__('os').getuid()))
+        operator_patch.start();self.addCleanup(operator_patch.stop)
+        ancestors=set(Path(self.tmp.name).parents)
         original=Path.lstat
         def installation_stat(path):
             value=original(path)
-            return SimpleNamespace(st_uid=0,st_mode=value.st_mode) if str(path) in {'/','/opt'} else value
+            return SimpleNamespace(st_uid=0,st_mode=value.st_mode&~0o022) if path in ancestors else value
         ancestor_patch=patch.object(Path,'lstat',installation_stat);ancestor_patch.start();self.addCleanup(ancestor_patch.stop)
         self.value={'phase':'bootstrap_adopted','status':'known_good','schema':{'observed':146}}
         self.path.write_bytes(canonical(self.value));self.path.chmod(0o600)
@@ -330,6 +334,11 @@ class HistoricalBootstrapDataTests(unittest.TestCase):
     def test_unbounded_original_record_refuses(self):
         self.path.write_bytes(b' '*65537)
         with self.assertRaisesRegex(RuntimeError,'bootstrap_data_untrusted'):origin.bootstrap_record(self.path)
+    def test_untrusted_original_data_parent_refuses(self):
+        self.path.parent.chmod(0o777)
+        try:
+            with self.assertRaisesRegex(RuntimeError,'bootstrap_parent_untrusted'):origin.bootstrap_record(self.path)
+        finally:self.path.parent.chmod(0o700)
 
 
 class NativeOperatorPrivilegeTests(IndependentOperatorScopeTests):

@@ -2429,3 +2429,9 @@ The enrolled native operator Auth transport uses its exact private database
 network alias and restricted supabase_auth_admin login, not the PostgreSQL
 superuser. Enrollment verifies alias ownership/no collision and actual native
 role privileges and connection bounds as well as its distinct system identity.
+
+Canonical package preparation distinguishes enrolled pre-grant bootstrap
+authority from a completed origin grant. The former requires the exact signed
+enrollment digest, actual ungoverned historical runtime configuration and no
+fabricated grant file or mount; the ordinary completed grant checks remain
+mandatory. This source preparation support does not authorize maintenance.
