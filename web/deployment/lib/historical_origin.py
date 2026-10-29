@@ -15,6 +15,8 @@ from .exceptional_release_approval import journal_lock, sign, verified, identifi
 
 POLICY=Path('/etc/madar/historical-origin-policy.json')
 KIND='independently-enrolled-historical-bootstrap-origin'
+SOURCE_FIELDS={'origin_kind','enrollment_root','enrollment_sha256','application_sha',
+               'controller_sha','schema','successor_intent_sha256'}
 ROLES=('backend','frontend','redis','parser-worker','remote-ingestion-worker',
        'notification-worker','calendar-sync-worker','data-deletion-worker')
 
@@ -59,6 +61,48 @@ def preservation_roots(db):
             WHERE schemaname='public' ORDER BY sequencename""").fetchall()
         return {'tables':roots,'public_sequences_sha256':digest(sequences)}
     finally:db.execute('ROLLBACK')
+
+
+def independent_operator_scope(rows,environment):
+    """Prove the two enrolled test-identity actors cannot write the origin DB."""
+    from .control_plane_upgrade_authorization import RELEASE_OPERATOR_POLICY,RELEASE_OPERATOR_KEY
+    from .completed_normal_resources import measured_spec
+    from .isolated_release_environment import run
+    from urllib.parse import urlsplit
+    facts=strict_json(protected(Path('/opt/madar-test/operator-fixture/facts.json'),private=True).read_bytes())
+    operator=strict_json(protected(RELEASE_OPERATOR_POLICY,private=True).read_bytes())
+    ids=facts.get('created_container_ids',[]);selected={r['Id']:r for r in rows if r['Id'] in ids}
+    if (len(ids)!=2 or len(set(ids))!=2 or set(selected)!=set(ids) or facts.get('realm_id')!=environment['realm_id']
+            or operator.get('environment_id')!='isolated-'+environment['realm_id']
+            or operator.get('database_system_identifier')!=environment['database_system_identifier']
+            or operator.get('auth_service')!=facts.get('auth_service')):
+        raise RuntimeError('historical_origin_operator_scope_invalid')
+    for row in selected.values():
+        if (row['Config'].get('Labels',{}).get('com.madar.operator-fixture')!=environment['realm_id']
+                or row['HostConfig'].get('Privileged') or row['HostConfig'].get('CapAdd')
+                or row['HostConfig'].get('PortBindings')
+                or {n['NetworkID'] for n in row['NetworkSettings']['Networks'].values()}!={facts['network_id']}):
+            raise RuntimeError('historical_origin_operator_network_or_privilege_invalid')
+    auth=selected.get(operator['auth_service']['id'])
+    if not auth or auth['Image']!=operator['auth_service']['image'] or measured_spec(auth)!=operator['auth_service']['spec_sha256']:
+        raise RuntimeError('historical_origin_operator_runtime_changed')
+    database=next(r for r in selected.values() if r['Id']!=auth['Id'])
+    config=dict(entry.split('=',1) for entry in auth['Config'].get('Env',[]) if '=' in entry)
+    uri=urlsplit(config.get('GOTRUE_DB_DATABASE_URL',''))
+    if (uri.scheme not in {'postgres','postgresql'} or uri.hostname!=database['Name'].lstrip('/')
+            or uri.port!=5432 or uri.path!='/operators' or uri.username!='postgres' or uri.query or uri.fragment):
+        raise RuntimeError('historical_origin_operator_database_transport_changed')
+    key=protected(RELEASE_OPERATOR_KEY,private=True).read_bytes()
+    if hashlib.sha256(config.get('GOTRUE_JWT_SECRET','').encode()).hexdigest()!=hashlib.sha256(key).hexdigest():
+        raise RuntimeError('historical_origin_operator_authentication_key_changed')
+    observed=strict_json(run(['/usr/bin/docker','exec',database['Id'],'psql','-XqAt','-U','postgres','-d','operators','-c',
+        "SELECT json_build_array(current_database(),system_identifier::text) FROM pg_control_system()"] ))
+    if (not isinstance(observed,list) or len(observed)!=2 or observed[0]!='operators'
+            or not re.fullmatch('[1-9][0-9]{0,31}',str(observed[1]))
+            or observed[1] in {environment['database_system_identifier'],*environment['denied_database_identifiers']}):
+        raise RuntimeError('historical_origin_operator_database_not_independent')
+    return {'actor_ids':sorted(ids),'database_system_identifier':observed[1],
+            'authentication_key_sha256':hashlib.sha256(key).hexdigest(),'network_id':facts['network_id']}
 
 
 def policy(system):
@@ -129,6 +173,7 @@ def observe(system,p,environment):
     inventory=discover(system.repo,source_sha=p['source_sha'],history_base_sha=p['source_sha'])
     rows=inspect_all();by_name={r['Name'].lstrip('/'):r for r in rows}
     if len(by_name)!=len(rows):raise RuntimeError('historical_origin_actor_identity_ambiguous')
+    operator_scope=independent_operator_scope(rows,environment)
     # Naming is the existing deployment contract, not an arbitrary caller list.
     for role in ROLES:
         r=by_name.get('madar-'+known['slot']+'-'+role)
@@ -161,10 +206,14 @@ def observe(system,p,environment):
             raise RuntimeError('historical_origin_database_changed')
         marker=db.execute("SELECT shobj_description(oid,'pg_database') FROM pg_database WHERE datname=current_database()").fetchone()[0]
         if marker!='madar-isolated-'+environment['realm_id']:raise RuntimeError('historical_origin_database_realm_changed')
+        absent=db.execute("""SELECT to_regprocedure('public.notification_delivery_protocol()') IS NULL,
+            to_regprocedure('public.notification_outbox_protocol()') IS NULL,
+            to_regprocedure('public.data_deletion_ownership_protocol()') IS NULL""").fetchone()
+        if tuple(absent)!=(True,True,True):raise RuntimeError('historical_origin_protocol_history_changed')
         preserved=preservation_roots(db)
     for r in rows:
         name=r['Name'].lstrip('/')
-        if (r['State']['Running'] and name.startswith('madar-') and name not in
+        if (r['State']['Running'] and r['Id'] not in operator_scope['actor_ids'] and name.startswith('madar-') and name not in
                 {'madar-'+known['slot']+'-'+role for role in ROLES}|{'madar-release-proxy'}):
             raise RuntimeError('historical_origin_unexpected_writer')
     return {'version':1,'kind':KIND,'environment_id':p['environment_id'],
@@ -173,11 +222,13 @@ def observe(system,p,environment):
         'bootstrap_sha256':digest(bootstrap),'known_good':known,'worker_authority':owner,
         'runtime':{r['Name']:{'id':r['Id'],'image':r['Image'],'spec_sha256':measured_spec(r)} for r in rows},
         'runtime_scope_sha256':digest(environment['runtime_scope']),
+        'independent_operator_scope':operator_scope,
         'configuration_sha256':{
             'application':hashlib.sha256(readonly_configuration(Path('/etc/madar/production.env'),private=True).read_bytes()).hexdigest(),
             'backup':hashlib.sha256(protected(Path('/etc/madar/backup.env'),private=True).read_bytes()).hexdigest(),
             'database_transport':hashlib.sha256(protected(Path('/etc/madar/automatic-database.dsn'),private=True).read_bytes()).hexdigest()},
         'database':catalog.document(),'history_sha256':history_digest(inventory,146),
+        'legacy_protocols':{'delivery':1,'outbox':1,'deletion':0,'native_successor_function_absence_verified':True},
         'original_data':preserved,
         'original_account_observations':accounts,'probe_configuration_sha256':hashlib.sha256(raw).hexdigest(),
         'protected_completion_claimed':False,'migration_authority_issued':False}
@@ -296,6 +347,63 @@ def inspect(system,request_id):
     return {'request':request,'request_sha256':digest(request),'enrollment':receipt,
             'state':'ENROLLED' if receipt else 'EXPIRED' if int(time.time())>=request['expires_at'] else 'AWAITING_ENROLLMENT',
             'migration_authority_issued':False}
+
+
+def validate_source_binding(value):
+    """Typed historical evidence reference, never a completed origin alias."""
+    from .automatic_release_admission import ROOT
+    if (not isinstance(value,dict) or set(value)!=SOURCE_FIELDS or value.get('origin_kind')!=KIND
+            or type(value.get('schema')) is not int or value['schema']!=146
+            or any(not re.fullmatch('[a-f0-9]{40}',str(value[k])) for k in ('application_sha','controller_sha'))
+            or any(not re.fullmatch('[a-f0-9]{64}',str(value[k])) for k in ('enrollment_sha256','successor_intent_sha256'))):
+        raise RuntimeError('historical_origin_source_binding_invalid')
+    path=Path(value['enrollment_root'])
+    if path.parent!=ROOT/'historical-origins' or str(path)!=value['enrollment_root']:
+        raise RuntimeError('historical_origin_evidence_path_invalid')
+    identifier(path.name)
+    return path
+
+
+def successor_intent(contract):
+    """Non-circular exact C1 scope; receipt IDs are bound by the later context."""
+    from .completed_normal_profile import RECONCILED
+    if contract.get('operation')!=RECONCILED.operation or contract.get('version')!=RECONCILED.version:
+        raise RuntimeError('historical_origin_successor_operation_invalid')
+    return {'kind':'canonical146-160-successor-intent','repository':'judahsleibi34/Madar',
+        'origin_source_sha':contract['source_roles']['application_sha'],
+        'origin_database_system_identifier':contract['database']['system_identifier'],
+        'origin_schema':146,'target_schema':160,'candidate_source_sha':contract['candidate']['source_sha'],
+        'controller_sha':contract['candidate']['controller_sha'],'candidate_images':contract['candidate']['images'],
+        'candidate_redis_image':contract['candidate']['redis_image'],
+        'migration_manifest_sha256':contract['migration_manifest_sha256']}
+
+
+def recorded_observation(binding):
+    """Authenticate original DATA after writers stop; issue no live authority.
+
+    attest() remains mandatory before using a live origin. Execution separately
+    requires its own independently issued credential and technical acceptance.
+    """
+    from .exceptional_release_approval import KEY
+    path=validate_source_binding(binding)
+    p=strict_json(protected(POLICY,private=True).read_bytes());key=protected(KEY,private=True).read_bytes()
+    if (p.get('kind')!=KIND or hashlib.sha256(key).hexdigest()!=p.get('approval_key_sha256')):
+        raise RuntimeError('historical_origin_record_trust_changed')
+    request=verified(path/'bootstrap-origin-request.json',key);receipt=verified(path/'bootstrap-origin-consumed.json',key)
+    observation=request.get('observation')
+    if (not isinstance(observation,dict) or observation.get('kind')!=KIND
+            or request.get('kind')!=KIND or receipt.get('kind')!=KIND
+            or request.get('request_id')!=path.name or receipt.get('request_id')!=path.name
+            or receipt.get('request_sha256')!=digest(request) or digest(receipt)!=binding['enrollment_sha256']
+            or receipt.get('policy_sha256')!=digest(p) or request.get('policy_sha256')!=digest(p)
+            or receipt.get('observation_sha256')!=digest(observation) or p.get('observation_sha256')!=digest(observation)
+            or p.get('source_sha')!=binding['application_sha'] or observation.get('source_sha')!=binding['application_sha']
+            or p.get('controller_sha')!=binding['controller_sha'] or observation.get('controller_sha')!=binding['controller_sha']
+            or p.get('successor_intent_sha256')!=binding['successor_intent_sha256']
+            or receipt.get('successor_intent_sha256')!=binding['successor_intent_sha256']
+            or receipt.get('protected_completion_claimed') is not False or receipt.get('migration_authority_issued') is not False):
+        raise RuntimeError('historical_origin_recorded_evidence_changed')
+    return observation
 
 
 def bind_successor(system,state,intent,context_sha256):

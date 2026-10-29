@@ -16,9 +16,11 @@ class HistoricalOriginTests(unittest.TestCase):
         self.journal=self.root/'historical-origins';self.journal.mkdir()
         self.now=int(time.time());self.key=b'new independent test approval key'*2
         self.known={'sha':'a'*40,'schema':146,'slot':'green'}
-        self.observation={'version':1,'known_good':self.known,'protected_completion_claimed':False,'migration_authority_issued':False}
+        self.observation={'version':1,'kind':origin.KIND,'source_sha':'a'*40,'controller_sha':'b'*40,
+            'known_good':self.known,'protected_completion_claimed':False,'migration_authority_issued':False}
         self.p={'observation_sha256':digest(self.observation),'successor_intent_sha256':digest({'target':160}),
-                'expires_at':self.now+3600,'max_request_seconds':300,'source_sha':'a'*40,'controller_sha':'b'*40}
+                'expires_at':self.now+3600,'max_request_seconds':300,'source_sha':'a'*40,'controller_sha':'b'*40,
+                'kind':origin.KIND,'approval_key_sha256':__import__('hashlib').sha256(self.key).hexdigest()}
         self.state={'known_good_release':copy.deepcopy(self.known),'active_slot':'green','history':[{'phase':'bootstrap_adopted'}]}
         (self.state_root/'state.json').write_bytes(canonical(self.state))
         self.system=SimpleNamespace(state_root=self.state_root,authenticate_operator=Mock(return_value={'aal':'aal2','operator_auth_id':'separate-operator'}))
@@ -31,7 +33,7 @@ class HistoricalOriginTests(unittest.TestCase):
             ('policy',Mock(side_effect=lambda *_:(self.p,self.key,{}))),
             ('observe',Mock(side_effect=lambda *_:copy.deepcopy(self.observation))),
             ('operation_locks',lambda *_:__import__('contextlib').nullcontext(lambda:None)),
-            ('journal_lock',locked),('readonly_configuration',lambda p,**k:Path(p))]:
+            ('journal_lock',locked),('readonly_configuration',lambda p,**k:Path(p)),('protected',lambda p,**k:Path(p))]:
             stack.enter_context(patch.object(origin,target,value))
         stack.enter_context(patch.object(approval,'protected',lambda p,**k:Path(p)))
         from deployment.lib import automatic_release_admission
@@ -131,6 +133,48 @@ class HistoricalOriginTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'namespace_invalid'):
             with approval.journal_lock('00000000-0000-0000-0000-000000000000',namespace='/tmp/foreign'):pass
 
+    def test_recorded_origin_is_authentic_data_after_live_runtime_changes_not_authority(self):
+        r,_,state=self.enrolled();binding=origin.attest(self.system,state)
+        policy_file=self.root/'origin-policy.json';policy_file.write_bytes(canonical(self.p))
+        key_file=self.root/'approval.key';key_file.write_bytes(self.key)
+        with patch.object(origin,'POLICY',policy_file),patch.object(approval,'KEY',key_file):
+            self.assertEqual(origin.recorded_observation(binding),self.observation)
+            changed=copy.deepcopy(binding);changed['application_sha']='c'*40
+            with self.assertRaisesRegex(RuntimeError,'recorded_evidence_changed'):origin.recorded_observation(changed)
+        self.assertNotIn('completion_sha256',binding)
+
+
+class HistoricalPreparationBindingTests(unittest.TestCase):
+    def contract(self):
+        from test_schema160_release import reconciled_contract
+        from deployment.lib.automatic_release_admission import ROOT
+        value=reconciled_contract();old=value['source_roles']
+        path=ROOT/'historical-origins'/'00000000-0000-0000-0000-000000000001'
+        value['source_roles']={'origin_kind':origin.KIND,'enrollment_root':str(path),'enrollment_sha256':'c'*64,
+            'application_sha':old['application_sha'],'controller_sha':old['controller_sha'],'schema':146,'successor_intent_sha256':'0'*64}
+        value['source_roles']['successor_intent_sha256']=digest(origin.successor_intent(value))
+        value['origin']['write_contract_digest']=value['source_roles']['enrollment_sha256']
+        value['historical_files']={str(path/name):'d'*64 for name in ('bootstrap-origin-request.json','bootstrap-origin-consumed.json')}
+        return value
+    def test_truthful_source_is_accepted_for_preparation_but_never_registers_execution(self):
+        from deployment.lib.completed_normal_admission import validate_provider_preparation,validate_contract
+        from deployment.lib.completed_normal_profile import RECONCILED,profile
+        value=self.contract();self.assertEqual(validate_provider_preparation(value),RECONCILED)
+        for function in (profile,validate_contract):
+            with self.assertRaisesRegex(RuntimeError,'operation_profile_invalid'):function(value)
+    def test_candidate_database_manifest_or_images_cannot_reuse_original_intent(self):
+        from deployment.lib.completed_normal_admission import validate_provider_preparation
+        for section,key,changed in [('candidate','source_sha','e'*40),('database','system_identifier','123456789'),
+                ('candidate','images',{'backend':'sha256:'+'e'*64,'frontend':'sha256:'+'f'*64})]:
+            value=self.contract();value[section][key]=changed
+            with self.assertRaisesRegex(RuntimeError,'successor_scope_changed'):validate_provider_preparation(value)
+    def test_completed_history_alias_and_foreign_namespace_refuse(self):
+        from deployment.lib.completed_normal_admission import validate_provider_preparation
+        value=self.contract();value['historical_files']={str(Path(value['source_roles']['enrollment_root'])/'normal-completion.json'):'d'*64}
+        with self.assertRaisesRegex(RuntimeError,'history_invalid'):validate_provider_preparation(value)
+        value=self.contract();value['source_roles']['enrollment_root']='/tmp/foreign'
+        with self.assertRaisesRegex(RuntimeError,'evidence_path_invalid'):validate_provider_preparation(value)
+
 
 class PreservationBudgetTests(unittest.TestCase):
     def test_existing_transaction_is_never_committed_or_rolled_back(self):
@@ -218,3 +262,45 @@ class HistoricalPolicyTests(unittest.TestCase):
     def test_business_authentication_key_cannot_sign_enrollment(self):
         self.auth_file.write_bytes(self.key)
         with self.assertRaisesRegex(RuntimeError,'issuer_key_invalid'):self.read()
+
+
+class IndependentOperatorScopeTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.root=Path(self.tmp.name)
+        self.key=b'independent operator identity key'*2
+        self.key_file=self.root/'operator.key';self.key_file.write_bytes(self.key)
+        self.auth={'Id':'a'*64,'Name':'/operator-auth','Image':'sha256:'+'b'*64,
+            'Config':{'Labels':{'com.madar.operator-fixture':'realm'},'Env':['GOTRUE_JWT_SECRET='+self.key.decode(),
+                'GOTRUE_DB_DATABASE_URL=postgres://postgres:test@operator-database:5432/operators']},
+            'HostConfig':{'Privileged':False,'PortBindings':None,'CapAdd':None},
+            'NetworkSettings':{'Networks':{'operator':{'NetworkID':'c'*64}}}}
+        self.database=copy.deepcopy(self.auth);self.database.update(Id='d'*64,Name='/operator-database')
+        self.service={'id':self.auth['Id'],'image':self.auth['Image'],'spec_sha256':'e'*64}
+        self.facts={'created_container_ids':[self.auth['Id'],self.database['Id']],'realm_id':'realm','auth_service':self.service,'network_id':'c'*64}
+        self.environment={'realm_id':'realm','database_system_identifier':'123456789','denied_database_identifiers':['987654321']}
+        self.operator={'environment_id':'isolated-realm','database_system_identifier':'123456789','auth_service':self.service}
+        self.policy_file=self.root/'operator-policy.json';self.policy_file.write_bytes(canonical(self.operator))
+        self.facts_file=self.root/'facts.json';self.facts_file.write_bytes(canonical(self.facts))
+        def protected(path,**_):return self.facts_file if str(path).endswith('/facts.json') else Path(path)
+        stack=ExitStack();self.addCleanup(stack.close)
+        from deployment.lib import control_plane_upgrade_authorization as auth,completed_normal_resources as resources,isolated_release_environment as environment
+        stack.enter_context(patch.object(origin,'protected',protected))
+        stack.enter_context(patch.object(auth,'RELEASE_OPERATOR_POLICY',self.policy_file))
+        stack.enter_context(patch.object(auth,'RELEASE_OPERATOR_KEY',self.key_file))
+        stack.enter_context(patch.object(resources,'measured_spec',lambda *_:'e'*64))
+        self.native=stack.enter_context(patch.object(environment,'run',return_value=canonical(['operators','246813579'])))
+    def observe(self):return origin.independent_operator_scope([self.auth,self.database],self.environment)
+    def test_enrolled_operator_database_is_native_observed_and_separate(self):
+        out=self.observe();self.assertEqual(out['database_system_identifier'],'246813579');self.assertEqual(len(out['actor_ids']),2)
+    def test_operator_network_cannot_join_business_database_network(self):
+        self.auth['NetworkSettings']['Networks']['business']={'NetworkID':'f'*64}
+        with self.assertRaisesRegex(RuntimeError,'network_or_privilege_invalid'):self.observe()
+        self.native.assert_not_called()
+    def test_operator_authenticator_cannot_point_at_business_database(self):
+        self.auth['Config']['Env'][1]='GOTRUE_DB_DATABASE_URL=postgres://postgres:test@supabase-db:5432/postgres'
+        with self.assertRaisesRegex(RuntimeError,'database_transport_changed'):self.observe()
+        self.native.assert_not_called()
+    def test_source_or_production_database_identity_cannot_be_operator_database(self):
+        for sid in ['123456789','987654321']:
+            self.native.return_value=canonical(['operators',sid])
+            with self.assertRaisesRegex(RuntimeError,'database_not_independent'):self.observe()

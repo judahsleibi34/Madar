@@ -111,12 +111,27 @@ def observe_origin(contract,runtime,state_root=Path('/var/lib/madar/releases')):
     """An initialized146 database is not a compatible running application."""
     from deployment.lib.completed_normal_resources import ROLES,measured_spec_matches
     from deployment.lib.runtime_authority import load_worker_authority
-    roles=contract['source_roles'];root=Path(roles['completion_root']);origin=contract['origin']
+    roles=contract['source_roles'];origin=contract['origin']
+    bootstrap=roles.get('origin_kind')=='independently-enrolled-historical-bootstrap-origin'
+    if bootstrap:
+        from deployment.lib.historical_origin import validate_source_binding,recorded_observation,attest
+        from deployment.lib.control_plane_upgrade import SystemOperations
+        from deployment.lib.provider_recovery_runtime import readonly_configuration
+        root=validate_source_binding(roles)
+        state=strict_json(readonly_configuration(state_root/'state.json',private=True).read_bytes())
+        if attest(SystemOperations(),state)!=roles:raise RuntimeError('completed_package_historical_origin_changed')
+        observed=recorded_observation(roles)
+        record={'source_sha':roles['application_sha'],'images':{key:observed['runtime']['/madar-'+origin['slot']+'-'+key]['image'] for key in ('backend','frontend')},
+            'worker_generation':observed['worker_authority']['generation'],
+            'runtimes':{role:observed['runtime']['/madar-'+origin['slot']+'-'+role] for role in ROLES}}
+    else:
+        root=Path(roles['completion_root'])
     # Existing history is authenticated DATA, never reused execution authority.
     for name,expected in contract['historical_files'].items():
         if hashlib.sha256(protected(Path(name),private=Path(name).name!='admission.json').read_bytes()).hexdigest()!=expected:
             raise RuntimeError('completed_package_origin_history_changed')
-    record=strict_json(protected(root/'candidate-runtime.json',private=True).read_bytes())
+    if not bootstrap:
+        record=strict_json(protected(root/'candidate-runtime.json',private=True).read_bytes())
     if (record.get('source_sha')!=roles['application_sha'] or record.get('images')!=origin['images']
             or record.get('worker_generation')!=origin['worker_generation']
             or set(record.get('runtimes',{}))!=set(ROLES)):

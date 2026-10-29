@@ -86,7 +86,11 @@ def measure(package,source_hash,plan_hash,*,base=None):
     source=secured(package/'source',directory=True)
     files=manifest.get('files',{})
     actual={p.relative_to(source).as_posix() for p in source.rglob('*') if p.is_file() or p.is_symlink()}
-    if not isinstance(files,dict) or not REQUIRED_FILES.issubset(files) or set(files)!=actual:
+    required_files=set(REQUIRED_FILES)
+    if document.get('admission_contract',{}).get('source_roles',{}).get('origin_kind')=='independently-enrolled-historical-bootstrap-origin':
+        required_files.update('web/deployment/lib/'+name+'.py' for name in
+            ('historical_origin','exceptional_release_approval','automatic_release_admission','isolated_release_environment'))
+    if not isinstance(files,dict) or not required_files.issubset(files) or set(files)!=actual:
         raise RuntimeError('completed_upgrade_boot_source_inventory_changed')
     for relative,expected in files.items():
         path=Path(relative)

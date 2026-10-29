@@ -2662,3 +2662,18 @@ Historical enrollment holds and rechecks the existing upgrade and deployment
 lock inodes before durable effects. Infrastructure AAL2/current session identity
 is checked again after potentially lengthy native observations and before
 consumption; revocation during observation cannot create an enrollment.
+
+The canonical160 package producer now accepts a distinct typed historical-origin
+reference for preparation only. Its signed original observations remain DATA
+after writer fencing, with a separate enrollment root and no completion alias.
+The source binding pins a non-circular exact successor intent (original/candidate
+source, controller, database, canonical manifest and images). Changed candidates
+or databases cannot reuse it. Every operational profile/manifest gate remains
+closed; preparation does not issue a grant or execute147–160.
+
+The disposable infrastructure-identity pair is independently verified against
+its protected operator record, exact actor/network specifications, private
+transport and a native PostgreSQL system identifier distinct from the origin
+and production. It remains in the full runtime inventory; it cannot be hidden
+behind a broad writer-name exclusion. Legacy origin successor-protocol function
+absence is observed natively rather than inferred solely from schema146.
