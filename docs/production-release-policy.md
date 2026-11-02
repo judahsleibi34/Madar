@@ -4898,3 +4898,9 @@ main selection. See the control-plane architecture's isolated-source contract.
 Historical backup address leases require the exact registered origin and native
 DB identity/topology. Production discovery and restricted child credentials
 retain their existing contracts; see the control-plane architecture.
+
+
+Known-good boot recovery loads and verifies the unchanged recorded proxy route;
+it does not issue a new traffic promotion. Exact file bindings, loaded source and
+slot, worker ownership, health and policy remain mandatory. See the native
+ownership-drift finding in the control-plane architecture.

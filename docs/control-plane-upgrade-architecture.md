@@ -2699,3 +2699,22 @@ GitHub reader and the existing private-provider verifier. A dependency-closure
 check parses imports of every installed library, so source tests cannot silently
 succeed with a module absent from the installed controller. A controller marker
 alone does not substitute for installed file/manifest verification.
+
+
+### Restore recorded routing without a new promotion (2026-11-02)
+
+Repeated native historical reboot testing exposed an ownership transition: the
+promotion driver atomically rewrote an originally root-owned upstream file as
+operator-owned, changing the sealed read-only bind despite identical routing
+bytes. The first reboot became healthy; the second correctly refused that drift.
+That failed attempt remains failed in the acceptance evidence.
+
+Known-good restart now stops the proxy before recovery, verifies the recorded
+route hash, and starts the exact existing proxy against that unchanged file.
+Under the existing runtime-mutation lock it waits within the recovery budget for
+the loopback listener, verifies exact release SHA and slot, runs the existing
+backend/frontend stable validation, and rechecks runtime bindings and independent
+policy. It never calls a new promotion or changes the upstream file's ownership,
+inode, mode or bytes. A changed route, wrong loaded identity or failed readiness
+still fences writers. This correction requires fresh native repeated-reboot
+acceptance; its component tests do not replace that test.

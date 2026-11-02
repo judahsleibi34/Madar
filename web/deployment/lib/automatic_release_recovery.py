@@ -591,17 +591,9 @@ def recover(system,base_operations):
                     command(['start',ids['madar-'+slot+'-'+role]])
                 record('known_good_core_started')
                 load_environment_file(Path('/etc/madar/production.env'))
-                # Recovery uses only the measured installed driver. Operator
-                # configuration is pinned but cannot select another executable.
-                os.environ['MADAR_TRAFFIC_SWITCH_COMMAND']=str(system.control_root/'bin/madar-switch-traffic')
-                class RecoveryOperations(base_operations):
-                    def run(self,args,**kwargs):
-                        if args and args[0]==os.getenv('MADAR_TRAFFIC_SWITCH_COMMAND'):
-                            args=['/usr/sbin/runuser','-u','madar','--',*args]
-                        return super().run(args,**kwargs)
                 from .release_deployer import Compatibility
                 accepted=accepted_runtime(m);compat=Compatibility(accepted['compatible_min'],accepted['compatible_max'],m['history']['schema'],'none',accepted['compatible_min'],accepted['compatible_max'])
-                ops=RecoveryOperations(system.repo,STATE,Path('/etc/madar/production.env'),compat)
+                ops=base_operations(system.repo,STATE,Path('/etc/madar/production.env'),compat)
                 ops.release_root=STATE/'releases'/m['source_sha']
                 while True:
                     try:ops.validate_candidate_core(m['source_sha'],slot);break
@@ -615,9 +607,27 @@ def recover(system,base_operations):
             native(system,m)
             if historical:historical_restart_authority(system,m)
             else:grant(m['admission'])
-            ops._require_other_worker_slot_inactive(slot)
-            command(['start',ids['madar-release-proxy']])
-            ops.switch_traffic(slot);ops.validate_stable_candidate(m['source_sha'])
+            # Boot restores the already accepted route, not a new promotion.
+            # The proxy was fenced/stopped above, so its new process loads the
+            # exact sealed configuration. Rewriting it through the promotion
+            # driver can change an original root-owned file to operator-owned
+            # bytes and invalidate the immutable bind on the next reboot.
+            with runtime_mutation_lock(STATE):
+                ops._require_other_worker_slot_inactive(slot)
+                if hashlib.sha256(ROUTE.read_bytes()).hexdigest()!=m['route_sha256']:
+                    raise RuntimeError('automatic_recovery_recorded_route_changed')
+                command(['start',ids['madar-release-proxy']])
+                while True:
+                    try:identity=system.http_json('http://127.0.0.1:8001/health/version');break
+                    except RuntimeError as error:
+                        if str(error)!='production_health_unavailable':raise
+                        if time.monotonic()>=deadline:raise RuntimeError('automatic_recovery_proxy_unavailable') from None
+                        time.sleep(.25)
+                if identity.get('release_sha')!=m['source_sha'] or identity.get('release_slot')!=slot:
+                    raise RuntimeError('automatic_recovery_loaded_route_changed')
+                ops.validate_stable_candidate(m['source_sha'])
+                verify_runtime_scope(host['runtime_scope'],inspect_all())
+                if policy(system)!=(p,host):raise RuntimeError('automatic_recovery_policy_changed_during_restart')
             if pending:
                 # Rebind the same genuine completion after proven pre-SQL
                 # compensation. No new deployment receipt or authority exists.

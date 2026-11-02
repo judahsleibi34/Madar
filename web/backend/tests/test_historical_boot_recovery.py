@@ -54,6 +54,7 @@ class HistoricalBootRecoveryTests(unittest.TestCase):
             'enrollment_record':{'payload':{'expires_at':int(time.time())+3600}},'history':self.original['database']}
         self.p={'version':2,'historical_origin':self.binding,'controller_sha':self.controller,'expires_at':int(time.time())+300}
         self.system=SimpleNamespace(installed_sha=Mock(return_value=self.controller),interlock_file=self.root/'interlock',repo=self.root)
+        self.system.http_json=Mock(return_value={'release_sha':self.source,'release_slot':self.slot})
         self.enterContext(patch.object(recovery,'policy',return_value=(self.p,self.host)))
         self.enterContext(patch.object(recovery,'inspect_all',side_effect=lambda:copy.deepcopy(self.rows)))
         self.enterContext(patch.object(recovery,'historical_context',return_value=self.context))
@@ -128,7 +129,8 @@ class HistoricalBootRecoveryTests(unittest.TestCase):
         """Real coordinator/locks/journal, modeled Docker/database observations."""
         import os
         from deployment.lib import environment_file,isolated_release_environment
-        self.p.update(control_interface='ens3',control_gateway='10.0.2.2',max_recovery_seconds=30);self.seal()
+        self.p.update(control_interface='ens3',control_gateway='10.0.2.2',max_recovery_seconds=30)
+        if not (self.journal/'known-good.json').exists():self.seal()
         self.system.upgrade_root=self.root;self.system.control_root=self.root/'installed'
         events=[]
         ids={r['Name'].removeprefix('/'):r['Id'] for r in self.rows}
@@ -184,7 +186,8 @@ class HistoricalBootRecoveryTests(unittest.TestCase):
         self.assertLess(authority,starts(ids['madar-green-backend']))
         self.assertLess(owner,starts(ids['madar-green-notification-worker']))
         self.assertLess(candidate,starts(ids['madar-release-proxy']))
-        self.assertLess(starts(ids['madar-release-proxy']),index(lambda e:e[0]=='route'))
+        self.assertFalse(any(e[0]=='route' for e in events))
+        self.system.http_json.assert_called_once_with('http://127.0.0.1:8001/health/version')
         self.assertEqual(events[-1][0],'stable')
 
     def test_candidate_failure_fences_original_writers_without_promoting_or_issuing_authority(self):
@@ -194,6 +197,24 @@ class HistoricalBootRecoveryTests(unittest.TestCase):
         self.assertFalse(any(e==('effect',['/usr/bin/docker','start',ids['madar-release-proxy']]) for e in events))
         self.assertEqual(events[-1][1][:4],['/usr/bin/docker','stop','--time','15'])
         self.assertIn(ids['madar-green-notification-worker'],events[-1][1])
+
+    def test_wrong_loaded_slot_refuses_even_when_its_source_sha_matches(self):
+        self.system.http_json.return_value={'release_sha':self.source,'release_slot':'blue'}
+        with self.assertRaisesRegex(RuntimeError,'loaded_route_changed'):self.exercise_recovery()
+
+    def test_repeated_recovery_preserves_the_exact_recorded_route_inode_and_mode(self):
+        route=recovery.ROUTE;before=route.stat();body=route.read_bytes()
+        for _ in range(2):self.exercise_recovery()
+        after=route.stat();self.assertEqual((before.st_ino,before.st_uid,before.st_mode),(after.st_ino,after.st_uid,after.st_mode))
+        self.assertEqual(route.read_bytes(),body)
+
+    def test_fresh_proxy_listener_gets_a_bounded_read_only_retry_without_new_promotion(self):
+        self.system.http_json.side_effect=[RuntimeError('production_health_unavailable'),
+            {'release_sha':self.source,'release_slot':self.slot}]
+        with patch.object(recovery.time,'sleep'):
+            events,_,result=self.exercise_recovery()
+        self.assertEqual(result['phase'],'healthy');self.assertEqual(self.system.http_json.call_count,2)
+        self.assertFalse(any(e[0]=='route' for e in events))
 
     def test_independent_historical_policy_cannot_change_guest_controller_or_schema(self):
         from deployment.lib import active_recovery_inputs
