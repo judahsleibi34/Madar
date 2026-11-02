@@ -2909,3 +2909,12 @@ probe-input digest, canonical history and all ordinary admission gates remain
 mandatory. Legacy files retain strict address binding, and consumed origin
 records cannot be silently upgraded. See the control-plane architecture's native
 failure and fresh acceptance requirement.
+
+
+Historical146 preparation shares enrollment's explicit Auth/MFA/private-object
+probe-timestamp exclusions, with their names bound into the prepared fingerprint.
+It still hashes password/MFA material, ownership, other original columns and all
+public business data, and rechecks schema/roles/ACL structure. This is confined
+to live historical preparation. SQL-boundary snapshots after writer fencing
+retain every original column; the preservation verifier explicitly refuses a
+preparation-normalized snapshot as migration completion evidence.

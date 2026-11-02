@@ -4,7 +4,7 @@ from pathlib import Path
 from deployment.lib.completed_normal_profile import maintenance_role
 
 from deployment.lib.completed_normal_admission import digest
-from deployment.lib.completed_normal_profile import profile, LEGACY, APPLICATION, COMMERCIAL, FENCED, OUTBOX
+from deployment.lib.completed_normal_profile import profile, LEGACY, APPLICATION, COMMERCIAL, FENCED, OUTBOX, RECONCILED
 
 IDENTITY_SQL="BEGIN READ ONLY; SET LOCAL search_path=pg_catalog; SELECT json_build_object('system_identifier',system_identifier::text,'schema',schema_version)::text FROM pg_catalog.pg_control_system(),public.application_schema_state WHERE contract_key='core'; COMMIT;"
 
@@ -45,7 +45,18 @@ def database_structure_digest(contract,runtime):
 
 def verify_preparation_baseline(contract,runtime,baseline):
     """Only the explicit new profile uses a protected execution row boundary."""
-    if profile(contract) in (COMMERCIAL,FENCED,OUTBOX):
+    selected=profile(contract)
+    if selected is RECONCILED and contract.get('source_roles',{}).get('origin_kind')=='independently-enrolled-historical-bootstrap-origin':
+        # Source-owned live probe rules only. The normal migration snapshot
+        # taken after writer fencing still hashes every original column.
+        current=_customer_snapshot(contract,runtime,selected,preparation_probes=True)
+        identities=[row for name,row in sorted(current['roots'].items()) if not name.startswith('public.')]
+        if (digest(current)!=contract['customer_table_roots_sha256']
+                or digest({'roots':identities})!=contract['customer_identity_roots_sha256']
+                or database_structure_digest(contract,runtime)!=contract['database_structure_sha256']):
+            raise RuntimeError('completed_upgrade_current_customer_data_changed')
+        return
+    if selected in (COMMERCIAL,FENCED,OUTBOX):
         if database_structure_digest(contract,runtime)!=contract['database_structure_sha256']:
             raise RuntimeError('completed_upgrade_database_structure_changed')
         return
@@ -216,10 +227,17 @@ def migration_customer_snapshot(contract,runtime,*,columns=None):
     return _customer_snapshot(contract,runtime,profile(contract),columns=columns)
 
 
-def _customer_snapshot(contract,runtime,selected,*,columns=None,native=None):
+def _customer_snapshot(contract,runtime,selected,*,columns=None,native=None,preparation_probes=False):
     from deployment.lib.active_recovery_reconciliation import identifier
     native=native or (lambda:observe_native(contract,runtime))
     schema=native()
+    ignored={}
+    if preparation_probes:
+        from .completed_normal_profile import RECONCILED
+        from .historical_origin import KIND,PROBE_TIMESTAMP_COLUMNS
+        if selected is not RECONCILED or contract.get('source_roles',{}).get('origin_kind')!=KIND or schema!=146:
+            raise RuntimeError('historical_baseline_probe_scope_invalid')
+        ignored=PROBE_TIMESTAMP_COLUMNS
     def query(body):
         sql=("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET LOCAL search_path=pg_catalog,public,extensions; SET LOCAL statement_timeout='60s'; "
              "SET LOCAL TIME ZONE 'UTC';\n"+body+"\nCOMMIT;")
@@ -250,7 +268,7 @@ def _customer_snapshot(contract,runtime,selected,*,columns=None,native=None):
         if len(parts)!=2 or parts[0] not in {'public','auth','storage'}:
             raise RuntimeError('completed_migration_customer_column_inventory_invalid')
         table='.'.join(identifier(part) for part in parts)
-        projection=','.join('t.'+identifier(n) for n in names)
+        projection=','.join('t.'+identifier(n) for n in names if n not in ignored.get(name,()))
         literal="'"+name.replace("'","''")+"'"
         statements.append("SELECT json_build_object('table',"+literal+",'count',count(*),'sha256',"
             "encode(sha256(convert_to(coalesce(string_agg(h,'' ORDER BY h COLLATE \"C\"),''),'UTF8')),'hex'))::text "
@@ -263,6 +281,8 @@ def _customer_snapshot(contract,runtime,selected,*,columns=None,native=None):
     if native()!=schema:
         raise RuntimeError('completed_migration_customer_snapshot_schema_changed')
     result={'schema':schema,'columns':columns,'roots':{row['table']:row for row in rows[:-1]}}
+    if preparation_probes:
+        result['ignored_preparation_probe_timestamps']={n:list(v) for n,v in ignored.items() if n in columns}
     if selected is COMMERCIAL:
         #146 adds exactly one immutable catalog row, not customer activity.
         #Measure every original row as well as the exact approved addition.
@@ -287,6 +307,8 @@ def _customer_snapshot(contract,runtime,selected,*,columns=None,native=None):
 
 def verify_migration_customer_preservation(before,after, *, contract=None):
     """Only the approved schema-state row may differ across the SQL chain."""
+    if any("ignored_preparation_probe_timestamps" in value for value in (before,after)):
+        raise RuntimeError("completed_migration_preparation_snapshot_forbidden")
     selected = LEGACY if contract is None else profile(contract)
     if (before.get('schema')!=selected.source or after.get('schema')!=selected.target
             or before.get('columns')!=after.get('columns')
@@ -341,7 +363,7 @@ def historical_preparation_baseline(contract,runtime):
     if _observe_native(contract,runtime,RECONCILED)!=146:
         raise RuntimeError('historical_baseline_source_schema_changed')
     current=_customer_snapshot(contract,runtime,RECONCILED,
-        native=lambda:_observe_native(contract,runtime,RECONCILED))
+        native=lambda:_observe_native(contract,runtime,RECONCILED),preparation_probes=True)
     identities=[row for name,row in sorted(current['roots'].items()) if not name.startswith('public.')]
     structure=runtime.command(['docker','exec',contract['database']['container_id'],'psql','-XqAt',
         '-v','ON_ERROR_STOP=1','-U',maintenance_role(contract),'-d','postgres','-c',STRUCTURE_SQL]).strip()

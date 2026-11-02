@@ -2882,3 +2882,13 @@ Release state remains operator-owned mutable data: the preparation reader uses
 the existing private configuration reader and then requires independent historical
 enrollment attestation. Root-only receipt and signing-key trust rules do not change.
 Native acceptance caught this distinction; changing state ownership is not a fix.
+
+Real native observations confirmed successful Auth/MFA verification changes
+`auth.users` and `auth.mfa_factors` fingerprints. Historical preparation now
+uses the same explicit probe-timestamp exclusions as historical enrollment:
+users' sign-in/update times, factors' challenge/update times, and objects'
+access/update times. Password/MFA material, ownership, all other original columns
+and all public business records remain hashed; schema/roles/ACLs remain bound.
+The plan also binds the names of those excluded preparation columns. Existing
+SQL-execution snapshots remain exact across every original column after writer
+fencing; they cannot opt into preparation normalization through their public API.

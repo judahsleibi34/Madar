@@ -50,6 +50,16 @@ def bootstrap_record(path):
     finally:os.close(descriptor)
 
 
+# Only established probe activity, never passwords, MFA material, ownership or
+# public business records. The same rule applies to live preparation snapshots;
+# exact post-fencing SQL-boundary snapshots retain every original column.
+PROBE_TIMESTAMP_COLUMNS={
+    'auth.users':('last_sign_in_at','updated_at'),
+    'auth.mfa_factors':('last_challenged_at','updated_at'),
+    'storage.objects':('last_accessed_at','updated_at'),
+}
+
+
 def preservation_roots(db):
     """Bounded native READ ONLY snapshot; customer values never leave as text.
 
@@ -78,9 +88,7 @@ def preservation_roots(db):
             relation=sql.SQL('{}.{}').format(sql.Identifier(schema),sql.Identifier(table))
             count=db.execute(sql.SQL('SELECT count(*) FROM {}').format(relation)).fetchone()[0]
             if not 0<=count<=100000:raise RuntimeError('historical_origin_row_budget')
-            ignored=(['last_sign_in_at','updated_at'] if (schema,table)==('auth','users') else
-                ['last_challenged_at','updated_at'] if (schema,table)==('auth','mfa_factors') else
-                ['last_accessed_at','updated_at'] if (schema,table)==('storage','objects') else [])
+            ignored=list(PROBE_TIMESTAMP_COLUMNS.get(schema+'.'+table,()))
             value=sql.SQL('to_jsonb(t) - {}::text[]').format(sql.Literal(ignored))
             checksum=db.execute(sql.SQL("""SELECT encode(sha256(convert_to(
               coalesce(string_agg(h,'' ORDER BY h COLLATE "C"),''),'UTF8')),'hex')
