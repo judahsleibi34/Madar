@@ -217,6 +217,114 @@ def require_historical_boundary(binding,system):
                 raise RuntimeError('automatic_recovery_historical_consumed_operation_requires_recovery')
 
 
+def verify_receiver_retirement(hold,packet,*,now=None):
+    """Verify the independently pinned receiver, not a caller's cleanup flag.
+
+    The source hold is root-private and pinned before source poweroff. Neither
+    this receipt nor its key can issue deployment, migration or write authority.
+    Expired holds remain blocking until independently resolved; they never clear
+    themselves. A retirement receipt does not certify application restoration.
+    """
+    import base64
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+    now=int(time.time()) if now is None else now
+    local={'version','kind','hold_id','environment_id','guest_uuid','machine_id','root_filesystem_uuid',
+        'controller_sha','controller_tree_sha256','historical_origin','known_good_sha256',
+        'receiver_public_key','created_at','expires_at'}
+    bound={'run_id','receiver_id','operation_id','manifest_sha256','source_guest_uuid','source_sha',
+        'source_database_system_identifier','source_physical_host_uuid','receiver_physical_host_uuid',
+        'receiver_filesystem_uuid','receiver_enrollment_sha256','source_origin_sha256'}
+    if (not isinstance(hold,dict) or set(hold)!=local|bound or type(hold['version']) is not int or hold['version']!=1
+            or hold['kind']!='isolated-independent-restoration-source-hold'
+            or type(hold['created_at']) is not int or type(hold['expires_at']) is not int
+            or not hold['created_at']<=now<hold['expires_at']<=hold['created_at']+14400
+            or not re.fullmatch(r'codex-[0-9]{8}T[0-9]{6}Z-automatic-execution-[a-f0-9]{8}',str(hold['run_id']))
+            or hold['source_guest_uuid']!=hold['guest_uuid']
+            or hold['receiver_physical_host_uuid'] in {hold['source_physical_host_uuid'],hold['source_guest_uuid']}
+            or not re.fullmatch('[a-f0-9]{32}',str(hold['machine_id']))
+            or not re.fullmatch('[1-9][0-9]{0,19}',str(hold['source_database_system_identifier']))):
+        raise RuntimeError('automatic_recovery_restore_hold_invalid')
+    for name in ('hold_id','guest_uuid','root_filesystem_uuid','source_physical_host_uuid',
+                 'receiver_physical_host_uuid','receiver_filesystem_uuid','receiver_id','operation_id'):
+        try:
+            if str(uuid.UUID(hold[name]))!=hold[name]:raise ValueError()
+        except (ValueError,TypeError,AttributeError):raise RuntimeError('automatic_recovery_restore_hold_identity_invalid') from None
+    for name in ('manifest_sha256','receiver_enrollment_sha256','source_origin_sha256','known_good_sha256','controller_tree_sha256'):
+        if not re.fullmatch('[a-f0-9]{64}',str(hold[name])):raise RuntimeError('automatic_recovery_restore_hold_digest_invalid')
+    if any(not re.fullmatch('[a-f0-9]{40}',str(hold[n])) for n in ('source_sha','controller_sha')):
+        raise RuntimeError('automatic_recovery_restore_hold_source_invalid')
+    if not isinstance(packet,dict) or set(packet)!={'payload','signature','receiver_public_key'}:
+        raise RuntimeError('automatic_recovery_receiver_retirement_packet_invalid')
+    try:
+        if packet['receiver_public_key']!=hold['receiver_public_key']:raise ValueError()
+        Ed25519PublicKey.from_public_bytes(base64.b64decode(hold['receiver_public_key'],validate=True)).verify(
+            base64.b64decode(packet['signature'],validate=True),canonical(packet['payload']))
+    except Exception:raise RuntimeError('automatic_recovery_receiver_retirement_signature_invalid') from None
+    value=packet['payload']
+    fields=bound|{'version','kind','cleanup_sha256','retired_at','directory_removed',
+        'no_owned_containers','no_owned_networks','no_owned_volumes','deployment_authority_issued','migration_sql_executed'}
+    if (not isinstance(value,dict) or set(value)!=fields or type(value['version']) is not int or value['version']!=1
+            or value['kind']!='independently-retired-synthetic-receiver'
+            or any(value[k]!=hold[k] for k in bound)
+            or type(value['retired_at']) is not int or not hold['created_at']<=value['retired_at']<=now
+            or now-value['retired_at']>300
+            or not re.fullmatch('[a-f0-9]{64}',str(value['cleanup_sha256']))
+            or any(value[k] is not True for k in ('directory_removed','no_owned_containers','no_owned_networks','no_owned_volumes'))
+            or any(value[k] is not False for k in ('deployment_authority_issued','migration_sql_executed'))):
+        raise RuntimeError('automatic_recovery_receiver_retirement_scope_invalid')
+    return value
+
+
+def release_independent_restoration_hold(system,packet):
+    """Release only the exact source hold after verified off-host retirement.
+
+    The normal known-good restart remains a separate operation. All actors are
+    still stopped here, and the existing boot policy rechecks DB/protocol/state
+    before starting any of them. Existing SQL/approval interlocks stay intact.
+    """
+    if os.geteuid()!=0:raise RuntimeError('automatic_recovery_restore_hold_root_required')
+    from .historical_origin import operation_locks,restored_context
+    from .control_plane_upgrade import require_root_directory
+    with operation_locks(system) as guard:
+        path=ROOT/'independent-restore-in-progress.json';hold=read(path)
+        value=verify_receiver_retirement(hold,packet)
+        p,host=policy(system)
+        if (p.get('version')!=2 or any(hold[k]!=p[k] for k in
+                ('environment_id','guest_uuid','machine_id','root_filesystem_uuid','controller_sha','controller_tree_sha256','historical_origin'))
+                or hold['expires_at']>p['expires_at']):
+            raise RuntimeError('automatic_recovery_restore_hold_policy_changed')
+        original=restored_context(hold['historical_origin'],historical_context(hold['historical_origin']),now=int(time.time()))
+        manifest=read(ROOT/'known-good.json')
+        if (digest(manifest)!=hold['known_good_sha256'] or manifest.get('kind')!='historical-bootstrap-known-good-recovery'
+                or manifest.get('historical_origin')!=hold['historical_origin']
+                or original['source_sha']!=hold['source_sha'] or original['host']['guest_uuid']!=hold['guest_uuid']
+                or original['database']['system_identifier']!=hold['source_database_system_identifier']
+                or host['database_system_identifier']!=hold['source_database_system_identifier']
+                or digest(historical_context(hold['historical_origin']))!=hold['source_origin_sha256']):
+            raise RuntimeError('automatic_recovery_restore_hold_origin_changed')
+        rows=inspect_all();verify_runtime_scope(host['runtime_scope'],rows)
+        if any(r['State'].get('Running') is not False for r in rows):
+            raise RuntimeError('automatic_recovery_restore_hold_source_not_stopped')
+        guard();verify_fence(p['control_interface'])
+        record={'operation':'release-independent-restoration-source-hold','hold_sha256':digest(hold),
+            'retirement_receipt_sha256':digest(packet),'receiver_id':value['receiver_id'],
+            'migration_sql_executed':False,'deployment_authority_issued':False,'application_started':False}
+        parent=ROOT/'restoration-retirements';require_root_directory(parent,create=True)
+        consumed=parent/(hold['hold_id']+'.json')
+        if consumed.exists():
+            if read(consumed)!=record:raise RuntimeError('automatic_recovery_restore_hold_consumption_conflict')
+        else:atomic_json(consumed,record,exclusive=True)
+        # A crash after durable consumption can finish this same unlink only
+        # while the exact original hold still exists. No absent-hold replay.
+        guard()
+        if read(path)!=hold:raise RuntimeError('automatic_recovery_restore_hold_replaced')
+        path.unlink()
+        descriptor=os.open(ROOT,os.O_RDONLY|os.O_DIRECTORY)
+        try:os.fsync(descriptor)
+        finally:os.close(descriptor)
+        return record
+
+
 def seal_historical_known_good(system):
     """Seal an actual enrolled bootstrap origin, without a completion or grant."""
     from .historical_origin import operation_locks,attest,restored_context

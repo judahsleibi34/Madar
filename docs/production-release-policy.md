@@ -4911,3 +4911,13 @@ configuration and read-only host inputs. It does not manufacture configuration
 files from a newer provider architecture. Ordinary completed-origin checks,
 independent restoration, approval and execution boundaries remain mandatory.
 See the historical configuration contract in the control-plane architecture.
+
+An isolated historical source restoration hold can be released only by the
+existing root controller after fresh retirement evidence from the independently
+pinned physical receiver, exact source/policy/known-good binding, stopped source
+actors and durable single-use consumption. It remains a separate recovery action,
+not release approval or application startup. Expiration alone cannot remove the
+hold. Retirement is distinct from full-application restoration acceptance; both
+retain independent evidence. See the receiver retirement contract in the
+control-plane architecture. Native poweroff/retirement/resume acceptance is still
+required before claiming this boundary operationally complete.

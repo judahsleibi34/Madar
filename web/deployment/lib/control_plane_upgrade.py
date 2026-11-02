@@ -3791,6 +3791,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument('--restore-isolated-fence',action='store_true',help='Restore the independently enrolled disposable guest fence before networking')
     parser.add_argument('--recover-known-good',action='store_true',help='Recover the exact independently sealed known-good application; never migrate')
+    parser.add_argument('--release-independent-restore-hold',action='store_true',help='Release the exact isolated historical source hold using a fresh receiver-signed retirement receipt on stdin; does not start services')
     parser.add_argument('--install-isolated-recovery',action='store_true',help='Install boot dependencies only in a positively enrolled disposable guest')
     parser.add_argument('--automatic-release',action='store_true',
         help='Execute an independently admitted routine release through the existing deployer')
@@ -3827,7 +3828,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.historical_origin:
         if any((args.sha,args.exceptional,args.dry_run,args.automatic_release,args.automatic_poll,
                 args.automatic_retry_failed_source,args.authenticate_operator,args.restore_isolated_fence,
-                args.recover_known_good,args.install_isolated_recovery,args.recover_current_schema,args.rehearsal_attestation)):
+                args.recover_known_good,args.release_independent_restore_hold,args.install_isolated_recovery,args.recover_current_schema,args.rehearsal_attestation)):
             parser.error('historical enrollment cannot mix with release execution or source selection')
         if args.historical_origin=='prepare':
             if args.request_id or args.confirm_request_digest:parser.error('prepare uses only independently pinned origin policy')
@@ -3850,7 +3851,7 @@ def main(argv: list[str] | None = None) -> int:
             print('HISTORICAL ORIGIN: REFUSED; error: '+code,file=sys.stderr);return 1
     if args.exceptional:
         if any((args.dry_run,args.automatic_release,args.automatic_poll,args.automatic_retry_failed_source,args.authenticate_operator,
-                args.restore_isolated_fence,args.recover_known_good,args.install_isolated_recovery,args.recover_current_schema,args.rehearsal_attestation)):
+                args.restore_isolated_fence,args.recover_known_good,args.release_independent_restore_hold,args.install_isolated_recovery,args.recover_current_schema,args.rehearsal_attestation)):
             parser.error('exceptional release review and execution cannot mix with other operations')
         if args.exceptional=='prepare':
             if not args.sha or args.request_id or args.confirm_request_digest:parser.error('prepare requires only an exact source SHA')
@@ -3877,14 +3878,19 @@ def main(argv: list[str] | None = None) -> int:
             code=str(error) if re.fullmatch('[a-z0-9_:,]{1,200}',str(error)) else 'exceptional_execution_failed'
             print('EXCEPTIONAL RELEASE: REFUSED; error: '+code,file=sys.stderr);return 1
     if args.request_id or args.confirm_request_digest:parser.error('request arguments require an exceptional action')
-    recovery_modes=(args.restore_isolated_fence,args.recover_known_good,args.install_isolated_recovery)
+    recovery_modes=(args.restore_isolated_fence,args.recover_known_good,args.install_isolated_recovery,args.release_independent_restore_hold)
     if any(recovery_modes):
         if sum(recovery_modes)!=1 or any((args.sha,args.dry_run,args.automatic_release,args.automatic_poll,args.automatic_retry_failed_source,args.authenticate_operator,args.recover_current_schema,args.rehearsal_attestation)):
             parser.error('recovery is a separate lifecycle operation')
         try:
-            from deployment.lib.automatic_release_recovery import restore_isolation,install
+            from deployment.lib.automatic_release_recovery import restore_isolation,install,release_independent_restoration_hold
             operations=SystemOperations()
-            result=(restore_isolation(operations) if args.restore_isolated_fence else
+            if args.release_independent_restore_hold:
+                raw=sys.stdin.buffer.read(65537)
+                if not 0<len(raw)<=65536:raise RuntimeError('automatic_recovery_retirement_input_size')
+                from deployment.lib.migration_inventory import strict_json
+                result=release_independent_restoration_hold(operations,strict_json(raw))
+            else:result=(restore_isolation(operations) if args.restore_isolated_fence else
                     install(operations) if args.install_isolated_recovery else operations.recover_automatic_known_good())
             print(json.dumps(result,sort_keys=True));return 0
         except (RuntimeError,ValueError,OSError,TypeError,subprocess.SubprocessError):

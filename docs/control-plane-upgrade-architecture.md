@@ -2748,3 +2748,39 @@ changed profile refuse. Ordinary completed origins retain their existing fixed
 configuration contract. This root-only read observer issues no authority and
 cannot substitute for independent restoration, exact approval or actual SQL
 execution. Its native canonical acceptance remains required.
+
+### Independent receiver retirement and historical source holds (2026-11-02)
+
+The existing disposable physical receiver can retire with `--retire-and-attest`.
+It reads its original root-private receiver key, performs the exact-owned cleanup,
+removes the receiver directory, and then independently reobserves Docker for any
+remaining receiver-labeled containers, networks or volumes. Only absence permits
+a retirement signature. The receipt binds the original enrollment, physical
+host/filesystem, source guest/database/revision, backup operation and manifest,
+and historical origin. It certifies retirement only: not restoration acceptance,
+release completion, migration or write authority. Ordinary `--retire` remains an
+available cleanup action even when attestation cannot be produced.
+
+Before powering off the source, the independent parent must pin a root-private
+`automatic-recovery/independent-restore-in-progress.json` with the exact receiver
+public key/enrollment and those source bindings, the enrolled recovery policy,
+the existing historical known-good manifest, a unique hold ID and bounded lifetime.
+The hold never expires itself. Boot recovery continues refusing while it exists.
+An absent receipt, wrong scope/key, expired hold or stale retirement cannot clear it.
+
+The installed controller's `--release-independent-restore-hold` accepts only the
+bounded signed receipt on stdin. Under the existing upgrade/deployment locks it
+revalidates the independent historical recovery policy, HMAC-authenticated origin,
+known-good manifest and runtime identities, requires every source actor stopped,
+and checks the exact network fence. It durably consumes the hold/receipt before
+unlinking and fsyncing the original hold. A crash between consumption and unlink
+may finish only that identical hold; absent-hold replay refuses. No actor starts,
+SQL runs, approval is consumed, route changes or new grant issues in this action.
+The separate existing known-good recovery must subsequently pass all its checks.
+A lost receipt after receiver deletion leaves the source fenced for independently
+authorized recovery; it is not claimed as unattended availability acceptance.
+
+These source/signature/journal checks require fresh native source-poweroff,
+physical receiver retirement, safe owned guest resume and application acceptance.
+Component tests do not establish that operational result or open canonical160
+execution or production registration.

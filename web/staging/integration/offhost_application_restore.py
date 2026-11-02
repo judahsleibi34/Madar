@@ -10,7 +10,7 @@ import base64,hashlib,json,os,re,subprocess,sys,time
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[2]))
 from deployment.lib.provider_recovery_runtime import protected
-from deployment.lib.migration_inventory import digest,strict_json
+from deployment.lib.migration_inventory import canonical,digest,strict_json
 from deployment.lib.migration_executor import atomic_json
 from deployment.lib.coordinated_archive_restore import restore_archive,verify_restored_archive
 from deployment.lib.coordinated_storage_restore import recover_metadata
@@ -449,7 +449,38 @@ def cleanup(run_id):
     atomic_json(root/'cleanup.json',result,exclusive=True);return result
 
 
-def retire_scope(run_id):
+def retirement_signer(root):
+    """Read the existing receiver key before removing its exact owned scope."""
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from cryptography.hazmat.primitives.serialization import Encoding,PublicFormat
+    key=Ed25519PrivateKey.from_private_bytes(protected(root/'receiver.key',private=True).read_bytes())
+    public=protected(root/'receiver.pub',private=True).read_bytes()
+    if key.public_key().public_bytes(Encoding.Raw,PublicFormat.Raw)!=public:
+        raise RuntimeError('offhost_retirement_receiver_key_changed')
+    return key,public
+
+
+def retirement_receipt(enrollment,result,signer):
+    """Attest completed retirement, never restoration success or deployment."""
+    key,public=signer
+    value={'version':1,'kind':'independently-retired-synthetic-receiver',
+        'run_id':enrollment['run_id'],'receiver_id':enrollment['receiver_id'],
+        'operation_id':enrollment['backup_operation_id'],'manifest_sha256':enrollment['manifest_sha256'],
+        'source_guest_uuid':enrollment['source_guest_uuid'],'source_sha':enrollment['source_sha'],
+        'source_database_system_identifier':enrollment['source_database_system_identifier'],
+        'source_physical_host_uuid':enrollment['source_product_uuid'],
+        'receiver_physical_host_uuid':enrollment['product_uuid'],
+        'receiver_filesystem_uuid':enrollment['filesystem_uuid'],
+        'receiver_enrollment_sha256':digest(enrollment),'cleanup_sha256':digest(result),
+        'retired_at':int(time.time()),'directory_removed':True,
+        'no_owned_containers':True,'no_owned_networks':True,'no_owned_volumes':True,
+        'deployment_authority_issued':False,'migration_sql_executed':False}
+    if enrollment.get('version')==2:value['source_origin_sha256']=enrollment['source_origin_sha256']
+    return {'payload':value,'signature':base64.b64encode(key.sign(canonical(value))).decode(),
+        'receiver_public_key':base64.b64encode(public).decode()}
+
+
+def retire_scope(run_id,*,attest=False):
     """Bounded owned-run retirement; independent of expired restore authority."""
     import shutil
     root,enrollment=root_for(run_id,allow_expired=True)
@@ -457,6 +488,7 @@ def retire_scope(run_id):
     stat=root.lstat()
     if root.is_symlink() or stat.st_uid!=0 or (stat.st_dev,stat.st_ino)!=(before['directory_device'],before['directory_inode']):
         raise RuntimeError('offhost_retirement_scope_replaced')
+    signer=retirement_signer(root) if attest else None
     result=cleanup(run_id)
     ids=command(['docker','ps','-aq','--no-trunc']).decode().split()
     rows=json.loads(command(['docker','inspect',*ids])) if ids else []
@@ -481,12 +513,23 @@ def retire_scope(run_id):
     shutil.rmtree(root)
     result['directory_removed']=not root.exists()
     result['disk_after']=shutil.disk_usage('/')._asdict()
+    if attest:
+        # Reobserve after retirement. A cleanup return value cannot establish
+        # exclusivity, nor can an expired enrollment restart the source itself.
+        if root.exists() or root.is_symlink():raise RuntimeError('offhost_retirement_directory_survived')
+        for resource in ('ps','network','volume'):
+            args=(['docker','ps','-aq','--no-trunc'] if resource=='ps' else
+                  ['docker',resource,'ls','-q'])
+            if command([*args,'--filter','label=com.madar.test.receiver='+enrollment['receiver_id']]).strip():
+                raise RuntimeError('offhost_retirement_owned_resource_survived')
+        result['retirement_receipt']=retirement_receipt(enrollment,result,signer)
     return result
 
 
 if __name__=='__main__':
     try:
         if len(sys.argv)==3 and sys.argv[1]=='--retire':result=retire_scope(sys.argv[2])
+        elif len(sys.argv)==3 and sys.argv[1]=='--retire-and-attest':result=retire_scope(sys.argv[2],attest=True)
         elif len(sys.argv)==3 and sys.argv[1]=='--continue':result=restore(sys.argv[2],continuation=True)
         elif len(sys.argv)==3 and sys.argv[1]=='--cleanup':result=cleanup(sys.argv[2])
         elif len(sys.argv)==2:result=restore(sys.argv[1])
