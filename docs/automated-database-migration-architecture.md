@@ -2873,3 +2873,8 @@ unmerged controller via `isolated_controller_source`. This remains explicitly
 a test source selection, preserves the real GitHub origin/main and converges
 on the existing bundle/installer path. Production still requires authenticated
 main selection. See the control-plane architecture's isolated-source contract.
+
+
+Historical backup address leases require the exact registered origin and native
+DB identity/topology. Production discovery and restricted child credentials
+retain their existing contracts; see the control-plane architecture.

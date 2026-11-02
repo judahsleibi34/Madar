@@ -2679,3 +2679,15 @@ production. Mixed source modes, a changed tree/source/registration, an ordinary
 completed-origin operation, or production use refuse. The exact package, CI,
 staging, recovery, AAL2 approval and protected execution gates are still required.
 This source transport is not unattended real-GitHub-main dispatch acceptance.
+
+
+The existing root-sealed backup address lease can observe the exact registered
+historical contract. It reuses the native database observer and signed original
+network inventory, verifies the running healthy container, immutable specification
+and PostgreSQL identity, and selects only its enrolled native bridge address.
+Historical labels and a loopback control bridge are not relabeled as a modern
+production Compose deployment. The child still receives only the existing
+anonymous sealed address/maintenance-role fd with no supplementary groups.
+Default production address discovery keeps its strict single-network/no-port
+Compose contract. Preflight and post-capture reobservation use the same exact
+historical contract; this grants neither SQL migration nor backup success.

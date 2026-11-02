@@ -77,3 +77,54 @@ class HistoricalDatabaseTopologyTests(unittest.TestCase):
     def test_different_operation_cannot_gain_historical_multi_network_permission(self):
         self.contract['operation']='completed-normal-schema115-136-upgrade'
         with self.assertRaisesRegex(RuntimeError,'database_networks_changed'):self.check()
+
+    def backup_support(self):
+        from scripts import backup_support as support
+        self.expected['maintenance_role']='supabase_admin'
+        self.enterContext(patch('deployment.lib.emergency_routing_repair.Runtime',return_value=self.runtime))
+        return support
+
+    def test_root_backup_lease_uses_same_enrolled_native_topology_without_forging_compose_labels(self):
+        support=self.backup_support()
+        # The full preparation validator authenticates the immutable contract;
+        # this transport test varies live Docker/SQL topology independently.
+        with patch('deployment.lib.completed_normal_admission.validate_provider_preparation',return_value=RECONCILED):
+            self.assertEqual(support.direct_local_database_address(database_contract=self.contract),'10.1.0.2')
+            descriptor=support.sealed_local_database_binding(maintenance_role='supabase_admin',database_contract=self.contract)
+            try:
+                import os,fcntl
+                value=json.loads(os.pread(descriptor,4096,0))
+                self.assertEqual(value['address'],'10.1.0.2');self.assertEqual(value['maintenance_role'],'supabase_admin')
+                self.assertEqual(fcntl.fcntl(descriptor,fcntl.F_GET_SEALS),support.DATABASE_SEALS)
+                with patch.dict(os.environ,{support.LOCAL_DATABASE_FD:str(descriptor)}):
+                    # A modeled root reader cannot fabricate a root-owned fd.
+                    # Actual UID0 child inheritance is tested by the separate
+                    # privileged backup descriptor acceptance.
+                    if os.getuid()!=0:
+                        with self.assertRaisesRegex(support.BackupError,'binding_invalid'):
+                            support.leased_local_database_address()
+                    with self.assertRaisesRegex(support.BackupError,'root_observer_required'):
+                        support.direct_local_database_address(database_contract=self.contract)
+            finally:__import__('os').close(descriptor)
+
+    def test_historical_backup_lease_refuses_wrong_role_endpoint_and_database_before_child_effects(self):
+        support=self.backup_support()
+        with patch('deployment.lib.completed_normal_admission.validate_provider_preparation',return_value=RECONCILED):
+            with self.assertRaisesRegex(support.BackupError,'maintenance_role_required'):
+                support.sealed_local_database_binding(database_contract=self.contract)
+            for address in ('127.0.0.1','169.254.2.1','8.8.8.8','0.0.0.0'):
+                self.row['NetworkSettings']['Networks'][self.expected['network_name']]['IPAddress']=address
+                with self.subTest(address=address),self.assertRaisesRegex(support.BackupError,'address_invalid'):
+                    support.direct_local_database_address(database_contract=self.contract)
+            self.row['NetworkSettings']['Networks'][self.expected['network_name']]['IPAddress']='10.1.0.2'
+            self.row['Id']='f'*64
+            with self.assertRaisesRegex(RuntimeError,'native_database_identity_changed'):
+                support.direct_local_database_address(database_contract=self.contract)
+
+    def test_default_production_backup_address_observer_keeps_its_strict_compose_shape(self):
+        support=self.backup_support()
+        value={'running':True,'health':'healthy','service':'postgres','directory':'/opt/madar-test/origin146',
+            'publications':{'5432/tcp':[{'HostIp':'127.0.0.1','HostPort':'25432'}]},'networks':self.row['NetworkSettings']['Networks']}
+        with patch.object(support.subprocess,'run',return_value=type('Result',(),{'stdout':json.dumps(value)})()):
+            with self.assertRaisesRegex(support.BackupError,'direct_database_unavailable'):
+                support.direct_local_database_address()

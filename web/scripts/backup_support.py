@@ -530,12 +530,14 @@ LOCAL_DATABASE_FD = 'MADAR_LOCAL_DATABASE_BINDING_FD'
 DATABASE_SEALS = fcntl.F_SEAL_WRITE | fcntl.F_SEAL_GROW | fcntl.F_SEAL_SHRINK | fcntl.F_SEAL_SEAL
 
 
-def sealed_local_database_binding(*, maintenance_role='postgres') -> int:
+def sealed_local_database_binding(*, maintenance_role='postgres',database_contract=None) -> int:
     if os.geteuid() != 0 or LOCAL_DATABASE_FD in os.environ:
         raise BackupError('local_backup_binding_root_required')
     if not isinstance(maintenance_role,str) or maintenance_role not in {'postgres','supabase_admin'}:
         raise BackupError('local_backup_maintenance_role_invalid')
-    address = direct_local_database_address()
+    if database_contract is not None and maintenance_role!='supabase_admin':
+        raise BackupError('local_backup_historical_maintenance_role_required')
+    address = direct_local_database_address(**({'database_contract':database_contract} if database_contract is not None else {}))
     fd = os.memfd_create('madar-native-backup-address', os.MFD_ALLOW_SEALING)
     try:
         # fd 9 belongs to backup_madar.sh's existing backup lock.
@@ -591,8 +593,38 @@ def leased_local_database_role() -> str:
     return local_database_lease().get('maintenance_role','postgres')
 
 
-def direct_local_database_address() -> str:
+def direct_local_database_address(*,database_contract=None) -> str:
     """Resolve only the healthy native DB; never persist a Docker bridge address."""
+    if database_contract is not None:
+        if os.geteuid()!=0 or LOCAL_DATABASE_FD in os.environ:
+            raise BackupError('local_backup_historical_root_observer_required')
+        from deployment.lib.completed_normal_admission import validate_provider_preparation
+        from deployment.lib.completed_normal_profile import RECONCILED,maintenance_role
+        from deployment.lib.historical_origin import KIND
+        if (validate_provider_preparation(database_contract) is not RECONCILED
+                or database_contract['source_roles'].get('origin_kind')!=KIND
+                or maintenance_role(database_contract)!='supabase_admin'):
+            raise BackupError('local_backup_historical_contract_invalid')
+        from deployment.lib.completed_normal_database import observe_native
+        from deployment.lib.emergency_routing_repair import Runtime
+        runtime=Runtime();observe_native(database_contract,runtime)
+        expected=database_contract['database'];rows=runtime.inspect([expected['container_id']])
+        row=next(iter(rows.values())) if len(rows)==1 else None
+        if row is None or row['Id']!=expected['container_id']:
+            raise BackupError('local_backup_historical_database_changed')
+        from deployment.lib.completed_normal_resources import measured_spec
+        from deployment.lib.historical_origin import database_networks
+        topology=database_networks(database_contract);networks=row['NetworkSettings']['Networks']
+        if (measured_spec(row)!=expected['spec_sha256'] or not row['State']['Running']
+                or row['State'].get('Health',{}).get('Status')!='healthy'
+                or {name:entry.get('NetworkID') for name,entry in networks.items()}!=topology):
+            raise BackupError('local_backup_historical_database_changed')
+        try:address=ipaddress.ip_address(networks[expected['network_name']]['IPAddress'])
+        except (ValueError,KeyError,TypeError):raise BackupError('local_backup_historical_address_invalid') from None
+        if (address.version!=4 or not address.is_private or address.is_loopback or address.is_link_local
+                or address.is_unspecified or address.is_multicast):
+            raise BackupError('local_backup_historical_address_invalid')
+        return str(address)
     if LOCAL_DATABASE_FD in os.environ:
         return leased_local_database_address()
     shape = ('{"running":{{json .State.Running}},"health":{{json .State.Health.Status}},'

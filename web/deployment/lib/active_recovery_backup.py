@@ -96,7 +96,8 @@ def verify_backup_execution_context(package, *, expected_schema=115, completed_c
                 'PGDATABASE':'postgres', 'PGSSLMODE':'disable'}
     if any(env.get(key) != value for key, value in expected.items()):
         raise RuntimeError('normal_backup_database_configuration_mismatch')
-    descriptor = backup_support.sealed_local_database_binding(**({'maintenance_role':role} if role!='postgres' else {}))
+    options=historical_database_options(contract)
+    descriptor = backup_support.sealed_local_database_binding(**({'maintenance_role':role} if role!='postgres' else {}),**options)
     try:
         address = json.loads(os.pread(descriptor,4096,0))['address']
         env['PGHOSTADDR'] = address
@@ -134,9 +135,15 @@ print(json.dumps({'uid':os.getuid(),'gid':os.getgid(),'supplementary_groups':os.
                                     user=identity.pw_uid, timeout=120))
     finally:
         os.close(descriptor)
-    if backup_support.direct_local_database_address() != address:
+    if backup_support.direct_local_database_address(**options) != address:
         raise RuntimeError('normal_backup_database_address_changed')
     return result
+
+
+def historical_database_options(contract):
+    if contract is not None and contract.get('source_roles',{}).get('origin_kind')=='independently-enrolled-historical-bootstrap-origin':
+        return {'database_contract':contract}
+    return {}
 
 
 def remote_receiver(package,plan,backup,sums,filesystem_uuid,*,expected_schema=115,namespace='normal-local-production',maintenance_manifest_sha256=None):
@@ -254,7 +261,8 @@ def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_con
     role=maintenance_role(completed_context.contract) if completed_context is not None else 'postgres'
     if role!='postgres' and cfg.get('PGUSER')!=role:
         raise RuntimeError('normal_backup_maintenance_configuration_changed')
-    descriptor = backup_support.sealed_local_database_binding(**({'maintenance_role':role} if role!='postgres' else {}))
+    options=historical_database_options(completed_context.contract if completed_context is not None else None)
+    descriptor = backup_support.sealed_local_database_binding(**({'maintenance_role':role} if role!='postgres' else {}),**options)
     try:
         address = json.loads(os.pread(descriptor,4096,0))['address']
         env[backup_support.LOCAL_DATABASE_FD] = str(descriptor)
@@ -268,7 +276,7 @@ def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_con
     finally:
         os.close(descriptor)
     # A restart/address change during capture invalidates the lease and backup.
-    if backup_support.direct_local_database_address() != address:
+    if backup_support.direct_local_database_address(**options) != address:
         raise RuntimeError('normal_backup_database_address_changed')
 
     if maintenance_capture is None:
