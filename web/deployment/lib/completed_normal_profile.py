@@ -101,6 +101,14 @@ def profile(contract):
     selected = {LEGACY_OPERATION: LEGACY, MANUAL_OPERATION: MANUAL,
         APPLICATION_OPERATION: APPLICATION, COMMERCIAL_OPERATION: COMMERCIAL,
         FENCED_OPERATION: FENCED, OUTBOX_OPERATION: OUTBOX}.get(contract.get('operation'))
+    if selected is None and contract.get('operation')==RECONCILED_OPERATION:
+        # No global registration: independent exact isolated acceptance policy
+        # identifies technical support, while the issuer separately gates effects.
+        from .schema160_release import isolated_registration
+        try:isolated_registration(contract)
+        except (OSError,RuntimeError,ValueError):
+            raise RuntimeError('completed_normal_operation_profile_invalid') from None
+        selected=RECONCILED
     if selected is None or type(contract.get('version')) is not int or contract['version'] != selected.version:
         raise RuntimeError('completed_normal_operation_profile_invalid')
     return selected

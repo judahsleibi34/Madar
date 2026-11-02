@@ -514,3 +514,45 @@ class HistoricalSupervisorProjectionTests(unittest.TestCase):
     def test_addition_cannot_overwrite_an_original(self):
         self.record['resources'][str(self.original)]=self.checksum(self.original);self.save()
         with self.assertRaisesRegex(RuntimeError,'addition_overwrites_original'):self.observe()
+
+
+class HistoricalDatabaseEndpointTests(unittest.TestCase):
+    def setUp(self):
+        from test_schema150_actor_inventory import historical_fixture,repin
+        from deployment.lib.completed_normal_resources import measured_spec
+        from deployment.lib.completed_normal_admission import digest as context_digest,encoded
+        (data,scope),rows=historical_fixture();self.row=next(r for r in rows if r['Name']=='/supabase-db')
+        self.row['HostConfig']['PortBindings']={'5432/tcp':[{'HostIp':'127.0.0.1','HostPort':'25432'}]}
+        self.row['NetworkSettings']['Networks']['historical-control']={'NetworkID':'7'*64,'IPAddress':'10.7.0.2'}
+        native=self.row['NetworkSettings']['Networks']['madar-local-supabase_default'];native['IPAddress']='10.1.0.2'
+        data['target_networks']['historical-control']='7'*64
+        db=data['containers']['native:db'];db['networks']['historical-control']='7'*64
+        db['spec_sha256']=measured_spec(self.row);data,scope=repin(data,scope)
+        self.contract={'operation':scope['operation'],'version':8,'source_roles':data['historical_origin'],
+            'candidate':{'source_sha':scope['source_sha'],'controller_sha':scope['controller_sha']},
+            'writer_inventory_sha256':scope['inventory_sha256'],'database':{'container_id':db['id'],
+                'image':db['image'],'system_identifier':scope['system_identifier']}}
+        self.environment={'version':2,'guest_uuid':'guest','machine_id':'machine','root_filesystem_uuid':'filesystem',
+            'realm_id':'realm','database_container_id':db['id'],'database_system_identifier':scope['system_identifier'],
+            'runtime_scope':{db['id']:{'spec_sha256':db['spec_sha256']}}}
+        observed={'runtime':{'/supabase-db':{k:db[k] for k in ('id','image','spec_sha256')}},
+            'host':{k:self.environment[k] for k in ('guest_uuid','machine_id','root_filesystem_uuid','realm_id')},
+            'database':{'system_identifier':scope['system_identifier']}}
+        self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);root=Path(self.tmp.name)
+        destination=root/context_digest(self.contract);destination.mkdir();(destination/'provider-inventory.json').write_bytes(encoded(data))
+        self.enterContext(patch('deployment.lib.completed_normal_admission.ADMISSIONS',root))
+        self.enterContext(patch.object(origin,'protected',lambda p,**kw:Path(p)))
+        self.enterContext(patch.object(origin,'recorded_observation',return_value=observed))
+        self.enterContext(patch('deployment.lib.isolated_release_environment.observe_host',return_value=self.environment))
+        self.enterContext(patch('deployment.lib.isolated_release_environment.observe_effect_fence'))
+    def observe(self):return origin.native_database_endpoint(self.contract,self.row)
+    def test_parent_lease_uses_enrolled_native_endpoint_not_loopback_control_bridge(self):
+        self.assertEqual(self.observe()['IPAddress'],'10.1.0.2')
+    def test_changed_network_id_without_spec_change_refuses(self):
+        self.row['NetworkSettings']['Networks']['madar-local-supabase_default']['NetworkID']='0'*64
+        with self.assertRaisesRegex(RuntimeError,'database_transport_changed'):self.observe()
+    def test_changed_database_identity_or_public_port_refuses(self):
+        old=self.row['Id'];self.row['Id']='0'*64
+        with self.assertRaisesRegex(RuntimeError,'database_transport_changed'):self.observe()
+        self.row['Id']=old;self.row['HostConfig']['PortBindings']['5432/tcp'][0]['HostIp']='0.0.0.0'
+        with self.assertRaisesRegex(RuntimeError,'database_transport_changed'):self.observe()

@@ -2735,3 +2735,13 @@ and arbitrary exclusions still refuse. Original systemd controls are compared
 with the existing installer's exact supersession record, and native provider
 DNS remains restricted to the original bridge when the database also has an
 independently enrolled loopback control bridge. Version1 topology is unchanged.
+
+The first canonical historical engineering rehearsal may receive exact
+root-protected, read-only technical registration in a positively identified
+isolated KVM guest. It binds the full context, plan, controller, application,
+database,146→160 boundary and a maximum three-hour lifetime. This permits only
+read-only fixture preflight and never claims a prior completed rehearsal.
+The existing issuer refuses canonical execution credentials until its exact
+exceptional-approval bridge is integrated; fixture execute/forward modes and
+production registration remain closed. Native SQL leases resolve the exact
+enrolled provider bridge, never an alternate loopback control bridge.

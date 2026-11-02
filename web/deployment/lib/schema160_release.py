@@ -69,8 +69,86 @@ def captured_source(root):
     return raw, snapshots
 
 
+ISOLATED_REGISTRATION=Path('/etc/madar/schema160-isolated-acceptance.json')
+
+
+def isolated_registration(contract):
+    """Independently pinned technical profile; never SQL/deployment authority.
+
+    The ordinary registry stays closed. Only a positively identified disposable
+    KVM guest may recognize the exact frozen first-rehearsal context. A candidate
+    cannot write this root-owned policy. Every privileged effect still requires
+    the existing issuer credential and independent exceptional approval.
+    """
+    import os,re,time
+    from .provider_recovery_runtime import protected
+    from .migration_inventory import strict_json
+    from .completed_normal_admission import digest
+    from .completed_normal_profile import RECONCILED
+    from .historical_origin import KIND,validate_source_binding
+    path=protected(ISOLATED_REGISTRATION)
+    metadata=path.stat()
+    if metadata.st_mode&0o222 or not 0<metadata.st_size<=8192:
+        raise RuntimeError('schema160_isolated_registration_not_frozen')
+    p=strict_json(path.read_bytes())
+    fields={'version','kind','environment_id','guest_uuid','machine_id','root_filesystem_uuid',
+        'operation','context_sha256','plan_sha256','controller_sha','application_sha',
+        'database_system_identifier','origin_schema','target_schema','created_at','expires_at'}
+    if (not isinstance(p,dict) or set(p)!=fields or type(p.get('version')) is not int or p['version']!=1
+            or p['kind']!='isolated-canonical-controller-acceptance'
+            or contract.get('operation')!=RECONCILED.operation or contract.get('version')!=RECONCILED.version
+            or contract.get('source_roles',{}).get('origin_kind')!=KIND
+            or p['operation']!=RECONCILED.operation or p['context_sha256']!=digest(contract)
+            or p['plan_sha256']!=contract.get('plan_sha256')
+            or p['controller_sha']!=contract.get('candidate',{}).get('controller_sha')
+            or p['application_sha']!=contract.get('candidate',{}).get('source_sha')
+            or p['database_system_identifier']!=contract.get('database',{}).get('system_identifier')
+            or type(p['origin_schema']) is not int or p['origin_schema']!=146
+            or type(p['target_schema']) is not int or p['target_schema']!=160
+            or any(not re.fullmatch('[a-f0-9]{64}',str(p[k])) for k in ('context_sha256','plan_sha256'))
+            or any(not re.fullmatch('[a-f0-9]{40}',str(p[k])) for k in ('controller_sha','application_sha'))
+            or type(p['created_at']) is not int or type(p['expires_at']) is not int
+            or not p['created_at']<=int(time.time())<p['expires_at']<=p['created_at']+10800):
+        raise RuntimeError('schema160_isolated_registration_scope_invalid')
+    validate_source_binding(contract['source_roles'])
+    from .isolated_release_environment import observe_host,observe_effect_fence,run
+    if os.geteuid()==0:
+        host=observe_host();observe_effect_fence(execution=True)
+        if (host['version']!=2 or p['environment_id']!='isolated-'+host['realm_id']
+                or host['database_system_identifier']!=p['database_system_identifier']
+                or p['database_system_identifier'] in host['denied_database_identifiers']
+                or any(p[k]!=host[k] for k in ('guest_uuid','machine_id','root_filesystem_uuid'))):
+            raise RuntimeError('schema160_isolated_registration_host_changed')
+    else:
+        # A child receives only the existing fresh, context-scoped credential;
+        # root-private environment policy is never exposed to the child.
+        from .control_plane_upgrade_authorization import require_upgrade_authorization
+        require_upgrade_authorization(p['controller_sha'],required_operation=RECONCILED.operation,
+            required_schema=146,required_context_digest=digest(contract),require_rehearsal=True)
+        if (Path('/sys/class/dmi/id/product_uuid').read_text().strip().lower()!=p['guest_uuid']
+                or Path('/etc/machine-id').read_text().strip()!=p['machine_id']
+                or run(['/usr/bin/systemd-detect-virt']).decode().strip()!='kvm'
+                or run(['/usr/bin/findmnt','-n','-o','UUID','/']).decode().strip()!=p['root_filesystem_uuid']):
+            raise RuntimeError('schema160_isolated_registration_host_changed')
+    return p
+
+
 def admitted_manifest(root, contract):
-    raise RuntimeError('schema160_protected_controller_integration_incomplete')
+    try:isolated_registration(contract)
+    except (OSError,RuntimeError,ValueError):
+        raise RuntimeError('schema160_protected_controller_integration_incomplete') from None
+    from .completed_normal_profile import RECONCILED
+    from .control_plane_upgrade_authorization import require_upgrade_authorization
+    from .migration_executor import MigrationManifest,Migration
+    from .completed_normal_admission import digest
+    require_upgrade_authorization(contract['candidate']['controller_sha'],required_operation=RECONCILED.operation,
+        required_schema=146,required_context_digest=digest(contract),require_rehearsal=True)
+    raw,_=captured_source(root)
+    if contract['migration_manifest_sha256']!=MANIFEST_SHA256:
+        raise RuntimeError('schema160_migration_manifest_changed')
+    return MigrationManifest(release_sha=contract['candidate']['source_sha'],coordinated=True,
+        migrations=tuple(Migration(number=r['number'],path=Path(root)/r['path'],sha256=r['sha256'],
+            from_schema=r['from_schema'],to_schema=r['to_schema'],compatibility=r['compatibility']) for r in raw['migrations']))
 
 
 def expected_protocols(schema):

@@ -97,9 +97,17 @@ def verify_complete_rehearsal(actor):
     if actor.contract.get('operation') == RECONCILED.operation:
         from deployment.lib.completed_normal_admission import validate_provider_preparation
         validate_provider_preparation(actor.contract)
-        # A fresh genesis report cannot fill the independently protected
-        # preserved-application/issuer/restore/reboot acceptance boundary.
-        raise RuntimeError('schema160_protected_rehearsal_acceptance_required')
+        # The first isolated engineering rehearsal cannot truthfully claim a
+        # prior complete protected upgrade. Exact independent test registration
+        # permits read-only preflight; execution authority remains issuer-gated.
+        from deployment.lib.schema160_release import isolated_registration
+        try:registration=isolated_registration(actor.contract)
+        except (OSError,RuntimeError,ValueError):
+            raise RuntimeError('schema160_protected_rehearsal_acceptance_required') from None
+        if actor.document.get('fixture_only') is not True or actor.document.get('production_authorization') is not False:
+            raise RuntimeError('schema160_isolated_rehearsal_scope_required')
+        return {'scope':'isolated-first-engineering-rehearsal','registration':registration,
+            'complete_upgrade_rehearsal':False,'production_authorization':False}
     if profile(actor.contract) in (MANUAL,APPLICATION,COMMERCIAL,FENCED,OUTBOX):
         return verify_manual_controller_validation(actor)
     record=measured_record(actor.document['complete_rehearsal'])

@@ -718,3 +718,50 @@ def supervisor_controls(contract,name,root):
         if hashlib.sha256(protected(Path(path)).read_bytes()).hexdigest()!=checksum:
             raise RuntimeError('historical_origin_supervisor_controls_changed')
     return original,'disabled' if name in installation['superseded_units'] else unit['state']['enabled']
+
+
+def native_database_endpoint(contract,row):
+    """Resolve the enrolled native bridge, never the loopback control bridge.
+
+    A root SQL lease uses this observer only after ordinary identity/credential
+    checks. It neither opens a connection nor issues migration permission.
+    """
+    from .completed_normal_resources import measured_spec_matches
+    from .schema150_actor_inventory import DEFAULT_NETWORK
+    from .isolated_release_environment import observe_host,observe_effect_fence
+    observed=recorded_observation(contract['source_roles']);environment=observe_host()
+    observe_effect_fence(execution=True)
+    expected=observed['runtime'].get('/supabase-db',{})
+    if (observed['host']!={k:environment[k] for k in ('guest_uuid','machine_id','root_filesystem_uuid','realm_id')}
+            or environment['database_container_id']!=contract['database']['container_id']
+            or environment['database_system_identifier']!=contract['database']['system_identifier']
+            or observed['database']['system_identifier']!=environment['database_system_identifier']
+            or row.get('Id')!=expected.get('id') or row.get('Id')!=contract['database']['container_id']
+            or row.get('Name')!='/supabase-db' or row.get('Image')!=expected.get('image')
+            or row.get('Image')!=contract['database']['image'] or not row.get('State',{}).get('Running')
+            or row['State'].get('Restarting') or not measured_spec_matches(row,expected.get('spec_sha256'))):
+        raise RuntimeError('historical_origin_database_transport_changed')
+    host=row['HostConfig'];networks=row['NetworkSettings']['Networks']
+    enrolled=environment['runtime_scope'].get(row['Id'],{})
+    from .completed_normal_admission import ADMISSIONS,digest as context_digest
+    from .schema150_actor_inventory import validate_inventory
+    from .completed_normal_profile import RECONCILED
+    binding={'operation':RECONCILED.operation,'context_sha256':context_digest(contract),
+        'source_sha':contract['candidate']['source_sha'],'controller_sha':contract['candidate']['controller_sha'],
+        'inventory_sha256':contract['writer_inventory_sha256'],'system_identifier':contract['database']['system_identifier'],
+        'source_schema':146,'target_schema':160}
+    inventory=validate_inventory(strict_json(protected(ADMISSIONS/context_digest(contract)/'provider-inventory.json',private=True).read_bytes()),binding)
+    native=inventory['containers']['native:db']
+    if (inventory.get('historical_origin')!=contract['source_roles'] or native['id']!=row['Id']
+            or set(networks)!=set(native['networks'])
+            or any(v.get('NetworkID')!=native['networks'][k] for k,v in networks.items())):
+        raise RuntimeError('historical_origin_database_transport_changed')
+    # The full original row was independently enrolled; do not let a new port,
+    # host network, or Docker DNS override become an alternate maintenance path.
+    if (enrolled.get('spec_sha256')!=expected['spec_sha256']
+            or host.get('NetworkMode') in ('host','none') or host.get('ExtraHosts') or host.get('Dns')
+            or host.get('DnsSearch') or host.get('DnsOptions') or host.get('PublishAllPorts')
+            or any(b.get('HostIp')!='127.0.0.1' for ports in (host.get('PortBindings') or {}).values() for b in ports)
+            or DEFAULT_NETWORK not in networks or not networks[DEFAULT_NETWORK].get('NetworkID')):
+        raise RuntimeError('historical_origin_database_transport_changed')
+    return networks[DEFAULT_NETWORK]

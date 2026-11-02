@@ -111,9 +111,16 @@ def main():
     document,source=measure(package,args.approved_source,args.approved_plan)
     if Path(__file__)!=source/'web/scripts/continue_completed_normal_upgrade.py':
         raise RuntimeError('completed_upgrade_boot_entry_location_changed')
-    if args.mode in {'preflight','execute','forward-preflight','forward-resume'} and (document.get('fixture_only') or document.get('production_authorization') is False):
+    fixture_request=document.get('fixture_only') or document.get('production_authorization') is False
+    if args.mode in {'execute','forward-preflight','forward-resume'} and fixture_request:
         raise RuntimeError('completed_upgrade_fixture_cannot_authorize_production')
     sys.path.insert(0,str(source/'web'))
+    if args.mode=='preflight' and fixture_request:
+        from deployment.lib.schema160_release import isolated_registration
+        from deployment.lib.completed_normal_admission import digest
+        try:isolated_registration(dict(document['admission_contract'],plan_sha256=digest(document)))
+        except (OSError,RuntimeError,ValueError,KeyError):
+            raise RuntimeError('completed_upgrade_fixture_cannot_authorize_production') from None
     if args.mode in {'capture-inventory','verify-candidate'}:
         from deployment.lib.completed_normal_admission import digest,ADMISSIONS
         contract = dict(document['admission_contract'], plan_sha256=digest(document))

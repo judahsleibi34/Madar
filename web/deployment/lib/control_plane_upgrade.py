@@ -2868,6 +2868,11 @@ print(hashlib.sha256(keys[0].encode()).hexdigest())
             from deployment.lib.completed_normal_profile import profile
             selected_profile = profile(completed_normal_contract)
             from deployment.lib.completed_normal_profile import RECONCILED
+            if selected_profile is RECONCILED:
+                # Technical isolated registration cannot issue execution rights.
+                # The canonical exceptional issuer bridge must be implemented
+                # and accepted before this credential boundary may open.
+                raise UpgradeError('schema160_exceptional_execution_approval_required')
             if completed_normal_mode is not None and (selected_profile is not RECONCILED
                     or completed_normal_mode not in {'prepare','activate','adopt'}):
                 raise UpgradeError('completed_maintenance_child_scope_invalid')

@@ -77,11 +77,15 @@ def issue_database_lease(contract):
     from deployment.lib.environment_file import load_environment_file
     runtime=Runtime();observe_native(contract,runtime)
     row=next(iter(runtime.inspect([contract['database']['container_id']]).values()))
-    if (row['HostConfig'].get('PortBindings') or len(row['NetworkSettings']['Networks'])!=1
-            or row['Config'].get('Labels',{}).get('com.docker.compose.service')!='db'
-            or row['Config'].get('Labels',{}).get('com.docker.compose.project.working_dir')!='/opt/madar/local-supabase'):
-        raise RuntimeError('completed_migration_native_configuration_changed')
-    endpoint=next(iter(row['NetworkSettings']['Networks'].values()))
+    if contract['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin':
+        from deployment.lib.historical_origin import native_database_endpoint
+        endpoint=native_database_endpoint(contract,row)
+    else:
+        if (row['HostConfig'].get('PortBindings') or len(row['NetworkSettings']['Networks'])!=1
+                or row['Config'].get('Labels',{}).get('com.docker.compose.service')!='db'
+                or row['Config'].get('Labels',{}).get('com.docker.compose.project.working_dir')!='/opt/madar/local-supabase'):
+            raise RuntimeError('completed_migration_native_configuration_changed')
+        endpoint=next(iter(row['NetworkSettings']['Networks'].values()))
     if not endpoint.get('NetworkID'):raise RuntimeError('completed_migration_native_network_changed')
     address=ipaddress.ip_address(endpoint['IPAddress'])
     if (address.version!=4 or not address.is_private or address.is_loopback or address.is_link_local
