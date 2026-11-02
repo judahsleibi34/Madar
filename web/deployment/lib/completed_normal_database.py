@@ -330,12 +330,12 @@ def historical_preparation_baseline(contract,runtime):
     from .completed_normal_profile import RECONCILED
     from .historical_origin import KIND,attest
     from .control_plane_upgrade import SystemOperations
-    from .provider_recovery_runtime import protected
+    from .provider_recovery_runtime import readonly_configuration
     if (os.geteuid()!=0 or contract.get('source_roles',{}).get('origin_kind')!=KIND
             or validate_provider_preparation(contract) is not RECONCILED):
         raise RuntimeError('historical_baseline_preparation_required')
     system=SystemOperations()
-    state=json.loads(protected(system.state_root/'state.json',private=True).read_bytes())
+    state=json.loads(readonly_configuration(system.state_root/'state.json',private=True).read_bytes())
     if attest(system,state)!=contract['source_roles']:
         raise RuntimeError('historical_baseline_origin_changed')
     if _observe_native(contract,runtime,RECONCILED)!=146:

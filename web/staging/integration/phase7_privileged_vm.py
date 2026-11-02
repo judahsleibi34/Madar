@@ -652,6 +652,8 @@ class AutomaticReleaseGuest:
         with os.fdopen(descriptor,'rb') as source:
             actual=os.fstat(source.fileno());value=source.read(33).strip()
             if ((actual.st_dev,actual.st_ino)!=(metadata.st_dev,metadata.st_ino)
+                    or actual.st_uid!=1000 or not stat.S_ISREG(actual.st_mode)
+                    or actual.st_nlink!=1 or actual.st_mode&0o077
                     or value!=str(pid).encode()):
                 raise RuntimeError('automatic_guest_resume_pidfile_changed')
 

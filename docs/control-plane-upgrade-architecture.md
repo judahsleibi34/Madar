@@ -2877,3 +2877,8 @@ historical enrollment and the exact live schema146 database, and shares the SQL
 and identity checks used by execution. It does not register a provisional
 operation merely to calculate its future plan digest. Ordinary execution, boot
 and migration snapshot entrypoints retain their strict registered-profile gate.
+
+Release state remains operator-owned mutable data: the preparation reader uses
+the existing private configuration reader and then requires independent historical
+enrollment attestation. Root-only receipt and signing-key trust rules do not change.
+Native acceptance caught this distinction; changing state ownership is not a fix.

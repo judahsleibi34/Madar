@@ -329,20 +329,30 @@ class PrivilegedVmSafetyTests(unittest.TestCase):
 
 class AutomaticGuestCleanupTests(unittest.TestCase):
     def test_clean_qemu_shutdown_may_remove_pidfile_but_substitution_refuses(self):
+        # CI's application UID differs from Node2's test UID. Model ownership
+        # only; links, inode identity, private modes, contents and reads are real.
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory);path=root/'qemu.pid'
-            vm.AutomaticReleaseGuest.verify_inactive_pidfile(path,12345)
-            path.write_text('12345\n');path.chmod(0o600)
-            vm.AutomaticReleaseGuest.verify_inactive_pidfile(path,12345)
-            path.write_text('54321\n')
-            with self.assertRaisesRegex(RuntimeError,'pidfile_changed'):
+            actual_lstat=Path.lstat;actual_fstat=os.fstat
+            def owned(metadata):
+                values=list(metadata);values[4]=1000
+                return os.stat_result(values)
+            def lstat(target,*args,**kwargs):
+                value=actual_lstat(target,*args,**kwargs)
+                return owned(value) if target==path else value
+            with patch.object(Path,'lstat',lstat),patch.object(vm.os,'fstat',side_effect=lambda fd:owned(actual_fstat(fd))):
                 vm.AutomaticReleaseGuest.verify_inactive_pidfile(path,12345)
-            path.unlink();path.symlink_to(root/'missing')
-            with self.assertRaisesRegex(RuntimeError,'pidfile_ownership_changed'):
+                path.write_text('12345\n');path.chmod(0o600)
                 vm.AutomaticReleaseGuest.verify_inactive_pidfile(path,12345)
-            path.unlink();path.mkdir()
-            with self.assertRaisesRegex(RuntimeError,'pidfile_ownership_changed'):
-                vm.AutomaticReleaseGuest.verify_inactive_pidfile(path,12345)
+                path.write_text('54321\n')
+                with self.assertRaisesRegex(RuntimeError,'pidfile_changed'):
+                    vm.AutomaticReleaseGuest.verify_inactive_pidfile(path,12345)
+                path.unlink();path.symlink_to(root/'missing')
+                with self.assertRaisesRegex(RuntimeError,'pidfile_ownership_changed'):
+                    vm.AutomaticReleaseGuest.verify_inactive_pidfile(path,12345)
+                path.unlink();path.mkdir()
+                with self.assertRaisesRegex(RuntimeError,'pidfile_ownership_changed'):
+                    vm.AutomaticReleaseGuest.verify_inactive_pidfile(path,12345)
 
     def test_resume_never_touches_an_active_guest_disk(self):
         from unittest.mock import Mock

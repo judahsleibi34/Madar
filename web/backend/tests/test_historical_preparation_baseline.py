@@ -17,7 +17,7 @@ class HistoricalPreparationBaselineTests(unittest.TestCase):
         self.runtime=Mock();self.runtime.command.return_value='a'*64+'\n'
         for name,value in [('os.geteuid',lambda:0),
                 ('deployment.lib.control_plane_upgrade.SystemOperations',lambda:self.system),
-                ('deployment.lib.provider_recovery_runtime.protected',lambda p,**kw:Path(p)),
+                ('deployment.lib.provider_recovery_runtime.readonly_configuration',lambda p,**kw:Path(p)),
                 ('deployment.lib.historical_origin.attest',Mock(return_value=self.contract['source_roles']))]:
             self.enterContext(patch(name,value))
 
