@@ -541,13 +541,21 @@ class AutomaticReleaseGuest:
             '-netdev','user,id=owned,net=10.0.2.0/24,hostfwd=tcp:127.0.0.1:'+str(self.port)+'-:22',
             '-device','virtio-net-pci,netdev=owned,mac='+self.mac]
         with (self.directory/'qemu.log').open('xb') as out:
+            os.fchmod(out.fileno(),0o600)
             self.process=subprocess.Popen(args,stdin=subprocess.DEVNULL,stdout=out,stderr=out,start_new_session=True,
                 env={'PATH':os.defpath,'HOME':'/nonexistent'})
         for _ in range(120):
             if self.process.poll() is not None:raise RuntimeError('automatic_guest_qemu_launch_failed')
             path=self.directory/'qemu.pid'
             if path.exists():
-                self.pid=int(path.read_text());self.require_owned_pid()
+                descriptor=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK|os.O_CLOEXEC)
+                with os.fdopen(descriptor,'rb') as source:
+                    metadata=os.fstat(source.fileno());value=source.read(33).strip()
+                    if (metadata.st_uid!=1000 or not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink!=1
+                            or len(value)>32 or value and not re.fullmatch(rb'[1-9][0-9]{0,9}',value)):
+                        raise RuntimeError('automatic_guest_pidfile_ownership_refused')
+                    if not value:time.sleep(1);continue
+                    self.pid=int(value);self.require_owned_pid();os.fchmod(source.fileno(),0o600)
                 result=subprocess.run(self.ssh_args()+['true'],capture_output=True,timeout=6)
                 if result.returncode==0:
                     facts=json.loads(self.command(self.ssh_args()+['sudo -n python3 -'],data=b'import json,pathlib,socket,subprocess;print(json.dumps({"uuid":pathlib.Path("/sys/class/dmi/id/product_uuid").read_text().strip().lower(),"hostname":socket.gethostname(),"virt":subprocess.check_output(["systemd-detect-virt"]).decode().strip()}))'))
@@ -564,6 +572,60 @@ class AutomaticReleaseGuest:
                 or self.run_id.encode() not in arguments or self.uuid.encode() not in arguments
                 or not any(str(self.directory/'guest.qcow2').encode() in a for a in arguments)):
             raise RuntimeError('automatic_guest_pid_ownership_refused')
+
+    def resume_after_poweroff(self):
+        """Restart this owned inactive disk, not a clone or a fresh authority.
+
+        The caller retires any independent receiver and releases its source hold
+        first. Existing guest controller/boot policy decides whether actors may
+        start. This method cannot bypass that policy or extend the run lifetime.
+        """
+        if (self.process is None or self.process.poll() is None or type(self.pid) is not int or self.pid<=0
+                or Path('/proc',str(self.pid)).exists()):
+            raise RuntimeError('automatic_guest_resume_requires_observed_poweroff')
+        if (self.directory!=Path('/opt/madar-development/scratch/codex-runs')/self.run_id/'guest'
+                or any(p.is_symlink() for p in (self.directory,*self.directory.parents)) or self.directory.stat().st_uid!=1000
+                or self.directory.stat().st_mode&0o077 or self.record.get('resources_removed') is not False
+                or self.record.get('production_authority') is not False
+                or self.record.get('run_id')!=self.run_id or self.record.get('directory')!=str(self.directory)
+                or self.evidence!=Path('/opt/madar-development/evidence/integration')/self.run_id
+                or self.record.get('guest_uuid')!=self.uuid or self.record.get('pid')!=self.pid
+                or self.record.get('identity')!={'uuid':self.uuid,'hostname':'madar-release-test','virt':'kvm'}):
+            raise RuntimeError('automatic_guest_resume_scope_changed')
+        cycles=self.record.get('power_cycles',0)
+        if type(cycles) is not int or not 0<=cycles<2:raise RuntimeError('automatic_guest_resume_budget_exceeded')
+        current=json.loads(Path('/opt/madar-development/inventory/CURRENT-AUTOMATIC-EXECUTION.json').read_bytes())
+        from datetime import datetime
+        if (current.get('run_id')!=self.run_id or current.get('scratch')!=str(self.directory.parent)
+                or type(current.get('max_lifetime_seconds')) is not int or not 0<current['max_lifetime_seconds']<=10800
+                or time.time()>=datetime.fromisoformat(current['created_at']).timestamp()+current['max_lifetime_seconds']):
+            raise RuntimeError('automatic_guest_resume_run_expired_or_changed')
+        for name in ('guest.qcow2','seed.iso','identity','known_hosts','qemu.pid','qemu.log'):
+            path=self.directory/name;metadata=path.lstat()
+            if (path.is_symlink() or not stat.S_ISREG(metadata.st_mode) or metadata.st_uid!=1000
+                    or metadata.st_nlink!=1 or metadata.st_mode&0o077):
+                raise RuntimeError('automatic_guest_resume_file_ownership_changed')
+        pidfile=self.directory/'qemu.pid'
+        if pidfile.read_text().strip()!=str(self.pid):raise RuntimeError('automatic_guest_resume_pidfile_changed')
+        references=subprocess.run(['/usr/bin/sudo','-n','/usr/bin/fuser','--',str(self.directory/'guest.qcow2')],
+            capture_output=True,timeout=10,env={'PATH':os.defpath,'HOME':'/nonexistent'})
+        if references.returncode!=1 or references.stdout.strip() or references.stderr.strip():
+            raise RuntimeError('automatic_guest_resume_disk_referenced_or_unverified')
+        info=json.loads(self.command(['/usr/bin/qemu-img','info','--output=json',str(self.directory/'guest.qcow2')]))
+        if (info.get('format')!='qcow2' or info.get('backing-filename') or info.get('encrypted')
+                or info.get('virtual-size')!=self.disk_gib*1024**3):
+            raise RuntimeError('automatic_guest_resume_disk_changed')
+        for name in ('qemu.log','serial.log'):
+            path=self.directory/name
+            if not path.exists():continue
+            if path.is_symlink() or path.stat().st_uid!=1000 or path.stat().st_nlink!=1:
+                raise RuntimeError('automatic_guest_resume_log_ownership_changed')
+            target=self.evidence/('private-guest-poweroff-'+str(cycles+1)+'-'+name)
+            with target.open('xb') as out:out.write(path.read_bytes()[-65536:])
+            target.chmod(0o600);path.unlink()
+        old=self.pid;pidfile.unlink();self.pid=None;self.process=None
+        facts=self.launch();self.record.update(power_cycles=cycles+1,resumed_from_pid=old);self.save()
+        return facts
 
     def close(self):
         if self.directory.is_symlink() or self.directory.parent.name!=self.run_id:

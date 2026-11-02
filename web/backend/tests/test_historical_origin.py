@@ -640,7 +640,7 @@ class HistoricalBootControlsTests(unittest.TestCase):
             if label=='historical_alert_instances':return SimpleNamespace(stdout=self.instances)
             name=args[2]
             return SimpleNamespace(stdout='\n'.join([
-                'FragmentPath=/etc/systemd/system/'+name,'DropInPaths=',
+                'FragmentPath='+str(self.root/name),'DropInPaths=',
                 'LoadState=loaded','ActiveState='+self.active,'UnitFileState=static']))
         self.system=SimpleNamespace(command=Mock(side_effect=command))
         self.enterContext(patch.object(origin,'BOOT_UNIT_ROOT',self.root))

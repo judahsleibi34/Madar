@@ -2596,3 +2596,47 @@ completion links the actual protected normal-completion receipt. These are
 source/component integrations, not a claim that canonical147–160 has executed:
 the current full-data restore failed readiness, and full native package,
 protected execution, handoff, preservation and reboot acceptance remain pending.
+
+### Historical grantless restart integration (2026-11-02)
+
+The existing known-good recovery controller accepts a separately root-enrolled
+v2 historical policy and a distinct historical-bootstrap-known-good-recovery
+manifest. It authenticates the original enrollment packets, host/filesystem,
+database and canonical history, original bootstrap DATA, configuration, actors,
+route and worker generation. It creates no migration authority, prior completion
+or mounted write grant. Unknown/changed actors, schema, protocols or ownership
+refuse. Ordinary completed v1 recovery remains a separate strict contract.
+
+Install the existing early-fence/recovery units before historical enrollment;
+the early barrier must be active and enabled, and the recovery unit inactive.
+After truthful enrollment, the independent root v2 policy pins that exact source.
+The same explicit recovery installation then seals its historical restart
+manifest. The original private infrastructure-identity pair is restored only
+from its separately enrolled IDs, native database identity/role scope and health.
+All application startup still follows native schema/history verification and
+exclusive original ownership, using the existing Docker operations and traffic
+driver. Recovery journals are distinct from deployment completion receipts.
+
+The exact loaded early-isolation unit is authenticated as network-barrier DATA,
+not a stoppable writer supervisor. Its immutable fragment, enabled/active/exited
+state, empty jobs/control processes, absence of drop-ins and loaded-file freshness
+remain mandatory. Provider inventory reobserves that barrier at its authority
+boundaries. The existing protected boot installer supersedes only the measured
+old recovery supervisor; it preserves early isolation and Docker's dependencies.
+
+An independent-restore source hold is root controlled and never self-expires.
+The independent recovery operator must retire its receiver before releasing the
+hold. Any consumed successor or approval, including the crash gap between those
+two records, blocks historical restart for authorized recovery. There is no blind
+SQL replay or implicit consumed-approval reuse. Automatic historical pre-effect
+abandonment and protected forward continuation still require separate acceptance.
+
+The existing owned KVM construction class can restart the same powered-off disk
+at most twice, without changing UUID, keys, disk or resource budget. It requires
+observed old-process exit, authenticated paths/ownership, no file users, unchanged
+standalone QCOW2 metadata and the original unextended run deadline. It never
+modifies an active QCOW2 directly. The parent watchdog and exact teardown remain
+mandatory. These are source/component integrations; real historical restart,
+full-data restoration and protected canonical execution have not yet passed on
+this source. Production, permanent staging and automatic-deployment timers remain
+unchanged.

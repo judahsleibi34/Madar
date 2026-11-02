@@ -15,6 +15,7 @@ from .isolated_release_environment import observe_host,observe_effect_fence,requ
 POLICY=Path('/etc/madar/automatic-recovery-policy.json')
 ROOT=Path('/var/lib/madar-control-plane/upgrades/automatic-recovery')
 STATE=Path('/var/lib/madar/releases')
+ROUTE=Path('/var/lib/madar/proxy/active-upstreams.conf')
 ROLES=('backend','frontend','redis','parser-worker','remote-ingestion-worker','notification-worker','calendar-sync-worker','data-deletion-worker')
 CONSUMERS=('notification-worker','calendar-sync-worker','data-deletion-worker')
 PROVIDERS=('supabase-db','supabase-auth','supabase-rest','supabase-storage','supabase-envoy')
@@ -29,8 +30,10 @@ def policy(system):
     fields={'version','kind','environment_id','guest_uuid','machine_id','root_filesystem_uuid',
         'controller_sha','controller_tree_sha256','expires_at','control_interface','control_mac',
         'control_address','control_gateway','max_recovery_seconds'}
-    if (set(p)!=fields or type(p['version']) is not int or p['version']!=1
-            or p['kind']!='isolated-known-good-recovery-policy'
+    historical=type(p.get('version')) is int and p['version']==2
+    if historical:fields|={'historical_origin'}
+    if (set(p)!=fields or type(p['version']) is not int or p['version'] not in {1,2}
+            or p['kind']!=('isolated-historical-recovery-policy' if historical else 'isolated-known-good-recovery-policy')
             or p['environment_id']!='isolated-'+host['realm_id']
             or any(p[k]!=host[k] for k in ('guest_uuid','machine_id','root_filesystem_uuid'))
             or p['controller_sha']!=system.installed_sha()
@@ -39,6 +42,11 @@ def policy(system):
             or p['control_interface']!='ens3' or not re.fullmatch('[0-9a-f]{2}(:[0-9a-f]{2}){5}',str(p['control_mac']))
             or p['control_address']!='10.0.2.15/24' or p['control_gateway']!='10.0.2.2'):
         raise RuntimeError('automatic_recovery_independent_policy_invalid')
+    if historical:
+        from .historical_origin import validate_source_binding
+        validate_source_binding(p['historical_origin'])
+        if p['historical_origin']['controller_sha']!=p['controller_sha']:
+            raise RuntimeError('automatic_recovery_historical_controller_changed')
     from .active_recovery_inputs import controller_tree_digest
     if p['controller_tree_sha256']!=controller_tree_digest():raise RuntimeError('automatic_recovery_controller_changed')
     mac=Path('/sys/class/net',p['control_interface'],'address').read_text().strip()
@@ -116,7 +124,9 @@ def seal_known_good(system,value):
     policy, seal itself, alter history, or create a deployment completion.
     """
     if not POLICY.exists() and not POLICY.is_symlink():return None
-    p,host=policy(system);receipt,completion_sha=completed(value)
+    p,host=policy(system)
+    if p.get('version')!=1:raise RuntimeError('automatic_recovery_completed_policy_required')
+    receipt,completion_sha=completed(value)
     state=read(STATE/'state.json',private=False)
     known=state.get('known_good_release');slot=value['candidate']['slot']
     if not isinstance(known,dict) or known.get('sha')!=value['source_sha'] or state.get('active_slot')!=slot or state.get('in_progress_release'):
@@ -141,7 +151,7 @@ def seal_known_good(system,value):
         'attempt_id':value['attempt_id'],'admission':value,'completion_sha256':completion_sha,
         'environment':host,'history':history,'selection':selection,'known_good_release':known,'worker_ownership':owner,
         'authority_sha256':grant(value),'actors':{n:byname[n]['Id'] for n in names},
-        'route_sha256':hashlib.sha256(Path('/var/lib/madar/proxy/active-upstreams.conf').read_bytes()).hexdigest()}
+        'route_sha256':hashlib.sha256(ROUTE.read_bytes()).hexdigest()}
     atomic_json(ROOT/'known-good.json',manifest)
     return {'operation':'seal-known-good-recovery','source_sha':value['source_sha'],'manifest_sha256':digest(manifest),'deployment_authority_issued':False}
 
@@ -152,9 +162,160 @@ def same_known_good(left,right):
         and {k:v for k,v in left.items() if k!='schema_attested_at'}=={k:v for k,v in right.items() if k!='schema_attested_at'})
 
 
+def historical_context(binding):
+    from .historical_origin import KIND,validate_source_binding,recorded_observation
+    path=validate_source_binding(binding);observed=recorded_observation(binding)
+    return {'kind':KIND,'source_binding':binding,'request_record':read(path/'bootstrap-origin-request.json'),
+        'enrollment_record':read(path/'bootstrap-origin-consumed.json'),'history':observed['database']}
+
+
+def require_historical_boot_controls(system,original):
+    from .historical_origin import network_barrier_control,BOOT_UNIT_ROOT
+    controls=original.get('boot_controls',{});barriers=controls.get('network_barriers',{})
+    if (set(barriers)!={'madar-isolated-fence.service'}
+            or network_barrier_control(system)!=barriers['madar-isolated-fence.service']):
+        raise RuntimeError('automatic_recovery_historical_network_barrier_required')
+    name='madar-known-good-recovery.service';fragment=BOOT_UNIT_ROOT/name
+    expected=unit_definitions()[name].encode();metadata={'uid':0,'mode':0o644,'sha256':hashlib.sha256(expected).hexdigest()}
+    unit=controls.get('units',{}).get(name)
+    if (unit!={'fragment':str(fragment),'dropins':[],'state':{'enabled':'enabled','active':'inactive'}}
+            or controls.get('files',{}).get(str(fragment))!=metadata):
+        raise RuntimeError('automatic_recovery_historical_restart_unit_required')
+    raw=system.command('historical_restart_unit',['systemctl','show',name,
+        '--property=FragmentPath,DropInPaths,UnitFileState,NeedDaemonReload']).stdout
+    observed=dict(line.split('=',1) for line in raw.splitlines() if '=' in line)
+    file=protected(fragment);info=file.stat()
+    if (observed!={'FragmentPath':str(fragment),'DropInPaths':'','UnitFileState':'enabled','NeedDaemonReload':'no'}
+            or info.st_uid!=0 or info.st_mode&0o7777!=0o644 or file.read_bytes()!=expected):
+        raise RuntimeError('automatic_recovery_historical_restart_unit_changed')
+
+
+def require_historical_boundary(binding,system):
+    """No restart through consumed/ambiguous deployment or active restoration.
+
+    An off-host source hold is root controlled and never expires itself. The
+    independent recovery operator retires its receiver before releasing it.
+    This path never consumes or reuses deployment approval.
+    """
+    from .historical_origin import validate_source_binding
+    from .exceptional_release_approval import KEY,verified,CANONICAL_KIND,root as approval_root
+    path=validate_source_binding(binding)
+    forbidden=(ROOT/'independent-restore-in-progress.json',path/'bootstrap-origin-release-use.json',
+        system.interlock_file,admission.ROOT/'in-progress.json')
+    if any(p.exists() or p.is_symlink() for p in forbidden):
+        raise RuntimeError('automatic_recovery_historical_operation_or_restore_pending')
+    # Consumption precedes successor binding. A crash in that narrow interval
+    # cannot hide the already consumed approval from boot recovery.
+    requests=list(approval_root().glob('*/approval-consumed.json'))
+    if len(requests)>256:raise RuntimeError('automatic_recovery_historical_journal_budget')
+    if requests:
+        key=protected(KEY,private=True).read_bytes()
+        for consumed in requests:
+            verified(consumed,key);request=verified(consumed.parent/'request.json',key)
+            value=request.get('admission',{})
+            if value.get('kind')==CANONICAL_KIND and value.get('contract',{}).get('source_roles')==binding:
+                raise RuntimeError('automatic_recovery_historical_consumed_operation_requires_recovery')
+
+
+def seal_historical_known_good(system):
+    """Seal an actual enrolled bootstrap origin, without a completion or grant."""
+    from .historical_origin import operation_locks,attest,restored_context
+    from .control_plane_upgrade import require_root_directory
+    p,host=policy(system)
+    if p.get('version')!=2:raise RuntimeError('automatic_recovery_historical_policy_required')
+    with operation_locks(system) as guard:
+        state=read(STATE/'state.json',private=False);binding=attest(system,state)
+        if binding!=p['historical_origin']:raise RuntimeError('automatic_recovery_historical_enrollment_changed')
+        require_historical_boundary(binding,system)
+        context=historical_context(binding);original=restored_context(binding,context,now=int(time.time()))
+        require_historical_boot_controls(system,original)
+        if p['expires_at']>context['enrollment_record']['payload']['expires_at']:
+            raise RuntimeError('automatic_recovery_historical_policy_outlives_enrollment')
+        rows=inspect_all();verify_runtime_scope(host['runtime_scope'],rows)
+        if (any(r['HostConfig']['RestartPolicy']['Name']!='no' for r in rows)
+                or {r['Id'] for r in rows}!={r['id'] for r in original['runtime'].values()}):
+            raise RuntimeError('automatic_recovery_historical_actor_scope_changed')
+        byname={r['Name'].removeprefix('/'):r for r in rows};slot=state['known_good_release']['slot']
+        names=list(PROVIDERS)+['madar-'+slot+'-'+r for r in ROLES]+['madar-release-proxy']
+        operator=original['independent_operator_scope']
+        from .control_plane_upgrade_authorization import RELEASE_OPERATOR_POLICY
+        auth=read(RELEASE_OPERATOR_POLICY)['auth_service']['id']
+        if auth not in operator['actor_ids'] or len(operator['actor_ids'])!=2:
+            raise RuntimeError('automatic_recovery_historical_operator_scope_changed')
+        database=next(i for i in operator['actor_ids'] if i!=auth)
+        if (any(n not in byname for n in names)
+                or set(byname)-set(names)!={r['Name'].removeprefix('/') for r in rows if r['Id'] in operator['actor_ids']}):
+            raise RuntimeError('automatic_recovery_historical_runtime_incomplete')
+        history={**original['database'],'history_sha256':original['history_sha256']}
+        manifest={'version':2,'kind':'historical-bootstrap-known-good-recovery','policy_sha256':digest(p),
+            'source_sha':binding['application_sha'],'recovery_controller_sha':system.installed_sha(),
+            'historical_origin':binding,'historical_context':context,
+            'operator_configuration_sha256':hashlib.sha256(readonly_configuration(Path('/etc/madar/production.env')).read_bytes()).hexdigest(),
+            'configuration_sha256':original['configuration_sha256'],
+            'environment':host,'history':history,'known_good_release':state['known_good_release'],
+            'worker_ownership':read(STATE/'worker-ownership.json',private=False),
+            'operator_actors':{'database':database,'auth':auth},
+            'actors':{name:row['Id'] for name,row in byname.items()},
+            'route_sha256':hashlib.sha256(ROUTE.read_bytes()).hexdigest()}
+        require_root_directory(ROOT,create=True);guard()
+        atomic_json(ROOT/'known-good.json',manifest,exclusive=True)
+        return {'operation':'seal-historical-known-good-recovery','source_sha':binding['application_sha'],
+            'manifest_sha256':digest(manifest),'deployment_authority_issued':False,'protected_completion_claimed':False}
+
+
+def validate_historical_manifest(system,p,host,m):
+    from .historical_origin import restored_context,bootstrap_record
+    fields={'version','kind','policy_sha256','source_sha','recovery_controller_sha','historical_origin','historical_context',
+        'operator_configuration_sha256','configuration_sha256','environment','history','known_good_release','worker_ownership',
+        'operator_actors','actors','route_sha256'}
+    if (set(m)!=fields or type(m.get('version')) is not int or m['version']!=2 or p.get('version')!=2
+            or m.get('kind')!='historical-bootstrap-known-good-recovery' or m['policy_sha256']!=digest(p)
+            or m['historical_origin']!=p['historical_origin'] or m['recovery_controller_sha']!=system.installed_sha()
+            or any(m['environment'].get(k)!=host.get(k) for k in ('guest_uuid','machine_id','root_filesystem_uuid','realm_id'))):
+        raise RuntimeError('automatic_recovery_historical_manifest_changed')
+    require_historical_boundary(m['historical_origin'],system)
+    original=restored_context(m['historical_origin'],m['historical_context'],now=int(time.time()))
+    require_historical_boot_controls(system,original)
+    if (m['source_sha']!=original['source_sha'] or m['history']!={**original['database'],'history_sha256':original['history_sha256']}
+            or host['database_system_identifier']!=original['database']['system_identifier']
+            or host['database_container_id']!=m['actors'].get('supabase-db')
+            or digest(host['runtime_scope'])!=original['runtime_scope_sha256']
+            or digest(bootstrap_record(STATE/'origin-bootstrap-adopted.json'))!=original['bootstrap_sha256']
+            or hashlib.sha256(readonly_configuration(Path('/etc/madar/production.env')).read_bytes()).hexdigest()!=m['operator_configuration_sha256']
+            or m['operator_configuration_sha256']!=original['configuration_sha256']['application']):
+        raise RuntimeError('automatic_recovery_historical_original_data_changed')
+    files={'application':Path('/etc/madar/production.env'),'backup':Path('/etc/madar/backup.env'),
+        'database_transport':Path('/etc/madar/automatic-database.dsn')}
+    if (m['configuration_sha256']!=original['configuration_sha256'] or set(m['configuration_sha256'])!=set(files)
+            or any(hashlib.sha256(readonly_configuration(path,private=True).read_bytes()).hexdigest()!=m['configuration_sha256'][key]
+                for key,path in files.items())):
+        raise RuntimeError('automatic_recovery_historical_configuration_changed')
+    state=read(STATE/'state.json',private=False);known=state.get('known_good_release') or {}
+    owner=read(STATE/'worker-ownership.json',private=False)
+    if (state.get('in_progress_release') or state.get('rollback_failure') or state.get('active_slot')!=known.get('slot')
+            or not same_known_good(known,m['known_good_release'])
+            or any(type(known.get(k)) is not int for k in ('schema','schema_compatible_min','schema_compatible_max'))
+            or (known['schema'],known['schema_compatible_min'],known['schema_compatible_max'])!=(146,144,146)
+            or known.get('sha')!=m['source_sha'] or 'completed_normal_upgrade' in known
+            or owner!=m['worker_ownership'] or owner!=original['worker_authority']
+            or owner.get('owner')!='CANDIDATE' or owner.get('candidate')!={'sha':m['source_sha'],'slot':known['slot']}
+            or owner.get('generation')!=known.get('worker_generation')
+            or hashlib.sha256(ROUTE.read_bytes()).hexdigest()!=m['route_sha256']):
+        raise RuntimeError('automatic_recovery_historical_owner_or_route_changed')
+    actual={name.removeprefix('/'):r['id'] for name,r in original['runtime'].items()}
+    from .control_plane_upgrade_authorization import RELEASE_OPERATOR_POLICY
+    if (m['actors']!=actual or set(m['operator_actors'])!={'database','auth'}
+            or set(m['operator_actors'].values())!=set(original['independent_operator_scope']['actor_ids'])
+            or m['operator_actors']['auth']!=read(RELEASE_OPERATOR_POLICY)['auth_service']['id']):
+        raise RuntimeError('automatic_recovery_historical_actor_scope_changed')
+    return p,m,state
+
+
 def validate_manifest(system):
     p,host=policy(system);m=read(ROOT/'known-good.json')
-    if (m.get('version')!=1 or m.get('kind')!='completed-known-good-recovery'
+    if m.get('kind')=='historical-bootstrap-known-good-recovery':
+        return validate_historical_manifest(system,p,host,m)
+    if (p.get('version')!=1 or m.get('version')!=1 or m.get('kind')!='completed-known-good-recovery'
             or m.get('policy_sha256')!=digest(p) or m.get('recovery_controller_sha')!=system.installed_sha()
             or any(m['environment'].get(k)!=host.get(k) for k in ('guest_uuid','machine_id','root_filesystem_uuid','realm_id'))):
         raise RuntimeError('automatic_recovery_manifest_policy_changed')
@@ -170,7 +331,7 @@ def validate_manifest(system):
         raise RuntimeError('automatic_recovery_worker_ownership_ambiguous')
     if read('/var/lib/madar-control-plane/automatic-history.json')!=m['history']:
         raise RuntimeError('automatic_recovery_applied_history_changed')
-    if hashlib.sha256(Path('/var/lib/madar/proxy/active-upstreams.conf').read_bytes()).hexdigest()!=m['route_sha256']:
+    if hashlib.sha256(ROUTE.read_bytes()).hexdigest()!=m['route_sha256']:
         raise RuntimeError('automatic_recovery_recorded_route_changed')
     return p,m,state
 
@@ -178,6 +339,18 @@ def native(system,m):
     from .migration_inventory import discover,GitSource
     from .migration_drift import observe,history_digest
     from .automatic_release_selection import fixture_inventory
+    if m.get('kind')=='historical-bootstrap-known-good-recovery':
+        inventory=discover(system.repo,source_sha=m['source_sha'],history_base_sha=m['source_sha'])
+        with admission.connect_database() as db:
+            observed=observe(db,required_protocols={},expected_structure_sha256=m['history']['structure_sha256'])
+            try:
+                db.execute('BEGIN READ ONLY')
+                absent=db.execute("SELECT to_regprocedure('public.notification_delivery_protocol()') IS NULL AND to_regprocedure('public.notification_outbox_protocol()') IS NULL AND to_regprocedure('public.data_deletion_ownership_protocol()') IS NULL").fetchone()
+            finally:db.rollback()
+        if (observed.system_identifier!=m['history']['system_identifier'] or observed.schema!=146
+                or history_digest(inventory,146)!=m['history']['history_sha256'] or absent!=(True,)):
+            raise RuntimeError('automatic_recovery_historical_database_changed')
+        return observed.document()
     value=m['admission'];inventory=discover(system.repo,source_sha=m['source_sha'],history_base_sha=value['plan']['history_base_sha'])
     selection=m['selection']
     if selection is not None:
@@ -189,6 +362,73 @@ def native(system,m):
     if observed.system_identifier!=m['history']['system_identifier'] or observed.schema!=m['history']['schema'] or history_digest(inventory,observed.schema)!=m['history']['history_sha256']:
         raise RuntimeError('automatic_recovery_database_history_or_identity_changed')
     return observed.document()
+
+
+def accepted_runtime(m):
+    if m.get('kind')=='historical-bootstrap-known-good-recovery':
+        known=m['known_good_release']
+        return {'slot':known['slot'],'compatible_min':known['schema_compatible_min'],
+            'compatible_max':known['schema_compatible_max']}
+    return m['admission']['candidate']
+
+
+def historical_restart_authority(system,m):
+    """Reverify the existing grantless owner; never create a modern grant."""
+    p,host=policy(system);validate_historical_manifest(system,p,host,m)
+    slot=m['known_good_release']['slot'];rows=inspect_all()
+    from .completed_normal_resources import measured_spec
+    original=m['historical_context']['request_record']['payload']['observation']['runtime']
+    for row in rows:
+        name=row['Name'];expected=original.get(name)
+        if expected is None or (row['Id'],row['Image'],measured_spec(row))!=(expected['id'],expected['image'],expected['spec_sha256']):
+            raise RuntimeError('automatic_recovery_historical_runtime_changed')
+        if name in {'/madar-'+slot+'-'+role for role in ROLES}:
+            env=dict(x.split('=',1) for x in row['Config'].get('Env',[]) if '=' in x)
+            if (any(env.get(k) for k in ('MADAR_BUSINESS_WRITE_AUTHORITY','MADAR_BUSINESS_WRITE_CONTRACT'))
+                    or any(x['Destination']=='/run/madar' or x['Destination'].startswith('/run/madar/business-write-authority') for x in row.get('Mounts',[]))):
+                raise RuntimeError('automatic_recovery_historical_grant_was_not_original')
+    if {r['Id'] for r in rows}!=set(m['actors'].values()):raise RuntimeError('automatic_recovery_historical_runtime_changed')
+
+
+def recover_historical_operator(system,m,deadline):
+    """Restart only the separately enrolled infrastructure identity pair."""
+    historical_restart_authority(system,m)
+    p,_=policy(system);verify_fence(p['control_interface'])
+    ids=m['operator_actors'];run(['/usr/bin/docker','start',ids['database']])
+    while True:
+        ready=subprocess.run(['/usr/bin/docker','exec',ids['database'],'pg_isready','-h','127.0.0.1','-U','postgres','-d','operators'],
+            stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=5,
+            env={'PATH':os.defpath,'HOME':'/nonexistent','DOCKER_HOST':'unix:///var/run/docker.sock','DOCKER_CONFIG':'/nonexistent'})
+        if ready.returncode==0:break
+        if time.monotonic()>=deadline:raise RuntimeError('automatic_recovery_historical_operator_database_unavailable')
+        time.sleep(1)
+    run(['/usr/bin/docker','start',ids['auth']])
+    from .historical_origin import independent_operator_scope
+    original=m['historical_context']['request_record']['payload']['observation']
+    current=inspect_all()
+    if independent_operator_scope(current,observe_host())!=original['independent_operator_scope']:
+        raise RuntimeError('automatic_recovery_historical_operator_scope_changed')
+    auth=next(r for r in current if r['Id']==ids['auth'])
+    endpoints=auth['NetworkSettings']['Networks']
+    if len(endpoints)!=1:raise RuntimeError('automatic_recovery_historical_operator_network_changed')
+    address=next(iter(endpoints.values())).get('IPAddress')
+    from ipaddress import IPv4Address
+    try:
+        if not IPv4Address(address).is_private or str(IPv4Address(address))!=address:raise ValueError()
+    except (ValueError,TypeError):raise RuntimeError('automatic_recovery_historical_operator_network_changed') from None
+    from urllib.request import build_opener,ProxyHandler,HTTPRedirectHandler
+    class NoRedirect(HTTPRedirectHandler):
+        def redirect_request(self,*a,**kw):return None
+    opener=build_opener(ProxyHandler({}),NoRedirect())
+    while True:
+        try:
+            with opener.open('http://'+address+':9999/health',timeout=5) as response:
+                body=response.read(65537)
+                if response.status!=200 or len(body)>65536 or not isinstance(strict_json(body),dict):raise ValueError()
+            break
+        except (OSError,ValueError):
+            if time.monotonic()>=deadline:raise RuntimeError('automatic_recovery_historical_operator_auth_unavailable')
+            time.sleep(1)
 
 def observe_reserved_attempt(value):
     """Authenticate a historical consumption record without reusing its grant.
@@ -280,10 +520,12 @@ def recover(system,base_operations):
             require_root_directory(ROOT,create=True)
             boot=Path('/proc/sys/kernel/random/boot_id').read_text().strip();uuid.UUID(boot)
             journal=ROOT/('boot-'+boot+'.json')
-            atomic_json(journal,{'operation':'known-good-boot-recovery','boot_id':boot,'phase':'verifying_completed_scope',
+            atomic_json(journal,{'operation':'historical-known-good-boot-recovery' if initial_policy.get('version')==2 else 'known-good-boot-recovery',
+                'boot_id':boot,'phase':'verifying_historical_enrollment' if initial_policy.get('version')==2 else 'verifying_completed_scope',
                 'controller_sha':initial_policy['controller_sha'],'deployment_authority_issued':False,'migration_sql_executed':False})
             p,m,state=validate_manifest(system);manifest=m;verify_fence(p['control_interface'])
-            pending=pending_scope(m,state);rows=inspect_all()
+            historical=m.get('kind')=='historical-bootstrap-known-good-recovery'
+            pending=None if historical else pending_scope(m,state);rows=inspect_all()
             # Current independently enrolled inventory can retire an obsolete
             # inactive slot. Every accepted provider/application identity still
             # has to match its original sealed preimage exactly.
@@ -293,12 +535,12 @@ def recover(system,base_operations):
             if set(selected)!=accepted:raise RuntimeError('automatic_recovery_accepted_inventory_incomplete')
             verify_runtime_scope(selected,[r for r in rows if r['Id'] in accepted])
             if any(r['HostConfig']['RestartPolicy']['Name']!='no' for r in rows):raise RuntimeError('automatic_recovery_restart_policy_changed')
-            slot=m['admission']['candidate']['slot'];ids=m['actors'];deadline=started+p['max_recovery_seconds']
+            slot=accepted_runtime(m)['slot'];ids=m['actors'];deadline=started+p['max_recovery_seconds']
             boot=Path('/proc/sys/kernel/random/boot_id').read_text().strip();uuid.UUID(boot)
             journal=ROOT/('boot-'+boot+'.json')
             def record(phase,**details):
-                atomic_json(journal,{'operation':'known-good-boot-recovery','boot_id':boot,'source_sha':m['source_sha'],'manifest_sha256':digest(m),'phase':phase,'deployment_authority_issued':False,'migration_sql_executed':False,**details})
-            record('verified_identity_and_completed_scope')
+                atomic_json(journal,{'operation':'historical-known-good-boot-recovery' if historical else 'known-good-boot-recovery','boot_id':boot,'source_sha':m['source_sha'],'manifest_sha256':digest(m),'phase':phase,'deployment_authority_issued':False,'migration_sql_executed':False,**({'protected_completion_claimed':False} if historical else {}),**details})
+            record('verified_identity_and_historical_enrollment' if historical else 'verified_identity_and_completed_scope')
             def command(args):return run(['/usr/bin/docker',*args])
             writing=[r['Id'] for r in rows if any(r['Name'].endswith('-'+role) for role in ('backend','parser-worker','remote-ingestion-worker',*CONSUMERS)) or r['Name']=='/madar-release-proxy']
             with runtime_mutation_lock(STATE):
@@ -341,7 +583,10 @@ def recover(system,base_operations):
                 record('private_providers_started')
                 # No worker or backend starts until accepted authority, protocols
                 # and the singleton generation were independently rechecked.
-                grant(m['admission'])
+                if historical:
+                    recover_historical_operator(system,m,deadline)
+                    historical_restart_authority(system,m)
+                else:grant(m['admission'])
                 for role in ('redis','parser-worker','remote-ingestion-worker','backend','frontend'):
                     command(['start',ids['madar-'+slot+'-'+role]])
                 record('known_good_core_started')
@@ -355,7 +600,7 @@ def recover(system,base_operations):
                             args=['/usr/sbin/runuser','-u','madar','--',*args]
                         return super().run(args,**kwargs)
                 from .release_deployer import Compatibility
-                accepted=m['admission']['candidate'];compat=Compatibility(accepted['compatible_min'],accepted['compatible_max'],m['history']['schema'],'none',accepted['compatible_min'],accepted['compatible_max'])
+                accepted=accepted_runtime(m);compat=Compatibility(accepted['compatible_min'],accepted['compatible_max'],m['history']['schema'],'none',accepted['compatible_min'],accepted['compatible_max'])
                 ops=RecoveryOperations(system.repo,STATE,Path('/etc/madar/production.env'),compat)
                 ops.release_root=STATE/'releases'/m['source_sha']
                 while True:
@@ -367,7 +612,10 @@ def recover(system,base_operations):
                 for role in CONSUMERS:command(['start',ids['madar-'+slot+'-'+role]])
                 record('accepted_workers_started')
             ops.validate_candidate(m['source_sha'],slot)
-            native(system,m);grant(m['admission']);ops._require_other_worker_slot_inactive(slot)
+            native(system,m)
+            if historical:historical_restart_authority(system,m)
+            else:grant(m['admission'])
+            ops._require_other_worker_slot_inactive(slot)
             command(['start',ids['madar-release-proxy']])
             ops.switch_traffic(slot);ops.validate_stable_candidate(m['source_sha'])
             if pending:
@@ -380,13 +628,14 @@ def recover(system,base_operations):
         if manifest is not None:
             # All starts are idempotent existing-container effects. On failure
             # leave only private providers available for authorized diagnosis.
-            names=['madar-release-proxy']+['madar-'+manifest['admission']['candidate']['slot']+'-'+r for r in ('backend','parser-worker','remote-ingestion-worker',*CONSUMERS)]
+            names=['madar-release-proxy']+['madar-'+accepted_runtime(manifest)['slot']+'-'+r for r in ('backend','parser-worker','remote-ingestion-worker',*CONSUMERS)]
             selected=[manifest['actors'][n] for n in names if n in manifest['actors']]
             if selected:
                 try:run(['/usr/bin/docker','stop','--time','15',*selected])
                 except Exception:pass
         if journal is not None:
-            atomic_json(journal,{'operation':'known-good-boot-recovery','phase':'fenced','source_sha':manifest['source_sha'] if manifest is not None else None,'error_type':type(error).__name__,'error_code':str(error) if isinstance(error,RuntimeError) else 'bounded_effect_failed','migration_sql_executed':False,'deployment_authority_issued':False})
+            atomic_json(journal,{'operation':'historical-known-good-boot-recovery' if initial_policy.get('version')==2 else 'known-good-boot-recovery',
+                'phase':'fenced','source_sha':manifest['source_sha'] if manifest is not None else None,'error_type':type(error).__name__,'error_code':str(error) if isinstance(error,RuntimeError) else 'bounded_effect_failed','migration_sql_executed':False,'deployment_authority_issued':False})
         raise
     finally:os.close(lock)
 
@@ -444,5 +693,7 @@ def install(system):
         protected(path)
     run(['/usr/bin/systemctl','daemon-reload'])
     run(['/usr/bin/systemctl','enable','madar-isolated-fence.service','madar-known-good-recovery.service'])
-    return {'operation':'install-isolated-known-good-recovery','guest_uuid':host['guest_uuid'],
+    result={'operation':'install-isolated-known-good-recovery','guest_uuid':host['guest_uuid'],
         'unit_sha256':{k:hashlib.sha256(v.encode()).hexdigest() for k,v in files.items()},'production_activation':False}
+    if p['version']==2:result['historical_recovery']=seal_historical_known_good(system)
+    return result

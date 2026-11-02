@@ -70,6 +70,11 @@ class HistoricalPhysicalRecoveryTests(unittest.TestCase):
             with self.subTest(key=key),self.assertRaisesRegex(RuntimeError,'restored_context_changed_or_expired'):self.check()
             self.fixture.receipt=original
 
+    def test_json_number_alias_does_not_change_the_exact_source_context(self):
+        changed=copy.deepcopy(self.context);changed['history']['schema']=146.0
+        with self.assertRaisesRegex(RuntimeError,'restored_context_changed_or_expired'):
+            origin.restored_context(self.binding,changed,now=int(time.time()))
+
     def test_local_journal_signature_is_checked_independently_of_receiver(self):
         path=self.directory/'bootstrap-origin-consumed.json'
         packet=copy.deepcopy(self.context['enrollment_record']);packet['signature']='0'*64

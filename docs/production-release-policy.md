@@ -4871,3 +4871,11 @@ completion links the actual protected normal-completion receipt. These are
 source/component integrations, not a claim that canonical147–160 has executed:
 the current full-data restore failed readiness, and full native package,
 protected execution, handoff, preservation and reboot acceptance remain pending.
+
+Historical restart now has a distinct independently pinned, grantless recovery
+manifest in the existing controller. The authenticated early network barrier is
+kept separate from stoppable writers; protected boot supersedes only the old
+restart supervisor. Active restoration or consumed/ambiguous upgrade state still
+fences legacy restart. No new deployment grant, historical completion or SQL
+replay follows. Native acceptance remains pending; see the historical grantless
+restart integration in `docs/control-plane-upgrade-architecture.md`.

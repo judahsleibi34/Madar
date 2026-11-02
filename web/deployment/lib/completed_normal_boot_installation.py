@@ -94,6 +94,18 @@ class CompletedNormalBootInstallation:
             from deployment.lib.historical_origin import recorded_observation
             original=recorded_observation(contract['source_roles'])['boot_controls']
             compatible_units={name for name in original['units'] if re.fullmatch(r'madar-(emergency-routing|normal-local-(boot|fallback)-[a-f0-9]{12}|compatible-normal-boot-[a-f0-9]{12})\.service',name)}
+            # An enrolled historical restart controller must not race the new
+            # protected boot actor after SQL. Supersede only the exact existing
+            # static unit, preserving the independent early isolation service.
+            recovery='madar-known-good-recovery.service'
+            if recovery in original['units']:
+                from deployment.lib.automatic_release_recovery import unit_definitions
+                control=original['units'][recovery];fragment=str(UNITS/recovery)
+                expected=hashlib.sha256(unit_definitions()[recovery].encode()).hexdigest()
+                if (control['fragment']!=fragment or control['dropins']
+                        or original['files'].get(fragment)!={'sha256':expected,'uid':0,'mode':0o644}):
+                    raise RuntimeError('completed_boot_historical_recovery_unit_changed')
+                compatible_units.add(recovery)
             if (set(baseline['old_units'])!=compatible_units
                     or any(original['files'].get(path)!=value for path,value in baseline['files'].items())
                     or any(original['units'].get(name,{}).get('state')!=value for name,value in baseline['unit_states'].items())

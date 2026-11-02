@@ -58,6 +58,30 @@ class CompletedBootInstallationTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError,'historical_preimage_changed'):
                 m.CompletedNormalBootInstallation(contract,document,self.installer.package,lambda:None,self.ops,units=self.units,admissions=self.path/'admissions')
 
+    def test_historical_restart_supervisor_is_superseded_but_network_barrier_is_preserved(self):
+        from test_historical_origin import HistoricalPreparationBindingTests
+        from deployment.lib.completed_normal_profile import RECONCILED
+        from deployment.lib.automatic_release_recovery import unit_definitions
+        contract=HistoricalPreparationBindingTests().contract();document=copy.deepcopy(self.installer.document)
+        before=document['boot_resources'];proxy=str(m.UNITS/m.PROXY);name='madar-known-good-recovery.service';fragment=str(m.UNITS/name)
+        record={'sha256':hashlib.sha256(unit_definitions()[name].encode()).hexdigest(),'uid':0,'mode':0o644}
+        state={'enabled':'enabled','active':'inactive'}
+        baseline={'files':{proxy:before['files'][proxy],fragment:record},'proxy_dropins':[],
+            'old_units':[name],'old_unit_dropins':{name:[]},'unit_states':{m.PROXY:before['unit_states'][m.PROXY],name:state}}
+        document['boot_resources']=baseline;contract['plan_sha256']=admission.digest(document)
+        observed={'boot_controls':{'files':dict(baseline['files']),'units':{
+            m.PROXY:{'state':baseline['unit_states'][m.PROXY],'dropins':[]},
+            name:{'fragment':fragment,'dropins':[],'state':state}},
+            'network_barriers':{'madar-isolated-fence.service':{'MODEL':'independently observed early barrier'}}}}
+        with patch.object(m,'profile',return_value=RECONCILED),patch('deployment.lib.historical_origin.recorded_observation',return_value=observed):
+            instance=m.CompletedNormalBootInstallation(contract,document,self.installer.package,lambda:None,self.ops,units=self.units,admissions=self.path/'admissions')
+            paths=instance.paths()
+            self.assertTrue(any(p.parent.name==name+'.d' for p in paths))
+            self.assertFalse(any('madar-isolated-fence.service.d' in str(p) for p in paths))
+            observed['boot_controls']['files'][fragment]=dict(record,sha256='f'*64)
+            with self.assertRaisesRegex(RuntimeError,'historical_recovery_unit_changed'):
+                m.CompletedNormalBootInstallation(contract,document,self.installer.package,lambda:None,self.ops,units=self.units,admissions=self.path/'admissions')
+
     def test_application_successor_preserves_verified_older_compatible_boot_actor(self):
         from test_completed_normal_application_release import application_contract
         contract=application_contract();document=copy.deepcopy(self.installer.document)

@@ -163,6 +163,22 @@ def alert_template_control(system):
         'state':{'enabled':'static','active':None},'instances':[]}
 
 
+def network_barrier_control(system):
+    """Early isolation is an authenticated barrier, never a stoppable writer."""
+    from .automatic_release_recovery import unit_definitions
+    name='madar-isolated-fence.service';fragment=BOOT_UNIT_ROOT/name
+    raw=system.command('historical_network_barrier',['systemctl','show',name,
+        '--property=FragmentPath,DropInPaths,LoadState,ActiveState,SubState,UnitFileState,MainPID,ControlPID,Job,NeedDaemonReload']).stdout
+    fields=dict(line.split('=',1) for line in raw.splitlines() if '=' in line)
+    expected={'FragmentPath':str(fragment),'DropInPaths':'','LoadState':'loaded','ActiveState':'active',
+        'SubState':'exited','UnitFileState':'enabled','MainPID':'0','ControlPID':'0','Job':'','NeedDaemonReload':'no'}
+    captured=protected(fragment);metadata=captured.stat()
+    if (fields!=expected or metadata.st_uid!=0 or metadata.st_mode&0o7777!=0o644
+            or captured.read_bytes()!=unit_definitions()[name].encode()):
+        raise RuntimeError('historical_origin_network_barrier_changed')
+    return {'fragment':str(fragment),'dropins':[],'state':{'enabled':'enabled','active':'active'}}
+
+
 def boot_controls(system):
     """Measure original supervisors as DATA before any successor is admitted."""
     names=[];file_states={}
@@ -181,8 +197,14 @@ def boot_controls(system):
             file_states[fields[0]]=fields[1]
     if not 1<=len(names)<=64 or len(names)!=len(set(names)):
         raise RuntimeError('historical_origin_boot_unit_budget')
-    files={};units={};templates={}
+    files={};units={};templates={};barriers={}
     for name in sorted(names):
+        if name=='madar-isolated-fence.service':
+            control=network_barrier_control(system);path=control['fragment']
+            captured=protected(Path(path));metadata=captured.stat()
+            files[path]={'sha256':hashlib.sha256(captured.read_bytes()).hexdigest(),'uid':metadata.st_uid,'mode':metadata.st_mode&0o7777}
+            barriers[name]=control
+            continue
         if name in file_states:
             control=alert_template_control(system)
             for path in (control['fragment'],*control['dropins']):
@@ -200,7 +222,7 @@ def boot_controls(system):
         paths=[fields['FragmentPath'],*fields['DropInPaths'].split()]
         for raw_path in paths:
             path=Path(raw_path)
-            if not path.is_relative_to('/etc/systemd/system') and not path.is_relative_to('/opt/madar/control-plane'):
+            if not path.is_relative_to(BOOT_UNIT_ROOT) and not path.is_relative_to('/opt/madar/control-plane'):
                 raise RuntimeError('historical_origin_boot_fragment_scope_invalid')
             captured=protected(path);metadata=captured.stat()
             files[raw_path]={'sha256':hashlib.sha256(captured.read_bytes()).hexdigest(),'uid':metadata.st_uid,'mode':metadata.st_mode&0o7777}
@@ -208,7 +230,8 @@ def boot_controls(system):
             'state':{'enabled':fields['UnitFileState'],'active':fields['ActiveState']}}
         units[name]=control
     if 'madar-release-proxy.service' not in units:raise RuntimeError('historical_origin_proxy_boot_missing')
-    return {'files':files,'units':units,**({'templates':templates} if templates else {})}
+    return {'files':files,'units':units,**({'templates':templates} if templates else {}),
+        **({'network_barriers':barriers} if barriers else {})}
 
 
 def policy(system):
@@ -564,7 +587,7 @@ def restored_context(binding,context,*,now):
         'request_record':strict_json(protected(request_path,private=True).read_bytes()),
         'enrollment_record':strict_json(protected(receipt_path,private=True).read_bytes()),
         'history':observed['database']}
-    if (context!=expected or request.get('observation')!=observed
+    if (digest(context)!=digest(expected) or request.get('observation')!=observed
             or digest(receipt)!=binding['enrollment_sha256']
             or receipt.get('request_sha256')!=digest(request)
             or receipt.get('successor_intent_sha256')!=binding['successor_intent_sha256']
@@ -851,6 +874,14 @@ def verify_actor_inventory(contract,inventory,rows):
         if exclusion!={'image':pinned['image'],'spec_sha256':pinned['spec_sha256'],'proof_sha256':inventory_digest(scope)}:
             raise RuntimeError('historical_origin_inventory_exclusion_changed')
     controls=observed['boot_controls']
+    for name,barrier in controls.get('network_barriers',{}).items():
+        from .control_plane_upgrade import SystemOperations
+        if name!='madar-isolated-fence.service' or network_barrier_control(SystemOperations())!=barrier:
+            raise RuntimeError('historical_origin_network_barrier_changed')
+        path=barrier['fragment'];record=controls['files'][path];actual=protected(Path(path));metadata=actual.stat()
+        if (metadata.st_uid!=record['uid'] or metadata.st_mode&0o7777!=record['mode']
+                or hashlib.sha256(actual.read_bytes()).hexdigest()!=record['sha256']):
+            raise RuntimeError('historical_origin_network_barrier_changed')
     for name,template in controls.get('templates',{}).items():
         if (name!='madar-ops-alert@.service' or template['state']!={'enabled':'static','active':None}
                 or template.get('instances')!=[]):

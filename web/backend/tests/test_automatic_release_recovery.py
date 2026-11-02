@@ -87,7 +87,7 @@ class ConfigurationBindingTests(unittest.TestCase):
         from types import SimpleNamespace
         from deployment.lib.migration_inventory import digest
         host={'guest_uuid':'own','machine_id':'own','root_filesystem_uuid':'own','realm_id':'own'}
-        policy={'trusted':'independent'}
+        policy={'version':1,'trusted':'independent'}
         with tempfile.TemporaryDirectory() as tmp:
             env=Path(tmp)/'production.env';env.write_text('changed bytes')
             manifest={'version':1,'kind':'completed-known-good-recovery','policy_sha256':digest(policy),

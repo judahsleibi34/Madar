@@ -328,6 +328,30 @@ class PrivilegedVmSafetyTests(unittest.TestCase):
 
 
 class AutomaticGuestCleanupTests(unittest.TestCase):
+    def test_resume_never_touches_an_active_guest_disk(self):
+        from unittest.mock import Mock
+        g=vm.AutomaticReleaseGuest.__new__(vm.AutomaticReleaseGuest)
+        g.process=Mock();g.process.poll.return_value=None;g.pid=os.getpid();g.command=Mock();g.launch=Mock()
+        with self.assertRaisesRegex(RuntimeError,'requires_observed_poweroff'):g.resume_after_poweroff()
+        g.command.assert_not_called();g.launch.assert_not_called()
+
+    def test_live_or_reused_pid_refuses_without_signaling_another_process(self):
+        from unittest.mock import Mock
+        g=vm.AutomaticReleaseGuest.__new__(vm.AutomaticReleaseGuest)
+        g.process=Mock();g.process.poll.return_value=0;g.pid=os.getpid();g.command=Mock();g.launch=Mock()
+        with patch.object(vm.os,'kill') as signal:
+            with self.assertRaisesRegex(RuntimeError,'requires_observed_poweroff'):g.resume_after_poweroff()
+            signal.assert_not_called()
+        g.command.assert_not_called();g.launch.assert_not_called()
+
+    def test_unowned_resume_directory_refuses_before_qcow_inspection(self):
+        from unittest.mock import Mock
+        g=vm.AutomaticReleaseGuest.__new__(vm.AutomaticReleaseGuest)
+        g.process=Mock();g.process.poll.return_value=0;g.pid=2147483647
+        g.directory=Path('/unowned/guest');g.run_id='foreign';g.command=Mock();g.launch=Mock()
+        with self.assertRaisesRegex(RuntimeError,'resume_scope_changed'):g.resume_after_poweroff()
+        g.command.assert_not_called();g.launch.assert_not_called()
+
     def guest(self,root):
         from unittest.mock import Mock
         g=vm.AutomaticReleaseGuest.__new__(vm.AutomaticReleaseGuest)
