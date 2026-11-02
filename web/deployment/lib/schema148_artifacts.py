@@ -179,8 +179,9 @@ def provenance_inputs(actor,binding):
     if (set(binding)!={'archive','artifact_id','run_id'} or any(type(binding[k]) is not int or binding[k]<=0 for k in ('artifact_id','run_id'))):
         raise RuntimeError('schema148_ci_provenance_binding_invalid')
     def api(endpoint):
-        return json.loads(actor.ops.command('schema148_ci_provenance',[
-            '/usr/sbin/runuser','-u','madar','--','/usr/bin/gh','api','repos/'+REPOSITORY+'/actions/'+endpoint]).stdout)
+        from deployment.lib.isolated_github_observation import api as observe_api
+        return observe_api('repos/'+REPOSITORY+'/actions/'+endpoint,
+            operations=actor.ops,label='schema148_ci_provenance')
     artifact=api('artifacts/'+str(binding['artifact_id']));run=api('runs/'+str(binding['run_id']))
     if artifact.get('id')!=binding['artifact_id'] or run.get('id')!=binding['run_id']:
         raise RuntimeError('schema148_ci_provenance_binding_changed')

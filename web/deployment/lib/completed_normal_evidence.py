@@ -284,13 +284,9 @@ def verified_fresh_application(actor, binding, image_binding, image_receipt):
     source=actor.contract['candidate']['source_sha']
 
     def api(endpoint):
-        raw=actor.ops.command('schema160_fresh_evidence',[
-            '/usr/sbin/runuser','-u','madar','--','/usr/bin/gh','api',
-            'repos/'+REPOSITORY+'/actions/'+endpoint],timeout=30).stdout
-        if len(raw)>2*1024**2:raise RuntimeError('schema160_fresh_api_response_limit')
-        packet=strict_json(raw.encode())
-        if not isinstance(packet,dict):raise RuntimeError('schema160_fresh_api_invalid')
-        return packet
+        from deployment.lib.isolated_github_observation import api as observe_api
+        return observe_api('repos/'+REPOSITORY+'/actions/'+endpoint,
+            operations=actor.ops,label='schema160_fresh_evidence')
 
     def observe():
         artifact=api('artifacts/'+str(binding['artifact_id']))

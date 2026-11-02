@@ -2640,3 +2640,24 @@ mandatory. These are source/component integrations; real historical restart,
 full-data restoration and protected canonical execution have not yet passed on
 this source. Production, permanent staging and automatic-deployment timers remain
 unchanged.
+
+
+### Authenticated GitHub observations in isolated historical acceptance (2026-11-02)
+
+The existing package, artifact and fresh-staging validators can consume a
+root-enrolled read-only parent transport when the disposable KVM execution
+firewall denies guest egress. It reuses the independent test observer public-key
+pin; the private key and GitHub credential remain outside the guest. The parent
+performs an actual fixed github.com GET for an exact allowlisted repository
+endpoint. Each signed response binds the root policy, guest/filesystem/database,
+installed controller/tree, request nonce and at most sixty seconds of validity.
+The guest rechecks policy and isolation after the response. Forged, stale,
+substituted or unenrolled observations refuse without direct-network fallback.
+
+This transport carries raw GitHub metadata, never deployment authority or a
+caller-supplied PASS. Existing source, CI, artifact digest and fresh-application
+checks remain mandatory. Ordinary direct GitHub observation is unchanged when
+no isolated transport is enrolled. Unknown endpoints and production environments
+cannot enroll this policy. Root journals retain bounded observation hashes and
+failures; the owned run retires its request workspace. Positive guest/parent
+transport and protected canonical execution still require native acceptance.

@@ -263,11 +263,10 @@ def prepare(repository,plan,inventory,probes,model):
             or contract['database']['system_identifier']!=environment['database_system_identifier']):
         raise RuntimeError('completed_package_guest_database_changed')
     runtime=Runtime();original=observe_origin(contract,runtime)
-    import subprocess
+    from deployment.lib.isolated_github_observation import api
     sha=plan['controller_source_sha']
-    raw=subprocess.check_output(['/usr/sbin/runuser','-u','madar','--','/usr/bin/gh','api',
-        'repos/judahsleibi34/Madar/commits/'+sha],timeout=30)
-    authentication=strict_json(raw);tree,files=snapshot(repository,sha)
+    authentication=api('repos/judahsleibi34/Madar/commits/'+sha)
+    tree,files=snapshot(repository,sha)
     result=freeze(BASE,sha,tree,files,plan,inventory,probes,model,authentication)
     package=Path(result['package'])
     def guard():

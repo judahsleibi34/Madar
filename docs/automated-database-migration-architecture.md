@@ -2859,3 +2859,10 @@ restart supervisor. Active restoration or consumed/ambiguous upgrade state still
 fences legacy restart. No new deployment grant, historical completion or SQL
 replay follows. Native acceptance remains pending; see the historical grantless
 restart integration in `docs/control-plane-upgrade-architecture.md`.
+
+
+Isolated historical acceptance may use the exact root-enrolled parent GitHub
+observation transport described in `control-plane-upgrade-architecture.md`.
+It reuses independent test trust and carries only fresh authenticated raw API
+metadata. It cannot approve a release, waive CI/staging, admit production or
+weaken the execution firewall. Canonical protected acceptance remains required.
