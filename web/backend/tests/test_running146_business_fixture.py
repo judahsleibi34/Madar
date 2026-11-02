@@ -16,6 +16,14 @@ spec.loader.exec_module(fixture)
 
 
 class BusinessFixtureSafetyTests(unittest.TestCase):
+    def test_receiver_probe_cannot_redirect_credentials_to_an_external_endpoint(self):
+        with patch.object(fixture.urllib.request, 'build_opener') as opener:
+            for endpoint in ('https://attacker.invalid', 'http://proxy:8001@attacker.invalid',
+                             'http://127.0.0.1:5432'):
+                with self.subTest(endpoint=endpoint), self.assertRaisesRegex(RuntimeError, 'private_application_endpoint_required'):
+                    fixture.api({}, application_base=endpoint)
+            opener.assert_not_called()
+
     def test_unprivileged_actor_cannot_read_credentials_or_invoke_docker(self):
         with patch.object(fixture.os, 'geteuid', return_value=1000), \
                 patch.object(fixture.subprocess, 'check_output') as command, \

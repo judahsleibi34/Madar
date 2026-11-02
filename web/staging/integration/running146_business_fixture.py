@@ -59,8 +59,9 @@ def insert(db, table, values):
     return str(db.execute(query, args).fetchone()[0])
 
 
-def api(subject):
+def api(subject, *, application_base='http://127.0.0.1:8001'):
     """Use genuine password sessions, current membership and server CSRF."""
+    require(application_base in {'http://127.0.0.1:8001', 'http://proxy:8001'}, 'private_application_endpoint_required')
     from http.cookies import SimpleCookie
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     cookies = {}; csrf = None
@@ -76,7 +77,7 @@ def api(subject):
         if csrf:
             headers['X-CSRF-Token'] = csrf
         try:
-            response = opener.open(urllib.request.Request('http://127.0.0.1:8001'+path,
+            response = opener.open(urllib.request.Request(application_base+path,
                 data=json.dumps(body).encode() if body is not None else None,
                 method=method, headers=headers), timeout=25)
         except urllib.error.HTTPError as error:
@@ -208,10 +209,10 @@ def seed(db, subjects, *, resume=False):
     return records
 
 
-def functional(subjects, records):
+def functional(subjects, records, *, member_subjects=None, application_base='http://127.0.0.1:8001'):
     require(len(records) == len(subjects) == 2, 'two_tenants_required')
     for index, subject in enumerate(subjects):
-        app = api(subject); owned, other = records[index], records[1-index]
+        app = api(subject, application_base=application_base); owned, other = records[index], records[1-index]
         project = app('GET', '/builder/projects/'+owned['project'])['project']
         require(project['tenant_id'] == subject['tenant_id'] and project['status'] == 'published'
                 and project['published_schema']['forms'], 'project_data_changed')
@@ -228,11 +229,15 @@ def functional(subjects, records):
         site = app('GET', '/public/sites/'+owned['site_subdomain']+'/runtime')
         require(owned['project'] in json.dumps(site) and other['project'] not in json.dumps(site),
                 'published_site_integrity_failed')
-        from deployment.lib.provider_recovery_runtime import protected
-        member = json.loads(protected(ROOT/('member-'+str(subject['tenant_id'])+'.json'), private=True).read_bytes())
+        if member_subjects is None:
+            from deployment.lib.provider_recovery_runtime import protected
+            member = json.loads(protected(ROOT/('member-'+str(subject['tenant_id'])+'.json'), private=True).read_bytes())
+        else:
+            require(len(member_subjects) == len(subjects), 'member_inventory_invalid')
+            member = member_subjects[index]
         require(member['user_id'] == owned['member_user_id'] and member['tenant_id'] == subject['tenant_id'],
                 'member_identity_changed')
-        member_app = api(member)
+        member_app = api(member, application_base=application_base)
         require(member_app('GET', '/builder/projects/'+owned['project'])['project']['tenant_id']
                 == subject['tenant_id'], 'member_project_unavailable')
         member_app('GET', '/builder/projects/'+other['project'], expected=404)
