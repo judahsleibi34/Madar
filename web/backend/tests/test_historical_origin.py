@@ -452,6 +452,18 @@ class HistoricalInventoryBindingTests(unittest.TestCase):
         self.enterContext(patch('deployment.lib.isolated_release_environment.observe_host',return_value=self.environment))
         self.enterContext(patch('deployment.lib.isolated_release_environment.observe_effect_fence'))
     def verify(self):return origin.verify_actor_inventory(self.contract,self.inventory,self.rows)
+    def test_enrolled_alert_template_bytes_remain_mandatory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'madar-ops-alert@.service';path.write_bytes(b'exact alert template')
+            metadata=path.stat();controls=self.observed['boot_controls']
+            controls['templates']={'madar-ops-alert@.service':{'fragment':str(path),'dropins':[],
+                'state':{'enabled':'static','active':'inactive'}}}
+            controls['files'][str(path)]={'sha256':__import__('hashlib').sha256(path.read_bytes()).hexdigest(),
+                'uid':metadata.st_uid,'mode':metadata.st_mode&0o7777}
+            with patch.object(origin,'protected',lambda p,**kw:Path(p)):
+                self.verify()
+                path.write_bytes(b'substituted template')
+                with self.assertRaisesRegex(RuntimeError,'alert_template_changed'):self.verify()
     def test_root_projection_matches_entire_original_universe_and_separate_operator_scope(self):
         self.assertEqual(self.verify(),self.scope)
     def test_operator_exclusion_is_not_arbitrary_exclusion_authority(self):
@@ -556,3 +568,36 @@ class HistoricalDatabaseEndpointTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'database_transport_changed'):self.observe()
         self.row['Id']=old;self.row['HostConfig']['PortBindings']['5432/tcp'][0]['HostIp']='0.0.0.0'
         with self.assertRaisesRegex(RuntimeError,'database_transport_changed'):self.observe()
+
+
+class HistoricalBootControlsTests(unittest.TestCase):
+    def setUp(self):
+        self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
+        self.root=Path(self.temp.name)
+        self.names=['madar-release-proxy.service','madar-ops-alert@.service']
+        self.active='inactive'
+        for name in self.names:(self.root/name).write_text('authenticated '+name)
+        def command(label,args):
+            if label=='historical_boot_units':
+                return SimpleNamespace(stdout='\n'.join(n+' static -' for n in self.names))
+            name=args[2]
+            return SimpleNamespace(stdout='\n'.join([
+                'FragmentPath=/etc/systemd/system/'+name,'DropInPaths=',
+                'LoadState=loaded','ActiveState='+self.active,'UnitFileState=static']))
+        self.system=SimpleNamespace(command=Mock(side_effect=command))
+        self.enterContext(patch.object(origin,'protected',lambda p,**kw:self.root/Path(p).name))
+
+    def test_static_alert_template_is_measured_but_is_not_a_stoppable_actor(self):
+        value=origin.boot_controls(self.system)
+        self.assertEqual(set(value['units']),{'madar-release-proxy.service'})
+        self.assertEqual(set(value['templates']),{'madar-ops-alert@.service'})
+        self.assertIn('/etc/systemd/system/madar-ops-alert@.service',value['files'])
+
+    def test_unknown_template_is_not_silently_ignored_or_admitted(self):
+        self.names.append('madar-unknown@.service')
+        with self.assertRaisesRegex(RuntimeError,'boot_unit_inventory_invalid'):origin.boot_controls(self.system)
+        self.assertEqual(self.system.command.call_count,1)
+
+    def test_active_template_cannot_claim_inert_configuration(self):
+        self.active='active'
+        with self.assertRaisesRegex(RuntimeError,'alert_template_state_invalid'):origin.boot_controls(self.system)

@@ -149,12 +149,13 @@ def boot_controls(system):
     for line in raw.splitlines():
         fields=line.split()
         if not fields:continue
-        if not re.fullmatch(r'madar-[A-Za-z0-9-]+\.(service|timer)',fields[0]):
+        if (not re.fullmatch(r'madar-[A-Za-z0-9-]+\.(service|timer)',fields[0])
+                and fields[0]!='madar-ops-alert@.service'):
             raise RuntimeError('historical_origin_boot_unit_inventory_invalid')
         names.append(fields[0])
     if not 1<=len(names)<=64 or len(names)!=len(set(names)):
         raise RuntimeError('historical_origin_boot_unit_budget')
-    files={};units={}
+    files={};units={};templates={}
     for name in sorted(names):
         raw=system.command('historical_boot_unit',['systemctl','show',name,
             '--property=FragmentPath,DropInPaths,LoadState,ActiveState,UnitFileState']).stdout
@@ -169,10 +170,18 @@ def boot_controls(system):
                 raise RuntimeError('historical_origin_boot_fragment_scope_invalid')
             metadata=protected(path).stat()
             files[raw_path]={'sha256':hashlib.sha256(path.read_bytes()).hexdigest(),'uid':metadata.st_uid,'mode':metadata.st_mode&0o7777}
-        units[name]={'fragment':fields['FragmentPath'],'dropins':fields['DropInPaths'].split(),
+        control={'fragment':fields['FragmentPath'],'dropins':fields['DropInPaths'].split(),
             'state':{'enabled':fields['UnitFileState'],'active':fields['ActiveState']}}
+        if name=='madar-ops-alert@.service':
+            # An uninstantiated alert template is authenticated configuration,
+            # not a running supervisor that systemctl stop can address. Never
+            # omit its bytes or treat arbitrary templates as reviewed actors.
+            if fields['UnitFileState']!='static' or fields['ActiveState']!='inactive':
+                raise RuntimeError('historical_origin_alert_template_state_invalid')
+            templates[name]=control
+        else:units[name]=control
     if 'madar-release-proxy.service' not in units:raise RuntimeError('historical_origin_proxy_boot_missing')
-    return {'files':files,'units':units}
+    return {'files':files,'units':units,**({'templates':templates} if templates else {})}
 
 
 def policy(system):
@@ -672,6 +681,14 @@ def verify_actor_inventory(contract,inventory,rows):
         if exclusion!={'image':pinned['image'],'spec_sha256':pinned['spec_sha256'],'proof_sha256':inventory_digest(scope)}:
             raise RuntimeError('historical_origin_inventory_exclusion_changed')
     controls=observed['boot_controls']
+    for name,template in controls.get('templates',{}).items():
+        if name!='madar-ops-alert@.service' or template['state']!={'enabled':'static','active':'inactive'}:
+            raise RuntimeError('historical_origin_alert_template_changed')
+        for path in (template['fragment'],*template['dropins']):
+            record=controls['files'][path];actual=protected(Path(path));metadata=actual.stat()
+            if (metadata.st_uid!=record['uid'] or metadata.st_mode&0o7777!=record['mode']
+                    or hashlib.sha256(actual.read_bytes()).hexdigest()!=record['sha256']):
+                raise RuntimeError('historical_origin_alert_template_changed')
     if set(inventory['supervisors'])!=set(controls['units']):
         raise RuntimeError('historical_origin_inventory_supervisor_universe_changed')
     for name,unit in controls['units'].items():

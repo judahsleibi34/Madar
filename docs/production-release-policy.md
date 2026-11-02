@@ -4773,3 +4773,10 @@ codec at that candidate commit, including commit/tree/blob integrity checks.
 Current checkout bytes and newer controller dependencies cannot relabel older
 images. GitHub source, CI, archive checksums and immutable image identity checks
 remain mandatory. This correction issues no execution or migration authority.
+
+Historical boot enrollment records the installed static, inactive
+madar-ops-alert@.service template as authenticated configuration, separately
+from concrete stoppable supervisors. Its fragment/drop-in bytes, ownership and
+mode remain mandatory during provider-inventory attestation. Unknown templates
+and active template observations refuse. This fixes native enrollment without
+inventing a runnable template instance or weakening writer fencing.
