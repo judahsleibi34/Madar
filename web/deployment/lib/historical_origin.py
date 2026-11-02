@@ -548,6 +548,33 @@ def recorded_observation(binding):
     return observation
 
 
+def restored_context(binding,context,*,now):
+    """Verify receiver-returned origin DATA against the original local issuer.
+
+    The receiver's signature cannot enroll a source or invent prior completion.
+    Its exact request/enrollment packets must match the independently protected
+    source journal, whose signatures are checked locally without exporting keys.
+    """
+    from .exceptional_release_approval import KEY
+    path=validate_source_binding(binding);observed=recorded_observation(binding)
+    key=protected(KEY,private=True).read_bytes()
+    request_path=path/'bootstrap-origin-request.json';receipt_path=path/'bootstrap-origin-consumed.json'
+    request=verified(request_path,key);receipt=verified(receipt_path,key)
+    expected={'kind':KIND,'source_binding':binding,
+        'request_record':strict_json(protected(request_path,private=True).read_bytes()),
+        'enrollment_record':strict_json(protected(receipt_path,private=True).read_bytes()),
+        'history':observed['database']}
+    if (context!=expected or request.get('observation')!=observed
+            or digest(receipt)!=binding['enrollment_sha256']
+            or receipt.get('request_sha256')!=digest(request)
+            or receipt.get('successor_intent_sha256')!=binding['successor_intent_sha256']
+            or type(receipt.get('expires_at')) is not int or receipt['expires_at']<=now
+            or receipt.get('protected_completion_claimed') is not False
+            or receipt.get('migration_authority_issued') is not False):
+        raise RuntimeError('historical_origin_restored_context_changed_or_expired')
+    return observed
+
+
 def bind_successor(system,state,intent,context_sha256):
     """Consume enrollment for one separately approved release context, not SQL.
 

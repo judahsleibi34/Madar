@@ -72,6 +72,32 @@ def captured_source(root):
 ISOLATED_REGISTRATION=Path('/etc/madar/schema160-isolated-acceptance.json')
 
 
+def require_independent_recovery(document,contract,system):
+    """Use the existing physical receiver verifier for this enrolled origin.
+
+    This is a technical precondition, not approval or migration authority. The
+    immutable plan names a root-enrolled receiver receipt; no caller boolean can
+    stand in for full independently signed restored-application acceptance.
+    """
+    import re,time
+    from .automatic_release_admission import execution_policy,physical_recovery_evidence
+    evidence=document.get('independent_recovery')
+    if (not isinstance(evidence,dict) or set(evidence)!={'receipt_sha256'}
+            or not re.fullmatch('[a-f0-9]{64}',str(evidence['receipt_sha256']))):
+        raise RuntimeError('schema160_independent_recovery_receipt_required')
+    policy,environment=execution_policy(system)
+    if (policy['controller_sha']!=contract['candidate']['controller_sha']
+            or environment['database_system_identifier']!=contract['database']['system_identifier']):
+        raise RuntimeError('schema160_independent_recovery_scope_changed')
+    recovery={'kind':'independent-physical-application-v1',
+        'source_system_identifier':contract['database']['system_identifier'],
+        'restore_system_identifier':contract['database']['system_identifier'],
+        'restored_schema':146,'receipt_sha256':evidence['receipt_sha256']}
+    physical_recovery_evidence(recovery,policy,contract['source_roles']['application_sha'],
+        {'delivery':1,'outbox':1,'deletion':0},now=int(time.time()),historical_binding=contract['source_roles'])
+    return recovery
+
+
 def isolated_registration(contract):
     """Independently pinned technical profile; never SQL/deployment authority.
 

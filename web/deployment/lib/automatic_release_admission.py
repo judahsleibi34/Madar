@@ -178,7 +178,7 @@ def execution_policy(operations):
 
 PHYSICAL_RECOVERY=Path('/etc/madar/independent-test-recovery')
 
-def physical_recovery_evidence(recovery,policy,origin_source,protocols,*,now):
+def physical_recovery_evidence(recovery,policy,origin_source,protocols,*,now,historical_binding=None):
     """Consume separately pinned off-host restoration, never a self-signed PASS.
 
     A physical PG copy retains its system identifier. Only an independently
@@ -201,7 +201,11 @@ def physical_recovery_evidence(recovery,policy,origin_source,protocols,*,now):
         'database_system_identifier','schema','backup_earliest_at','expires_at','manifest_sha256',
         'received_sha256','completion_sha256','history_sha256','receiver_id','operation_id','attempt_id',
         'receiver_implementation_sha256','receiver_source_sha','receipt'}
-    if (not isinstance(trust,dict) or set(trust)!=fields or type(trust['version']) is not int or trust['version']!=1
+    historical=historical_binding is not None
+    if historical:
+        fields=(fields-{'completion_sha256'})|{'historical_origin','source_origin_sha256'}
+    if (not isinstance(trust,dict) or set(trust)!=fields or type(trust['version']) is not int
+            or trust['version']!=(2 if historical else 1)
             or trust['kind']!='independently-enrolled-physical-test-restoration'
             or trust['environment_id']!=policy['environment_id'] or trust['source_sha']!=origin_source
             or trust['database_system_identifier'] in policy['denied_database_identifiers']
@@ -211,7 +215,9 @@ def physical_recovery_evidence(recovery,policy,origin_source,protocols,*,now):
     for name in ('source_physical_host_uuid','receiver_physical_host_uuid','receiver_filesystem_uuid','source_guest_uuid','receiver_id','operation_id','attempt_id'):
         if str(uuid.UUID(trust[name]))!=trust[name]:raise RuntimeError('automatic_physical_recovery_identity_invalid')
     if (type(trust['schema']) is not int or not re.fullmatch('[1-9][0-9]{0,19}',str(trust['database_system_identifier']))
-            or any(not re.fullmatch('[a-f0-9]{64}',str(trust[k])) for k in ('manifest_sha256','received_sha256','completion_sha256','history_sha256','receiver_implementation_sha256'))
+            or any(not re.fullmatch('[a-f0-9]{64}',str(trust[k])) for k in
+                ('manifest_sha256','received_sha256','history_sha256','receiver_implementation_sha256',
+                 'source_origin_sha256' if historical else 'completion_sha256'))
             or not re.fullmatch('[a-f0-9]{40}',str(trust['receiver_source_sha']))):
         raise RuntimeError('automatic_physical_recovery_identity_invalid')
     packet=trust['receipt']
@@ -223,6 +229,19 @@ def physical_recovery_evidence(recovery,policy,origin_source,protocols,*,now):
         Ed25519PublicKey.from_public_bytes(key).verify(base64.b64decode(packet['signature'],validate=True),canonical(packet['payload']))
     except Exception:raise RuntimeError('automatic_physical_recovery_receiver_signature_invalid') from None
     value=packet['payload'];observed=value.get('database_observation',{});functional=value.get('functional_acceptance',{})
+    if historical:
+        from .historical_origin import restored_context
+        context=value.get('release_context')
+        if (trust['historical_origin']!=historical_binding or trust['schema']!=146
+                or protocols!={'delivery':1,'outbox':1,'deletion':0}
+                or digest(context)!=trust['source_origin_sha256']):
+            raise RuntimeError('automatic_physical_recovery_historical_scope_changed')
+        origin=restored_context(historical_binding,context,now=now)
+        if (origin['database']['system_identifier']!=trust['database_system_identifier']
+                or origin['database']['schema']!=146 or origin['source_sha']!=origin_source
+                or origin['host']['guest_uuid']!=trust['source_guest_uuid']
+                or origin['history_sha256']!=trust['history_sha256']):
+            raise RuntimeError('automatic_physical_recovery_historical_observation_changed')
     bound=('source_physical_host_uuid','receiver_physical_host_uuid','receiver_filesystem_uuid',
         'source_guest_uuid','source_sha','manifest_sha256','received_sha256','receiver_id','operation_id','attempt_id',
         'receiver_implementation_sha256','receiver_source_sha')
@@ -238,8 +257,8 @@ def physical_recovery_evidence(recovery,policy,origin_source,protocols,*,now):
             or observed.get('system_identifier')!=trust['database_system_identifier'] or observed.get('schema')!=trust['schema']
             or observed.get('protocols')!=[protocols[k] for k in ('delivery','outbox','deletion')]
             or observed.get('read_only') is not True or type(observed.get('fingerprints')) is not int or observed['fingerprints']<=0
-            or value.get('release_context',{}).get('completion_sha256')!=trust['completion_sha256']
-            or value.get('release_context',{}).get('history',{}).get('history_sha256')!=trust['history_sha256']
+            or (not historical and (value.get('release_context',{}).get('completion_sha256')!=trust['completion_sha256']
+                or value.get('release_context',{}).get('history',{}).get('history_sha256')!=trust['history_sha256']))
             or any(value.get(k) is not False for k in ('production_modified','new_deployment_authority_issued','release_migration_sql_executed'))):
         raise RuntimeError('automatic_physical_recovery_observation_changed')
     actors=value.get('runtime',{})

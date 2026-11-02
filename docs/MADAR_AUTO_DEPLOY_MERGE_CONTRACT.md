@@ -2341,3 +2341,14 @@ Extra, missing, substituted or unobserved networks refuse; ordinary completed
 origins retain their single-network contract. Older enrollments without this
 new observation cannot acquire it implicitly. This source correction does not
 issue canonical execution authority or establish protected-upgrade acceptance.
+
+Canonical historical preflight now requires an exact independent physical
+restoration receipt in its immutable plan. The existing receiver verifier has
+an explicit historical v2 trust shape: the signed receiver context must match
+both original locally authenticated enrollment journal packets, the exact
+successor intent, source guest, database and canonical history. It claims no
+modern completion. Ordinary routine-release verification still accepts only
+its original completed-release trust shape. Expired enrollment, failed full
+application acceptance and changed tenant/MFA/Storage checks refuse. This is
+consumer integration; the latest full-data native restoration failed readiness
+and has no acceptance receipt. Canonical execution remains issuer-blocked.

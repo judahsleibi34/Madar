@@ -315,6 +315,9 @@ class CompletedNormalUpgrade:
         if self.document.get('failed_boot_interlock') is not None and self.reconciliation_root().exists():
             raise RuntimeError('completed_upgrade_interlock_reconciliation_already_consumed')
         observe_native(self.contract,self.actor.runtime)
+        if self.contract['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin':
+            from deployment.lib.schema160_release import require_independent_recovery
+            require_independent_recovery(self.document,self.contract,self.ops)
         from deployment.lib.active_recovery_backup import verify_backup_execution_context
         from deployment.lib.completed_normal_profile import RECONCILED
         if self.profile is RECONCILED and 'maintenance_role' in self.contract['database']:
