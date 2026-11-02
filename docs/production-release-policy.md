@@ -4794,3 +4794,10 @@ dependency boundary. Both HTTP endpoints must return200, readiness must be true
 and the release identity must match. A response body cannot override HTTP503.
 Failed restoration still fences all owned services and consumes its authority;
 continuation requires a separately authenticated exact attempt.
+
+A separately authorized independent-restore continuation reuses the existing
+restored PostgreSQL instance and revalidates Storage bytes against the original
+authenticated archive. Existing Storage attributes are verified exactly in an
+explicit read-only mode; they are never recreated or overwritten. Ordinary
+metadata recovery still refuses preexisting attributes. Changed bytes, versions,
+metadata or scope refuse before restored application acceptance.

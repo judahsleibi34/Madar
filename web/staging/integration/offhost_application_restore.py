@@ -381,7 +381,12 @@ print(json.dumps({'system_identifier':identity[0],'schema':identity[1],'protocol
         else:atomic_json(root/'database-observation.json',observation,exclusive=True)
         phase('database_roles_acls_data_and_history_restored',fingerprints=len(app['fingerprints']),schema=app['schema'])
         storage_env=dict(v.split('=',1) for v in app['containers']['storage']['Config']['Env'])
-        recover_metadata(app['storage_objects'],root/'objects',namespace=(storage_env.get('TENANT_ID'),storage_env.get('GLOBAL_S3_BUCKET')))
+        if continuation:
+            # A later readiness failure cannot authorize metadata recreation.
+            # Independently recheck every original archive byte and attribute.
+            verify_restored_archive(incoming/'objects.tar.gz',root/'objects',max_bytes=1024**3,max_members=100000)
+        recover_metadata(app['storage_objects'],root/'objects',namespace=(storage_env.get('TENANT_ID'),storage_env.get('GLOBAL_S3_BUCKET')),
+            verify_only=continuation)
         storage_uid,storage_gid=storage_identity(app['containers']['storage']['Config'])
         for path in (root/'objects',*(root/'objects').rglob('*')):os.chown(path,storage_uid,storage_gid)
         for role in ('auth','rest','storage','gateway','redis','parser-worker','remote-ingestion-worker','backend','frontend','notification-worker','calendar-sync-worker','data-deletion-worker','proxy'):create(role)
