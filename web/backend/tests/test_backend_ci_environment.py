@@ -160,7 +160,7 @@ class BackendCiEnvironmentTests(unittest.TestCase):
         tmpfs_index = tokens.index("--tmpfs")
         self.assertEqual(
             tokens[tmpfs_index + 1],
-            "/tmp:rw,exec,nosuid,nodev,size=1g,mode=1777",
+            "/tmp:rw,exec,nosuid,nodev,size=4g,mode=1777",
         )
 
     def test_backend_ci_mounts_frontend_vite_config_read_only(self):
