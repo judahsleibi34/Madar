@@ -121,6 +121,38 @@ class HistoricalOriginTests(unittest.TestCase):
             origin.bind_successor(self.system,state,{'target':164},'c'*64)
         self.assertFalse((self.journal/r['request_id']/'bootstrap-origin-release-use.json').exists())
 
+    def test_successor_binding_borrows_real_coordinator_locks_without_reacquiring(self):
+        import os
+        from deployment.lib import schema150_provider_adapter as provider,control_plane_upgrade
+        r,_,state=self.enrolled();self.system.upgrade_root=self.root/'upgrades';self.system.upgrade_root.mkdir()
+        self.system.interlock_file=self.root/'interlock'
+        paths=(self.system.upgrade_root/'upgrade.lock',self.state_root/'deploy.lock')
+        for path in paths:path.touch(mode=0o600)
+        fds=[control_plane_upgrade.acquire_lock(p,create=False) for p in paths]
+        try:
+            with patch.object(provider,'protected',lambda p,**kw:Path(p)),patch.object(control_plane_upgrade,'acquire_lock',side_effect=AssertionError('recursive_lock_acquisition')):
+                value=origin.bind_successor_under_locks(self.system,state,{'target':160},'c'*64,upgrade_lock=fds[0],deploy_lock=fds[1])
+                self.assertEqual(value['context_sha256'],'c'*64);self.assertFalse(value['migration_authority_issued'])
+                for fd,path in zip(fds,paths):provider.require_owned_lock(fd,path)
+        finally:
+            for fd in fds:os.close(fd)
+
+    def test_unheld_coordinator_lock_cannot_bind_origin(self):
+        import os
+        from deployment.lib import schema150_provider_adapter as provider
+        r,_,state=self.enrolled();self.system.upgrade_root=self.root/'upgrades';self.system.upgrade_root.mkdir()
+        self.system.interlock_file=self.root/'interlock'
+        paths=(self.system.upgrade_root/'upgrade.lock',self.state_root/'deploy.lock')
+        for path in paths:path.touch(mode=0o600)
+        fds=[os.open(p,os.O_RDWR) for p in paths]
+        try:
+            with patch.object(provider,'protected',lambda p,**kw:Path(p)):
+                with self.assertRaisesRegex(RuntimeError,'coordinator_lock_not_held'):
+                    origin.bind_successor_under_locks(self.system,state,{'target':160},'c'*64,upgrade_lock=fds[0],deploy_lock=fds[1])
+            self.assertFalse((self.journal/r['request_id']/'bootstrap-origin-release-use.json').exists())
+        finally:
+            for fd in fds:os.close(fd)
+
     def test_state_race_after_consumption_cannot_link_false_origin(self):
         r=self.prepared();changed=copy.deepcopy(self.state);changed['known_good_release']['schema']=160
         (self.state_root/'state.json').write_bytes(canonical(changed))

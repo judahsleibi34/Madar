@@ -241,3 +241,35 @@ def require_upgrade_authorization(
         )
     ):
         raise RuntimeError("control_plane_upgrade_exclusive_interlock")
+    if 'canonical_exceptional_approval_sha256' in state or 'canonical_exceptional_approval' in authorization:
+        require_canonical_operation_lease(state,authorization)
+
+
+def require_canonical_operation_lease(state,authorization):
+    """Root-hash-bound child lease; approval cannot outlive its exact parent."""
+    import uuid
+    from .completed_normal_admission import digest
+    from .completed_normal_profile import RECONCILED
+    lease=authorization.get('canonical_exceptional_approval')
+    fields={'version','kind','request_id','approval_sha256','admission_sha256','context_sha256',
+        'operation_id','attempt_id','execution_expires_at','pid','process_start','boot_id'}
+    if (not isinstance(lease,dict) or set(lease)!=fields or type(lease['version']) is not int or lease['version']!=1
+            or lease['kind']!='canonical-exceptional-operation-lease'
+            or state.get('operation')!=RECONCILED.operation or authorization.get('operation')!=RECONCILED.operation
+            or digest(lease)!=state.get('canonical_exceptional_approval_sha256')
+            or lease['context_sha256']!=state.get('context_sha256')
+            or lease['context_sha256']!=authorization.get('context_sha256')
+            or any(not re.fullmatch('[a-f0-9]{64}',str(lease[k])) for k in ('approval_sha256','admission_sha256','context_sha256'))
+            or type(lease['execution_expires_at']) is not int or time.time()>=lease['execution_expires_at']
+            or type(lease['pid']) is not int or lease['pid']<=0
+            or not re.fullmatch('[0-9]{1,32}',str(lease['process_start']))):
+        raise RuntimeError('canonical_exceptional_operation_lease_invalid_or_expired')
+    try:
+        if any(str(uuid.UUID(lease[k]))!=lease[k] for k in ('request_id','operation_id','attempt_id','boot_id')):
+            raise ValueError()
+        process=Path('/proc')/str(lease['pid'])
+        if (process.stat().st_uid!=0 or process.joinpath('stat').read_text().split(') ',1)[1].split()[19]!=lease['process_start']
+                or Path('/proc/sys/kernel/random/boot_id').read_text().strip()!=lease['boot_id']):
+            raise ValueError()
+    except (OSError,ValueError,KeyError,IndexError,TypeError):
+        raise RuntimeError('canonical_exceptional_operation_parent_not_current') from None

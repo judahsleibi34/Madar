@@ -4835,3 +4835,39 @@ its original completed-release trust shape. Expired enrollment, failed full
 application acceptance and changed tenant/MFA/Storage checks refuse. This is
 consumer integration; the latest full-data native restoration failed readiness
 and has no acceptance receipt. Canonical execution remains issuer-blocked.
+
+The existing exceptional approval issuer now has a distinct v2, isolated-only
+policy for one exact canonical146→160 context, plan, source bundle, enrollment,
+operation and attempt. It does not expand the v1 private-table contracts or
+routine Class A/B policy. Canonical review runs the existing coordinator's full
+read-only technical preflight and verifies all fourteen immutable SQL files with
+the PostgreSQL analyzer. A prior modern completion or an original runtime
+compatibility range through160 is never invented.
+
+The frozen existing continuation entrypoint exposes approval-prepare,
+approval-inspect, approval-approve, approval-reject, approval-revoke and
+approved-execute. Decisions/execution require the exact request UUID and digest;
+fresh infrastructure AAL2 enters through terminal/protected stdin. The ordinary
+fixture execute path and generic automatic executor cannot dispatch this chain.
+The separate independently protected exact policy and technical registration are
+mandatory; production registration and authority remain closed.
+
+Consumption occurs under both existing lock inodes before maintenance effects.
+It binds the historical enrollment to one successor without recursively taking
+flock. Approval expires before consumption; the consumed parent has a separately
+bounded execution deadline fixed before approval (at most three hours). Every
+fresh root credential checks the same consumed owner and scope. Its nonsecret
+child lease is root-hash-bound to the context, approval, process start, boot ID
+and deadline; missing/substituted/expired leases and dead or changed parents
+refuse. The existing service receives the credential after root releases its
+temporary deployment lock so User=madar can acquire that same inode itself.
+Original release-state ownership remains operator-owned DATA; no fake grant,
+historical completion, or privilege change is used.
+
+The existing coordinator/executor/provider/handoff/traffic/receipt mechanisms
+remain responsible for actual effects and technical acceptance. Consumption or
+SQL uncertainty stays durable and cannot authorize replay. Canonical approval
+completion links the actual protected normal-completion receipt. These are
+source/component integrations, not a claim that canonical147–160 has executed:
+the current full-data restore failed readiness, and full native package,
+protected execution, handoff, preservation and reboot acceptance remain pending.

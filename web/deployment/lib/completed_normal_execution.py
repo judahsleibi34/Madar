@@ -717,6 +717,15 @@ class CompletedNormalUpgrade:
         self.lock=acquire_lock(self.ops.upgrade_root/'upgrade.lock',create=False)
         try:
             self.preflight(locked=True)
+            historical=self.contract['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin'
+            if historical:
+                from deployment.lib.exceptional_release_approval import verify_canonical_execution,execution_event
+                self.ops.automatic_upgrade_lock=self.lock
+                value=getattr(self.ops,'canonical_exceptional_admission',None)
+                if not isinstance(value,dict) or value.get('contract')!=self.contract:
+                    raise RuntimeError('schema160_exceptional_execution_approval_required')
+                verify_canonical_execution(value,self.ops,consume=True,token=getattr(self.ops,'exceptional_operator_token',None))
+                execution_event(self.ops,value,'EXECUTING',{'context_sha256':digest(self.contract)})
             self.reconcile_failed_interlock()
             self.quiesced=True;self.ops.quiesce(self.controller)
             # Retain this lock across root credential windows. Release it only
@@ -838,6 +847,8 @@ class CompletedNormalUpgrade:
                     'application_sha':self.contract['candidate']['source_sha'],'controller_sha':self.controller,
                     'images':self.contract['candidate']['images'],'backup':final,'customer_database_restored':False}
                 exclusive(self.root/'normal-acceptance.json',encoded(result))
+                if historical:
+                    execution_event(self.ops,value,'VERIFYING',{'acceptance_sha256':file_digest(self.root/'normal-acceptance.json')})
                 # Public acceptance precedes boot release; final completion is
                 # published only after that independently observed effect.
                 lifecycle.activate_after_grant()
@@ -846,9 +857,23 @@ class CompletedNormalUpgrade:
                 from deployment.lib.completed_normal_baseline import seal_compatible_release
                 seal_compatible_release(self.contract,self.root,self.ops.state_root)
                 self.event('normal_completed',schema=self.profile.target,mode='NORMAL')
+                if historical:
+                    execution_event(self.ops,value,'COMPLETED',{'context_sha256':digest(self.contract),
+                        'completion_path':str(self.root/'normal-completion.json'),
+                        'completion_sha256':file_digest(protected(self.root/'normal-completion.json',private=True))})
             self.ops.clear_interlock()
             return result
         except Exception as error:
+            if self.contract['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin':
+                try:
+                    from deployment.lib import exceptional_release_approval as approval
+                    value=getattr(self.ops,'canonical_exceptional_admission',None)
+                    if isinstance(value,dict) and self.lock is not None:
+                        status=approval.inspect(self.ops,value['request_id'])
+                        if status['state'] in {'APPROVED','REVALIDATING','AUTHORIZED_FOR_EXECUTION','EXECUTING','VERIFYING'}:
+                            approval.execution_event(self.ops,value,'RECOVERY_REQUIRED' if status['consumed'] else 'FAILED',
+                                {'error_type':type(error).__name__,'context_sha256':digest(self.contract)})
+                except Exception:pass # Preserve original error and durable consumed authority.
             self.failure(error)
             raise
         finally:
@@ -858,7 +883,9 @@ class CompletedNormalUpgrade:
                 finally:
                     try:
                         if self.lock is not None:os.close(self.lock)
-                    finally:self.lock=None
+                    finally:
+                        self.lock=None
+                        if hasattr(self.ops,'automatic_upgrade_lock'):self.ops.automatic_upgrade_lock=None
 
     def complete_application(self, handoff, kernel):
         """The existing handoff at144, with no migration intent or SQL child.

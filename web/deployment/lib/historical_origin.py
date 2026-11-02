@@ -586,18 +586,55 @@ def bind_successor(system,state,intent,context_sha256):
     if not re.fullmatch('[a-f0-9]{64}',str(context_sha256)):
         raise RuntimeError('historical_origin_successor_context_invalid')
     with operation_locks(system) as guard:
-        origin=attest(system,state);p,key,_=policy(system)
-        if digest(intent)!=origin['successor_intent_sha256']:
-            raise RuntimeError('historical_origin_successor_intent_changed')
-        request_id=(state['known_good_release']['historical_origin'])['request_id']
-        with journal_lock(request_id,namespace='historical-origins') as path:
-            if (path/'bootstrap-origin-release-use.json').exists():
-                raise RuntimeError('historical_origin_successor_already_bound')
-            receipt={'kind':'historical-origin-single-successor-binding','origin':origin,
-                'context_sha256':context_sha256,'intent_sha256':digest(intent),'bound_at':int(time.time()),
-                'migration_authority_issued':False}
-            guard();atomic_json(path/'bootstrap-origin-release-use.json',sign(receipt,key),exclusive=True)
-        return receipt
+        return _bind_successor(system,state,intent,context_sha256,guard)
+
+
+def bind_successor_under_locks(system,state,intent,context_sha256,*,upgrade_lock,deploy_lock):
+    """Borrow the coordinator's real locks; never recursively acquire flock."""
+    from .schema150_provider_adapter import require_owned_lock
+    from .automatic_release_admission import require_no_pending_operation
+    def guard():
+        require_owned_lock(upgrade_lock,system.upgrade_root/'upgrade.lock')
+        require_owned_lock(deploy_lock,system.state_root/'deploy.lock')
+        require_no_pending_operation()
+        if system.interlock_file.exists() or system.interlock_file.is_symlink():
+            raise RuntimeError('historical_origin_conflicting_operation')
+    guard()
+    return _bind_successor(system,state,intent,context_sha256,guard)
+
+
+def _bind_successor(system,state,intent,context_sha256,guard):
+    if not re.fullmatch('[a-f0-9]{64}',str(context_sha256)):
+        raise RuntimeError('historical_origin_successor_context_invalid')
+    origin=attest(system,state);p,key,_=policy(system)
+    if digest(intent)!=origin['successor_intent_sha256']:
+        raise RuntimeError('historical_origin_successor_intent_changed')
+    request_id=(state['known_good_release']['historical_origin'])['request_id']
+    with journal_lock(request_id,namespace='historical-origins') as path:
+        if (path/'bootstrap-origin-release-use.json').exists():
+            raise RuntimeError('historical_origin_successor_already_bound')
+        receipt={'kind':'historical-origin-single-successor-binding','origin':origin,
+            'context_sha256':context_sha256,'intent_sha256':digest(intent),'bound_at':int(time.time()),
+            'migration_authority_issued':False}
+        guard()
+        if int(time.time())>=p['expires_at']:raise RuntimeError('historical_origin_successor_enrollment_expired')
+        atomic_json(path/'bootstrap-origin-release-use.json',sign(receipt,key),exclusive=True)
+    return receipt
+
+
+def require_successor_binding(contract):
+    """Durable exact binding DATA after consumption; never fresh SQL authority."""
+    from .exceptional_release_approval import KEY
+    from .completed_normal_admission import digest as context_digest
+    binding=contract['source_roles'];path=validate_source_binding(binding)
+    recorded_observation(binding)
+    value=verified(path/'bootstrap-origin-release-use.json',protected(KEY,private=True).read_bytes())
+    if (value.get('kind')!='historical-origin-single-successor-binding'
+            or value.get('origin')!=binding or value.get('context_sha256')!=context_digest(contract)
+            or value.get('intent_sha256')!=digest(successor_intent(contract))
+            or value.get('migration_authority_issued') is not False):
+        raise RuntimeError('historical_origin_successor_binding_changed')
+    return value
 
 
 def original_runtime(contract):

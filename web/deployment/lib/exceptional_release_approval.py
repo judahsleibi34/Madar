@@ -15,6 +15,8 @@ from .provider_recovery_runtime import protected
 POLICY=Path('/etc/madar/exceptional-release-policy.json')
 KEY=Path('/etc/madar/release-approval.key')
 CONTRACTS={'drop-independent-table-v1':'D','enable-private-table-rls-v1':'C'}
+CANONICAL='canonical146-160-coordinated-v1'
+CANONICAL_KIND='canonical-historical-exceptional-release'
 STATES={'DISCOVERED','CI_PENDING','CI_ACCEPTED','STAGING_PENDING','STAGING_ACCEPTED',
     'TECHNICAL_REVIEW_REQUIRED','AWAITING_ADMIN_APPROVAL','APPROVED','REVALIDATING',
     'AUTHORIZED_FOR_EXECUTION','EXECUTING','VERIFYING','COMPLETED','REJECTED',
@@ -72,19 +74,29 @@ def _policy_material(execution,database_system_identifier):
     fields={'version','policy_id','environment_id','database_system_identifier','controller_sha',
         'enabled','contracts','approval_key_sha256','max_approval_seconds','max_request_seconds',
         'max_table_bytes','max_table_rows','relation_owner','require_physical_restore','physical_recovery_receipt_sha256'}
-    if (not isinstance(p,dict) or set(p)!=fields or type(p['version']) is not int or p['version']!=1
+    canonical_policy=isinstance(p,dict) and type(p.get('version')) is int and p['version']==2
+    if canonical_policy:
+        fields=(fields-{'max_table_bytes','max_table_rows','relation_owner'})|{'canonical_scope','execution_max_seconds'}
+    if (not isinstance(p,dict) or set(p)!=fields or type(p['version']) is not int or p['version'] not in {1,2}
             or p['enabled'] is not True or not re.fullmatch('[a-zA-Z0-9_-]{1,128}',str(p['policy_id']))
             or p['environment_id']!=execution['environment_id']
             or p['database_system_identifier']!=database_system_identifier
             or p['controller_sha']!=execution['controller_sha']
             or not isinstance(p['contracts'],list) or not p['contracts']
-            or any(c not in CONTRACTS for c in p['contracts']) or len(set(p['contracts']))!=len(p['contracts'])
+            or any(c not in ({CANONICAL} if canonical_policy else CONTRACTS) for c in p['contracts'])
+            or len(set(p['contracts']))!=len(p['contracts'])
             or not re.fullmatch('[a-f0-9]{64}',str(p['approval_key_sha256']))
             or not re.fullmatch('[a-f0-9]{64}',str(p['physical_recovery_receipt_sha256']))
-            or p['relation_owner']!='postgres' or p['require_physical_restore'] is not True
+            or p['require_physical_restore'] is not True
             or any(type(p[k]) is not int or not 0<p[k]<=limit for k,limit in
-                (('max_approval_seconds',300),('max_request_seconds',600),
-                 ('max_table_bytes',16*1024**2),('max_table_rows',10000)))):
+                (('max_approval_seconds',300),('max_request_seconds',600)))):
+        raise RuntimeError('exceptional_policy_not_enrolled')
+    if canonical_policy:
+        validate_canonical_scope(p['canonical_scope'])
+        if type(p['execution_max_seconds']) is not int or not 0<p['execution_max_seconds']<=10800:
+            raise RuntimeError('exceptional_policy_not_enrolled')
+    elif (p['relation_owner']!='postgres' or any(type(p[k]) is not int or not 0<p[k]<=limit
+            for k,limit in (('max_table_bytes',16*1024**2),('max_table_rows',10000)))):
         raise RuntimeError('exceptional_policy_not_enrolled')
     key=protected(KEY,private=True).read_bytes()
     if not 32<=len(key)<=4096 or hashlib.sha256(key).hexdigest()!=p['approval_key_sha256']:
@@ -94,6 +106,134 @@ def _policy_material(execution,database_system_identifier):
     if hmac.compare_digest(key,protected(RELEASE_OPERATOR_KEY,private=True).read_bytes()):
         raise RuntimeError('exceptional_issuer_authentication_key_reused')
     return p,key
+
+
+def validate_canonical_scope(value):
+    fields={'context_sha256','plan_sha256','source_bundle_sha256','enrollment_sha256',
+        'candidate_source_sha','operation_id','attempt_id'}
+    if (not isinstance(value,dict) or set(value)!=fields
+            or any(not re.fullmatch('[a-f0-9]{64}',str(value[k])) for k in
+                ('context_sha256','plan_sha256','source_bundle_sha256','enrollment_sha256'))
+            or not re.fullmatch('[a-f0-9]{40}',str(value['candidate_source_sha']))):
+        raise RuntimeError('exceptional_canonical_policy_scope_invalid')
+    identifier(value['operation_id']);identifier(value['attempt_id']);return value
+
+
+def canonical_scope(driver):
+    """Use the existing plan/context codec; never reinterpret its byte digest."""
+    from .completed_normal_admission import digest as context_digest
+    return validate_canonical_scope({'context_sha256':context_digest(driver.contract),
+        'plan_sha256':context_digest(driver.document),'source_bundle_sha256':driver.document['source_bundle_sha256'],
+        'enrollment_sha256':driver.contract['source_roles']['enrollment_sha256'],
+        'candidate_source_sha':driver.contract['candidate']['source_sha'],
+        'operation_id':driver.document['operation_id'],'attempt_id':driver.document['attempt_id']})
+
+
+def canonical_driver(system):
+    """Only the existing measured coordinator can supply live technical gates."""
+    from .completed_normal_execution import CompletedNormalUpgrade,SOURCE_PACKAGES
+    from .completed_normal_profile import RECONCILED
+    from .historical_origin import KIND
+    from .completed_normal_admission import digest as context_digest
+    driver=getattr(system,'canonical_exceptional_driver',None)
+    if (type(driver) is not CompletedNormalUpgrade or driver.ops is not system
+            or driver.profile is not RECONCILED or driver.contract['source_roles'].get('origin_kind')!=KIND
+            or driver.document.get('fixture_only') is not True
+            or driver.document.get('production_authorization') is not False
+            or driver.contract!=dict(driver.document['admission_contract'],plan_sha256=context_digest(driver.document))
+            or driver.package!=SOURCE_PACKAGES/('normal-source-'+driver.document['source_bundle_sha256'])
+            or system.installed_sha()!=driver.contract['candidate']['controller_sha']):
+        raise RuntimeError('exceptional_canonical_measured_coordinator_required')
+    return driver
+
+
+def observe_canonical(system,request_id,*,created_at=None,expires_at=None):
+    """Read-only exact C1 technical admission, distinct from routine admission.
+
+    This never claims the original146 runtime supports intermediate schemas.
+    Actual maintenance, canonical executor and forward recovery remain required.
+    """
+    from .schema160_release import isolated_registration
+    from .historical_origin import policy as origin_policy
+    from .automatic_release_admission import PHYSICAL_RECOVERY
+    from .completed_normal_admission import digest as context_digest
+    p,_=policy(system);driver=canonical_driver(system);scope=canonical_scope(driver)
+    if (p['version']!=2 or p['contracts']!=[CANONICAL] or p['canonical_scope']!=scope
+            or driver.document.get('independent_recovery')!={'receipt_sha256':p['physical_recovery_receipt_sha256']}
+            or driver.contract['database']['system_identifier']!=p['database_system_identifier']
+            or driver.controller!=p['controller_sha']):
+        raise RuntimeError('exceptional_canonical_scope_not_independently_enrolled')
+    driver.preflight(locked=system.deploy_lock_descriptor is not None)
+    registration=isolated_registration(driver.contract);origin,_,_=origin_policy(system)
+    # The common verifier in preflight has already authenticated this exact
+    # pinned receiver record/signature. Its own expiry also bounds the operation.
+    trust=strict_json(protected(PHYSICAL_RECOVERY/(p['physical_recovery_receipt_sha256']+'.json'),private=True).read_bytes())
+    now=int(time.time());start=now if created_at is None else created_at
+    end=min(start+p['execution_max_seconds'],registration['expires_at'],origin['expires_at'],trust['expires_at']) if expires_at is None else expires_at
+    if (type(start) is not int or type(end) is not int or not start<=now<end
+            or end>min(start+p['execution_max_seconds'],registration['expires_at'],origin['expires_at'],trust['expires_at'])):
+        raise RuntimeError('exceptional_canonical_admission_expired_or_extended')
+    identifier(request_id)
+    return {'version':1,'kind':CANONICAL_KIND,'environment':'isolated-test','request_id':request_id,
+        **scope,'source_sha':driver.contract['candidate']['source_sha'],'controller_sha':driver.controller,
+        'source_package':str(driver.package),'contract':driver.contract,'policy_sha256':digest(p),
+        'created_at':start,'expires_at':end}
+
+
+def reobserve_review(system,value):
+    if value.get('kind')==CANONICAL_KIND:
+        return observe_canonical(system,value['request_id'],created_at=value['created_at'],expires_at=value['expires_at'])
+    return system.reobserve_automatic_admission(value)
+
+
+def create_canonical(system):
+    """Prepare review in the SAME signed approval journal; issue no authority."""
+    from .automatic_release_admission import require_no_pending_operation
+    from .schema160_release import captured_source
+    from .migration_risk import analyze
+    p,key=policy(system);driver=canonical_driver(system)
+    if p['version']!=2:raise RuntimeError('exceptional_canonical_policy_required')
+    require_no_pending_operation();request_id=str(uuid.uuid4())
+    with journal_lock(request_id) as path:
+        event(path,key,'DISCOVERED',{'source_sha':driver.controller,'requested_by':'controller:'+system.installed_sha()})
+        event(path,key,'CI_PENDING',{'source_sha':driver.contract['candidate']['source_sha']})
+        try:
+            value=observe_canonical(system,request_id)
+            if value['policy_sha256']!=digest(p):raise RuntimeError('exceptional_policy_changed')
+            document,source=driver.actor.measure()
+            if document!=driver.document:raise RuntimeError('exceptional_canonical_package_changed')
+            manifest,sql=captured_source(source)
+            migrations=[]
+            for row in manifest['migrations']:
+                risk=analyze(sql[row['number']],origin=row['from_schema'],target=row['to_schema'])
+                if set(risk.reasons)&{'postgresql_parser_unavailable','sql_unparseable_or_parser_unsupported','sql_analysis_size_or_type_limit'}:
+                    raise RuntimeError('exceptional_canonical_sql_analysis_unavailable')
+                migrations.append(dict(row,observed_risk=risk.document()))
+            review={'why':'Exact independently enrolled coordinated historical146→160 transition requires administrator approval.',
+                'origin':'Truthful historical enrollment; no prior modern completion or write grant is claimed.',
+                'source_sha':value['source_sha'],'controller_sha':value['controller_sha'],
+                'context_sha256':value['context_sha256'],'plan_sha256':value['plan_sha256'],
+                'database_system_identifier':driver.contract['database']['system_identifier'],
+                'origin_schema':146,'target_schema':160,'images':driver.contract['candidate']['images'],
+                'manifest_sha256':driver.contract['migration_manifest_sha256'],
+                'sql':migrations,
+                'recovery_receipt_sha256':p['physical_recovery_receipt_sha256'],
+                'maintenance':'All original ingress, application/provider writers and workers fenced before canonical SQL. No public writable intermediate schema.',
+                'protocols':{'delivery2_from':157,'outbox2_from':159,'deletion2_at':160},
+                'recovery_limitations':'Committed SQL is forward-only. Ambiguous effects remain fenced and consumed authority cannot authorize replay.'}
+            request={'version':1,'request_id':request_id,'admission':value,'admission_sha256':digest(value),
+                'policy_sha256':digest(p),'created_at':int(time.time()),
+                'expires_at':min(value['expires_at'],int(time.time())+p['max_request_seconds']),'review':review}
+            current,current_key=policy(system)
+            if current!=p or not hmac.compare_digest(current_key,key):raise RuntimeError('exceptional_policy_changed')
+            if int(time.time())>=value['expires_at']:raise RuntimeError('exceptional_canonical_admission_expired_or_extended')
+            atomic_json(path/'request.json',sign(request,key),exclusive=True)
+            for state in ('CI_ACCEPTED','STAGING_PENDING','STAGING_ACCEPTED','TECHNICAL_REVIEW_REQUIRED','AWAITING_ADMIN_APPROVAL'):
+                event(path,key,state,{'admission_sha256':digest(value),'context_sha256':value['context_sha256']})
+            return {'request_id':request_id,'request_sha256':digest(request),'state':'AWAITING_ADMIN_APPROVAL','review':review}
+        except Exception as error:
+            event(path,key,'FAILED',{'error_type':type(error).__name__})
+            raise
 
 
 def supported(sql,*,origin,target):
@@ -320,7 +460,7 @@ def decide(system,request_id,action,token,confirmation):
         elif action=='reject':event(path,key,'REJECTED',{'operator':operator,'request_sha256':digest(request)})
         else:
             # Deliberate approval revalidates exact artifacts/state as well as identity.
-            observed=system.reobserve_automatic_admission(request['admission'])
+            observed=reobserve_review(system,request['admission'])
             if observed!=request['admission']:raise RuntimeError('exceptional_technical_observation_changed')
             approval={'version':1,'approval_id':str(uuid.uuid4()),'request_sha256':digest(request),
                 'admission_sha256':request['admission_sha256'],'policy_sha256':digest(p),
@@ -333,8 +473,10 @@ def decide(system,request_id,action,token,confirmation):
 
 def verify_execution(value,system,*,consume=False,token=None):
     """Called with both deployment locks, including on issuer credential creation."""
+    if value.get('kind')==CANONICAL_KIND:
+        return verify_canonical_execution(value,system,consume=consume,token=token)
     from .schema150_provider_adapter import require_owned_lock
-    require_owned_lock(system.automatic_upgrade_lock,system.upgrade_root/'upgrade.lock')
+    require_owned_lock(getattr(system,'automatic_upgrade_lock',None),system.upgrade_root/'upgrade.lock')
     require_owned_lock(system.deploy_lock_descriptor,system.state_root/'deploy.lock')
     x=validate_extension(value);p,key=policy(system)
     with journal_lock(x['request_id']) as path:
@@ -376,12 +518,120 @@ def verify_execution(value,system,*,consume=False,token=None):
 
 def execution_event(system,value,state,detail):
     p,key=audit_policy(system)
-    if digest(p)!=validate_extension(value)['policy_sha256']:
+    x=canonical_admission_scope(value) if value.get('kind')==CANONICAL_KIND else validate_extension(value)
+    if digest(p)!=x['policy_sha256']:
         raise RuntimeError('exceptional_policy_changed')
-    with journal_lock(validate_extension(value)['request_id']) as path:
+    with journal_lock(x['request_id']) as path:
         if _request(path,key)['admission']!=value:
             raise RuntimeError('exceptional_audit_admission_changed')
         return event(path,key,state,detail)
+
+
+def canonical_admission_scope(value):
+    from .completed_normal_admission import digest as context_digest,validate_provider_preparation
+    from .completed_normal_profile import RECONCILED
+    from .completed_normal_execution import SOURCE_PACKAGES
+    from .historical_origin import KIND
+    scope_fields={'context_sha256','plan_sha256','source_bundle_sha256','enrollment_sha256',
+        'candidate_source_sha','operation_id','attempt_id'}
+    fields=scope_fields|{'version','kind','environment','request_id','source_sha','controller_sha',
+        'source_package','contract','policy_sha256','created_at','expires_at'}
+    if (not isinstance(value,dict) or set(value)!=fields or type(value['version']) is not int or value['version']!=1
+            or value['kind']!=CANONICAL_KIND or value['environment']!='isolated-test'
+            or any(not re.fullmatch('[a-f0-9]{40}',str(value[k])) for k in ('source_sha','controller_sha'))
+            or not re.fullmatch('[a-f0-9]{64}',str(value['policy_sha256']))
+            or any(type(value[k]) is not int for k in ('created_at','expires_at'))
+            or not value['created_at']<value['expires_at']<=value['created_at']+10800):
+        raise RuntimeError('exceptional_canonical_admission_invalid')
+    scope=validate_canonical_scope({k:value[k] for k in scope_fields});identifier(value['request_id'])
+    contract=value['contract']
+    if (validate_provider_preparation(contract) is not RECONCILED
+            or contract['source_roles'].get('origin_kind')!=KIND
+            or value['context_sha256']!=context_digest(contract) or value['plan_sha256']!=contract['plan_sha256']
+            or value['enrollment_sha256']!=contract['source_roles']['enrollment_sha256']
+            or value['source_sha']!=value['candidate_source_sha'] or value['source_sha']!=contract['candidate']['source_sha']
+            or value['controller_sha']!=contract['candidate']['controller_sha']
+            or value['source_package']!=str(SOURCE_PACKAGES/('normal-source-'+value['source_bundle_sha256']))):
+        raise RuntimeError('exceptional_canonical_admission_scope_changed')
+    return {**scope,'request_id':value['request_id'],'policy_sha256':value['policy_sha256']}
+
+
+def verify_canonical_execution(value,system,*,consume=False,token=None):
+    """Exact one-time approval under the existing coordinator's two lock inodes.
+
+    Approval expires at consumption. A consumed operation has a separately
+    bounded execution deadline, fixed before approval; it cannot gain a new
+    owner, boot identity, release or lifetime. Failures require forward recovery.
+    """
+    from .schema150_provider_adapter import require_owned_lock
+    from .historical_origin import bind_successor_under_locks,successor_intent,require_successor_binding
+    from .provider_recovery_runtime import readonly_configuration
+    x=canonical_admission_scope(value)
+    require_owned_lock(getattr(system,'automatic_upgrade_lock',None),system.upgrade_root/'upgrade.lock')
+    require_owned_lock(system.deploy_lock_descriptor,system.state_root/'deploy.lock')
+    p,key=policy(system) if consume else audit_policy(system)
+    if (p['version']!=2 or p['contracts']!=[CANONICAL] or x['policy_sha256']!=digest(p)
+            or p['canonical_scope']!={k:x[k] for k in p['canonical_scope']}
+            or value['controller_sha']!=p['controller_sha']
+            or value['contract']['database']['system_identifier']!=p['database_system_identifier']
+            or value['expires_at']>value['created_at']+p['execution_max_seconds']):
+        raise RuntimeError('exceptional_canonical_execution_policy_changed')
+    with journal_lock(x['request_id']) as path:
+        request=_request(path,key);approval=verified(path/'approval.json',key)
+        state=history(path,key)[-1]['state'];now=int(time.time())
+        if (request['admission']!=value or request['policy_sha256']!=digest(p)
+                or approval['request_sha256']!=digest(request) or approval['admission_sha256']!=digest(value)
+                or approval['policy_sha256']!=digest(p)
+                or not approval['issued_at']<approval['expires_at']<=min(request['expires_at'],value['expires_at'],approval['issued_at']+p['max_approval_seconds'])):
+            raise RuntimeError('exceptional_approval_scope_changed')
+        if now>=value['expires_at']:raise RuntimeError('exceptional_canonical_execution_deadline_expired')
+        if (path/'revoked.json').exists():
+            verified(path/'revoked.json',key);raise RuntimeError('exceptional_approval_revoked')
+        consumed=path/'approval-consumed.json'
+        owner={'admission_sha256':digest(value),'approval_sha256':digest(approval),'attempt_id':value['attempt_id'],
+            'pid':os.getpid(),'process_start':Path('/proc/self/stat').read_text().split(') ',1)[1].split()[19],
+            'boot_id':Path('/proc/sys/kernel/random/boot_id').read_text().strip(),'execution_expires_at':value['expires_at']}
+        if consume:
+            if consumed.exists():raise RuntimeError('exceptional_approval_consumed')
+            if state!='APPROVED':raise RuntimeError('exceptional_approval_not_executable')
+            if min(request['expires_at'],approval['expires_at'])<=now:
+                event(path,key,'EXPIRED',{'approval_sha256':digest(approval)});raise RuntimeError('exceptional_approval_expired')
+            if reobserve_review(system,value)!=value:raise RuntimeError('exceptional_technical_observation_changed')
+            operator=system.authenticate_operator(token)
+            if any(operator[k]!=approval['operator'][k] for k in ('operator_auth_id','policy_sha256','session_id_sha256')):
+                raise RuntimeError('exceptional_current_operator_changed')
+            # Reobserve/revalidation may have been expensive. Do not consume
+            # an approval that expired or changed policy while gates ran.
+            current,current_key=policy(system)
+            if current!=p or not hmac.compare_digest(current_key,key):raise RuntimeError('exceptional_policy_changed')
+            if int(time.time())>=min(request['expires_at'],approval['expires_at']):
+                event(path,key,'EXPIRED',{'approval_sha256':digest(approval)});raise RuntimeError('exceptional_approval_expired')
+            event(path,key,'REVALIDATING',{'operator':operator})
+            atomic_json(consumed,sign(owner,key),exclusive=True)
+            # Existing release state is operator-owned DATA. Root trust comes
+            # from the independent enrollment, never a state-file ownership change.
+            state_value=strict_json(readonly_configuration(system.state_root/'state.json',private=True).read_bytes())
+            bind_successor_under_locks(system,state_value,successor_intent(value['contract']),value['context_sha256'],
+                upgrade_lock=system.automatic_upgrade_lock,deploy_lock=system.deploy_lock_descriptor)
+            if int(time.time())>=value['expires_at']:raise RuntimeError('exceptional_canonical_execution_deadline_expired')
+            event(path,key,'AUTHORIZED_FOR_EXECUTION',{'consumption_sha256':digest(owner)})
+        elif (not consumed.exists() or verified(consumed,key)!=owner
+                or state not in {'AUTHORIZED_FOR_EXECUTION','EXECUTING','VERIFYING'}):
+            raise RuntimeError('exceptional_approval_not_owned_or_revoked')
+        require_successor_binding(value['contract'])
+        return approval
+
+
+def require_canonical_execution(system,contract):
+    value=getattr(system,'canonical_exceptional_admission',None)
+    if not isinstance(value,dict) or value.get('kind')!=CANONICAL_KIND or value.get('contract')!=contract:
+        raise RuntimeError('schema160_exceptional_execution_approval_required')
+    approval=verify_canonical_execution(value,system)
+    return {'version':1,'kind':'canonical-exceptional-operation-lease','request_id':value['request_id'],
+        'approval_sha256':digest(approval),'admission_sha256':digest(value),'context_sha256':value['context_sha256'],
+        'operation_id':value['operation_id'],'attempt_id':value['attempt_id'],'execution_expires_at':value['expires_at'],
+        'pid':os.getpid(),'process_start':Path('/proc/self/stat').read_text().split(') ',1)[1].split()[19],
+        'boot_id':Path('/proc/sys/kernel/random/boot_id').read_text().strip()}
 
 
 def verify_independent_recovery(p,execution,proof,*,now):

@@ -2784,6 +2784,8 @@ print(hashlib.sha256(keys[0].encode()).hexdigest())
         status=approval.inspect(self,request_id)
         if status['request'] is None:raise UpgradeError('exceptional_request_unaccepted')
         value=status['request']['admission']
+        if value.get('kind')==approval.CANONICAL_KIND:
+            raise UpgradeError('schema160_exceptional_protected_coordinator_required')
         if confirmation!=status['request_sha256']:raise UpgradeError('exceptional_explicit_confirmation_required')
         if status['state']!='APPROVED' or status['consumed']:raise UpgradeError('exceptional_approval_not_executable')
         require_no_pending_operation()
@@ -2870,10 +2872,11 @@ print(hashlib.sha256(keys[0].encode()).hexdigest())
             from deployment.lib.completed_normal_profile import RECONCILED
             if (selected_profile is RECONCILED and completed_normal_contract['source_roles'].get('origin_kind')
                     == 'independently-enrolled-historical-bootstrap-origin'):
-                # Technical isolated registration cannot issue execution rights.
-                # The canonical exceptional issuer bridge must be implemented
-                # and accepted before this credential boundary may open.
-                raise UpgradeError('schema160_exceptional_execution_approval_required')
+                # Technical registration alone still cannot issue rights. The
+                # same independent approval journal must have consumed this
+                # exact operation in this parent/boot/lock window.
+                from deployment.lib.exceptional_release_approval import require_canonical_execution
+                witnesses['canonical_exceptional_approval']=require_canonical_execution(self,completed_normal_contract)
             if completed_normal_mode is not None and (selected_profile is not RECONCILED
                     or completed_normal_mode not in {'prepare','activate','adopt'}):
                 raise UpgradeError('completed_maintenance_child_scope_invalid')
@@ -2959,6 +2962,8 @@ print(hashlib.sha256(keys[0].encode()).hexdigest())
             from deployment.lib.completed_normal_admission import digest
             witnesses['migration_resumption']=authorize_witness(completed_normal_contract,migration_resumption)
             witness_hashes['migration_resumption_sha256']=digest(migration_resumption)
+        if 'canonical_exceptional_approval' in witnesses:
+            witness_hashes['canonical_exceptional_approval_sha256']=digest(witnesses['canonical_exceptional_approval'])
         token = secrets.token_urlsafe(32)
         descriptor, temporary = tempfile.mkstemp(prefix=".authorized.", dir=self.runtime_root)
         try:
@@ -3038,7 +3043,25 @@ print(hashlib.sha256(keys[0].encode()).hexdigest())
                 if completed_normal_mode not in {'prepare','activate','adopt'}:
                     raise UpgradeError('completed_maintenance_parent_execution_required')
                 extra['completed_normal_mode']=completed_normal_mode
-            self.write_authorization(approved_sha,completed_normal_contract=completed_normal_contract,**extra)
+            canonical=(profile(completed_normal_contract) is RECONCILED
+                and completed_normal_contract['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin')
+            owned=False
+            try:
+                if canonical and self.deploy_lock_descriptor is not None:
+                    raise UpgradeError('canonical_service_requires_released_deployment_lock')
+                if canonical:
+                    self.deploy_lock_descriptor=acquire_lock(self.state_root/'deploy.lock',create=False);owned=True
+                self.write_authorization(approved_sha,completed_normal_contract=completed_normal_contract,**extra)
+            except BaseException:
+                if canonical:self.clear_authorization()
+                raise
+            finally:
+                # The existing User=madar service must acquire deploy.lock
+                # itself. The durable exact-operation interlock remains armed.
+                if owned:
+                    try:self.release_deployment_lock()
+                    except BaseException:
+                        self.clear_authorization();raise
         else:
             if completed_normal_mode is not None or migration_resumption is not None:
                 raise UpgradeError('completed_normal_deploy_contract_required')
