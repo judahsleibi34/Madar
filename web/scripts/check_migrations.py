@@ -174,6 +174,19 @@ _automated_reporting_spec = importlib.util.spec_from_file_location(
 _automated_reporting_candidate = importlib.util.module_from_spec(_automated_reporting_spec)
 _automated_reporting_spec.loader.exec_module(_automated_reporting_candidate)
 validated_automated_reporting_entries = _automated_reporting_candidate.validated_entries
+_bi_team_sharing_spec = importlib.util.spec_from_file_location(
+    "madar_bi_team_sharing_candidate", Path(__file__).with_name("bi_team_sharing_candidate.py"),
+)
+_bi_team_sharing_candidate = importlib.util.module_from_spec(_bi_team_sharing_spec)
+_bi_team_sharing_spec.loader.exec_module(_bi_team_sharing_candidate)
+validated_bi_team_sharing_entries = _bi_team_sharing_candidate.validated_entries
+_bi_report_delivery_lifecycle_spec = importlib.util.spec_from_file_location(
+    "madar_bi_report_delivery_lifecycle_candidate",
+    Path(__file__).with_name("bi_report_delivery_lifecycle_candidate.py"),
+)
+_bi_report_delivery_lifecycle_candidate = importlib.util.module_from_spec(_bi_report_delivery_lifecycle_spec)
+_bi_report_delivery_lifecycle_spec.loader.exec_module(_bi_report_delivery_lifecycle_candidate)
+validated_bi_report_delivery_lifecycle_entries = _bi_report_delivery_lifecycle_candidate.validated_entries
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -499,6 +512,8 @@ def check_production_lineage(errors: list[str]) -> None:
             retained_future.update({entry["number"]: entry for entry in validated_webhook_entries(REPO_ROOT.parent)})
             retained_future.update({entry["number"]: entry for entry in validated_bi_dashboard_entries(REPO_ROOT.parent)})
             retained_future.update({entry["number"]: entry for entry in validated_automated_reporting_entries(REPO_ROOT.parent)})
+            retained_future.update({entry["number"]: entry for entry in validated_bi_team_sharing_entries(REPO_ROOT.parent)})
+            retained_future.update({entry["number"]: entry for entry in validated_bi_report_delivery_lifecycle_entries(REPO_ROOT.parent)})
             learning=validate_learning_path(REPO_ROOT.parent)
             if learning['status']=='finalized':
                 learning_manifest=json.loads((REPO_ROOT.parent / learning['manifest_path']).read_text())

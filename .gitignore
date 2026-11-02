@@ -104,3 +104,7 @@ env13-8
 /QA testing/Automation Testing/reports/
 /backend-auth-discovery.txt
 /Modelfile.deepseek32k
+
+# Restricted local release evidence and relocation inventories
+/private-evidence/
+/inventory/

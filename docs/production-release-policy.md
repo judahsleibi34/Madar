@@ -1,5 +1,157 @@
 # Madar production release acceptance policy
 
+## Unadmitted explicit account lifecycle candidate167 (2026-10-30)
+
+The final owner policy defines two separate actions. Deactivate freezes access
+and processing immediately and permits authorized reactivation strictly before
+2160 complete hours; the deadline initiates permanent erasure. Delete initiates
+erasure immediately with zero recovery hold. A deletion request must never be
+interpreted as deactivation. Recovery cancels automatic erasure only before the
+deadline and before irreversible work. Ordinary Delete → Archive is unchanged.
+
+The Phase6E owner policy requires permanent account erasure of all owned active
+and archived content, versions, reports/exports/caches, credentials and history,
+account records and associated private/provider storage. Audit and credential
+history have no default retention exemption. Only a specifically documented,
+legally mandatory record may survive; no such exception is enabled here.
+Candidate167 permits credential-event DELETE only under a current irreversible
+protocol3 erasure scope for the owning source/project. Normal UPDATE/DELETE
+remain append-only-protected. Account-linked audit, identity and operational
+lifecycle history are removed after verification; unknown ownership/adapters
+block completion, and independent projects remain untouched. No privileged
+provider key shared with another account is erased as if it belonged to one user.
+
+Candidate167 requires a coordinated binary/worker cutover. Older binaries do
+not verify revoked session IDs; rollback to pre167 binaries after applying167
+is not admitted. No automatic migration authority is added.
+
+Candidate167 is unselected and customer admission for both actions remains
+explicitly disabled. Disposable service-only acceptance does not authorize
+customer activation. Protocol2 remains exactly160; protocol3 has independent
+ownership, leases and verification. Unsupported schemas, shared dependencies,
+unimplemented provider adapters and unresolved retention obligations fail closed.
+Independent projects must remain untouched. Provider acknowledgements alone
+cannot certify erasure; independent absence checks are required. Completion is
+limited to server-controlled resources, excluding disconnected devices and
+previous downloads. Filesystem worker fences require shared private roots.
+
+The candidate uses a blocked migration policy and requires reconciliation of
+legacy deletion work. Acceptance must continue to distinguish verified erasure
+from safe refusal, and every unresolved provider or ownership family remains a
+release gate. This source work changes no
+active146 descriptor, protected controller authority, automatic orchestration,
+persistent database or production service.
+
+## Phase6F erasure coverage remains unadmitted (2026-10-30)
+
+The unpublished candidate167 adds explicit private/local Calendar ownership and
+owned-project form/reservation/quiz metadata adapters, plus account-owned
+installation/MFA/activity records. Calendar actors do not establish ownership;
+shared calendars, external connections, cross-project dependencies and unknown
+notification producers block before reference release. Ordinary Archive is
+unchanged. No tenant-wide Builder asset purge is authorized by uploader identity.
+The candidate167 SQL inventory and lifecycle database tests are the maintained
+resource-coverage authority; unsupported rows must fail closed before reference
+release.
+
+Candidate lifecycle workers require an independently protected restore-floor file
+outside upload/chart/public storage roots, shared consistently by the entire
+coordinated fleet. Completion publishes a monotonic, non-identifying filesystem
+generation before its final SQL acknowledgement. SQL preserves only platform
+generation counters after account receipts are erased. The new candidate restore
+component rejects stale generations, changed snapshot hashes, snapshots crossing
+erasure and snapshots/restores during irreversible work. It is **not wired into
+the protected backup/restore executor and grants no restore authority**. Installed
+sealed-manifest integration, rollback-resistant independent floor protection,
+shared backup/WAL/provider-version handling and log-sink coverage remain required.
+Never restore old customer data based only on this component's test result.
+
+In this candidate configuration Calendar bootstrap payload caching is disabled
+in every upgraded process. Already-running older workers must be drained/restarted;
+process-local clearing cannot certify another process's memory. Remaining module,
+provider, shared-ownership and operational gaps prevent general completion claims.
+Both customer actions stay disabled; the active146 release, exact160 protocol2
+horizon, automatic dispatch and published001–166 SQL are unchanged.
+
+## Phase6G Builder ownership remains unadmitted (2026-10-30)
+
+The unpublished candidate167 now records verified Builder asset ownership and
+exact private-provider identity separately from uploader attribution and project
+consumer references. New provider publication requires that durable binding.
+Protocol3 may erase only exact account-owned Builder provider/cache objects after
+complete consumer inventory and independent absence checks. Legacy provenance,
+shared consumers, provider disagreement and independently owned projects fail
+closed; no tenant-wide Builder directory deletion is authorized.
+
+Builder garbage collection now participates in the account work fence and must
+preserve recoverable bytes during the 2160-hour deactivation window. Candidate
+lock registration also checks exact live account existence while serialized with
+final lock retirement, preventing stale local processes from recreating an
+account lock filename after verified completion. This is shared-filesystem
+cross-process evidence, not multi-host acceptance.
+
+The synchronized candidate167 checksum/manifest update is compatibility metadata
+for this still-unselected coordinated binary/SQL candidate. It selects no release,
+changes no active descriptor, admits no migration and grants no customer or
+production authority. Remote Calendar, installed provider versions, logs/backups
+and legacy Builder ownership remain blocking.
+
+## Phase6H Learning and Academy ownership remains unadmitted (2026-10-30)
+
+Candidate167 treats exact learner participation and exact account-linked Academy
+applications as personal state while preserving independently owned courses,
+assessments, forms, certificates, opportunities, organizations and projects.
+Personal enrollments, progress, attempts, answers, reviews of the subject's own
+attempt, exact private recording/form/application files and workflow history may
+be erased only beneath a live irreversible protocol3 scope and exact registered
+provider identity. Ordinary immutable protections remain in force outside that
+narrow DELETE scope.
+
+Instructor assignments, actions on another participant's record, referral and
+reward finance, withdrawals, mixed checkouts, email-only identities, contradictory
+registry metadata and unknown provider objects fail closed before relational
+release. Provider path shape or actor identity alone never establishes ownership.
+Teaching catalogs, Form definitions and immutable versions remain preserved.
+These adapters do not admit customer actions, install the worker, select
+candidate167 or establish real-provider, backup, restore, log or multi-host
+acceptance.
+
+## Phase6I Commerce account erasure remains unadmitted (2026-11-02)
+
+The unpublished candidate167 now distinguishes personal Commerce state from
+independently owned merchant ledgers. Exact `customer_id` and checkout `user_id`
+links authorize removal of customer loyalty accounts, entitlements and append-only
+loyalty transactions under the existing live irreversible protocol3 lease.
+Learning Commerce access entitlements are removed. Checkout identity is detached,
+and exact linked order contact/address/confirmation identifiers are erased in
+place. Order totals, line items, product snapshots, inventory movements, status
+and payment state, payment events, offerings, catalogs, products, variants and
+merchant loyalty rules remain unchanged. Ordinary Commerce Delete → Archive and
+the normal append-only loyalty trigger remain unchanged outside that narrow scope.
+
+Email similarity without an exact account link is not deletion authority and
+fails closed. A checkout using any live provider, including Stripe, also fails
+closed because the current adapter cannot independently prove absence or a
+specifically established mandatory retention basis for provider-side customer,
+payment-method or checkout-session data. Local synthetic payment events have no
+external provider object. Builder media referenced by a product, variant,
+taxonomy, landing page or order snapshot is an independent/shared business asset;
+account erasure refuses rather than deleting or transferring those bytes.
+
+Commerce customer/order/checkout/payment parent writes now participate in the
+existing account work fence, including delayed payment events, so deactivation
+preserves recoverable state and prevents stale processing until authorized
+reactivation. Catalog caches contain merchant/public catalog data rather than the
+customer account payload and are not used as proof of personal-data absence.
+
+Disposable PostgreSQL17/PostgREST/Vault and real-worker evidence verifies this
+boundary, including merchant/unrelated-order preservation and safe provider/media
+refusal. It does not admit customer actions or execution, install the worker,
+select candidate167, change active schema146, authorize migration, or establish
+production/provider/log/backup/restore/multi-host acceptance. The candidate167
+SQL inventory, account lifecycle database tests and this policy are the maintained
+boundary.
+
 ## Approved reduced PR220 scope (2026-10-23)
 
 PR220 acceptance is frozen to application architecture, database integrity,
@@ -2868,6 +3020,39 @@ must pass before this can be proposed for release. The active release remains
 schema 146; no scheduler, worker, migration, deployment, or persistent data
 processing is authorized by this candidate.
 
+### Unselected private BI team-sharing candidate (schema 165)
+
+Migration 165 is an additive, checksum-pinned candidate after schema 164. It
+adds owner-managed dashboard viewer/editor grants and immutable-report viewer
+grants only for active members of the same tenant workspace. Share rows are
+tenant/project/owner/resource bound, revision checked, RLS enabled, and private
+to `service_role`; no public links or direct authenticated-role access exist.
+Destructive dashboard actions, report mutation, scheduling, and share management
+remain owner-only. `bi_team_sharing_candidate.py`, the disposable 164→165
+rehearsal, focused authorization/frontend tests, and the complete 146→165 chain
+must pass before release review. The active release remains schema 146; applying
+migration 165, deploying it, or modifying persistent data requires separate
+authorization.
+
+### Unselected BI report delivery and lifecycle candidate (schema 166)
+
+Migration 166 is an additive, checksum-pinned candidate after schema 165. It
+adds owner-configured, opt-in delivery to active same-tenant members and bounded
+private-artifact retention. Delivery records use deterministic deduplication,
+bounded retries, expiring leases, and fencing tokens. Authorization is checked
+again immediately before any adapter handoff, and revoked shares, memberships,
+recipients, schedules, or delivery configurations fail closed. Cleanup jobs are
+disabled by default, retain artifacts for 7–365 days, wait for delivery work to
+finish, and delete only integrity-checked files beneath the private report root.
+Tables and mutation RPCs remain private to `service_role`; public links and
+external recipients are forbidden. The repository provides only an in-memory,
+offline test email adapter, so no live provider or message transmission is part
+of this candidate. `bi_report_delivery_lifecycle_candidate.py`, the disposable
+165→166 rehearsal, focused authorization/export/frontend tests, and the complete
+146→166 chain must pass before release review. The active release remains schema
+146; applying migration 166, activating a worker or provider, deploying, or
+modifying persistent data requires separate authorization.
+
 
 ### Formal-completion credentials (schema 130)
 
@@ -3769,3 +3954,23 @@ raw provider logs. Completion follows observed owned-service shutdown. None of
 this is protected handoff,boot/reboot or production acceptance. See
 [staging scope](architecture-phase9-2026-10-20/10-AUTOMATIC-FULL-STAGING.md) and
 [maintenance backup limits](architecture-phase9-2026-10-20/03-MAINTENANCE-BACKUP-AND-REPLICA.md).
+
+## Candidate167 Learning and Academy account erasure
+
+Candidate167 remains unselected and customer admission remains disabled. Its
+Learning/Academy account adapter grants no production, migration, deployment or
+general deletion authority. It may erase only exact account-linked learner
+participation, assessment evidence, form responses and application records after
+registered private-provider objects have been durably inventoried and independently
+observed absent. Courses, assessments, form definitions/versions, certificates,
+opportunities, organizations, projects and other participants remain independent.
+
+Instructor assignments, reviews or workflow actions on another participant's
+record, mismatched Form/Application ownership, unknown file accounting and all
+referral reward, withdrawal, checkout or other mixed financial/legal history fail
+closed before database release. Immutable-history trigger exceptions require a
+live irreversible protocol3 lease for the exact subject; ordinary update/delete
+behavior remains unchanged. Assessment cleanup and provider publication remain
+account-fenced through acknowledgement. These constraints do not alter ordinary
+resource Archive behavior or authorize log, backup, WAL/snapshot or provider-version
+retention exemptions.

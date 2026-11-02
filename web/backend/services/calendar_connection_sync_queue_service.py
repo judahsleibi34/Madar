@@ -115,6 +115,9 @@ def eligible_inbound_connections(
 ) -> list[dict[str, Any]]:
     database_client = client or service_supabase
     cutoff = (_now() - timedelta(seconds=max(60, interval_seconds))).isoformat()
+    from services.project_dataset_service import schema_version
+    if schema_version(client=database_client)==167:
+        return _rows(database_client.rpc("list_account_work167",{"p_kind":"calendar","p_limit":max(1,min(int(limit),100)),"p_before":cutoff}).execute())
     query = (
         database_client.table("calendar_sync_connections")
         .select(

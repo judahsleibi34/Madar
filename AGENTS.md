@@ -2,16 +2,18 @@
 
 ## Permanent development workspace
 
-Use `/opt/madar-development` for all Madar development. Reuse the canonical
-architecture worktree at `/opt/madar-development/worktrees/architecture`.
-Do not create Madar clones, worktrees, evidence or scratch directories under
-`/home/madar`. Do not create a new worktree or PR merely for another phase.
+In environments where `/opt/madar-development/worktrees/architecture` exists,
+reuse that canonical architecture worktree. In the owner development environment
+where `/opt/madar-development` is unavailable, use the existing owner checkout at
+`/home/judah/Madar Projects/Madar` on `Judah_branch`. Preserve all uncommitted and
+untracked owner work there. Do not create Madar clones, branches or worktrees merely
+for another phase, and do not create evidence or scratch directories under
+`/home/madar`.
 
-The existing `/opt/madar-development/repository` checkout is separate and may
-contain uncommitted work and active runtime dependencies. Preserve it.
-If an isolated worktree is necessary, first inspect `git worktree list` from
-the canonical worktree, then use `/opt/madar-development/worktrees/<purpose>`.
-Keep names descriptive and collision-free; preserve published branches/history.
+The existing `/opt/madar-development/repository` checkout, when present, is
+separate and may contain uncommitted work and active runtime dependencies.
+Preserve it. Do not create an isolated worktree unless the project owner gives
+separate explicit authorization. Preserve published branches/history.
 
 Keep current private evidence in `/opt/madar-development/evidence/integration`,
 historical evidence in `evidence/historical`, checkpoints in
@@ -28,10 +30,10 @@ backup, recovery and unrelated-project paths and dependencies. Historical paths
 in old reports describe their original test environments; consult the private
 relocation manifests rather than rewriting historical evidence.
 
-Start subsequent sessions with:
+In the owner development environment, start subsequent sessions with:
 
 ```bash
-cd /opt/madar-development/worktrees/architecture
+cd "/home/judah/Madar Projects/Madar"
 codex
 ```
 

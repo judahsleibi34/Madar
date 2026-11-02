@@ -1,13 +1,19 @@
 import os
 import re
+import tempfile
+import threading
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from starlette.responses import JSONResponse
 
+from services.storage_quota_service import StorageSafetyError, ensure_disk_capacity
+
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 DEFAULT_MAX_REQUEST_BODY_BYTES = 12 * 1024 * 1024
 DEFAULT_MAX_BUILDER_ASSET_REQUEST_BODY_BYTES = 252 * 1024 * 1024
+DEFAULT_MAX_DATASET_REQUEST_BODY_BYTES = 250_000_000 + 1024 * 1024
 DEFAULT_MAX_JSON_BODY_BYTES = 3 * 1024 * 1024
 DEFAULT_MAX_SMALL_JSON_BODY_BYTES = 256 * 1024
 DEFAULT_MAX_DATA_JSON_BODY_BYTES = 1024 * 1024
@@ -22,6 +28,10 @@ DATA_JSON_RE = re.compile(
     r"^/users/[^/]+/(?:data/read|cleaning/.*|analysis/.*|visualization/.*)$"
 )
 UPLOAD_ROUTE_RE = re.compile(r"^/users/[^/]+/(?:data/upload|avatar)$")
+DATASET_UPLOAD_RE = re.compile(
+    r"^/users/[^/]+/data/(?:upload|projects/[^/]+/datasets/upload|"
+    r"projects/[^/]+/sources/[^/]+/ingestions/upload)/?$"
+)
 USER_BUILDER_RE = re.compile(r"^/users/[^/]+/builder(?:/.*)?$")
 
 
@@ -29,10 +39,15 @@ class RequestBodyTooLarge(Exception):
     pass
 
 
+class DatasetUploadDisconnected(OSError):
+    """Tell Starlette's multipart parser to close partial spool files."""
+
+
 @dataclass(frozen=True)
 class RequestBodyLimitConfig:
     max_request_body_bytes: int
     max_builder_asset_request_body_bytes: int
+    max_dataset_request_body_bytes: int
     max_json_body_bytes: int
     max_small_json_body_bytes: int
     max_data_json_body_bytes: int
@@ -148,6 +163,9 @@ def select_request_body_limit(
     if _is_builder_asset_upload_path(path) and _is_multipart_content_type(content_type):
         return config.max_builder_asset_request_body_bytes
 
+    if DATASET_UPLOAD_RE.fullmatch(path) and _is_multipart_content_type(content_type):
+        return config.max_dataset_request_body_bytes
+
     if _is_multipart_content_type(content_type) or _is_upload_path(path):
         return config.max_request_body_bytes
 
@@ -173,6 +191,7 @@ class RequestBodyLimitMiddleware:
         *,
         max_request_body_bytes: int | None = None,
         max_builder_asset_request_body_bytes: int | None = None,
+        max_dataset_request_body_bytes: int | None = None,
         max_json_body_bytes: int | None = None,
         max_small_json_body_bytes: int | None = None,
         max_data_json_body_bytes: int | None = None,
@@ -188,6 +207,11 @@ class RequestBodyLimitMiddleware:
                 max_builder_asset_request_body_bytes,
                 "MAX_BUILDER_ASSET_REQUEST_BODY_BYTES",
                 DEFAULT_MAX_BUILDER_ASSET_REQUEST_BODY_BYTES,
+            ),
+            max_dataset_request_body_bytes=_limit_value(
+                max_dataset_request_body_bytes,
+                "MAX_DATASET_REQUEST_BODY_BYTES",
+                DEFAULT_MAX_DATASET_REQUEST_BODY_BYTES,
             ),
             max_json_body_bytes=_limit_value(
                 max_json_body_bytes,
@@ -205,65 +229,127 @@ class RequestBodyLimitMiddleware:
                 DEFAULT_MAX_DATA_JSON_BODY_BYTES,
             ),
         )
+        self._dataset_upload_slots = threading.BoundedSemaphore(
+            max(1, _env_int("MAX_CONCURRENT_DATASET_UPLOADS", 2))
+        )
 
     async def __call__(self, scope, receive, send):
         if scope.get("type") != "http":
             await self.app(scope, receive, send)
             return
 
+        path = scope.get("path", "")
+        content_type = _content_type(scope)
+        dataset_upload = (
+            scope.get("method", "").upper() == "POST"
+            and DATASET_UPLOAD_RE.fullmatch(path) is not None
+            and _is_multipart_content_type(content_type)
+        )
+        if dataset_upload and not self._dataset_upload_slots.acquire(blocking=False):
+            await self._send_busy(scope, receive, send)
+            return
+
         limit = select_request_body_limit(
             method=scope.get("method", ""),
-            path=scope.get("path", ""),
-            content_type=_content_type(scope),
+            path=path,
+            content_type=content_type,
             config=self.config,
         )
 
-        if limit is None:
-            await self.app(scope, receive, send)
-            return
-
-        content_length = _content_length(scope)
-
-        if content_length is not None and content_length > limit:
-            await self._send_too_large(scope, receive, send)
-            return
-
-        received_body_bytes = 0
-        response_started = False
-
-        async def limited_receive():
-            nonlocal received_body_bytes
-
-            message = await receive()
-
-            if message.get("type") == "http.request":
-                body = message.get("body") or b""
-                received_body_bytes += len(body)
-
-                if received_body_bytes > limit:
-                    raise RequestBodyTooLarge
-
-            return message
-
-        async def send_wrapper(message):
-            nonlocal response_started
-
-            if message.get("type") == "http.response.start":
-                response_started = True
-
-            await send(message)
-
         try:
-            await self.app(scope, limited_receive, send_wrapper)
-        except RequestBodyTooLarge:
-            if response_started:
-                raise
+            if limit is None:
+                await self.app(scope, receive, send)
+                return
 
-            await self._send_too_large(scope, receive, send)
+            content_length = _content_length(scope)
+
+            if content_length is not None and content_length > limit:
+                await self._send_too_large(scope, receive, send)
+                return
+
+            if dataset_upload:
+                # Starlette materializes multipart UploadFile bodies before the
+                # endpoint can stream them into private immutable storage. Keep
+                # that bounded spool from consuming the host disk floor first.
+                spool_bytes = content_length if content_length is not None else limit
+                try:
+                    ensure_disk_capacity(
+                        Path(tempfile.gettempdir()), incoming_bytes=spool_bytes,
+                    )
+                except StorageSafetyError as error:
+                    await self._send_insufficient_storage(scope, receive, send, error.code)
+                    return
+
+            received_body_bytes = 0
+            response_started = False
+
+            async def limited_receive():
+                nonlocal received_body_bytes
+
+                message = await receive()
+
+                if dataset_upload and message.get("type") == "http.disconnect":
+                    # Starlette 1.3 only closes partial multipart files for
+                    # MultiPartException/OSError. Its ClientDisconnect path can
+                    # otherwise retain the spool until garbage collection.
+                    raise DatasetUploadDisconnected("dataset upload client disconnected")
+
+                if message.get("type") == "http.request":
+                    body = message.get("body") or b""
+                    received_body_bytes += len(body)
+
+                    if received_body_bytes > limit:
+                        raise RequestBodyTooLarge
+
+                return message
+
+            async def send_wrapper(message):
+                nonlocal response_started
+
+                if message.get("type") == "http.response.start":
+                    response_started = True
+
+                await send(message)
+
+            try:
+                await self.app(scope, limited_receive, send_wrapper)
+            except DatasetUploadDisconnected:
+                # There is no peer left to receive an error response. The
+                # multipart parser has already closed its partial spool.
+                return
+            except RequestBodyTooLarge:
+                if response_started:
+                    raise
+
+                await self._send_too_large(scope, receive, send)
+        finally:
+            if dataset_upload:
+                self._dataset_upload_slots.release()
 
     async def _send_too_large(self, scope, receive, send):
         response = JSONResponse(
             status_code=413,
             content={"detail": "Request body too large"},
+        )
+        await response(scope, receive, send)
+
+    async def _send_busy(self, scope, receive, send):
+        response = JSONResponse(
+            status_code=429,
+            content={"detail": {
+                "code": "dataset_upload_busy",
+                "message": "The bounded dataset upload capacity is currently in use.",
+            }},
+            headers={"Retry-After": "1"},
+        )
+        await response(scope, receive, send)
+
+    async def _send_insufficient_storage(self, scope, receive, send, code: str):
+        response = JSONResponse(
+            status_code=507,
+            content={"detail": {
+                "code": code,
+                "message": "Temporary upload capacity is unavailable.",
+            }},
         )
         await response(scope, receive, send)

@@ -22,6 +22,8 @@ from services import (
     versioned_analytics_service,
     bi_dashboard_service,
     bi_reporting_service,
+    bi_sharing_service,
+    bi_report_delivery_service,
 )
 from services import data_source_credential_service
 from services.provider_credentials import AuthorizedSource
@@ -143,6 +145,34 @@ class DashboardRevisionRequest(BaseModel):
     expected_revision: int = Field(ge=1)
 
 
+class DashboardShareRequest(BaseModel):
+    expected_revision: int = Field(ge=1)
+    member_user_id: int = Field(ge=1)
+    permission: Literal["viewer", "editor"]
+
+
+class ReportShareRequest(BaseModel):
+    member_user_id: int = Field(ge=1)
+    permission: Literal["viewer"] = "viewer"
+    expected_share_revision: int | None = Field(default=None, ge=1)
+
+
+class RevokeReportShareRequest(BaseModel):
+    expected_share_revision: int = Field(ge=1)
+
+
+class ReportDeliveryConfigRequest(BaseModel):
+    expected_schedule_revision: int = Field(ge=1)
+    enabled: bool = False
+    recipient_user_ids: list[int] = Field(default_factory=list, max_length=25)
+
+
+class ReportLifecycleRequest(BaseModel):
+    expected_revision: int | None = Field(default=None, ge=1)
+    retention_days: int = Field(ge=7, le=365)
+    cleanup_enabled: bool = False
+
+
 class ExecuteDashboardWidgetRequest(BaseModel):
     refresh_latest: bool = False
     language: Literal["en", "ar"] = "en"
@@ -189,6 +219,9 @@ def get_storage_scope(
         "data_import",
         message="This plan does not include the data workspace.",
     )
+
+    from services.account_work_fence import protect_request
+    protect_request(request, context.tenant_id, context.user_id)
 
     return (
         data_services.safe_scope_value(context.tenant_id),
@@ -494,6 +527,17 @@ def create_bi_dashboard(
     )
 
 
+@router.get("/projects/{project_id}/shared-dashboards")
+def list_shared_bi_dashboards(
+    user_id: int, project_id: str, request: Request, response: Response,
+):
+    tenant_id, scoped_user_id = get_storage_scope(request, response, user_id)
+    enforce_data_workspace_rate_limit(request, scoped_user_id, "read", tenant_id=tenant_id)
+    return bi_sharing_service.list_shared_dashboards(
+        tenant_id=int(tenant_id), project_id=project_id, user_id=int(scoped_user_id),
+    )
+
+
 @router.get("/projects/{project_id}/dashboards/{dashboard_id}")
 def get_bi_dashboard(
     user_id: int, project_id: str, dashboard_id: str, request: Request, response: Response,
@@ -589,6 +633,49 @@ def execute_bi_dashboard_widget(
     )
 
 
+@router.get("/projects/{project_id}/dashboards/{dashboard_id}/shares")
+def list_bi_dashboard_shares(
+    user_id: int, project_id: str, dashboard_id: str, request: Request, response: Response,
+):
+    tenant_id, scoped_user_id = get_storage_scope(request, response, user_id)
+    enforce_data_workspace_rate_limit(request, scoped_user_id, "read", tenant_id=tenant_id)
+    return bi_sharing_service.list_dashboard_shares(
+        tenant_id=int(tenant_id), project_id=project_id, user_id=int(scoped_user_id),
+        dashboard_id=dashboard_id,
+    )
+
+
+@router.put("/projects/{project_id}/dashboards/{dashboard_id}/shares/{member_user_id}")
+def set_bi_dashboard_share(
+    user_id: int, project_id: str, dashboard_id: str, member_user_id: int,
+    payload: DashboardShareRequest, request: Request, response: Response,
+):
+    if payload.member_user_id != member_user_id:
+        raise HTTPException(status_code=422, detail="Shared member does not match the request path.")
+    tenant_id, scoped_user_id = get_storage_scope(request, response, user_id)
+    enforce_data_workspace_rate_limit(request, scoped_user_id, "source_write", tenant_id=tenant_id)
+    return bi_sharing_service.set_dashboard_share(
+        tenant_id=int(tenant_id), project_id=project_id, user_id=int(scoped_user_id),
+        dashboard_id=dashboard_id, expected_revision=payload.expected_revision,
+        member_user_id=member_user_id, permission=payload.permission,
+    )
+
+
+@router.delete("/projects/{project_id}/dashboards/{dashboard_id}/shares/{member_user_id}")
+def revoke_bi_dashboard_share(
+    user_id: int, project_id: str, dashboard_id: str, member_user_id: int,
+    payload: DashboardRevisionRequest, request: Request, response: Response,
+):
+    tenant_id, scoped_user_id = get_storage_scope(request, response, user_id)
+    enforce_data_workspace_rate_limit(request, scoped_user_id, "source_write", tenant_id=tenant_id)
+    dashboard = bi_sharing_service.revoke_dashboard_share(
+        tenant_id=int(tenant_id), project_id=project_id, user_id=int(scoped_user_id),
+        dashboard_id=dashboard_id, expected_revision=payload.expected_revision,
+        member_user_id=member_user_id,
+    )
+    return {"revoked": True, "dashboard": dashboard}
+
+
 @router.patch("/projects/{project_id}/dashboards/{dashboard_id}/automatic-refresh")
 def configure_bi_dashboard_automatic_refresh(
     user_id: int, project_id: str, dashboard_id: str,
@@ -658,6 +745,61 @@ def delete_bi_report_schedule(
     return {"deleted": True}
 
 
+@router.get("/projects/{project_id}/report-schedules/{schedule_id}/delivery")
+def get_bi_report_delivery_config(
+    user_id: int, project_id: str, schedule_id: str, request: Request, response: Response,
+):
+    tenant_id, scoped_user_id = get_storage_scope(request, response, user_id)
+    enforce_data_workspace_rate_limit(request, scoped_user_id, "read", tenant_id=tenant_id)
+    if not bi_report_delivery_service.delivery_available():
+        return {"available": False, "config": None, "recipient_user_ids": [], "members": []}
+    return {"available": True, **bi_report_delivery_service.get_delivery_config(
+        tenant_id=int(tenant_id), project_id=project_id, user_id=int(scoped_user_id),
+        schedule_id=schedule_id,
+    )}
+
+
+@router.patch("/projects/{project_id}/report-schedules/{schedule_id}/delivery")
+def configure_bi_report_delivery(
+    user_id: int, project_id: str, schedule_id: str, payload: ReportDeliveryConfigRequest,
+    request: Request, response: Response,
+):
+    tenant_id, scoped_user_id = get_storage_scope(request, response, user_id)
+    enforce_data_workspace_rate_limit(request, scoped_user_id, "source_write", tenant_id=tenant_id)
+    return bi_report_delivery_service.configure_delivery(
+        tenant_id=int(tenant_id), project_id=project_id, user_id=int(scoped_user_id),
+        schedule_id=schedule_id, expected_schedule_revision=payload.expected_schedule_revision,
+        enabled=payload.enabled, recipient_user_ids=payload.recipient_user_ids,
+    )
+
+
+@router.get("/projects/{project_id}/report-lifecycle")
+def get_bi_report_lifecycle(
+    user_id: int, project_id: str, request: Request, response: Response,
+):
+    tenant_id, scoped_user_id = get_storage_scope(request, response, user_id)
+    enforce_data_workspace_rate_limit(request, scoped_user_id, "read", tenant_id=tenant_id)
+    if not bi_report_delivery_service.delivery_available():
+        return {"available": False, "settings": None}
+    return {"available": True, "settings": bi_report_delivery_service.get_lifecycle_settings(
+        tenant_id=int(tenant_id), project_id=project_id, user_id=int(scoped_user_id),
+    )}
+
+
+@router.patch("/projects/{project_id}/report-lifecycle")
+def configure_bi_report_lifecycle(
+    user_id: int, project_id: str, payload: ReportLifecycleRequest,
+    request: Request, response: Response,
+):
+    tenant_id, scoped_user_id = get_storage_scope(request, response, user_id)
+    enforce_data_workspace_rate_limit(request, scoped_user_id, "source_write", tenant_id=tenant_id)
+    return bi_report_delivery_service.configure_lifecycle(
+        tenant_id=int(tenant_id), project_id=project_id, user_id=int(scoped_user_id),
+        expected_revision=payload.expected_revision, retention_days=payload.retention_days,
+        cleanup_enabled=payload.cleanup_enabled,
+    )
+
+
 @router.post("/projects/{project_id}/reports", status_code=202)
 def generate_bi_report(
     user_id: int, project_id: str, payload: ManualReportRequest,
@@ -699,6 +841,71 @@ def get_bi_report(
     )
 
 
+@router.get("/projects/{project_id}/shared-reports")
+def list_shared_bi_reports(
+    user_id: int, project_id: str, request: Request, response: Response,
+):
+    tenant_id, scoped_user_id = get_storage_scope(request, response, user_id)
+    enforce_data_workspace_rate_limit(request, scoped_user_id, "read", tenant_id=tenant_id)
+    return bi_sharing_service.list_shared_reports(
+        tenant_id=int(tenant_id), project_id=project_id, user_id=int(scoped_user_id),
+    )
+
+
+@router.get("/projects/{project_id}/reports/{report_id}/shares")
+def list_bi_report_shares(
+    user_id: int, project_id: str, report_id: str, request: Request, response: Response,
+):
+    tenant_id, scoped_user_id = get_storage_scope(request, response, user_id)
+    enforce_data_workspace_rate_limit(request, scoped_user_id, "read", tenant_id=tenant_id)
+    return bi_sharing_service.list_report_shares(
+        tenant_id=int(tenant_id), project_id=project_id, user_id=int(scoped_user_id), report_id=report_id,
+    )
+
+
+@router.get("/projects/{project_id}/reports/{report_id}/deliveries")
+def list_bi_report_deliveries(
+    user_id: int, project_id: str, report_id: str, request: Request, response: Response,
+):
+    tenant_id, scoped_user_id = get_storage_scope(request, response, user_id)
+    enforce_data_workspace_rate_limit(request, scoped_user_id, "read", tenant_id=tenant_id)
+    if not bi_report_delivery_service.delivery_available():
+        return {"available": False, "items": []}
+    return {"available": True, **bi_report_delivery_service.list_deliveries(
+        tenant_id=int(tenant_id), project_id=project_id, user_id=int(scoped_user_id),
+        report_id=report_id,
+    )}
+
+
+@router.put("/projects/{project_id}/reports/{report_id}/shares/{member_user_id}")
+def set_bi_report_share(
+    user_id: int, project_id: str, report_id: str, member_user_id: int,
+    payload: ReportShareRequest, request: Request, response: Response,
+):
+    if payload.member_user_id != member_user_id:
+        raise HTTPException(status_code=422, detail="Shared member does not match the request path.")
+    tenant_id, scoped_user_id = get_storage_scope(request, response, user_id)
+    enforce_data_workspace_rate_limit(request, scoped_user_id, "source_write", tenant_id=tenant_id)
+    return bi_sharing_service.set_report_share(
+        tenant_id=int(tenant_id), project_id=project_id, user_id=int(scoped_user_id), report_id=report_id,
+        member_user_id=member_user_id, expected_share_revision=payload.expected_share_revision,
+    )
+
+
+@router.delete("/projects/{project_id}/reports/{report_id}/shares/{member_user_id}")
+def revoke_bi_report_share(
+    user_id: int, project_id: str, report_id: str, member_user_id: int,
+    payload: RevokeReportShareRequest, request: Request, response: Response,
+):
+    tenant_id, scoped_user_id = get_storage_scope(request, response, user_id)
+    enforce_data_workspace_rate_limit(request, scoped_user_id, "source_write", tenant_id=tenant_id)
+    bi_sharing_service.revoke_report_share(
+        tenant_id=int(tenant_id), project_id=project_id, user_id=int(scoped_user_id), report_id=report_id,
+        member_user_id=member_user_id, expected_share_revision=payload.expected_share_revision,
+    )
+    return {"revoked": True}
+
+
 @router.get("/projects/{project_id}/reports/{report_id}/export.csv")
 def download_bi_report(
     user_id: int, project_id: str, report_id: str, request: Request, response: Response,
@@ -707,8 +914,39 @@ def download_bi_report(
     enforce_data_workspace_rate_limit(request, scoped_user_id, "read", tenant_id=tenant_id)
     path, filename = bi_reporting_service.report_artifact(
         tenant_id=int(tenant_id), project_id=project_id, user_id=int(scoped_user_id), report_id=report_id,
+        request=request,
     )
     return FileResponse(path, media_type="text/csv", filename=filename,
+                        headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
+
+
+@router.get("/projects/{project_id}/reports/{report_id}/export.pdf")
+def download_bi_report_pdf(
+    user_id: int, project_id: str, report_id: str, request: Request, response: Response,
+    language: Literal["en", "ar"] = Query(default="en"),
+):
+    tenant_id, scoped_user_id = get_storage_scope(request, response, user_id)
+    enforce_data_workspace_rate_limit(request, scoped_user_id, "read", tenant_id=tenant_id)
+    path, filename, media_type = bi_reporting_service.report_export_artifact(
+        tenant_id=int(tenant_id), project_id=project_id, user_id=int(scoped_user_id),
+        report_id=report_id, export_format="pdf", language=language, request=request,
+    )
+    return FileResponse(path, media_type=media_type, filename=filename,
+                        headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
+
+
+@router.get("/projects/{project_id}/reports/{report_id}/export.xlsx")
+def download_bi_report_xlsx(
+    user_id: int, project_id: str, report_id: str, request: Request, response: Response,
+    language: Literal["en", "ar"] = Query(default="en"),
+):
+    tenant_id, scoped_user_id = get_storage_scope(request, response, user_id)
+    enforce_data_workspace_rate_limit(request, scoped_user_id, "read", tenant_id=tenant_id)
+    path, filename, media_type = bi_reporting_service.report_export_artifact(
+        tenant_id=int(tenant_id), project_id=project_id, user_id=int(scoped_user_id),
+        report_id=report_id, export_format="xlsx", language=language, request=request,
+    )
+    return FileResponse(path, media_type=media_type, filename=filename,
                         headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
 
 

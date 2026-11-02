@@ -1,4 +1,5 @@
 import logging
+from services.account_work_fence import scoped_work
 import re
 from pathlib import Path
 from typing import Any
@@ -612,6 +613,7 @@ def _query_one(client, table: str, fields: str, **equals) -> dict | None:
     return rows[0] if rows else None
 
 
+@scoped_work("run", "initiated_by_user_id")
 def reconcile_claimed_ingestion(run: dict, *, client=None) -> dict:
     """Reconcile one database-fenced run without inferring failure from age alone."""
     database = client or service_supabase

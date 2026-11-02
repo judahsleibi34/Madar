@@ -1,5 +1,6 @@
 import asyncio
 import unittest
+from unittest.mock import patch
 
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 from fastapi.testclient import TestClient
@@ -7,8 +8,10 @@ from fastapi.testclient import TestClient
 from routes import builder_routes
 from services.request_body_limits import (
     DEFAULT_MAX_BUILDER_ASSET_REQUEST_BODY_BYTES,
+    DEFAULT_MAX_DATASET_REQUEST_BODY_BYTES,
     RequestBodyLimitMiddleware,
 )
+from services.storage_quota_service import StorageSafetyError
 from services.request_security import (
     CSRF_COOKIE_NAME,
     CSRF_HEADER_NAME,
@@ -23,15 +26,19 @@ def build_body_limit_client(
     *,
     max_request_body_bytes=2048,
     max_builder_asset_request_body_bytes=4096,
+    max_dataset_request_body_bytes=None,
     max_json_body_bytes=256,
     max_small_json_body_bytes=64,
     max_data_json_body_bytes=128,
 ):
+    if max_dataset_request_body_bytes is None:
+        max_dataset_request_body_bytes = max_request_body_bytes
     app = FastAPI()
     app.add_middleware(
         RequestBodyLimitMiddleware,
         max_request_body_bytes=max_request_body_bytes,
         max_builder_asset_request_body_bytes=max_builder_asset_request_body_bytes,
+        max_dataset_request_body_bytes=max_dataset_request_body_bytes,
         max_json_body_bytes=max_json_body_bytes,
         max_small_json_body_bytes=max_small_json_body_bytes,
         max_data_json_body_bytes=max_data_json_body_bytes,
@@ -144,6 +151,119 @@ class RequestBodyLimitTests(unittest.TestCase):
         )
 
         self.assert_payload_too_large(response)
+
+    def test_dataset_upload_uses_dedicated_250mb_envelope(self):
+        client = build_body_limit_client(
+            max_request_body_bytes=512,
+            max_dataset_request_body_bytes=4096,
+        )
+        response = client.post(
+            "/users/1/data/upload",
+            files={"file": ("data.csv", b"x" * 2000, "text/csv")},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["size"], 2000)
+        self.assertEqual(DEFAULT_MAX_DATASET_REQUEST_BODY_BYTES, 251_048_576)
+
+    def test_dataset_upload_rejects_before_spooling_when_temp_disk_is_low(self):
+        reached_app = []
+        received = []
+
+        async def app(scope, receive, send):
+            reached_app.append(scope["path"])
+
+        middleware = RequestBodyLimitMiddleware(
+            app, max_dataset_request_body_bytes=4096,
+        )
+
+        async def receive():
+            received.append(True)
+            return {"type": "http.request", "body": b"x" * 2000,
+                    "more_body": False}
+
+        sent_messages = []
+
+        async def send(message):
+            sent_messages.append(message)
+
+        with patch(
+            "services.request_body_limits.ensure_disk_capacity",
+            side_effect=StorageSafetyError("storage_disk_floor_breached"),
+        ) as capacity:
+            asyncio.run(middleware({
+                "type": "http", "method": "POST", "path": "/users/1/data/upload",
+                "headers": [
+                    (b"content-type", b"multipart/form-data; boundary=x"),
+                    (b"content-length", b"2200"),
+                ],
+            }, receive, send))
+
+        self.assertEqual(reached_app, [])
+        self.assertEqual(received, [])
+        self.assertEqual(sent_messages[0]["status"], 507)
+        self.assertIn(b"storage_disk_floor_breached", sent_messages[1]["body"])
+        self.assertEqual(capacity.call_args.kwargs["incoming_bytes"], 2200)
+
+    def test_chunked_dataset_upload_reserves_the_full_request_envelope(self):
+        reached_app = []
+
+        async def app(scope, receive, send):
+            reached_app.append(scope["path"])
+            await send({"type": "http.response.start", "status": 204, "headers": []})
+            await send({"type": "http.response.body", "body": b""})
+
+        middleware = RequestBodyLimitMiddleware(
+            app, max_dataset_request_body_bytes=4096,
+        )
+
+        async def receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        sent_messages = []
+
+        async def send(message):
+            sent_messages.append(message)
+
+        with patch("services.request_body_limits.ensure_disk_capacity") as capacity:
+            asyncio.run(middleware({
+                "type": "http", "method": "POST", "path": "/users/1/data/upload",
+                "headers": [(b"content-type", b"multipart/form-data; boundary=x")],
+            }, receive, send))
+
+        self.assertEqual(reached_app, ["/users/1/data/upload"])
+        self.assertEqual(sent_messages[0]["status"], 204)
+        self.assertEqual(capacity.call_args.kwargs["incoming_bytes"], 4096)
+
+    def test_dataset_disconnect_is_translated_for_multipart_spool_cleanup(self):
+        saw_cleanup_error = []
+
+        async def app(_scope, receive, _send):
+            try:
+                await receive()
+            except OSError as error:
+                saw_cleanup_error.append(type(error).__name__)
+                raise
+
+        middleware = RequestBodyLimitMiddleware(
+            app, max_dataset_request_body_bytes=4096,
+        )
+
+        async def receive():
+            return {"type": "http.disconnect"}
+
+        sent_messages = []
+
+        async def send(message):
+            sent_messages.append(message)
+
+        with patch("services.request_body_limits.ensure_disk_capacity"):
+            asyncio.run(middleware({
+                "type": "http", "method": "POST", "path": "/users/1/data/upload",
+                "headers": [(b"content-type", b"multipart/form-data; boundary=x")],
+            }, receive, send))
+
+        self.assertEqual(saw_cleanup_error, ["DatasetUploadDisconnected"])
+        self.assertEqual(sent_messages, [])
 
     def test_builder_asset_upload_uses_dedicated_larger_limit(self):
         client = build_body_limit_client(

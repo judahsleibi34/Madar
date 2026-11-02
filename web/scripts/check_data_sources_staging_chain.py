@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed audit of the unselected schema146 -> schema164 staging path."""
+"""Fail-closed audit of the unselected schema146 -> schema166 staging path."""
 
 from __future__ import annotations
 
@@ -30,6 +30,8 @@ EXPECTED = (
     (161, 162, "migrations-161-162-webhooks.json"),
     (162, 163, "migrations-162-163-bi-dashboards.json"),
     (163, 164, "migrations-163-164-automated-reporting.json"),
+    (164, 165, "migrations-164-165-bi-team-sharing.json"),
+    (165, 166, "migrations-165-166-bi-report-delivery-lifecycle.json"),
 )
 
 
@@ -64,6 +66,8 @@ def validate() -> dict:
         "webhook_candidate.py",
         "bi_dashboard_candidate.py",
         "automated_reporting_candidate.py",
+        "bi_team_sharing_candidate.py",
+        "bi_report_delivery_lifecycle_candidate.py",
     )
     for filename in validators:
         _load_validator(filename).validated_entries(ROOT)
@@ -90,7 +94,7 @@ def validate() -> dict:
         raise RuntimeError("excluded_schema142_present")
     return {
         "active_schema": 146,
-        "target_schema": 164,
+        "target_schema": 166,
         "excluded_schemas": [142],
         "transitions": [f"{source}->{target}" for source, target, _ in observed],
         "manifests": sorted(seen_manifests),

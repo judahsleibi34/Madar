@@ -46,6 +46,15 @@ _cache_lock = threading.RLock()
 _inflight: dict[int, set[object]] = {}
 
 
+def _lifecycle_cache_disabled() -> bool:
+    # Process-local payloads cannot be independently erased by another worker.
+    # Candidate lifecycle deployments use DB-backed bootstrap reads instead.
+    if os.getenv("ACCOUNT_ERASURE_RESTORE_FLOOR_FILE", "").strip():
+        clear_calendar_workspace_cache()
+        return True
+    return False
+
+
 def calendar_workspace_cache_key(
     *,
     tenant_id: int,
@@ -68,6 +77,8 @@ def calendar_workspace_cache_key(
 
 
 def read_calendar_workspace_cache(key: str, tenant_id: int | None = None) -> Any | None:
+    if _lifecycle_cache_disabled():
+        return None
     current_time = time.monotonic()
     with _cache_lock:
         entry = _cache.get(key)
@@ -89,6 +100,8 @@ def write_calendar_workspace_cache(
     *,
     ttl_seconds: int | None = None,
 ) -> Any:
+    if _lifecycle_cache_disabled():
+        return value
     ttl = _bounded_int(
         str(ttl_seconds) if ttl_seconds is not None else None,
         CALENDAR_WORKSPACE_CACHE_TTL_SECONDS,
@@ -112,6 +125,8 @@ def get_or_create_calendar_workspace(
     tenant_id: int,
     factory: Callable[[], Any],
 ) -> tuple[Any, bool]:
+    if _lifecycle_cache_disabled():
+        return factory(), False
     target_tenant = int(tenant_id)
     token = object()
     with _cache_lock:

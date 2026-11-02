@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from services.account_work_fence import calendar_work
+
 import json
 import logging
 import os
@@ -95,6 +97,7 @@ def _set_task_failure(job: dict[str, Any], code: str) -> None:
     ).eq("id", job["task_id"]).eq("tenant_id", job["tenant_id"]).execute()
 
 
+@calendar_work
 def process_job(job: dict[str, Any]) -> str:
     try:
         result = process_task_sync_job(job)
@@ -192,6 +195,7 @@ def process_sync_batch(*, limit: int = 10, worker_id: str | None = None) -> int:
     return len(jobs)
 
 
+@calendar_work
 def process_connection_job(job: dict[str, Any]) -> str:
     try:
         counts = process_connection_sync_job(job)

@@ -75,3 +75,17 @@ class CalendarWorkspaceCacheTests(unittest.TestCase):
         assert cache_hit is False
         assert payload == {"events": [{"id": "stale"}]}
         assert read_calendar_workspace_cache(key) is None
+
+    def test_candidate_lifecycle_clears_existing_payloads_and_never_caches(self):
+        import os
+        from unittest.mock import patch
+        write_calendar_workspace_cache('old',7,{'private':'payload'})
+        with patch.dict(os.environ,{'ACCOUNT_ERASURE_RESTORE_FLOOR_FILE':'/configured/independent/floor'}):
+            self.assertIsNone(read_calendar_workspace_cache('old'))
+            calls=[]
+            for _ in range(2):
+                result,hit=get_or_create_calendar_workspace('key',7,lambda:calls.append(1) or {'fresh':True})
+                self.assertFalse(hit);self.assertEqual(result,{'fresh':True})
+            write_calendar_workspace_cache('new',7,{'private':'payload'})
+            self.assertEqual(len(calls),2);self.assertEqual(calendar_workspace_cache_size(),0)
+        self.assertIsNone(read_calendar_workspace_cache('new'))

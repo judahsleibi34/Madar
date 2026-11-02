@@ -170,6 +170,19 @@ _automated_reporting_spec = importlib.util.spec_from_file_location(
 _automated_reporting_candidate = importlib.util.module_from_spec(_automated_reporting_spec)
 _automated_reporting_spec.loader.exec_module(_automated_reporting_candidate)
 validated_automated_reporting_entries = _automated_reporting_candidate.validated_entries
+_bi_team_sharing_spec = importlib.util.spec_from_file_location(
+    "madar_bi_team_sharing_candidate", Path(__file__).with_name("bi_team_sharing_candidate.py"),
+)
+_bi_team_sharing_candidate = importlib.util.module_from_spec(_bi_team_sharing_spec)
+_bi_team_sharing_spec.loader.exec_module(_bi_team_sharing_candidate)
+validated_bi_team_sharing_entries = _bi_team_sharing_candidate.validated_entries
+_bi_report_delivery_lifecycle_spec = importlib.util.spec_from_file_location(
+    "madar_bi_report_delivery_lifecycle_candidate",
+    Path(__file__).with_name("bi_report_delivery_lifecycle_candidate.py"),
+)
+_bi_report_delivery_lifecycle_candidate = importlib.util.module_from_spec(_bi_report_delivery_lifecycle_spec)
+_bi_report_delivery_lifecycle_spec.loader.exec_module(_bi_report_delivery_lifecycle_candidate)
+validated_bi_report_delivery_lifecycle_entries = _bi_report_delivery_lifecycle_candidate.validated_entries
 import re
 
 
@@ -539,10 +552,10 @@ def validate(root: Path = ROOT) -> list[str]:
                 ).glob("*.sql")
             )
 
-            if versions != list(range(1, 165 if learning_contract['status']=='finalized' else 143)):
+            if versions != list(range(1, 167 if learning_contract['status']=='finalized' else 143)):
                 errors.append(
                     "migration namespace must contain exactly "
-                    f"001 through {164 if learning_contract['status']=='finalized' else 142}: {tree}"
+                    f"001 through {166 if learning_contract['status']=='finalized' else 142}: {tree}"
                 )
 
     except (OSError, KeyError, ValueError, TypeError) as error:
@@ -615,6 +628,8 @@ def validate(root: Path = ROOT) -> list[str]:
         validated_webhook_entries(root)
         validated_bi_dashboard_entries(root)
         validated_automated_reporting_entries(root)
+        validated_bi_team_sharing_entries(root)
+        validated_bi_report_delivery_lifecycle_entries(root)
     except (OSError, ValueError, TypeError, KeyError) as error:
         errors.append(f"shared immutable-storage candidate invalid: {error}")
     return errors

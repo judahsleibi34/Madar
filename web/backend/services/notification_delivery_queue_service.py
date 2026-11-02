@@ -1,4 +1,5 @@
 from __future__ import annotations
+from services.account_work_fence import notification_work
 
 import logging
 import os
@@ -41,6 +42,7 @@ def _safe_code(value: str | None, fallback: str = "delivery_failed") -> str:
     return normalized if SAFE_CODE_PATTERN.fullmatch(normalized) else fallback
 
 
+@notification_work
 def resolve_outbox_notification(row: dict[str, Any], *, client=None) -> int:
     outbox_id = str(row.get("id") or "")
     if not outbox_id:
