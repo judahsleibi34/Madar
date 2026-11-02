@@ -216,6 +216,13 @@ def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_con
         completed_context.validate(plan,root,package)
         if completed_context.schema==160:
             verify_backup_execution_context(package,expected_schema=160,completed_context=completed_context)
+    historical_replica=False
+    if completed_context is not None and historical_database_options(completed_context.contract):
+        from deployment.lib import isolated_backup_replica
+        # An exact root-enrolled historical KVM transport, not a selectable
+        # production namespace or an SSH/network exception in the guest.
+        isolated_backup_replica.policy(completed_context)
+        historical_replica=True;replica_namespace=isolated_backup_replica.NAMESPACE
     if authorizing_context is not None:
         import re
         if (recovery_context is not None or set(authorizing_context)!={'plan_sha256','source_bundle_sha256'}
@@ -235,6 +242,8 @@ def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_con
     replica=acceptance['node1_replica']
     if file_digest(readonly_configuration(NODE1_CONFIGURATION,private=True))!=replica['configuration_sha256']:
         raise RuntimeError('normal_backup_node1_configuration_changed')
+    if historical_replica and isolated_backup_replica.policy(completed_context)[0]['receiver_filesystem_uuid']!=replica['filesystem_uuid']:
+        raise RuntimeError('normal_backup_node1_enrolled_filesystem_changed')
     started=datetime.now(timezone.utc).isoformat()
     identity=pwd.getpwnam('madar')
     canonical=Path('/var/lib/madar/backups')
@@ -335,9 +344,12 @@ def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_con
         if authorizing_context is not None:
             from types import SimpleNamespace
             replica_plan=SimpleNamespace(digest=scope_digest)
-        output=checked(remote_receiver(package,replica_plan,backup,sums,replica['filesystem_uuid'],expected_schema=expected_schema,
-            namespace=replica_namespace,maintenance_manifest_sha256=maintenance_digest),stdin=archive)
-    remote=json.loads(output)
+        if historical_replica:
+            remote=isolated_backup_replica.replicate(completed_context,archive,backup,sums,maintenance_digest)
+        else:
+            output=checked(remote_receiver(package,replica_plan,backup,sums,replica['filesystem_uuid'],expected_schema=expected_schema,
+                namespace=replica_namespace,maintenance_manifest_sha256=maintenance_digest),stdin=archive)
+            remote=json.loads(output)
     if (remote.get('operation')!='actual-append-only-normal-backup-replica' or remote.get('plan_sha256')!=replica_plan.digest
             or remote.get('backup_id')!=backup.name or remote.get('sha256sums_sha256')!=sums
             or remote.get('schema')!=expected_schema or remote.get('namespace')!=replica_namespace

@@ -2784,3 +2784,42 @@ These source/signature/journal checks require fresh native source-poweroff,
 physical receiver retirement, safe owned guest resume and application acceptance.
 Component tests do not establish that operational result or open canonical160
 execution or production registration.
+
+### Historical maintenance replica transport (2026-11-02)
+
+The historical canonical backup context uses the existing maintenance capture,
+ordinary logical archive, executed local restore, migration-input sealing and
+`normal_backup_replica` verification. Its transport adapter keeps Node1 SSH
+credentials on the independent parent and leaves the KVM effect firewall intact.
+It cannot use the production backup namespace or substitute a physical archive
+for a logical one. Ordinary production replication keeps its original SSH/mount
+contract and schema gates.
+
+The immutable plan authenticates a root-private typed Node1 configuration with
+the historical enrollment, source guest/database/controller and target software,
+independent observer and receiver public keys, physical receiver/filesystem,
+bounded archive size and expiry. The actual installed controller, signed source
+context, measured isolation and current fenced authority are revalidated. The
+artifact report must identify the same filesystem. A new root-only nonce scope
+contains the exact archive and request; the parent must independently pin the
+frozen context/plan and pre/post backup scopes before signing and transferring.
+No caller PASS field or guest-supplied command, destination or SSH key is accepted.
+
+The independently root-enrolled Node1 test receiver checks the actual physical
+host/filesystem, parent signature, exact stage/plan/context, deadline and measured
+headroom before durably consuming the transfer. It verifies complete transported
+bytes, the shared normal backup checksums/inventory and canonical146→160
+maintenance manifest, original-role/object bindings, schema, controller and
+application identity. Both146 and160 are tied to their actual pre/post scopes.
+Accepted files are append-only under the exact owned test run. A receiver-key
+signature binds the exact request and received inventory. Receipt of bytes
+explicitly does not claim database or full-application restoration, SQL execution
+or deployment authority. The independent full application receipt remains required.
+
+The guest authenticates that receipt before the existing pipeline publishes its
+backup evidence; it rechecks local authority and policy and removes only its own
+verified bulk transfer copy. Failed or replayed transfers never overwrite prior
+evidence. Compact transfer journals are bounded; exhaustion refuses further runs
+until exact-owned retirement. Parent orchestration, physical receiver acceptance
+and the complete canonical operation still require native testing. Source/archive
+tests do not establish schema160 acceptance or production authorization.

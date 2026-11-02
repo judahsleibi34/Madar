@@ -2891,3 +2891,12 @@ configuration and read-only host inputs. It does not manufacture configuration
 files from a newer provider architecture. Ordinary completed-origin checks,
 independent restoration, approval and execution boundaries remain mandatory.
 See the historical configuration contract in the control-plane architecture.
+
+Historical canonical maintenance backups retain the existing capture, executed
+local restore and migration-input sealing. The independently enrolled isolated
+transport carries the same logical bytes through the existing Node1 receiver;
+its signed receipt is separate from physical full-application recovery evidence.
+Neither evidence grants migration authority. The exact operation, source,
+controller, database, pre/post scopes and required independent approvals remain
+mandatory. See `control-plane-upgrade-architecture.md` for the transport contract
+and native acceptance still required before opening protected schema160 admission.

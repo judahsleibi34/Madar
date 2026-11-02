@@ -4921,3 +4921,13 @@ hold. Retirement is distinct from full-application restoration acceptance; both
 retain independent evidence. See the receiver retirement contract in the
 control-plane architecture. Native poweroff/retirement/resume acceptance is still
 required before claiming this boundary operationally complete.
+
+Root-enrolled historical KVM maintenance backups may use the existing pipeline's
+parent-mediated Node1 transport. It preserves the logical format, executed local
+restore and exact canonical pre/post scope checks. The independent parent and
+receiver must pin the frozen operation and authenticate actual bytes; the guest
+verifies the receiver signature while retaining its network fence. Production's
+SSH/mount contract is unchanged. A signed replica receipt proves receipt only,
+and cannot replace independent application restoration or release approval.
+See the transport contract and remaining native acceptance requirement in the
+control-plane architecture.

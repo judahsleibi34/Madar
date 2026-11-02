@@ -62,6 +62,7 @@ declare -a tracked_files=(
   lib/completed_normal_private_provider.py
   lib/isolated_release_environment.py
   lib/isolated_github_observation.py
+  lib/isolated_backup_replica.py
   lib/schema148_consumers.py
   lib/schema148_artifacts.py
   lib/schema148_release.py
