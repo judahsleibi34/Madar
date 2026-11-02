@@ -2900,3 +2900,12 @@ Neither evidence grants migration authority. The exact operation, source,
 controller, database, pre/post scopes and required independent approvals remain
 mandatory. See `control-plane-upgrade-architecture.md` for the transport contract
 and native acceptance still required before opening protected schema160 admission.
+
+Historical successor admission distinguishes stable provider identity from
+transient Docker addresses. Explicit version2 probe inputs authenticate exact
+provider image/specification/container/native-network identities against the
+independent runtime scope before resolving current private addresses. The signed
+probe-input digest, canonical history and all ordinary admission gates remain
+mandatory. Legacy files retain strict address binding, and consumed origin
+records cannot be silently upgraded. See the control-plane architecture's native
+failure and fresh acceptance requirement.

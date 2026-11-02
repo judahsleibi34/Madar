@@ -354,6 +354,49 @@ def verify_provider_configurations(binding,*,runtime=None):
     return digest(expected)
 
 
+def provider_probe_endpoints(material,by_name,environment):
+    """Bind probes to enrolled providers; IP addresses are runtime observations.
+
+    Legacy endpoint files retain their exact-address contract. The explicit v2
+    contract pins identities/specifications and the native network instead, so
+    a legitimate restart cannot turn an obsolete address into a credential URL.
+    """
+    from ipaddress import IPv4Address,IPv4Network
+    from .completed_normal_resources import measured_spec
+    from .schema150_actor_inventory import DEFAULT_NETWORK
+    legacy=isinstance(material,dict) and set(material)=={'subjects','endpoints','anon_key'}
+    if not legacy and (not isinstance(material,dict) or set(material)!={'version','subjects','provider_bindings','anon_key'}
+            or type(material['version']) is not int or material['version']!=2
+            or not isinstance(material['provider_bindings'],dict)
+            or set(material['provider_bindings'])!={'auth','rest','storage'}):
+        raise RuntimeError('historical_origin_probe_shape')
+    endpoints={}
+    for component,port in (('auth',9999),('rest',3000),('storage',5000)):
+        row=by_name.get('supabase-'+component)
+        if not row or row.get('Name')!='/supabase-'+component or row.get('State',{}).get('Running') is not True:
+            raise RuntimeError('historical_origin_probe_provider_substitution')
+        network=row['NetworkSettings']['Networks'].get(DEFAULT_NETWORK)
+        if not network or not network.get('IPAddress'):raise RuntimeError('historical_origin_provider_network_changed')
+        if not legacy:
+            binding=material['provider_bindings'][component]
+            expected=environment.get('runtime_scope',{}).get(row['Id'],{})
+            if (not isinstance(binding,dict) or set(binding)!={'id','image','spec_sha256','network_id'}
+                    or any(not re.fullmatch('[a-f0-9]{64}',str(binding[k])) for k in ('id','spec_sha256','network_id'))
+                    or not re.fullmatch('sha256:[a-f0-9]{64}',str(binding['image']))
+                    or binding!={'id':row['Id'],'image':row['Image'],'spec_sha256':measured_spec(row),'network_id':network.get('NetworkID')}
+                    or any(expected.get(k)!=v for k,v in
+                        {'name':row['Name'],'image':binding['image'],'spec_sha256':binding['spec_sha256']}.items())):
+                raise RuntimeError('historical_origin_probe_provider_substitution')
+        try:
+            address=IPv4Address(network['IPAddress'])
+            if not any(address in IPv4Network(cidr) for cidr in ('10.0.0.0/8','172.16.0.0/12','192.168.0.0/16')):raise ValueError()
+        except (ValueError,TypeError):raise RuntimeError('historical_origin_provider_network_changed') from None
+        endpoints[component]='http://'+str(address)+':'+str(port)
+    if legacy and material['endpoints']!=endpoints:
+        raise RuntimeError('historical_origin_probe_provider_substitution')
+    return endpoints
+
+
 def observe(system,p,environment):
     """Measure actual original state, never accept caller-provided PASS fields.
 
@@ -408,14 +451,8 @@ def observe(system,p,environment):
     raw=protected(probes,private=True).read_bytes()
     if len(raw)>65536:raise RuntimeError('historical_origin_probe_budget')
     material=strict_json(raw)
-    if set(material)!={'subjects','endpoints','anon_key'}:raise RuntimeError('historical_origin_probe_shape')
-    endpoints={}
-    for component,port in (('auth',9999),('rest',3000),('storage',5000)):
-        network=by_name['supabase-'+component]['NetworkSettings']['Networks'].get('madar-local-supabase_default')
-        if not network or not network.get('IPAddress'):raise RuntimeError('historical_origin_provider_network_changed')
-        endpoints[component]='http://'+network['IPAddress']+':'+str(port)
-    if material['endpoints']!=endpoints:raise RuntimeError('historical_origin_probe_provider_substitution')
-    accounts=observe_subjects(material['subjects'],material['endpoints'],material['anon_key'])
+    endpoints=provider_probe_endpoints(material,by_name,environment)
+    accounts=observe_subjects(material['subjects'],endpoints,material['anon_key'])
     with connect_database() as db:
         catalog=observe_database(db,required_protocols={})
         if catalog.schema!=146 or catalog.system_identifier!=p['database_system_identifier']:

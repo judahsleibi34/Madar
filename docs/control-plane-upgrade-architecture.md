@@ -2840,3 +2840,27 @@ or issue deployment/migration authority. The application's recovery remains a
 separate existing controller operation. A failed or consumed resume never becomes
 a fresh attempt implicitly. Native physical-retirement and guest-resume testing
 remains required; modeled process/SSH tests are not that acceptance evidence.
+
+### Historical provider probe identities across reboot (2026-11-02)
+
+Fresh native testing recovered the historical application through two actual
+reboots with unchanged route inode/ownership, release/worker/manifest receipts,
+provider IDs/specifications and original data fingerprints. Subsequent origin
+readmission nevertheless refused: the old probe file pinned transient Docker
+addresses which had changed during restart. The refusal and unchanged-source
+diagnosis remain in the run's evidence; the run did not execute canonical SQL.
+
+Explicit version2 historical probe inputs bind each fixed Auth, PostgREST and
+Storage provider by container ID, immutable image, measured Docker specification
+and native network ID. Before sending any credentials, the observer verifies
+those bindings against both the actual running provider and independently
+enrolled runtime scope. It resolves the current private IPv4 address only from
+that authenticated native network and uses code-owned provider ports. Caller
+URLs, public/loopback/invalid addresses, substituted actors/images/configurations,
+foreign networks and unknown versions refuse. Legacy endpoint files retain their
+strict old address contract and cannot silently gain the new capability.
+
+The root-private probe input is still hashed into the signed historical origin
+observation. Existing consumed enrollment is not rewritten to select a new probe
+contract or controller. Fresh controller/enrollment and native readmission after
+repeated reboot are required before canonical admission can use this correction.

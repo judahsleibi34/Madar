@@ -14,6 +14,60 @@ from deployment.lib.migration_inventory import digest
 from test_historical_origin import HistoricalPreparationBindingTests
 
 
+class HistoricalProviderProbeBindings(unittest.TestCase):
+    def fixture(self):
+        from deployment.lib.schema150_actor_inventory import DEFAULT_NETWORK
+        rows={};scope={};bindings={};endpoints={}
+        for number,(name,port) in enumerate((('auth',9999),('rest',3000),('storage',5000)),1):
+            row={'Id':str(number)*64,'Name':'/supabase-'+name,'Image':'sha256:'+str(number)*64,
+                'Config':{'Env':['ACTUAL_CONFIGURATION=unchanged']},'HostConfig':{},'Mounts':[],
+                'State':{'Running':True},'NetworkSettings':{'Networks':{DEFAULT_NETWORK:{'NetworkID':'b'*64,'IPAddress':'172.18.0.'+str(number+2)}}}}
+            checksum=measured_spec(row);rows['supabase-'+name]=row
+            scope[row['Id']]={'name':row['Name'],'image':row['Image'],'spec_sha256':checksum,'binds':{}}
+            bindings[name]={'id':row['Id'],'image':row['Image'],'spec_sha256':checksum,'network_id':'b'*64}
+            endpoints[name]='http://172.18.0.'+str(number+2)+':'+str(port)
+        return rows,{'runtime_scope':scope},{'version':2,'subjects':[],'provider_bindings':bindings,'anon_key':'synthetic'},endpoints
+
+    def test_verified_provider_identity_survives_actual_runtime_address_change(self):
+        from deployment.lib.schema150_actor_inventory import DEFAULT_NETWORK
+        rows,environment,material,endpoints=self.fixture()
+        self.assertEqual(origin.provider_probe_endpoints(material,rows,environment),endpoints)
+        rows['supabase-auth']['NetworkSettings']['Networks'][DEFAULT_NETWORK]['IPAddress']='172.18.0.19'
+        expected=dict(endpoints,auth='http://172.18.0.19:9999')
+        self.assertEqual(origin.provider_probe_endpoints(material,rows,environment),expected)
+
+    def test_provider_image_spec_identity_network_and_enrollment_substitution_refuse(self):
+        from deployment.lib.schema150_actor_inventory import DEFAULT_NETWORK
+        for fault in ('id','image','spec','network','scope','stopped'):
+            rows,environment,material,endpoints=self.fixture();row=rows['supabase-auth']
+            if fault=='id':row['Id']='f'*64
+            elif fault=='image':row['Image']='sha256:'+'f'*64
+            elif fault=='spec':row['Config']['Env'].append('UNREVIEWED_CONFIGURATION=changed')
+            elif fault=='network':row['NetworkSettings']['Networks'][DEFAULT_NETWORK]['NetworkID']='f'*64
+            elif fault=='scope':environment['runtime_scope'].pop(row['Id'])
+            else:row['State']['Running']=False
+            with self.subTest(fault=fault),self.assertRaisesRegex(RuntimeError,'provider_substitution'):
+                origin.provider_probe_endpoints(material,rows,environment)
+
+    def test_legacy_probe_cannot_silently_gain_address_drift_permission(self):
+        from deployment.lib.schema150_actor_inventory import DEFAULT_NETWORK
+        rows,environment,material,endpoints=self.fixture()
+        legacy={'subjects':[],'endpoints':endpoints,'anon_key':'synthetic'}
+        self.assertEqual(origin.provider_probe_endpoints(legacy,rows,environment),endpoints)
+        rows['supabase-auth']['NetworkSettings']['Networks'][DEFAULT_NETWORK]['IPAddress']='172.18.0.19'
+        with self.assertRaisesRegex(RuntimeError,'provider_substitution'):origin.provider_probe_endpoints(legacy,rows,environment)
+
+    def test_unknown_version_caller_url_or_public_address_refuses(self):
+        from deployment.lib.schema150_actor_inventory import DEFAULT_NETWORK
+        for fault in ('version','url','public','loopback','invalid'):
+            rows,environment,material,endpoints=self.fixture()
+            if fault=='version':material['version']=3
+            elif fault=='url':material['endpoints']={'auth':'http://production.invalid'}
+            else:rows['supabase-auth']['NetworkSettings']['Networks'][DEFAULT_NETWORK]['IPAddress']={
+                'public':'8.8.8.8','loopback':'127.0.0.1','invalid':'172.18.0.3/../production'}[fault]
+            with self.subTest(fault=fault),self.assertRaises(RuntimeError):origin.provider_probe_endpoints(material,rows,environment)
+
+
 class HistoricalConfigurationTests(unittest.TestCase):
     def setUp(self):
         tmp=tempfile.TemporaryDirectory();self.addCleanup(tmp.cleanup);self.root=Path(tmp.name)

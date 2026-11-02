@@ -4938,3 +4938,10 @@ the actual stopped-source hold before poweroff and authenticate retirement befor
 resuming the owned inactive disk. Nonce-consumed control cannot extend the run's
 lifetime or adopt an unknown guest. It does not automatically start the application
 or create any production authority. Native acceptance remains outstanding.
+
+Historical version2 provider probes resolve addresses only after authenticating
+the fixed provider's container/image/specification/native-network bindings against
+the independently enrolled runtime. Their root-private input digest remains part
+of historical enrollment. Existing strict endpoint files and consumed enrollment
+are not reinterpreted or rewritten. Fresh native repeated-boot/readmission
+acceptance is required; actual recovery alone does not prove successor admission.
