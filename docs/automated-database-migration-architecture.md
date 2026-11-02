@@ -2781,3 +2781,16 @@ authenticated archive. Existing Storage attributes are verified exactly in an
 explicit read-only mode; they are never recreated or overwritten. Ordinary
 metadata recovery still refuses preexisting attributes. Changed bytes, versions,
 metadata or scope refuse before restored application acceptance.
+
+Historical enrollment now measures actual readiness through both the stable
+proxy and active backend, along with both frontend routes, using the existing
+controller's HTTP transport. Docker liveness is insufficient. The separately
+verified historical bootstrap still supplies no modern migration completion.
+A degraded/backlogged application cannot become an enrolled upgrade origin.
+
+The full preserved-data fixture uses a genuine future in-app calendar reminder
+created by the historical event API for pending work. It does not create a
+synthetic delayed outbox job that ages into the historical backlog alarm. This
+change applies before new baseline capture/enrollment; previously captured
+failed restoration data and its receipts are never rewritten or declared PASS.
+Readiness thresholds, canonical SQL and source application images are unchanged.

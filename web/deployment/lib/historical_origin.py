@@ -245,6 +245,37 @@ def policy(system):
     return p,key,environment
 
 
+def serving_observation(system,source_sha,slot):
+    """Real historical readiness without inventing a modern migration receipt.
+
+    Reuse the installed controller's HTTP transport and fixed slot/route ports.
+    The independently pinned original configuration determines optional external
+    integrations; Docker liveness alone is never serving acceptance.
+    """
+    from .control_plane_upgrade import SLOT_PORTS
+    if slot not in SLOT_PORTS or not re.fullmatch('[a-f0-9]{40}',str(source_sha)):
+        raise RuntimeError('historical_origin_serving_identity_invalid')
+    result={}
+    for name,port in (('stable',8001),('active',SLOT_PORTS[slot]['backend'])):
+        version=system.http_json('http://127.0.0.1:'+str(port)+'/health/version')
+        ready=system.http_json('http://127.0.0.1:'+str(port)+'/health/ready')
+        if (not isinstance(version,dict) or version.get('release_sha')!=source_sha
+                or version.get('release_slot')!=slot
+                or type(version.get('schema_compatible_min')) is not int or version['schema_compatible_min']!=144
+                or type(version.get('schema_compatible_max')) is not int or version['schema_compatible_max']!=146):
+            raise RuntimeError('historical_origin_serving_identity_changed')
+        if (not isinstance(ready,dict) or ready.get('ready') is not True
+                or not isinstance(ready.get('components'),dict)
+                or any(ready['components'].get(k)!='ok' for k in
+                    ('environment','database','redis','auth','storage','schema','admin_mfa_policy',
+                     'parser_isolation','notification_worker','data_deletion_worker'))):
+            raise RuntimeError('historical_origin_serving_unready')
+        result[name]={'version':version,'readiness':ready}
+    for port in (3000,SLOT_PORTS[slot]['frontend']):
+        system.http_ok('http://127.0.0.1:'+str(port)+'/')
+    return result
+
+
 def observe(system,p,environment):
     """Measure actual original state, never accept caller-provided PASS fields.
 
@@ -274,6 +305,7 @@ def observe(system,p,environment):
             or bootstrap.get('candidate_slot')!=known['slot'] or bootstrap.get('traffic_target')!=known['slot']
             or bootstrap.get('schema')!={'observed':146} or bootstrap.get('images')!=known.get('images')):
         raise RuntimeError('historical_origin_truthful_bootstrap_required')
+    serving=serving_observation(system,p['source_sha'],known['slot'])
     tree,_=snapshot(system.repo,p['source_sha'])
     if tree!=p['source_tree_sha']:raise RuntimeError('historical_origin_source_tree_changed')
     inventory=discover(system.repo,source_sha=p['source_sha'],history_base_sha=p['source_sha'])
@@ -326,6 +358,7 @@ def observe(system,p,environment):
         'host':{k:environment[k] for k in ('guest_uuid','machine_id','root_filesystem_uuid','realm_id')},
         'controller_sha':system.installed_sha(),'source_sha':p['source_sha'],'source_tree_sha':tree,
         'bootstrap_sha256':digest(bootstrap),'known_good':known,'worker_authority':owner,
+        'serving':serving,
         'runtime':{r['Name']:{'id':r['Id'],'image':r['Image'],'spec_sha256':measured_spec(r)} for r in rows},
         'runtime_scope_sha256':digest(environment['runtime_scope']),
         'boot_controls':boot_controls(system),

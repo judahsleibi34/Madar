@@ -180,12 +180,9 @@ def seed(db, subjects, *, resume=False):
                 notification = insert(db, 'user_notifications', {'event_id': event, 'tenant_id': tenant,
                     'user_id': user, 'event_type': 'fixture.original', 'title': 'Preserved notification',
                     'body': 'Synthetic in-app record only'})
-                pending = insert(db, 'notification_outbox', {'tenant_id': tenant, 'user_id': user,
-                    'channel': 'internal', 'template': 'fixture.original', 'available_at': '2035-01-01T00:00:00Z',
-                    'payload': {'notification_id': notification}, 'deduplication_key': 'original-'+project})
             records.append({'tenant_id': tenant, 'user_id': user, 'project': project,
                 'submission': submission, 'reservation': reservation,
-                'notification_event': event, 'notification': notification, 'pending_outbox': pending})
+                'notification_event': event, 'notification': notification})
             atomic_json(progress, records)
         record = records[index]
         require(record['tenant_id'] == tenant and record['user_id'] == user, 'seed_progress_subject_changed')
@@ -198,9 +195,18 @@ def seed(db, subjects, *, resume=False):
         if 'event' not in record:
             record['event'] = app('POST', '/calendar/events', {'calendar_id': record['calendar'],
                 'title': 'Preserved event', 'starts_at': '2035-01-02T12:00:00Z',
-                'ends_at': '2035-01-02T13:00:00Z', 'timezone': 'UTC', 'project_id': project},
+                'ends_at': '2035-01-02T13:00:00Z', 'timezone': 'UTC', 'project_id': project,
+                'reminders': [{'channel': 'in_app', 'minutes_before': 15}]},
                 expected=201)['event']['id']
             atomic_json(progress, records)
+        # Genuine pending application work, created by the event API. A fake
+        # delayed notification would age into the legacy backlog health gate.
+        pending=db.execute("SELECT id::text FROM public.calendar_event_reminders WHERE event_id=%s "
+            "AND tenant_id=%s AND channel='in_app' AND delivery_status='scheduled' "
+            "AND scheduled_for>now()", (record['event'],tenant)).fetchall()
+        require(len(pending)==1, 'original_pending_reminder_required')
+        record['pending_reminder_id']=pending[0][0]
+        atomic_json(progress, records)
         if not record.get('status_transition_accepted'):
             changed = app('PATCH', '/builder/reservations/'+reservation+'/status', {'status': 'confirmed'})
             require(changed['reservation']['status'] == 'confirmed', 'reservation_transition_failed')
@@ -241,6 +247,7 @@ def functional(subjects, records, *, member_subjects=None, application_base='htt
         require(member_app('GET', '/builder/projects/'+owned['project'])['project']['tenant_id']
                 == subject['tenant_id'], 'member_project_unavailable')
         member_app('GET', '/builder/projects/'+other['project'], expected=404)
+        require(app('GET', '/health/ready').get('ready') is True, 'application_unready')
 
 
 def complete_original_data(db, state, subjects, records):

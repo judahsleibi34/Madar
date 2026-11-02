@@ -608,3 +608,30 @@ class HistoricalBootControlsTests(unittest.TestCase):
     def test_actual_alert_instance_cannot_be_hidden_as_a_template(self):
         self.instances='madar-ops-alert@failed.service loaded active running diagnostic alert'
         with self.assertRaisesRegex(RuntimeError,'alert_instances_require_review'):origin.boot_controls(self.system)
+
+
+class HistoricalServingReadinessTests(unittest.TestCase):
+    def setUp(self):
+        self.version={'release_sha':'a'*40,'release_slot':'green','schema_compatible_min':144,'schema_compatible_max':146}
+        self.ready={'ready':True,'components':{k:'ok' for k in ('environment','database','redis','auth','storage','schema','admin_mfa_policy','parser_isolation','notification_worker','data_deletion_worker')}}
+        self.ready['components']['calendar_sync_worker']='disabled'
+        self.system=SimpleNamespace(http_json=Mock(side_effect=lambda url:copy.deepcopy(self.version if url.endswith('/version') else self.ready)),http_ok=Mock())
+    def test_real_route_and_active_slot_are_read_without_modern_completion(self):
+        observed=origin.serving_observation(self.system,'a'*40,'green')
+        self.assertEqual(set(observed),{'stable','active'})
+        self.assertEqual([v.args[0] for v in self.system.http_json.call_args_list], [
+            'http://127.0.0.1:8001/health/version','http://127.0.0.1:8001/health/ready',
+            'http://127.0.0.1:8201/health/version','http://127.0.0.1:8201/health/ready'])
+        self.assertEqual([v.args[0] for v in self.system.http_ok.call_args_list], [
+            'http://127.0.0.1:3000/','http://127.0.0.1:3200/'])
+    def test_live_but_backlogged_or_unready_origin_cannot_be_enrolled(self):
+        self.ready['ready']=False;self.ready['components']['notification_queue']='backlogged'
+        with self.assertRaisesRegex(RuntimeError,'serving_unready'):
+            origin.serving_observation(self.system,'a'*40,'green')
+    def test_wrong_source_or_schema_and_missing_core_provider_refuse(self):
+        for key,value in [('release_sha','b'*40),('schema_compatible_max',160),('release_slot','blue')]:
+            with self.subTest(key=key),patch.dict(self.version,{key:value}),self.assertRaisesRegex(RuntimeError,'serving_identity_changed'):
+                origin.serving_observation(self.system,'a'*40,'green')
+        self.ready['components'].pop('auth')
+        with self.assertRaisesRegex(RuntimeError,'serving_unready'):
+            origin.serving_observation(self.system,'a'*40,'green')
