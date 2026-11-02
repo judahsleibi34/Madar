@@ -127,3 +127,32 @@ class SourceProxyBindingTests(unittest.TestCase):
             elif fault=='public':bindings['8080/tcp'][0]['HostIp']='0.0.0.0'
             else:bindings['80/tcp']=[{'HostIp':'127.0.0.1','HostPort':'3200'}]
             with self.assertRaisesRegex(RuntimeError,'source_proxy_binding'):receiver.restored_proxy_configuration('127.0.0.1:3200',app)
+
+
+class RestoredReadinessTests(unittest.TestCase):
+    def test_http_status_and_exact_source_are_mandatory(self):
+        observed=[{'http_status':200,'body':{'ready':True}},
+                  {'http_status':200,'body':{'release_sha':'a'*40}}]
+        self.assertTrue(receiver.application_ready(observed,'a'*40))
+        import copy
+        for role in (0,1):
+            for status in (503,True,'200'):
+                changed=copy.deepcopy(observed);changed[role]['http_status']=status
+                self.assertFalse(receiver.application_ready(changed,'a'*40))
+        self.assertFalse(receiver.application_ready(observed,'b'*40))
+        self.assertFalse(receiver.application_ready([observed[0]],'a'*40))
+
+    def test_actual_http_error_body_is_retained_without_becoming_acceptance(self):
+        import io
+        from contextlib import redirect_stdout
+        from urllib.error import HTTPError
+        class Version(io.BytesIO):
+            status=200
+        failure=HTTPError('http://proxy:8001/health/ready',503,'Unavailable',{},
+            io.BytesIO(b'{"ready":false,"reason":"dependency_unavailable"}'))
+        output=io.StringIO()
+        with patch('urllib.request.urlopen',side_effect=[failure,Version(json.dumps({'release_sha':'a'*40}).encode())]),redirect_stdout(output):
+            exec(compile(receiver.READINESS_PROBE,'native-restored-readiness','exec'),{})
+        observed=json.loads(output.getvalue())
+        self.assertEqual(observed[0],{'http_status':503,'body':{'ready':False,'reason':'dependency_unavailable'}})
+        self.assertFalse(receiver.application_ready(observed,'a'*40))

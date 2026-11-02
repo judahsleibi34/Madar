@@ -24,6 +24,30 @@ ROLE_CPU={'database':.35,'auth':.15,'rest':.1,'storage':.1,'gateway':.05,'redis'
     'frontend':.05,'backend':.35,'parser-worker':.2,'remote-ingestion-worker':.1,
     'notification-worker':.2,'calendar-sync-worker':.1,'data-deletion-worker':.1,'proxy':.05}
 
+READINESS_PROBE="""import json
+from urllib.request import urlopen
+from urllib.error import HTTPError
+observations=[]
+for path in ('ready','version'):
+ try:response=urlopen('http://proxy:8001/health/'+path,timeout=5)
+ except HTTPError as error:response=error
+ with response:
+  raw=response.read(131073)
+  if len(raw)>131072:raise RuntimeError('restored_readiness_response_budget')
+  observations.append({'http_status':response.status,'body':json.loads(raw)})
+print(json.dumps(observations))
+"""
+
+
+def application_ready(observations,source_sha):
+    """A JSON ready flag cannot override the actual HTTP readiness result."""
+    return (isinstance(observations,list) and len(observations)==2
+        and all(isinstance(v,dict) and set(v)=={'http_status','body'}
+            and type(v['http_status']) is int and v['http_status']==200
+            and isinstance(v['body'],dict) for v in observations)
+        and observations[0]['body'].get('ready') is True
+        and observations[1]['body'].get('release_sha')==source_sha)
+
 
 def storage_identity(configuration):
     """Keep object ownership aligned with the authenticated provider process.
@@ -364,9 +388,13 @@ print(json.dumps({'system_identifier':identity[0],'schema':identity[1],'protocol
         deadline=time.monotonic()+240
         while True:
             try:
-                probe=command(['docker','exec','-i',owner['containers']['backend'],'python','-'],data=b"import json;from urllib.request import urlopen;print(json.dumps([json.load(urlopen('http://proxy:8001/health/ready',timeout=5)),json.load(urlopen('http://proxy:8001/health/version',timeout=5))]))",timeout=15)
-                ready,identity=json.loads(probe)
-                if ready['ready'] is True and identity['release_sha']==app['source_sha']:break
+                probe=command(['docker','exec','-i',owner['containers']['backend'],'python','-'],
+                    data=READINESS_PROBE.encode(),timeout=15)
+                observations=json.loads(probe)
+                # Preserve the actual routed refusal, not merely HTTPError503.
+                # This private diagnostic never substitutes for acceptance.
+                atomic_json(root/'last-readiness-observation.json',observations)
+                if application_ready(observations,app['source_sha']):break
             except (OSError,ValueError,RuntimeError):pass
             if time.monotonic()>deadline:raise RuntimeError('offhost_test_restored_application_unready')
             time.sleep(2)

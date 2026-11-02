@@ -2304,3 +2304,10 @@ Enrollment captures its exact static unit-file identity and root-protected
 fragment/drop-ins, with an explicit nonapplicable active state. Any loaded alert
 instance requires review. Provider attestation reobserves that absence and the
 exact template configuration; no alert instance is started for measurement.
+
+Independent test restoration preserves bounded private routed readiness
+observations, including non-200 JSON responses, so failures identify the actual
+dependency boundary. Both HTTP endpoints must return200, readiness must be true
+and the release identity must match. A response body cannot override HTTP503.
+Failed restoration still fences all owned services and consumes its authority;
+continuation requires a separately authenticated exact attempt.
