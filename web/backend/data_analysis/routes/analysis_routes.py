@@ -227,6 +227,11 @@ def assisted_analysis_for_dataset_version(
             symbols=request.symbols,
             tenant_id=tenant_id,
             user_id=scoped_user_id,
+            dataset_version=persistent["version"],
+            dataset_identity={
+                "project_id": project_id, "dataset_id": dataset_id,
+                "version_id": version_id,
+            },
         )
         version = persistent["version"]
         dataset = persistent["dataset"]

@@ -33,6 +33,28 @@ def parse_dataset(payload: dict[str, Any]) -> dict[str, Any]:
         or user_id in (None, "")
     ):
         raise ValueError("invalid_parse_request")
+    operation = str(payload.get("operation") or "parse")
+    if operation == "csv_metadata":
+        if content_b64 is not None or source_url is not None or content_type is not None \
+                or not isinstance(input_path, str) or not input_path \
+                or len(input_path) > 4096:
+            raise ValueError("invalid_parse_request")
+        original_filename = payload.get("original_filename")
+        if not isinstance(original_filename, str) or not original_filename \
+                or len(original_filename) > 255:
+            raise ValueError("invalid_parse_request")
+        safe_path = DataReadingNormal(
+            input_path, tenant_id=str(tenant_id), user_id=str(user_id),
+        )._resolve_uploaded_file(input_path)
+        if safe_path.suffix.lower() != ".csv":
+            raise ValueError("invalid_parse_request")
+        from data_analysis.services import extract_csv_metadata
+
+        return extract_csv_metadata(
+            safe_path, original_filename=original_filename,
+        )
+    if operation != "parse":
+        raise ValueError("invalid_parse_request")
     if content_b64 is not None:
         if (
             input_path is not None

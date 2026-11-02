@@ -104,6 +104,8 @@ configure_structured_logging()
 RUNTIME_CONFIGURATION = validate_runtime_configuration()
 logger = logging.getLogger(__name__)
 app = FastAPI()
+from services.account_work_fence import AccountWorkFenceMiddleware
+app.add_middleware(AccountWorkFenceMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(RequestBodyLimitMiddleware)
 

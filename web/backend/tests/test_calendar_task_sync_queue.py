@@ -22,6 +22,9 @@ class RpcClient:
 
 class CalendarTaskSyncQueueTests(unittest.TestCase):
     def setUp(self):
+        # Historical queue behavior at166; candidate167 fencing has real DB tests.
+        schema=patch("services.project_dataset_service.schema_version",return_value=166)
+        schema.start();self.addCleanup(schema.stop)
         calendar_sync_worker.STATE.update(
             {
                 "healthy": False,

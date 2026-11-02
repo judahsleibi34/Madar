@@ -1,0 +1,14 @@
+{
+  "manifest_version": 1,
+  "release_sha": "STAGING",
+  "migrations": [
+    {
+      "number": 167,
+      "from_schema": 166,
+      "to_schema": 167,
+      "path": "web/database/migrations/167_add_account_recovery_hold.sql",
+      "sha256": "17c4a2405f3579aa596c9a18160a757ba17c73805ab4dc8ded4c003220b1eedc",
+      "compatibility": "coordinated"
+    }
+  ]
+}

@@ -1936,29 +1936,12 @@ async def upload_builder_asset(
 
     storage_key = f"{tenant_dir}/builder_assets/{filename}"
     asset_url = f"/uploads/{storage_key}"
-    try:
-        store_builder_asset(
-            storage_key=storage_key,
-            source_path=target_path,
-            content_type=detected_content_type,
-        )
-    except BuilderAssetStorageError as error:
-        target_path.unlink(missing_ok=True)
-        release_builder_asset_reservation(
-            reservation_id=storage_reservation_id,
-            tenant_id=context.tenant_id,
-        )
-        raise HTTPException(
-            status_code=503,
-            detail=error_detail(
-                "asset_storage_unavailable",
-                "Asset storage is temporarily unavailable.",
-            ),
-        ) from error
-
+    # Seal exact account/provider ownership before provider publication.  A
+    # provider failure removes this provisional registry row below.
     try:
         registered_asset = register_builder_asset(
             tenant_id=context.tenant_id,
+            owner_user_id=context.user_id,
             uploader_user_id=context.user_id,
             storage_key=storage_key,
             original_filename=file.filename or "asset",
@@ -1987,6 +1970,23 @@ async def upload_builder_asset(
         raise HTTPException(
             status_code=503,
             detail="Asset storage is temporarily unavailable",
+        ) from error
+    try:
+        store_builder_asset(
+            storage_key=storage_key,
+            source_path=target_path,
+            content_type=detected_content_type,
+        )
+    except BuilderAssetStorageError as error:
+        target_path.unlink(missing_ok=True)
+        try:
+            delete_builder_asset_registration(asset_id=str(registered_asset["id"]), tenant_id=context.tenant_id)
+        except Exception:
+            logger.warning("builder.asset_registry_rollback_failed", extra={"storage_key": storage_key})
+        release_builder_asset_reservation(reservation_id=storage_reservation_id, tenant_id=context.tenant_id)
+        raise HTTPException(
+            status_code=503,
+            detail=error_detail("asset_storage_unavailable", "Asset storage is temporarily unavailable."),
         ) from error
     try:
         finish_storage(

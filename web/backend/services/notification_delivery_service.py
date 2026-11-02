@@ -1,4 +1,5 @@
 from __future__ import annotations
+from services.account_work_fence import notification_work
 
 import json
 import logging
@@ -483,6 +484,7 @@ def _deliver_web_push(row: dict[str, Any]) -> None:
         raise DeliveryError("web_push_delivery_failed") from error
 
 
+@notification_work
 def deliver_notification(row: dict[str, Any]) -> None:
     channel = str(row.get("channel") or "").lower()
     if channel == "internal":

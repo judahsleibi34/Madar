@@ -1,0 +1,14 @@
+{
+  "manifest_version": 1,
+  "release_sha": "STAGING",
+  "migrations": [
+    {
+      "number": 166,
+      "from_schema": 165,
+      "to_schema": 166,
+      "path": "web/database/migrations/166_add_bi_report_delivery_lifecycle.sql",
+      "sha256": "4d0f93c11b537773062beeebdeb7c36e0968313dca39c56fb75307beacaa3375",
+      "compatibility": "expand-only"
+    }
+  ]
+}

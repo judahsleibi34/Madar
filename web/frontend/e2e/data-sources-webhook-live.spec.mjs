@@ -93,7 +93,10 @@ test("signed webhook reaches durable history, checkpoint, and browser status", a
 
   const firstBody = JSON.stringify({
     event_type: "record.upsert", resource: "records",
-    record: { id: "A", version: 1, data: { name: "Alpha", amount: 10 } },
+    record: { id: "A", version: 1, data: {
+      name: "Alpha", amount: 10, value: 10,
+      occurred_at: "2026-03-08T06:30:00Z", unsafe_label: "=CMD",
+    } },
   });
   const invalid = await api.post(ingress, {
     data: Buffer.from(firstBody),
@@ -177,15 +180,18 @@ test("signed webhook reaches durable history, checkpoint, and browser status", a
 
   const newerBody = JSON.stringify({
     event_type: "record.upsert", resource: "records",
-    record: { id: "A", version: 2, data: { name: "Alpha", amount: 25 } },
+    record: { id: "A", version: 2, data: { name: "Alpha", amount: 25, value: 25,
+      occurred_at: "2026-03-08T07:30:00Z", unsafe_label: "=CMD" } },
   });
   const olderBody = JSON.stringify({
     event_type: "record.upsert", resource: "records",
-    record: { id: "A", version: 0, data: { name: "Old", amount: 1 } },
+    record: { id: "A", version: 0, data: { name: "Old", amount: 1, value: 1,
+      occurred_at: "2026-03-08T05:30:00Z", unsafe_label: "=CMD" } },
   });
   const otherBody = JSON.stringify({
     event_type: "record.upsert", resource: "records",
-    record: { id: "B", version: 1, data: { name: "Beta", amount: 40 } },
+    record: { id: "B", version: 1, data: { name: "Beta", amount: 40, value: 40,
+      occurred_at: "2026-03-09T03:30:00Z", unsafe_label: "Beta" } },
   });
   for (const [body, eventId] of [
     [newerBody, "evt-authoritative-A-0002"],
@@ -256,7 +262,8 @@ test("signed webhook reaches durable history, checkpoint, and browser status", a
 
   const recoveredBody = JSON.stringify({
     event_type: "record.upsert", resource: "records",
-    record: { id: "C", version: 1, data: { name: "Crash recovered", amount: 60 } },
+    record: { id: "C", version: 1, data: { name: "Crash recovered", amount: 60, value: 60,
+      occurred_at: "2026-03-09T04:30:00Z", unsafe_label: "Crash recovered" } },
   });
   expect((await api.post(ingress, {
     data: Buffer.from(recoveredBody), headers: signed(recoveredBody, secret, "evt-crash-recovery-0001"),
@@ -281,7 +288,8 @@ test("signed webhook reaches durable history, checkpoint, and browser status", a
 
   const rotatedOutBody = JSON.stringify({
     event_type: "record.upsert", resource: "records",
-    record: { id: "D", version: 1, data: { name: "Rotated out", amount: 70 } },
+    record: { id: "D", version: 1, data: { name: "Rotated out", amount: 70, value: 70,
+      occurred_at: "2026-03-10T04:30:00Z", unsafe_label: "Rotated out" } },
   });
   expect((await api.post(ingress, {
     data: Buffer.from(rotatedOutBody), headers: signed(rotatedOutBody, secret, "evt-rotation-fenced-0001"),
@@ -312,7 +320,8 @@ test("signed webhook reaches durable history, checkpoint, and browser status", a
   })).status()).toBe(401);
   const rotatedBody = JSON.stringify({
     event_type: "record.upsert", resource: "records",
-    record: { id: "D", version: 2, data: { name: "Rotated credential", amount: 80 } },
+    record: { id: "D", version: 2, data: { name: "Rotated credential", amount: 80, value: 80,
+      occurred_at: "2026-03-10T05:30:00Z", unsafe_label: "Rotated credential" } },
   });
   expect((await api.post(ingress, {
     data: Buffer.from(rotatedBody), headers: signed(rotatedBody, rotatedSecret, "evt-rotated-secret-0001"),
@@ -330,7 +339,8 @@ test("signed webhook reaches durable history, checkpoint, and browser status", a
 
   const revokedDuringProcessingBody = JSON.stringify({
     event_type: "record.upsert", resource: "records",
-    record: { id: "E", version: 1, data: { name: "Revoked", amount: 90 } },
+    record: { id: "E", version: 1, data: { name: "Revoked", amount: 90, value: 90,
+      occurred_at: "2026-03-11T05:30:00Z", unsafe_label: "Revoked" } },
   });
   expect((await api.post(ingress, {
     data: Buffer.from(revokedDuringProcessingBody),

@@ -1584,6 +1584,32 @@ tables, service-role RPC grants, idempotent claims, lease recovery, disposable
 rehearsal, and complete 146→164 chain are mandatory before any later release
 proposal. Activation and deployment remain separately reviewed decisions.
 
+### Unselected private BI team-sharing candidate
+
+Schema 165 and its 164→165 manifest/bridge are candidate artifacts, not an
+active release selection. They add private same-tenant dashboard viewer/editor
+shares and immutable-report viewer shares using owner-scoped, revision-checked
+service-role RPCs. Public links and direct client-role table/RPC access are
+forbidden. Candidate presence must not apply migration 165 or modify a persistent
+environment. The SQL mirror/checksum, exact predecessor lock, RLS and grants,
+tenant isolation, revocation, disposable rehearsal, and complete 146→165 chain
+are mandatory release checks. The active schema-146 selection stays unchanged.
+
+### Unselected BI report delivery and lifecycle candidate
+
+Schema 166 and its 165→166 manifest/bridge are candidate artifacts, not an
+active release selection. They add opt-in delivery only to active same-tenant
+members, durable deduplicated attempts with bounded retries and fenced leases,
+immediate pre-handoff authorization rechecks, and disabled-by-default bounded
+cleanup of private report artifacts. Direct client-role access, public links,
+external recipients, and unbounded retention cleanup are forbidden. Only the
+offline in-memory test adapter exists; candidate presence must never configure a
+live provider, send a message, start a worker, apply migration 166, or touch a
+persistent environment. The SQL mirror/checksum, exact predecessor lock, RLS and
+grants, revocation behavior, retry/cleanup fencing, private-path containment,
+disposable rehearsal, and complete 146→166 chain are mandatory release checks.
+The active schema-146 selection stays unchanged.
+
 ---
 
 # 22. Repository documents that remain authoritative references

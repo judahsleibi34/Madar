@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   BarChart3,
@@ -81,6 +81,18 @@ const COPY = {
     dateColumn: "Verified date column",
     period: "Period",
     aggregation: "Aggregation",
+    customPeriod: "Custom reporting period (optional)",
+    startDate: "Start date",
+    endDate: "End date",
+    reportingTimezone: "Reporting timezone (IANA)",
+    periodInvalid: "Choose both dates in chronological order and provide an IANA timezone.",
+    dateSemanticsUnavailable: "No technically verified date column is available for this dataset version.",
+    periodRows: "Rows inside period",
+    missingDates: "Missing dates",
+    invalidDates: "Invalid dates",
+    outsidePeriod: "Valid rows outside period",
+    partialPeriod: "The first or last grouped period is partial for the requested boundaries or observed data coverage.",
+    allDates: "All valid dates",
     incompatible: "Choose a numeric column compatible with this operation.",
     result: "Deterministic result",
     noResult: "Run a supported metric to create a result.",
@@ -106,6 +118,45 @@ const COPY = {
     removeWidget: "Remove widget",
     widgetWidth: "Widget width",
     widgetHeight: "Widget height",
+    widgetTitle: "Widget title",
+    widgetType: "Presentation",
+    widgetPosition: "Layout position",
+    showLegend: "Show chart legend",
+    showTable: "Show accessible data table",
+    saveWidget: "Save widget",
+    chartLegend: "Series",
+    chartEmpty: "This verified result has no plottable numeric values.",
+    widgetLoading: "Loading verified widget result…",
+    sharedWithMe: "Shared with me",
+    sharingTitle: "Team sharing",
+    sharingHint: "Share only with active members of this workspace. No public link is created.",
+    sharingUnavailable: "Team sharing requires the unselected schema 165 capability.",
+    member: "Workspace member",
+    permission: "Permission",
+    viewer: "Viewer",
+    editor: "Editor",
+    share: "Share",
+    revoke: "Revoke",
+    noShares: "Not shared with any member.",
+    sharedViewer: "Shared viewer",
+    sharedEditor: "Shared editor",
+    ownerOnly: "Only the owner can manage sharing and destructive actions.",
+    reportShareHint: "Immutable reports can be shared for private viewing and download only.",
+    deliveryTitle: "Scheduled delivery",
+    deliveryHint: "Opt in to private email delivery for active workspace members. No public link is created.",
+    deliveryUnavailable: "Report delivery and retention require the unselected schema 166 capability.",
+    configureDelivery: "Configure delivery",
+    deliveryEnabled: "Deliver completed scheduled reports",
+    recipients: "Recipients",
+    saveDelivery: "Save delivery",
+    retentionTitle: "Private artifact retention",
+    retentionDays: "Retention days",
+    cleanupEnabled: "Delete private report artifacts after retention",
+    saveRetention: "Save retention",
+    deliveryHistory: "Delivery history",
+    noDeliveries: "No delivery attempts for this report.",
+    attempts: "Attempts",
+    artifactExpired: "Private export artifact removed under the retention policy.",
     needsAttention: "This widget needs attention because the selected operation is incompatible with the latest dataset schema.",
     reportsTitle: "Recurring reports",
     reportsHint: "Generate immutable, version-bound generic analytical reports with per-widget as-of information.",
@@ -117,7 +168,8 @@ const COPY = {
     editSchedule: "Edit schedule", saveSchedule: "Save schedule", scheduleEnabled: "Enabled",
     generateNow: "Generate report now", reportHistory: "Report history",
     noReports: "No reports have been generated.", noSchedules: "No recurring schedules.",
-    openReport: "Open report", downloadCsv: "Download CSV", printReport: "Print report",
+    openReport: "Open report", downloadCsv: "Download CSV", downloadPdf: "Download PDF",
+    downloadXlsx: "Download XLSX", printReport: "Print report",
     removeSchedule: "Remove schedule", archiveReport: "Archive report", nextRun: "Next run", statusLabel: "Status",
     reportDisclosure: "Generic analytical report — business meaning, units, currencies, and accounting treatment are not inferred.",
     previous: "Previous",
@@ -191,6 +243,18 @@ const COPY = {
     dateColumn: "عمود التاريخ المتحقق منه",
     period: "الفترة",
     aggregation: "التجميع",
+    customPeriod: "فترة تقرير مخصصة (اختياري)",
+    startDate: "تاريخ البداية",
+    endDate: "تاريخ النهاية",
+    reportingTimezone: "المنطقة الزمنية للتقرير (IANA)",
+    periodInvalid: "اختر تاريخي البداية والنهاية بترتيب صحيح وحدد منطقة زمنية من IANA.",
+    dateSemanticsUnavailable: "لا يتوفر عمود تاريخ متحقق منه تقنياً في إصدار مجموعة البيانات هذا.",
+    periodRows: "الصفوف داخل الفترة",
+    missingDates: "التواريخ المفقودة",
+    invalidDates: "التواريخ غير الصالحة",
+    outsidePeriod: "الصفوف المؤرخة خارج الفترة",
+    partialPeriod: "الفترة المجمعة الأولى أو الأخيرة جزئية بسبب الحدود المطلوبة أو تغطية البيانات المرصودة.",
+    allDates: "جميع التواريخ الصالحة",
     incompatible: "اختر عموداً رقمياً متوافقاً مع هذه العملية.",
     result: "نتيجة حتمية",
     noResult: "نفذ مقياساً مدعوماً لإنشاء نتيجة.",
@@ -216,6 +280,45 @@ const COPY = {
     removeWidget: "إزالة الأداة",
     widgetWidth: "عرض الأداة",
     widgetHeight: "ارتفاع الأداة",
+    widgetTitle: "عنوان الأداة",
+    widgetType: "طريقة العرض",
+    widgetPosition: "موضع التخطيط",
+    showLegend: "إظهار مفتاح الرسم",
+    showTable: "إظهار جدول البيانات المتاح",
+    saveWidget: "حفظ الأداة",
+    chartLegend: "السلسلة",
+    chartEmpty: "لا تحتوي هذه النتيجة المتحققة على قيم رقمية قابلة للرسم.",
+    widgetLoading: "جارٍ تحميل نتيجة الأداة المتحققة…",
+    sharedWithMe: "تمت مشاركتها معي",
+    sharingTitle: "المشاركة مع الفريق",
+    sharingHint: "شارك فقط مع أعضاء مساحة العمل النشطين. لا يتم إنشاء رابط عام.",
+    sharingUnavailable: "تتطلب مشاركة الفريق قدرة المخطط 165 غير المحددة للإصدار النشط.",
+    member: "عضو مساحة العمل",
+    permission: "الصلاحية",
+    viewer: "مشاهد",
+    editor: "محرر",
+    share: "مشاركة",
+    revoke: "إلغاء الوصول",
+    noShares: "لم تتم المشاركة مع أي عضو.",
+    sharedViewer: "مشاهد مشارك",
+    sharedEditor: "محرر مشارك",
+    ownerOnly: "يمكن للمالك فقط إدارة المشاركة والإجراءات المتلفة.",
+    reportShareHint: "يمكن مشاركة التقارير الثابتة للعرض والتنزيل الخاص فقط.",
+    deliveryTitle: "تسليم التقارير المجدولة",
+    deliveryHint: "فعّل تسليم البريد الخاص لأعضاء مساحة العمل النشطين. لا يتم إنشاء رابط عام.",
+    deliveryUnavailable: "يتطلب تسليم التقارير والاحتفاظ بها قدرة المخطط 166 غير المحددة للإصدار النشط.",
+    configureDelivery: "إعداد التسليم",
+    deliveryEnabled: "تسليم التقارير المجدولة المكتملة",
+    recipients: "المستلمون",
+    saveDelivery: "حفظ التسليم",
+    retentionTitle: "الاحتفاظ بملفات التقارير الخاصة",
+    retentionDays: "أيام الاحتفاظ",
+    cleanupEnabled: "حذف ملفات التقارير الخاصة بعد مدة الاحتفاظ",
+    saveRetention: "حفظ الاحتفاظ",
+    deliveryHistory: "سجل التسليم",
+    noDeliveries: "لا توجد محاولات تسليم لهذا التقرير.",
+    attempts: "المحاولات",
+    artifactExpired: "تم حذف ملف التصدير الخاص وفق سياسة الاحتفاظ.",
     needsAttention: "تحتاج هذه الأداة إلى مراجعة لأن العملية المحددة غير متوافقة مع مخطط أحدث إصدار.",
     reportsTitle: "التقارير الدورية",
     reportsHint: "أنشئ تقارير تحليلية عامة ثابتة مرتبطة بإصدار البيانات الدقيق لكل أداة.",
@@ -227,7 +330,8 @@ const COPY = {
     editSchedule: "تعديل الجدول", saveSchedule: "حفظ الجدول", scheduleEnabled: "مفعّل",
     generateNow: "إنشاء تقرير الآن", reportHistory: "سجل التقارير",
     noReports: "لم يتم إنشاء تقارير بعد.", noSchedules: "لا توجد جداول دورية.",
-    openReport: "فتح التقرير", downloadCsv: "تنزيل CSV", printReport: "طباعة التقرير",
+    openReport: "فتح التقرير", downloadCsv: "تنزيل CSV", downloadPdf: "تنزيل PDF",
+    downloadXlsx: "تنزيل XLSX", printReport: "طباعة التقرير",
     removeSchedule: "إزالة الجدول", archiveReport: "أرشفة التقرير", nextRun: "التشغيل التالي", statusLabel: "الحالة",
     reportDisclosure: "تقرير تحليلي عام — لا يتم استنتاج المعنى التجاري أو الوحدات أو العملات أو المعالجة المحاسبية.",
     previous: "السابق",
@@ -287,12 +391,13 @@ function StatePanel({ icon: Icon = Database, title, children, action, role = "st
   );
 }
 
-function ResultTable({ rows = [] }) {
+function ResultTable({ rows = [], caption = "" }) {
   const columns = [...new Set(rows.flatMap((row) => Object.keys(row || {})))];
   if (!rows.length || !columns.length) return null;
   return (
     <div className="bi-table-scroll">
       <table className="bi-table">
+        {caption ? <caption className="bi-table-caption">{caption}</caption> : null}
         <thead><tr>{columns.map((column) => <th key={column} scope="col">{column}</th>)}</tr></thead>
         <tbody>{rows.map((row, index) => (
           <tr key={index}>{columns.map((column) => <td key={column} dir="auto">{String(row?.[column] ?? "—")}</td>)}</tr>
@@ -302,18 +407,52 @@ function ResultTable({ rows = [] }) {
   );
 }
 
-function AccessibleBarChart({ chart, lang }) {
+function PeriodDisclosure({ report, copy }) {
+  const period = report?.metadata?.mappings_used;
+  if (!period?.date_column) return null;
+  const selectedRange = period.requested_start_date && period.requested_end_date
+    ? `${period.requested_start_date} — ${period.requested_end_date}` : copy.allDates;
+  return <aside className="bi-period-disclosure" role="status">
+    <strong>{copy.customPeriod}</strong>
+    <dl>
+      <div><dt>{copy.period}</dt><dd dir="ltr">{selectedRange}</dd></div>
+      <div><dt>{copy.reportingTimezone}</dt><dd dir="ltr">{period.timezone || "UTC"}</dd></div>
+      <div><dt>{copy.periodRows}</dt><dd>{period.selected_row_count ?? "—"}</dd></div>
+      <div><dt>{copy.missingDates}</dt><dd>{period.missing_date_count ?? 0}</dd></div>
+      <div><dt>{copy.invalidDates}</dt><dd>{period.invalid_date_count ?? 0}</dd></div>
+      <div><dt>{copy.outsidePeriod}</dt><dd>{period.outside_period_count ?? 0}</dd></div>
+    </dl>
+    {period.partial_periods ? <p className="bi-warning">{copy.partialPeriod}</p> : null}
+  </aside>;
+}
+
+function AccessibleChart({ chart, lang, showLegend = true, showTable = true, emptyLabel = "", legendLabel = "Series" }) {
+  const titleId = useId();
   const rows = Array.isArray(chart?.data) ? chart.data.slice(0, 30) : [];
   const xKey = chart?.x;
   const yKey = chart?.y;
-  const numericValues = rows.map((row) => Number(row?.[yKey])).filter(Number.isFinite);
+  const plottedRows = rows.filter((row) => Number.isFinite(Number(row?.[yKey])));
+  const numericValues = plottedRows.map((row) => Number(row?.[yKey]));
   const maximum = Math.max(0, ...numericValues.map((value) => Math.abs(value)));
-  if (!rows.length || !xKey || !yKey || !maximum) return null;
+  if (!rows.length || !xKey || !yKey || !maximum) return <p className="bi-empty-inline">{emptyLabel}</p>;
+  const isLine = chart?.type === "line";
+  const points = plottedRows.map((row, index) => {
+    const x = plottedRows.length === 1 ? 50 : 4 + (index / (plottedRows.length - 1)) * 92;
+    const y = 94 - (Math.abs(Number(row[yKey])) / maximum) * 88;
+    return { x, y, row };
+  });
   return (
-    <figure className="bi-chart" aria-labelledby="bi-chart-caption">
-      <figcaption id="bi-chart-caption">{chart.title}</figcaption>
-      <div className="bi-bars" role="img" aria-label={chart.title}>
-        {rows.map((row, index) => {
+    <figure className="bi-chart" aria-labelledby={titleId}>
+      <figcaption id={titleId}>{chart.title}</figcaption>
+      {showLegend ? <div className="bi-chart-legend" aria-label={`${legendLabel}: ${yKey}`}><i aria-hidden="true" /><span>{legendLabel}: {yKey}</span></div> : null}
+      {isLine ? <div className="bi-line-chart" role="img" aria-label={chart.title}>
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          <polyline points={points.map((point) => `${point.x},${point.y}`).join(" ")} />
+          {points.map((point, index) => <circle key={index} cx={point.x} cy={point.y} r="1.7" />)}
+        </svg>
+        <ol>{points.map((point, index) => <li key={`${String(point.row?.[xKey])}-${index}`}><span dir="auto">{String(point.row?.[xKey] ?? "—")}</span><strong>{formatNumber(point.row?.[yKey], lang)}</strong></li>)}</ol>
+      </div> : <div className="bi-bars" role="img" aria-label={chart.title}>
+        {plottedRows.map((row, index) => {
           const value = Number(row?.[yKey]);
           const width = Number.isFinite(value) ? Math.max(2, Math.abs(value) / maximum * 100) : 0;
           return (
@@ -324,10 +463,73 @@ function AccessibleBarChart({ chart, lang }) {
             </div>
           );
         })}
-      </div>
-      <ResultTable rows={rows} />
+      </div>}
+      {showTable ? <ResultTable rows={rows} caption={chart.title} /> : null}
     </figure>
   );
+}
+
+function SharingPanel({ copy, members, shares, selectedMemberId, permission, viewerOnly = false,
+  onMemberChange, onPermissionChange, onShare, onRevoke }) {
+  const availableMembers = members.filter((member) => !shares.some((share) => Number(share.member_user_id) === Number(member.id)));
+  return <section className="bi-sharing" aria-labelledby="bi-sharing-title">
+    <header><div><h3 id="bi-sharing-title">{copy.sharingTitle}</h3><p>{viewerOnly ? copy.reportShareHint : copy.sharingHint}</p></div></header>
+    <div className="bi-sharing-controls">
+      <label>{copy.member}<select aria-label={copy.member} value={selectedMemberId} onChange={(event) => onMemberChange(event.target.value)}><option value="">{copy.member}</option>{availableMembers.map((member) => <option key={member.id} value={member.id}>{`${member.first_name || ""} ${member.last_name || ""}`.trim() || member.email} · {member.email}</option>)}</select></label>
+      {!viewerOnly ? <label>{copy.permission}<select aria-label={copy.permission} value={permission} onChange={(event) => onPermissionChange(event.target.value)}><option value="viewer">{copy.viewer}</option><option value="editor">{copy.editor}</option></select></label> : null}
+      <button type="button" disabled={!selectedMemberId} onClick={onShare}>{copy.share}</button>
+    </div>
+    {shares.length ? <ul className="bi-sharing-list">{shares.map((share) => <li key={share.id}><div><strong>{`${share.member?.first_name || ""} ${share.member?.last_name || ""}`.trim() || share.member?.email || share.member_user_id}</strong><small>{share.member?.email || ""} · {share.permission === "editor" ? copy.editor : copy.viewer}</small></div><button type="button" onClick={() => onRevoke(share)}>{copy.revoke}</button></li>)}</ul> : <p className="bi-empty-inline">{copy.noShares}</p>}
+  </section>;
+}
+
+function DashboardWidget({ widget, execution, lang, copy, canEdit = true, onSave, onRefresh, onRemove }) {
+  const widgetReport = execution?.result;
+  const chart = widgetReport?.charts?.[0] || null;
+  const [draft, setDraft] = useState(() => ({
+    title: widget.title,
+    widget_type: widget.widget_type,
+    layout_config: { x: 0, y: 0, w: 6, h: 4, ...(widget.layout_config || {}) },
+    display_options: { show_table: true, show_legend: true, ...(widget.display_options || {}) },
+  }));
+  const supportedTypes = [
+    ...(widgetReport?.kpis?.length ? ["kpi"] : []),
+    ...(widgetReport?.tables?.[0]?.rows?.length ? ["table"] : []),
+    ...(chart ? ["bar", "line"] : []),
+  ];
+  if (!supportedTypes.includes(widget.widget_type)) supportedTypes.unshift(widget.widget_type);
+  const layout = draft.layout_config;
+  const setLayout = (key, value) => setDraft((current) => ({ ...current,
+    layout_config: { ...current.layout_config, [key]: Number(value) },
+  }));
+  const renderedChart = chart ? { ...chart, type: draft.widget_type === "line" ? "line" : "bar" } : null;
+  const showChart = ["bar", "line"].includes(draft.widget_type) && renderedChart;
+  const style = {
+    "--bi-widget-columns": Math.min(12, Math.max(1, layout.w)),
+    "--bi-widget-rows": Math.min(12, Math.max(1, layout.h)),
+    order: Math.min(1000, Math.max(0, layout.y)) * 12 + Math.min(11, Math.max(0, layout.x)),
+  };
+  return <article className="bi-widget" style={style}>
+    <header><div><h3>{widget.title}</h3><small>{widget.version_policy === "pinned" ? copy.pinned : copy.latest_committed} · v{execution?.provenance?.version_number || "—"}</small></div>{canEdit ? <div><button type="button" onClick={onRefresh}>{copy.refreshWidget}</button><button type="button" onClick={onRemove}>{copy.removeWidget}</button></div> : null}</header>
+    {canEdit ? <details className="bi-widget-editor"><summary>{copy.saveWidget}</summary><div>
+      <label>{copy.widgetTitle}<input value={draft.title} maxLength="160" onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} /></label>
+      <label>{copy.widgetType}<select value={draft.widget_type} onChange={(event) => setDraft((current) => ({ ...current, widget_type: event.target.value }))}>{supportedTypes.map((type) => <option key={type} value={type}>{type}</option>)}</select></label>
+      <label>{copy.widgetWidth}<select value={layout.w} onChange={(event) => { const width = Number(event.target.value); setDraft((current) => ({ ...current, layout_config: { ...current.layout_config, w: width, x: Math.min(current.layout_config.x, 12 - width) } })); }}>{[3, 4, 6, 8, 12].map((value) => <option key={value} value={value}>{value}/12</option>)}</select></label>
+      <label>{copy.widgetHeight}<select value={layout.h} onChange={(event) => setLayout("h", event.target.value)}>{[3, 4, 6, 8, 12].map((value) => <option key={value}>{value}</option>)}</select></label>
+      <label>{copy.widgetPosition} X<input type="number" min="0" max={12 - layout.w} value={layout.x} onChange={(event) => setLayout("x", Math.min(12 - layout.w, Math.max(0, Number(event.target.value))))} /></label>
+      <label>{copy.widgetPosition} Y<input type="number" min="0" max="1000" value={layout.y} onChange={(event) => setLayout("y", Math.min(1000, Math.max(0, Number(event.target.value))))} /></label>
+      <label className="bi-widget-check"><input type="checkbox" checked={draft.display_options.show_legend} onChange={(event) => setDraft((current) => ({ ...current, display_options: { ...current.display_options, show_legend: event.target.checked } }))} />{copy.showLegend}</label>
+      <label className="bi-widget-check"><input type="checkbox" checked={draft.display_options.show_table} onChange={(event) => setDraft((current) => ({ ...current, display_options: { ...current.display_options, show_table: event.target.checked } }))} />{copy.showTable}</label>
+      <button type="button" disabled={!draft.title.trim()} onClick={() => onSave(draft)}>{copy.saveWidget}</button>
+    </div></details> : null}
+    {execution === undefined ? <p className="bi-empty-inline" role="status">{copy.widgetLoading}</p> : execution?.status === "needs_attention" ? <p className="bi-warning">{execution.message || copy.needsAttention}</p> : <>
+      {draft.widget_type === "kpi" && widgetReport?.kpis?.[0] ? <strong className="bi-widget-kpi">{widgetReport.kpis[0].display_value ?? formatNumber(widgetReport.kpis[0].value, lang)}</strong> : null}
+      {showChart ? <AccessibleChart chart={renderedChart} lang={lang} showLegend={draft.display_options.show_legend} showTable={draft.display_options.show_table} emptyLabel={copy.chartEmpty} legendLabel={copy.chartLegend} /> : null}
+      {draft.widget_type === "table" ? <ResultTable rows={widgetReport?.tables?.[0]?.rows || []} caption={widget.title} /> : null}
+      <PeriodDisclosure report={widgetReport} copy={copy} />
+    </>}
+    <details><summary>{copy.provenance}</summary><code>{execution?.provenance?.dataset_version_id || widget.dataset_version_id}</code></details>
+  </article>;
 }
 
 export default function BusinessIntelligenceWorkspace({ lang = "en", projectId, user, onChangeProject }) {
@@ -359,6 +561,9 @@ export default function BusinessIntelligenceWorkspace({ lang = "en", projectId, 
   const [dateColumn, setDateColumn] = useState("");
   const [period, setPeriod] = useState("month");
   const [aggregation, setAggregation] = useState("count");
+  const [periodStartDate, setPeriodStartDate] = useState("");
+  const [periodEndDate, setPeriodEndDate] = useState("");
+  const [reportingTimezone, setReportingTimezone] = useState("UTC");
   const [metricStatus, setMetricStatus] = useState("idle");
   const [metricError, setMetricError] = useState("");
   const [metricResult, setMetricResult] = useState(null);
@@ -373,6 +578,21 @@ export default function BusinessIntelligenceWorkspace({ lang = "en", projectId, 
   const [widgetWidth, setWidgetWidth] = useState(6);
   const [widgetHeight, setWidgetHeight] = useState(4);
   const [widgetResults, setWidgetResults] = useState({});
+  const [sharingAvailable, setSharingAvailable] = useState(true);
+  const [dashboardShares, setDashboardShares] = useState([]);
+  const [dashboardMembers, setDashboardMembers] = useState([]);
+  const [dashboardShareMember, setDashboardShareMember] = useState("");
+  const [dashboardSharePermission, setDashboardSharePermission] = useState("viewer");
+  const [reportShares, setReportShares] = useState([]);
+  const [reportMembers, setReportMembers] = useState([]);
+  const [reportShareMember, setReportShareMember] = useState("");
+  const [deliveryAvailable, setDeliveryAvailable] = useState(true);
+  const [deliverySchedule, setDeliverySchedule] = useState(null);
+  const [deliveryEnabled, setDeliveryEnabled] = useState(false);
+  const [deliveryMembers, setDeliveryMembers] = useState([]);
+  const [deliveryRecipients, setDeliveryRecipients] = useState([]);
+  const [deliveryHistory, setDeliveryHistory] = useState([]);
+  const [lifecycleSettings, setLifecycleSettings] = useState({ retention_days: 90, cleanup_enabled: false, revision: 0 });
   const [reportingAvailable, setReportingAvailable] = useState(true);
   const [schedules, setSchedules] = useState([]);
   const [reports, setReports] = useState([]);
@@ -420,11 +640,19 @@ export default function BusinessIntelligenceWorkspace({ lang = "en", projectId, 
   const loadDashboards = useCallback(async () => {
     if (!projectRoot) return;
     try {
-      const response = await apiFetch(`${projectRoot}/dashboards?limit=100`, { credentials: "include" });
-      const body = await readApiResponse(response);
-      if (!response.ok) throw new Error(detailMessage(body, t.loadError));
-      const items = Array.isArray(body.items) ? body.items : [];
+      const [response, sharedResponse] = await Promise.all([
+        apiFetch(`${projectRoot}/dashboards?limit=100`, { credentials: "include" }),
+        apiFetch(`${projectRoot}/shared-dashboards`, { credentials: "include" }),
+      ]);
+      const [body, sharedBody] = await Promise.all([readApiResponse(response), readApiResponse(sharedResponse)]);
+      if (!response.ok || !sharedResponse.ok) throw new Error(detailMessage(body, detailMessage(sharedBody, t.loadError)));
+      const owned = (Array.isArray(body.items) ? body.items : []).map((item) => ({ ...item,
+        access: item.access || { is_owner: true, permission: "owner", can_edit: true, can_share: true },
+      }));
+      const shared = Array.isArray(sharedBody.items) ? sharedBody.items : [];
+      const items = [...owned, ...shared.filter((item) => !owned.some((ownedItem) => ownedItem.id === item.id))];
       setDashboardsAvailable(body.available !== false);
+      setSharingAvailable(sharedBody.available !== false);
       setDashboards(items);
       setSelectedDashboardId((current) => items.some((item) => item.id === current) ? current : (items[0]?.id || ""));
     } catch (requestError) {
@@ -435,17 +663,28 @@ export default function BusinessIntelligenceWorkspace({ lang = "en", projectId, 
   const loadReports = useCallback(async () => {
     if (!projectRoot) return;
     try {
-      const [scheduleResponse, reportResponse] = await Promise.all([
+      const [scheduleResponse, reportResponse, sharedResponse, lifecycleResponse] = await Promise.all([
         apiFetch(`${projectRoot}/report-schedules`, { credentials: "include" }),
         apiFetch(`${projectRoot}/reports?limit=50`, { credentials: "include" }),
+        apiFetch(`${projectRoot}/shared-reports`, { credentials: "include" }),
+        apiFetch(`${projectRoot}/report-lifecycle`, { credentials: "include" }),
       ]);
       const scheduleBody = await readApiResponse(scheduleResponse);
       const reportBody = await readApiResponse(reportResponse);
-      if (!scheduleResponse.ok || !reportResponse.ok) throw new Error(detailMessage(scheduleBody, detailMessage(reportBody, t.loadError)));
+      const sharedBody = await readApiResponse(sharedResponse);
+      const lifecycleBody = await readApiResponse(lifecycleResponse);
+      if (!scheduleResponse.ok || !reportResponse.ok || !sharedResponse.ok || !lifecycleResponse.ok) throw new Error(detailMessage(scheduleBody, detailMessage(reportBody, detailMessage(sharedBody, detailMessage(lifecycleBody, t.loadError)))));
       const isAvailable = scheduleBody.available !== false && reportBody.available !== false;
       setReportingAvailable(isAvailable);
       setSchedules(Array.isArray(scheduleBody.items) ? scheduleBody.items : []);
-      setReports(Array.isArray(reportBody.items) ? reportBody.items : []);
+      setSharingAvailable(sharedBody.available !== false);
+      setDeliveryAvailable(lifecycleBody.available !== false);
+      if (lifecycleBody.settings) setLifecycleSettings(lifecycleBody.settings);
+      const owned = (Array.isArray(reportBody.items) ? reportBody.items : []).map((item) => ({ ...item,
+        access: item.access || { is_owner: true, permission: "owner", can_edit: true, can_share: true },
+      }));
+      const shared = Array.isArray(sharedBody.items) ? sharedBody.items : [];
+      setReports([...owned, ...shared.filter((item) => !owned.some((ownedItem) => ownedItem.id === item.id))]);
     } catch (requestError) { setReportError(requestError.message || t.loadError); }
   }, [projectRoot, t.loadError]);
 
@@ -553,9 +792,21 @@ export default function BusinessIntelligenceWorkspace({ lang = "en", projectId, 
         const body = await readApiResponse(response);
         if (!response.ok) throw new Error(detailMessage(body, t.loadError));
         if (!active) return;
-        setDashboard(body);
+        const normalized = { ...body, access: body.access || { is_owner: true, permission: "owner", can_edit: true, can_share: true } };
+        setDashboard(normalized);
         setDashboardName(body.name || "");
         setDashboardDescription(body.description || "");
+        setDashboardShares([]);
+        setDashboardMembers([]);
+        setDashboardShareMember("");
+        if (normalized.access.is_owner && sharingAvailable) {
+          const sharesResponse = await apiFetch(`${projectRoot}/dashboards/${encodeURIComponent(body.id)}/shares`, { credentials: "include" });
+          const sharesBody = await readApiResponse(sharesResponse);
+          if (!sharesResponse.ok) throw new Error(detailMessage(sharesBody, t.loadError));
+          if (!active) return;
+          setDashboardShares(Array.isArray(sharesBody.items) ? sharesBody.items : []);
+          setDashboardMembers(Array.isArray(sharesBody.members) ? sharesBody.members : []);
+        }
         const executions = await Promise.all((body.widgets || []).map(async (widget) => {
           const execute = await apiFetch(`${projectRoot}/dashboards/${encodeURIComponent(body.id)}/widgets/${encodeURIComponent(widget.id)}/execute`, {
             method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
@@ -569,7 +820,7 @@ export default function BusinessIntelligenceWorkspace({ lang = "en", projectId, 
       }
     })();
     return () => { active = false; };
-  }, [activeLang, dashboardsAvailable, projectRoot, selectedDashboardId, t.loadError]);
+  }, [activeLang, dashboardsAvailable, projectRoot, selectedDashboardId, sharingAvailable, t.loadError]);
 
   const selectedRegistryDataset = datasets.find((item) => item.id === selectedDatasetId) || null;
   const version = versions.find((item) => item.id === selectedVersionId) || null;
@@ -588,12 +839,16 @@ export default function BusinessIntelligenceWorkspace({ lang = "en", projectId, 
   const effectiveValueColumn = operationNeedsValue && !(operation === "distinct_count" ? columns : numericColumns).includes(valueColumn)
     ? ((operation === "distinct_count" ? columns[0] : numericColumns[0]) || "")
     : valueColumn;
+  const customPeriodRequested = Boolean(periodStartDate || periodEndDate);
+  const periodSelectionValid = !customPeriodRequested || Boolean(
+    periodStartDate && periodEndDate && periodStartDate <= periodEndDate && reportingTimezone.trim(),
+  );
 
   const missingTotal = columns.reduce((total, column) => total + Number(profileFor(column, profiles.statistics, profiles.missing).missing || 0), 0);
   const metricLabel = t[operation];
   const metricCompatible = Boolean(version?.id && (
     operation === "count" || operation === "distinct_count" && columns.includes(effectiveValueColumn) ||
-    operation === "date_aggregate" && dateColumns.includes(dateColumn) && (!operationNeedsNumeric || numericColumns.includes(effectiveValueColumn)) ||
+    operation === "date_aggregate" && dateColumns.includes(dateColumn) && periodSelectionValid && (!operationNeedsNumeric || numericColumns.includes(effectiveValueColumn)) ||
     numericColumns.includes(effectiveValueColumn)
   ));
 
@@ -638,7 +893,11 @@ export default function BusinessIntelligenceWorkspace({ lang = "en", projectId, 
       metric.date_column = dateColumn;
       metric.period = period;
       metric.aggregation = aggregation;
-      metric.timezone = "UTC";
+      metric.timezone = reportingTimezone.trim() || "UTC";
+      if (periodStartDate && periodEndDate) {
+        metric.start_date = periodStartDate;
+        metric.end_date = periodEndDate;
+      }
     }
     try {
       const response = await apiFetch(
@@ -711,13 +970,32 @@ export default function BusinessIntelligenceWorkspace({ lang = "en", projectId, 
           title: resultMetricLabel, dataset_id: selectedDatasetId, dataset_version_id: version.id,
           version_policy: versionPolicy, analysis_spec: metricResult.metric,
           layout_config: { x: 0, y: 0, w: widgetWidth, h: widgetHeight },
-          display_options: { show_table: true } }),
+          display_options: { show_table: true, show_legend: true } }),
       });
       const body = await readApiResponse(response);
       if (!response.ok) throw new Error(detailMessage(body, t.loadError));
       setDashboard((current) => ({ ...current, ...body.dashboard, widgets: [...(current.widgets || []), body.widget] }));
       setWidgetResults((current) => ({ ...current, [body.widget.id]: { status: "ready", result: report,
         provenance: metricResult.provenance } }));
+      await loadDashboards();
+    } catch (requestError) { setDashboardError(requestError.message || t.loadError); }
+  };
+
+  const saveWidget = async (widget, draft) => {
+    setDashboardError("");
+    try {
+      const response = await apiFetch(`${projectRoot}/dashboards/${encodeURIComponent(dashboard.id)}/widgets/${encodeURIComponent(widget.id)}`, {
+        method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ expected_revision: dashboard.revision,
+          widget_type: draft.widget_type, title: draft.title.trim(), dataset_id: widget.dataset_id,
+          dataset_version_id: widget.dataset_version_id, version_policy: widget.version_policy,
+          analysis_spec: widget.analysis_spec, layout_config: draft.layout_config,
+          display_options: draft.display_options }),
+      });
+      const body = await readApiResponse(response);
+      if (!response.ok) throw new Error(detailMessage(body, t.loadError));
+      setDashboard((current) => ({ ...current, ...body.dashboard,
+        widgets: current.widgets.map((item) => item.id === widget.id ? body.widget : item) }));
       await loadDashboards();
     } catch (requestError) { setDashboardError(requestError.message || t.loadError); }
   };
@@ -764,6 +1042,41 @@ export default function BusinessIntelligenceWorkspace({ lang = "en", projectId, 
     } catch (requestError) { setDashboardError(requestError.message || t.loadError); }
   };
 
+  const shareDashboard = async () => {
+    if (!dashboard?.access?.is_owner || !dashboardShareMember) return;
+    setDashboardError("");
+    try {
+      const response = await apiFetch(`${projectRoot}/dashboards/${encodeURIComponent(dashboard.id)}/shares/${encodeURIComponent(dashboardShareMember)}`, {
+        method: "PUT", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ expected_revision: dashboard.revision, member_user_id: Number(dashboardShareMember), permission: dashboardSharePermission }),
+      });
+      const body = await readApiResponse(response);
+      if (!response.ok) throw new Error(detailMessage(body, t.loadError));
+      setDashboard((current) => ({ ...current, revision: body.dashboard?.revision ?? current.revision }));
+      setDashboardShareMember("");
+      const sharesResponse = await apiFetch(`${projectRoot}/dashboards/${encodeURIComponent(dashboard.id)}/shares`, { credentials: "include" });
+      const sharesBody = await readApiResponse(sharesResponse);
+      if (!sharesResponse.ok) throw new Error(detailMessage(sharesBody, t.loadError));
+      setDashboardShares(Array.isArray(sharesBody.items) ? sharesBody.items : []);
+      setDashboardMembers(Array.isArray(sharesBody.members) ? sharesBody.members : []);
+    } catch (requestError) { setDashboardError(requestError.message || t.loadError); }
+  };
+
+  const revokeDashboardShare = async (share) => {
+    if (!dashboard?.access?.is_owner) return;
+    setDashboardError("");
+    try {
+      const response = await apiFetch(`${projectRoot}/dashboards/${encodeURIComponent(dashboard.id)}/shares/${encodeURIComponent(share.member_user_id)}`, {
+        method: "DELETE", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ expected_revision: dashboard.revision, member_user_id: Number(share.member_user_id) }),
+      });
+      const body = await readApiResponse(response);
+      if (!response.ok) throw new Error(detailMessage(body, t.loadError));
+      setDashboard((current) => ({ ...current, revision: body.dashboard?.revision ?? current.revision }));
+      setDashboardShares((current) => current.filter((item) => Number(item.member_user_id) !== Number(share.member_user_id)));
+    } catch (requestError) { setDashboardError(requestError.message || t.loadError); }
+  };
+
   const createSchedule = async () => {
     if (!selectedDashboardId) return;
     setReportError("");
@@ -795,6 +1108,52 @@ export default function BusinessIntelligenceWorkspace({ lang = "en", projectId, 
     setScheduleTimezone(schedule.timezone); setScheduleTime(String(schedule.local_time || "09:00").slice(0, 5));
     setScheduleWeekday(schedule.weekday ?? 0); setScheduleMonthDay(schedule.month_day ?? 1);
     setScheduleEnabled(Boolean(schedule.enabled));
+  };
+
+  const openDeliveryConfig = async (schedule) => {
+    setReportError("");
+    try {
+      const response = await apiFetch(`${projectRoot}/report-schedules/${encodeURIComponent(schedule.id)}/delivery`, { credentials: "include" });
+      const body = await readApiResponse(response);
+      if (!response.ok) throw new Error(detailMessage(body, t.loadError));
+      setDeliveryAvailable(body.available !== false);
+      if (body.available === false) return;
+      setDeliverySchedule(schedule);
+      setDeliveryEnabled(Boolean(body.config?.enabled));
+      setDeliveryMembers(Array.isArray(body.members) ? body.members : []);
+      setDeliveryRecipients(Array.isArray(body.recipient_user_ids) ? body.recipient_user_ids.map(Number) : []);
+    } catch (requestError) { setReportError(requestError.message || t.loadError); }
+  };
+
+  const saveDeliveryConfig = async () => {
+    if (!deliverySchedule) return;
+    setReportError("");
+    try {
+      const response = await apiFetch(`${projectRoot}/report-schedules/${encodeURIComponent(deliverySchedule.id)}/delivery`, {
+        method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ expected_schedule_revision: deliverySchedule.revision,
+          enabled: deliveryEnabled, recipient_user_ids: deliveryRecipients }),
+      });
+      const body = await readApiResponse(response);
+      if (!response.ok) throw new Error(detailMessage(body, t.loadError));
+      const updatedSchedule = body.schedule || deliverySchedule;
+      setDeliverySchedule(updatedSchedule);
+      setSchedules((current) => current.map((item) => item.id === updatedSchedule.id ? { ...item, ...updatedSchedule } : item));
+    } catch (requestError) { setReportError(requestError.message || t.loadError); }
+  };
+
+  const saveLifecycle = async () => {
+    setReportError("");
+    try {
+      const response = await apiFetch(`${projectRoot}/report-lifecycle`, {
+        method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ expected_revision: lifecycleSettings.revision || null,
+          retention_days: Number(lifecycleSettings.retention_days), cleanup_enabled: Boolean(lifecycleSettings.cleanup_enabled) }),
+      });
+      const body = await readApiResponse(response);
+      if (!response.ok) throw new Error(detailMessage(body, t.loadError));
+      setLifecycleSettings(body);
+    } catch (requestError) { setReportError(requestError.message || t.loadError); }
   };
 
   const generateReport = async () => {
@@ -857,7 +1216,59 @@ export default function BusinessIntelligenceWorkspace({ lang = "en", projectId, 
       const response = await apiFetch(`${projectRoot}/reports/${encodeURIComponent(reportId)}`, { credentials: "include" });
       const body = await readApiResponse(response);
       if (!response.ok) throw new Error(detailMessage(body, t.loadError));
-      setSelectedReport(body);
+      const normalized = { ...body, access: body.access || { is_owner: true, permission: "owner", can_edit: true, can_share: true } };
+      setSelectedReport(normalized);
+      setDeliveryHistory([]);
+      setReportShares([]);
+      setReportMembers([]);
+      setReportShareMember("");
+      if (normalized.access.is_owner && sharingAvailable) {
+        const sharesResponse = await apiFetch(`${projectRoot}/reports/${encodeURIComponent(reportId)}/shares`, { credentials: "include" });
+        const sharesBody = await readApiResponse(sharesResponse);
+        if (!sharesResponse.ok) throw new Error(detailMessage(sharesBody, t.loadError));
+        setReportShares(Array.isArray(sharesBody.items) ? sharesBody.items : []);
+        setReportMembers(Array.isArray(sharesBody.members) ? sharesBody.members : []);
+      }
+      if (normalized.access.is_owner && deliveryAvailable) {
+        const deliveriesResponse = await apiFetch(`${projectRoot}/reports/${encodeURIComponent(reportId)}/deliveries`, { credentials: "include" });
+        const deliveriesBody = await readApiResponse(deliveriesResponse);
+        if (!deliveriesResponse.ok) throw new Error(detailMessage(deliveriesBody, t.loadError));
+        setDeliveryAvailable(deliveriesBody.available !== false);
+        setDeliveryHistory(Array.isArray(deliveriesBody.items) ? deliveriesBody.items : []);
+      }
+    } catch (requestError) { setReportError(requestError.message || t.loadError); }
+  };
+
+  const shareReport = async () => {
+    if (!selectedReport?.access?.is_owner || !reportShareMember) return;
+    setReportError("");
+    try {
+      const response = await apiFetch(`${projectRoot}/reports/${encodeURIComponent(selectedReport.id)}/shares/${encodeURIComponent(reportShareMember)}`, {
+        method: "PUT", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ member_user_id: Number(reportShareMember), permission: "viewer" }),
+      });
+      const body = await readApiResponse(response);
+      if (!response.ok) throw new Error(detailMessage(body, t.loadError));
+      setReportShareMember("");
+      const sharesResponse = await apiFetch(`${projectRoot}/reports/${encodeURIComponent(selectedReport.id)}/shares`, { credentials: "include" });
+      const sharesBody = await readApiResponse(sharesResponse);
+      if (!sharesResponse.ok) throw new Error(detailMessage(sharesBody, t.loadError));
+      setReportShares(Array.isArray(sharesBody.items) ? sharesBody.items : []);
+      setReportMembers(Array.isArray(sharesBody.members) ? sharesBody.members : []);
+    } catch (requestError) { setReportError(requestError.message || t.loadError); }
+  };
+
+  const revokeReportShare = async (share) => {
+    if (!selectedReport?.access?.is_owner) return;
+    setReportError("");
+    try {
+      const response = await apiFetch(`${projectRoot}/reports/${encodeURIComponent(selectedReport.id)}/shares/${encodeURIComponent(share.member_user_id)}`, {
+        method: "DELETE", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ member_user_id: Number(share.member_user_id), expected_share_revision: share.revision }),
+      });
+      const body = await readApiResponse(response);
+      if (!response.ok) throw new Error(detailMessage(body, t.loadError));
+      setReportShares((current) => current.filter((item) => Number(item.member_user_id) !== Number(share.member_user_id)));
     } catch (requestError) { setReportError(requestError.message || t.loadError); }
   };
 
@@ -865,6 +1276,8 @@ export default function BusinessIntelligenceWorkspace({ lang = "en", projectId, 
   const resultRows = report?.tables?.[0]?.rows || [];
   const chart = report?.charts?.[0] || null;
   const resultMetricLabel = metricResult?.metric?.label || metricLabel;
+  const selectedDashboardSummary = dashboards.find((item) => item.id === selectedDashboardId) || null;
+  const selectedDashboardOwned = selectedDashboardSummary?.access?.is_owner !== false;
   if (status === "loading") return <main className="bi-workspace" dir={activeLang === "ar" ? "rtl" : "ltr"}><StatePanel title={t.loading} /></main>;
   if (status === "error") return <main className="bi-workspace" dir={activeLang === "ar" ? "rtl" : "ltr"}><StatePanel icon={AlertTriangle} role="alert" title={t.loadError} action={<button type="button" onClick={loadDatasets}>{t.retry}</button>}>{error}</StatePanel></main>;
   if (!available) return <main className="bi-workspace" dir={activeLang === "ar" ? "rtl" : "ltr"}><StatePanel title={t.unavailable}>{t.unavailableHint}</StatePanel></main>;
@@ -954,19 +1367,19 @@ export default function BusinessIntelligenceWorkspace({ lang = "en", projectId, 
               <div className="bi-metric-form">
                 <label>{t.operation}<select value={operation} onChange={(event) => setOperation(event.target.value)}>{OPERATIONS.map((item) => <option key={item} value={item}>{t[item]}</option>)}</select></label>
                 {operationNeedsValue ? <label>{operation === "distinct_count" ? t.distinctColumn : t.valueColumn}<select value={effectiveValueColumn} onChange={(event) => setValueColumn(event.target.value)}><option value="">{t.select}</option>{(operation === "distinct_count" ? columns : numericColumns).map((column) => <option key={column}>{column}</option>)}</select></label> : null}
-                {operation === "date_aggregate" ? <><label>{t.dateColumn}<select value={dateColumn} onChange={(event) => setDateColumn(event.target.value)}><option value="">{t.select}</option>{dateColumns.map((column) => <option key={column}>{column}</option>)}</select></label><label>{t.period}<select value={period} onChange={(event) => setPeriod(event.target.value)}><option value="day">day</option><option value="week">week</option><option value="month">month</option></select></label><label>{t.aggregation}<select value={aggregation} onChange={(event) => setAggregation(event.target.value)}>{["count", "sum", "mean", "min", "max"].map((item) => <option key={item}>{item}</option>)}</select></label></> : <label>{t.groupColumn}<select value={groupColumn} onChange={(event) => setGroupColumn(event.target.value)}><option value="">{t.none}</option>{columns.map((column) => <option key={column}>{column}</option>)}</select></label>}
+                {operation === "date_aggregate" ? <><label>{t.dateColumn}<select value={dateColumn} onChange={(event) => setDateColumn(event.target.value)}><option value="">{t.select}</option>{dateColumns.map((column) => <option key={column}>{column}</option>)}</select></label><label>{t.period}<select value={period} onChange={(event) => setPeriod(event.target.value)}><option value="day">day</option><option value="week">week</option><option value="month">month</option></select></label><label>{t.aggregation}<select value={aggregation} onChange={(event) => setAggregation(event.target.value)}>{["count", "sum", "mean", "min", "max"].map((item) => <option key={item}>{item}</option>)}</select></label><fieldset className="bi-period-controls"><legend>{t.customPeriod}</legend><label>{t.startDate}<input aria-label={t.startDate} type="date" dir="ltr" value={periodStartDate} onChange={(event) => setPeriodStartDate(event.target.value)} /></label><label>{t.endDate}<input aria-label={t.endDate} type="date" dir="ltr" value={periodEndDate} onChange={(event) => setPeriodEndDate(event.target.value)} /></label><label>{t.reportingTimezone}<input aria-label={t.reportingTimezone} dir="ltr" value={reportingTimezone} onChange={(event) => setReportingTimezone(event.target.value)} /></label></fieldset></> : <label>{t.groupColumn}<select value={groupColumn} onChange={(event) => setGroupColumn(event.target.value)}><option value="">{t.none}</option>{columns.map((column) => <option key={column}>{column}</option>)}</select></label>}
                 <button type="button" disabled={!metricCompatible || metricStatus === "loading"} onClick={runMetric}>{metricStatus === "loading" ? <RefreshCw className="is-spinning" size={17} aria-hidden="true" /> : <Gauge size={17} aria-hidden="true" />}{metricStatus === "loading" ? t.running : t.run}</button>
               </div>
-              {!metricCompatible ? <p className="bi-warning" role="status">{t.incompatible}</p> : null}
+              {!periodSelectionValid ? <p className="bi-warning" role="status">{t.periodInvalid}</p> : operation === "date_aggregate" && !dateColumns.length ? <p className="bi-warning" role="status">{t.dateSemanticsUnavailable}</p> : !metricCompatible ? <p className="bi-warning" role="status">{t.incompatible}</p> : null}
               {metricError ? <p className="bi-error" role="alert">{metricError}</p> : null}
-              {report ? <article className="bi-result"><header><div><span>{t.result}</span><h3>{resultMetricLabel}</h3></div>{report.kpis?.[0] ? <strong>{report.kpis[0].display_value ?? formatNumber(report.kpis[0].value, activeLang)}</strong> : null}</header><p>{report.summary}</p><small>{t.unknownUnit}</small><ResultTable rows={resultRows} /><details><summary>{t.provenance}</summary><dl><div><dt>project_id</dt><dd>{metricResult.provenance?.project_id || projectId}</dd></div><div><dt>dataset_id</dt><dd>{metricResult.provenance?.dataset_id || selectedDatasetId}</dd></div><div><dt>dataset_version_id</dt><dd>{metricResult.provenance?.dataset_version_id || version?.id}</dd></div><div><dt>content_hash</dt><dd>{metricResult.provenance?.content_hash || version?.content_hash || t.noHash}</dd></div><div><dt>operation</dt><dd>{metricResult.metric?.operation}</dd></div></dl></details></article> : <p className="bi-empty-inline">{t.noResult}</p>}
+              {report ? <article className="bi-result"><header><div><span>{t.result}</span><h3>{resultMetricLabel}</h3></div>{report.kpis?.[0] ? <strong>{report.kpis[0].display_value ?? formatNumber(report.kpis[0].value, activeLang)}</strong> : null}</header><p>{report.summary}</p><small>{t.unknownUnit}</small><ResultTable rows={resultRows} /><PeriodDisclosure report={report} copy={t} /><details><summary>{t.provenance}</summary><dl><div><dt>project_id</dt><dd>{metricResult.provenance?.project_id || projectId}</dd></div><div><dt>dataset_id</dt><dd>{metricResult.provenance?.dataset_id || selectedDatasetId}</dd></div><div><dt>dataset_version_id</dt><dd>{metricResult.provenance?.dataset_version_id || version?.id}</dd></div><div><dt>content_hash</dt><dd>{metricResult.provenance?.content_hash || version?.content_hash || t.noHash}</dd></div><div><dt>operation</dt><dd>{metricResult.metric?.operation}</dd></div></dl></details></article> : <p className="bi-empty-inline">{t.noResult}</p>}
             </section>
           )}
 
           {tab === "Visualizations" && (
             <section className="bi-panel" id="bi-visualizations-panel" role="tabpanel" aria-labelledby="bi-visualizations-panel-tab">
               <div className="bi-panel-heading"><div><span>VISUALIZATIONS</span><h2 id="bi-visual-title">{t.chartTitle}</h2><p>{t.chartHint}</p></div><BarChart3 size={24} aria-hidden="true" /></div>
-              {chart ? <AccessibleBarChart chart={chart} lang={activeLang} /> : <StatePanel icon={BarChart3} title={t.chartTitle}>{t.chartUnavailable}</StatePanel>}
+              {chart ? <AccessibleChart chart={chart} lang={activeLang} emptyLabel={t.chartEmpty} legendLabel={t.chartLegend} /> : <StatePanel icon={BarChart3} title={t.chartTitle}>{t.chartUnavailable}</StatePanel>}
             </section>
           )}
 
@@ -977,17 +1390,25 @@ export default function BusinessIntelligenceWorkspace({ lang = "en", projectId, 
                 {dashboardError ? <p className="bi-error" role="alert">{dashboardError}</p> : null}
                 <div className="bi-dashboard-controls">
                   <label>{t.dashboardTitle}<select aria-label={t.dashboardTitle} value={selectedDashboardId} onChange={(event) => { setDashboard(null); setSelectedDashboardId(event.target.value); }}><option value="">{t.noDashboards}</option>{dashboards.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-                  <label>{t.dashboardName}<input aria-label={t.dashboardName} value={dashboardName} onChange={(event) => setDashboardName(event.target.value)} /></label>
-                  <label>{t.dashboardDescription}<input aria-label={t.dashboardDescription} value={dashboardDescription} onChange={(event) => setDashboardDescription(event.target.value)} /></label>
-                  {!dashboard ? <button type="button" onClick={() => void createDashboard()}>{t.createDashboard}</button> : <><button type="button" onClick={() => void saveDashboard()}>{t.saveDashboard}</button><button type="button" className="is-danger" onClick={() => void deleteDashboard()}>{t.deleteDashboard}</button></>}
+                  {!dashboard || dashboard.access?.can_edit ? <label>{t.dashboardName}<input aria-label={t.dashboardName} value={dashboardName} onChange={(event) => setDashboardName(event.target.value)} /></label> : null}
+                  {!dashboard || dashboard.access?.can_edit ? <label>{t.dashboardDescription}<input aria-label={t.dashboardDescription} value={dashboardDescription} onChange={(event) => setDashboardDescription(event.target.value)} /></label> : null}
+                  {!dashboard ? <button type="button" onClick={() => void createDashboard()}>{t.createDashboard}</button> : <>{dashboard.access?.can_edit ? <button type="button" onClick={() => void saveDashboard()}>{t.saveDashboard}</button> : null}{dashboard.access?.is_owner ? <button type="button" className="is-danger" onClick={() => void deleteDashboard()}>{t.deleteDashboard}</button> : null}</>}
                 </div>
                 {dashboard ? <>
-                  <label className="bi-auto-refresh"><input type="checkbox" checked={Boolean(dashboard.auto_refresh_enabled)} disabled={!reportingAvailable} onChange={(event) => void configureAutomaticRefresh(event.target.checked)} /><span><strong>{t.autoRefresh}</strong><small>{reportingAvailable ? t.autoRefreshHint : t.reportingUnavailable}</small></span></label>
-                  <div className="bi-widget-add"><label>Version policy<select aria-label="Version policy" value={versionPolicy} onChange={(event) => setVersionPolicy(event.target.value)}><option value="pinned">{t.pinned}</option><option value="latest_committed">{t.latest_committed}</option></select></label><label>{t.widgetWidth}<select aria-label={t.widgetWidth} value={widgetWidth} onChange={(event) => setWidgetWidth(Number(event.target.value))}>{[3, 4, 6, 8, 12].map((item) => <option key={item} value={item}>{item}/12</option>)}</select></label><label>{t.widgetHeight}<select aria-label={t.widgetHeight} value={widgetHeight} onChange={(event) => setWidgetHeight(Number(event.target.value))}>{[3, 4, 6, 8].map((item) => <option key={item} value={item}>{item}</option>)}</select></label><button type="button" disabled={!metricResult} onClick={() => void addCurrentWidget()}>{t.addWidget}</button></div>
-                  {(dashboard.widgets || []).length ? <div className="bi-widget-grid">{dashboard.widgets.map((widget) => {
-                    const execution = widgetResults[widget.id]; const widgetReport = execution?.result;
-                    return <article className="bi-widget" key={widget.id}><header><div><h3>{widget.title}</h3><small>{widget.version_policy === "pinned" ? t.pinned : t.latest_committed} · v{execution?.provenance?.version_number || "—"}</small></div><div><button type="button" onClick={() => void executeWidget(widget, true)}>{t.refreshWidget}</button><button type="button" onClick={() => void removeWidget(widget)}>{t.removeWidget}</button></div></header>{execution?.status === "needs_attention" ? <p className="bi-warning">{execution.message || t.needsAttention}</p> : <>{widgetReport?.kpis?.[0] ? <strong className="bi-widget-kpi">{widgetReport.kpis[0].display_value ?? formatNumber(widgetReport.kpis[0].value, activeLang)}</strong> : null}{widgetReport?.charts?.[0] ? <AccessibleBarChart chart={widgetReport.charts[0]} lang={activeLang} /> : <ResultTable rows={widgetReport?.tables?.[0]?.rows || []} />}</>}<details><summary>{t.provenance}</summary><code>{execution?.provenance?.dataset_version_id || widget.dataset_version_id}</code></details></article>;
-                  })}</div> : <p className="bi-empty-inline">{t.noWidgets}</p>}
+                  {!dashboard.access?.is_owner ? <p className="bi-notice" role="status"><strong>{dashboard.access?.permission === "editor" ? t.sharedEditor : t.sharedViewer}</strong> · {t.ownerOnly}</p> : null}
+                  {dashboard.access?.is_owner ? <label className="bi-auto-refresh"><input type="checkbox" checked={Boolean(dashboard.auto_refresh_enabled)} disabled={!reportingAvailable} onChange={(event) => void configureAutomaticRefresh(event.target.checked)} /><span><strong>{t.autoRefresh}</strong><small>{reportingAvailable ? t.autoRefreshHint : t.reportingUnavailable}</small></span></label> : null}
+                  {dashboard.access?.is_owner ? <div className="bi-widget-add"><label>Version policy<select aria-label="Version policy" value={versionPolicy} onChange={(event) => setVersionPolicy(event.target.value)}><option value="pinned">{t.pinned}</option><option value="latest_committed">{t.latest_committed}</option></select></label><label>{t.widgetWidth}<select aria-label={t.widgetWidth} value={widgetWidth} onChange={(event) => setWidgetWidth(Number(event.target.value))}>{[3, 4, 6, 8, 12].map((item) => <option key={item} value={item}>{item}/12</option>)}</select></label><label>{t.widgetHeight}<select aria-label={t.widgetHeight} value={widgetHeight} onChange={(event) => setWidgetHeight(Number(event.target.value))}>{[3, 4, 6, 8].map((item) => <option key={item} value={item}>{item}</option>)}</select></label><button type="button" disabled={!metricResult} onClick={() => void addCurrentWidget()}>{t.addWidget}</button></div> : null}
+                  {(dashboard.widgets || []).length ? <div className="bi-widget-grid">{dashboard.widgets.map((widget) => <DashboardWidget
+                    key={widget.id} widget={widget} execution={widgetResults[widget.id]} lang={activeLang} copy={t}
+                    canEdit={Boolean(dashboard.access?.can_edit)}
+                    onSave={(draft) => void saveWidget(widget, draft)}
+                    onRefresh={() => void executeWidget(widget, true)} onRemove={() => void removeWidget(widget)}
+                  />)}</div> : <p className="bi-empty-inline">{t.noWidgets}</p>}
+                  {dashboard.access?.is_owner ? (sharingAvailable ? <SharingPanel copy={t} members={dashboardMembers} shares={dashboardShares}
+                    selectedMemberId={dashboardShareMember} permission={dashboardSharePermission}
+                    onMemberChange={setDashboardShareMember} onPermissionChange={setDashboardSharePermission}
+                    onShare={() => void shareDashboard()} onRevoke={(share) => void revokeDashboardShare(share)} />
+                    : <aside className="bi-notice is-warning"><AlertTriangle size={20} aria-hidden="true" /><div><strong>{t.sharingUnavailable}</strong></div></aside>) : null}
                 </> : null}
               </>}
             </section>
@@ -1000,9 +1421,9 @@ export default function BusinessIntelligenceWorkspace({ lang = "en", projectId, 
                 {reportError ? <p className="bi-error" role="alert">{reportError}</p> : null}
                 <div className="bi-report-controls">
                   <label>{t.dashboardTitle}<select value={selectedDashboardId} onChange={(event) => setSelectedDashboardId(event.target.value)}><option value="">{t.noDashboards}</option>{dashboards.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-                  <button type="button" disabled={!selectedDashboardId} onClick={() => void generateReport()}><FileText size={16} aria-hidden="true" />{t.generateNow}</button>
+                  <button type="button" disabled={!selectedDashboardId || !selectedDashboardOwned} onClick={() => void generateReport()}><FileText size={16} aria-hidden="true" />{t.generateNow}</button>
                 </div>
-                <form className="bi-schedule-form" onSubmit={(event) => { event.preventDefault(); void createSchedule(); }}>
+                {selectedDashboardOwned ? <form className="bi-schedule-form" onSubmit={(event) => { event.preventDefault(); void createSchedule(); }}>
                   <label>{t.scheduleName}<input value={scheduleName} onChange={(event) => setScheduleName(event.target.value)} /></label>
                   <label>{t.cadence}<select value={scheduleCadence} onChange={(event) => setScheduleCadence(event.target.value)}><option value="daily">daily</option><option value="weekly">weekly</option><option value="monthly">monthly</option></select></label>
                   <label>{t.timezone}<input value={scheduleTimezone} onChange={(event) => setScheduleTimezone(event.target.value)} /></label>
@@ -1011,12 +1432,24 @@ export default function BusinessIntelligenceWorkspace({ lang = "en", projectId, 
                   {scheduleCadence === "monthly" ? <label>{t.monthDay}<input type="number" min="1" max="31" value={scheduleMonthDay} onChange={(event) => setScheduleMonthDay(event.target.value)} /></label> : null}
                   <label className="bi-schedule-enabled"><input type="checkbox" checked={scheduleEnabled} onChange={(event) => setScheduleEnabled(event.target.checked)} />{t.scheduleEnabled}</label>
                   <button type="submit" disabled={!selectedDashboardId}><CalendarClock size={16} aria-hidden="true" />{editingScheduleId ? t.saveSchedule : t.createSchedule}</button>
-                </form>
+                </form> : <p className="bi-notice" role="status">{t.ownerOnly}</p>}
+                {deliveryAvailable ? <section className="bi-lifecycle" aria-labelledby="bi-retention-title">
+                  <div><h3 id="bi-retention-title">{t.retentionTitle}</h3><p>{t.deliveryHint}</p></div>
+                  <label>{t.retentionDays}<input type="number" min="7" max="365" value={lifecycleSettings.retention_days} onChange={(event) => setLifecycleSettings((current) => ({ ...current, retention_days: Number(event.target.value) }))} /></label>
+                  <label className="bi-schedule-enabled"><input type="checkbox" checked={Boolean(lifecycleSettings.cleanup_enabled)} onChange={(event) => setLifecycleSettings((current) => ({ ...current, cleanup_enabled: event.target.checked }))} />{t.cleanupEnabled}</label>
+                  <button type="button" onClick={() => void saveLifecycle()}>{t.saveRetention}</button>
+                </section> : <aside className="bi-notice is-warning"><AlertTriangle size={20} aria-hidden="true" /><div><strong>{t.deliveryUnavailable}</strong></div></aside>}
                 <div className="bi-report-grid">
-                  <section><h3>{t.createSchedule}</h3>{schedules.length ? <ul className="bi-report-list">{schedules.map((schedule) => <li key={schedule.id}><div><strong>{schedule.name}</strong><small>{schedule.cadence} · {schedule.local_time} · {schedule.timezone} · {schedule.enabled ? t.scheduleEnabled : t.statusLabel}</small><small>{t.nextRun}: {formatDate(schedule.next_run_at, activeLang)}</small></div><div><button type="button" onClick={() => beginScheduleEdit(schedule)}>{t.editSchedule}</button><button type="button" onClick={() => void removeSchedule(schedule)}>{t.removeSchedule}</button></div></li>)}</ul> : <p className="bi-empty-inline">{t.noSchedules}</p>}</section>
-                  <section><h3>{t.reportHistory}</h3>{reports.length ? <ul className="bi-report-list">{reports.map((item) => <li key={item.id}><div><strong>{item.trigger_type} · {item.status}</strong><small>{formatDate(item.completed_at || item.created_at, activeLang)} · r{item.dashboard_revision}</small><small>{(item.version_vector || []).map((entry) => `v${entry.version_number || "—"}`).join(", ") || "—"}</small></div><div>{["failed", "needs_attention"].includes(item.status) ? <button type="button" onClick={() => void retryReport(item.id)}>{t.retry}</button> : null}<button type="button" onClick={() => void openReport(item.id)}>{t.openReport}</button></div></li>)}</ul> : <p className="bi-empty-inline">{t.noReports}</p>}</section>
+                  <section><h3>{t.createSchedule}</h3>{schedules.length ? <ul className="bi-report-list">{schedules.map((schedule) => <li key={schedule.id}><div><strong>{schedule.name}</strong><small>{schedule.cadence} · {schedule.local_time} · {schedule.timezone} · {schedule.enabled ? t.scheduleEnabled : t.statusLabel}</small><small>{t.nextRun}: {formatDate(schedule.next_run_at, activeLang)}</small></div><div><button type="button" onClick={() => beginScheduleEdit(schedule)}>{t.editSchedule}</button>{deliveryAvailable ? <button type="button" onClick={() => void openDeliveryConfig(schedule)}>{t.configureDelivery}</button> : null}<button type="button" onClick={() => void removeSchedule(schedule)}>{t.removeSchedule}</button></div></li>)}</ul> : <p className="bi-empty-inline">{t.noSchedules}</p>}</section>
+                  <section><h3>{t.reportHistory}</h3>{reports.length ? <ul className="bi-report-list">{reports.map((item) => <li key={item.id}><div><strong>{item.trigger_type} · {item.status}</strong><small>{formatDate(item.completed_at || item.created_at, activeLang)} · r{item.dashboard_revision}{item.access?.is_owner === false ? ` · ${t.sharedWithMe}` : ""}</small><small>{(item.version_vector || []).map((entry) => `v${entry.version_number || "—"}`).join(", ") || "—"}</small></div><div>{item.access?.is_owner !== false && ["failed", "needs_attention"].includes(item.status) ? <button type="button" onClick={() => void retryReport(item.id)}>{t.retry}</button> : null}<button type="button" onClick={() => void openReport(item.id)}>{t.openReport}</button></div></li>)}</ul> : <p className="bi-empty-inline">{t.noReports}</p>}</section>
                 </div>
-                {selectedReport ? <article className="bi-report-print" aria-live="polite"><header><div><small>{t.statusLabel}: {selectedReport.status}</small><h3>{selectedReport.result_snapshot?.title || selectedReport.definition_snapshot?.dashboard?.name || t.reportsTitle}</h3><p>{t.reportDisclosure}</p></div><div className="bi-print-actions">{selectedReport.status === "completed" ? <a className="bi-button" href={`${projectRoot}/reports/${encodeURIComponent(selectedReport.id)}/export.csv`}><Download size={16} aria-hidden="true" />{t.downloadCsv}</a> : null}<button type="button" onClick={() => window.print()}>{t.printReport}</button>{["completed", "failed", "needs_attention", "cancelled", "skipped"].includes(selectedReport.status) ? <button type="button" onClick={() => void archiveReport(selectedReport.id)}>{t.archiveReport}</button> : null}</div></header><p>{formatDate(selectedReport.completed_at || selectedReport.created_at, activeLang)}</p><dl className="bi-version-vector">{(selectedReport.version_vector || []).map((entry) => <div key={entry.widget_id}><dt>{entry.widget_id}</dt><dd>v{entry.version_number} · {entry.dataset_version_id} · {entry.content_hash || t.noHash}</dd></div>)}</dl>{(selectedReport.result_snapshot?.widgets || []).map((item) => <section className="bi-report-widget" key={item.widget_id}><h4>{item.title}</h4><p>{t.statusLabel}: {item.status}</p>{item.result?.kpis?.map((kpi, index) => <p key={`${kpi.label}-${index}`}><strong>{kpi.label}:</strong> {kpi.display_value ?? String(kpi.value ?? "—")}</p>)}<ResultTable rows={item.result?.tables?.[0]?.rows || []} /></section>)}{selectedReport.warnings?.length ? <ul>{selectedReport.warnings.map((warning, index) => <li key={`${warning.code}-${index}`}>{warning.code}</li>)}</ul> : null}</article> : null}
+                {deliverySchedule ? <section className="bi-delivery-config" aria-labelledby="bi-delivery-title">
+                  <div><h3 id="bi-delivery-title">{t.deliveryTitle}: {deliverySchedule.name}</h3><p>{t.deliveryHint}</p></div>
+                  <label className="bi-schedule-enabled"><input type="checkbox" checked={deliveryEnabled} onChange={(event) => setDeliveryEnabled(event.target.checked)} />{t.deliveryEnabled}</label>
+                  <fieldset><legend>{t.recipients}</legend>{deliveryMembers.map((member) => <label key={member.id}><input type="checkbox" checked={deliveryRecipients.includes(Number(member.id))} onChange={(event) => setDeliveryRecipients((current) => event.target.checked ? [...current, Number(member.id)] : current.filter((id) => id !== Number(member.id)))} /><span>{`${member.first_name || ""} ${member.last_name || ""}`.trim() || member.email} · {member.email}</span></label>)}</fieldset>
+                  <button type="button" disabled={deliveryEnabled && !deliveryRecipients.length} onClick={() => void saveDeliveryConfig()}>{t.saveDelivery}</button>
+                </section> : null}
+                {selectedReport ? <><article className="bi-report-print" aria-live="polite"><header><div><small>{t.statusLabel}: {selectedReport.status}{selectedReport.access?.is_owner === false ? ` · ${t.sharedWithMe}` : ""}</small><h3>{selectedReport.result_snapshot?.title || selectedReport.definition_snapshot?.dashboard?.name || t.reportsTitle}</h3><p>{t.reportDisclosure}</p>{selectedReport.artifact_deleted_at ? <p className="bi-warning">{t.artifactExpired}</p> : null}</div><div className="bi-print-actions">{selectedReport.status === "completed" && !selectedReport.artifact_deleted_at ? <><a className="bi-button" href={`${projectRoot}/reports/${encodeURIComponent(selectedReport.id)}/export.csv`}><Download size={16} aria-hidden="true" />{t.downloadCsv}</a><a className="bi-button" href={`${projectRoot}/reports/${encodeURIComponent(selectedReport.id)}/export.pdf?language=${activeLang}`}><Download size={16} aria-hidden="true" />{t.downloadPdf}</a><a className="bi-button" href={`${projectRoot}/reports/${encodeURIComponent(selectedReport.id)}/export.xlsx?language=${activeLang}`}><Download size={16} aria-hidden="true" />{t.downloadXlsx}</a></> : null}<button type="button" onClick={() => window.print()}>{t.printReport}</button>{selectedReport.access?.is_owner && ["completed", "failed", "needs_attention", "cancelled", "skipped"].includes(selectedReport.status) ? <button type="button" onClick={() => void archiveReport(selectedReport.id)}>{t.archiveReport}</button> : null}</div></header><p>{formatDate(selectedReport.completed_at || selectedReport.created_at, activeLang)}</p><dl className="bi-version-vector">{(selectedReport.version_vector || []).map((entry) => <div key={entry.widget_id}><dt>{entry.widget_id}</dt><dd>v{entry.version_number} · {entry.dataset_version_id} · {entry.content_hash || t.noHash}</dd></div>)}</dl>{(selectedReport.result_snapshot?.widgets || []).map((item) => <section className="bi-report-widget" key={item.widget_id}><h4>{item.title}</h4><p>{t.statusLabel}: {item.status}</p>{item.result?.kpis?.map((kpi, index) => <p key={`${kpi.label}-${index}`}><strong>{kpi.label}:</strong> {kpi.display_value ?? String(kpi.value ?? "—")}</p>)}<ResultTable rows={item.result?.tables?.[0]?.rows || []} /></section>)}{selectedReport.warnings?.length ? <ul>{selectedReport.warnings.map((warning, index) => <li key={`${warning.code}-${index}`}>{warning.code}</li>)}</ul> : null}</article>{selectedReport.access?.is_owner && deliveryAvailable ? <section className="bi-delivery-history" aria-labelledby="bi-delivery-history-title"><h3 id="bi-delivery-history-title">{t.deliveryHistory}</h3>{deliveryHistory.length ? <ul className="bi-report-list">{deliveryHistory.map((item) => <li key={item.id}><div><strong>{item.recipient?.email || item.recipient_user_id}</strong><small>{item.channel} · {item.status}</small><small>{t.attempts}: {item.attempts}/{item.max_attempts}{item.last_error_code ? ` · ${item.last_error_code}` : ""}</small></div></li>)}</ul> : <p className="bi-empty-inline">{t.noDeliveries}</p>}</section> : null}{selectedReport.access?.is_owner ? (sharingAvailable ? <SharingPanel copy={t} members={reportMembers} shares={reportShares} selectedMemberId={reportShareMember} permission="viewer" viewerOnly onMemberChange={setReportShareMember} onPermissionChange={() => {}} onShare={() => void shareReport()} onRevoke={(share) => void revokeReportShare(share)} /> : <aside className="bi-notice is-warning"><AlertTriangle size={20} aria-hidden="true" /><div><strong>{t.sharingUnavailable}</strong></div></aside>) : null}</> : null}
               </>}
             </section>
           )}

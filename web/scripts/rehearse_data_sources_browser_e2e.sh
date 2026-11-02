@@ -14,6 +14,7 @@ GATEWAY_NAME="madar-c3-browser-gateway-${RUN_ID}"
 VAULT_NAME="madar-c3-browser-vault-${RUN_ID}"
 FIXTURE_NAME="madar-c3-browser-fixture-${RUN_ID}"
 BACKEND_NAME="madar-c3-browser-backend-${RUN_ID}"
+NGINX_NAME="madar-c3-browser-nginx-${RUN_ID}"
 TEMP_DIR="$(mktemp -d)"
 REPORT_DIR="${TEMP_DIR}/private-reports"
 ARTIFACT_DIR="${MADAR_E2E_ARTIFACT_DIR:-/tmp/madar-data-sources-c3-step5-${RUN_ID}}"
@@ -24,6 +25,7 @@ PROVIDER_TOKEN="fixture-token-not-a-real-credential"
 GOOGLE_STATE_KEY="$(openssl rand -hex 32)"
 AUTH_ID="70000000-0000-4000-8000-000000000001"
 PROJECT_ID="70000000-0000-4000-8000-000000000002"
+MEMBER_AUTH_ID="70000000-0000-4000-8000-000000000003"
 CROSS_AUTH_ID="70000000-0000-4000-8000-000000000011"
 CROSS_PROJECT_ID="70000000-0000-4000-8000-000000000012"
 VITE_PID=""
@@ -39,6 +41,10 @@ OBJECT_PORT="$(free_port)"
 CONTROL_PORT="$(free_port)"
 BACKEND_PORT="$(free_port)"
 FRONTEND_PORT="$(free_port)"
+VITE_PORT="${FRONTEND_PORT}"
+if [[ "${MADAR_E2E_SCALABILITY:-NO}" == "YES" ]]; then
+  VITE_PORT="$(free_port)"
+fi
 
 cleanup() {
   local status=$?
@@ -46,12 +52,18 @@ cleanup() {
     docker logs "${BACKEND_NAME}" >"${ARTIFACT_DIR}/backend.log" 2>&1 || true
     docker logs "${FIXTURE_NAME}" >"${ARTIFACT_DIR}/fixture.log" 2>&1 || true
     docker logs "${GATEWAY_NAME}" >"${ARTIFACT_DIR}/gateway.log" 2>&1 || true
+    if [[ "${MADAR_E2E_SCALABILITY:-NO}" == "YES" ]]; then
+      docker exec "${BACKEND_NAME}" python tests/scalability_checkpoint_fixture.py finish >/dev/null 2>&1 || true
+      if [[ -f "${REPORT_DIR}/scalability-metrics.json" ]]; then
+        cp "${REPORT_DIR}/scalability-metrics.json" "${ARTIFACT_DIR}/scalability-metrics.json"
+      fi
+    fi
   fi
   if [[ -n "${VITE_PID}" ]]; then
     kill "${VITE_PID}" >/dev/null 2>&1 || true
     wait "${VITE_PID}" >/dev/null 2>&1 || true
   fi
-  docker rm -f "${BACKEND_NAME}" "${FIXTURE_NAME}" "${GATEWAY_NAME}" \
+  docker rm -f "${NGINX_NAME}" "${BACKEND_NAME}" "${FIXTURE_NAME}" "${GATEWAY_NAME}" \
     "${REST_NAME}" "${VAULT_NAME}" "${PG_NAME}" >/dev/null 2>&1 || true
   docker network rm "${NETWORK}" >/dev/null 2>&1 || true
   find "${TEMP_DIR}" -type f -exec chmod u+w {} + 2>/dev/null || true
@@ -62,13 +74,30 @@ trap cleanup EXIT
 
 mkdir -p "${ARTIFACT_DIR}" "${REPORT_DIR}"
 docker network create "${NETWORK}" >/dev/null
+PG_INIT_ENV=(-e POSTGRES_HOST_AUTH_METHOD=trust)
+if [[ "${MADAR_E2E_SCALABILITY:-NO}" == "YES" ]]; then
+  PG_INIT_ENV=(-e POSTGRES_HOST_AUTH_METHOD=scram-sha-256 -e POSTGRES_PASSWORD=fixture-bootstrap-only)
+fi
 docker run -d --name "${PG_NAME}" --network "${NETWORK}" --network-alias pg \
   --tmpfs /var/lib/postgresql/data:rw,noexec,nosuid,size=2g \
-  -e POSTGRES_HOST_AUTH_METHOD=trust "${PG_IMAGE}" >/dev/null
+  "${PG_INIT_ENV[@]}" "${PG_IMAGE}" >/dev/null
+pg_ready_checks=0
 for _ in $(seq 1 60); do
-  docker exec "${PG_NAME}" pg_isready -U postgres >/dev/null 2>&1 && break
+  if docker exec "${PG_NAME}" pg_isready -U postgres >/dev/null 2>&1; then
+    pg_ready_checks=$((pg_ready_checks + 1))
+    if ((pg_ready_checks >= 2)); then
+      break
+    fi
+  else
+    pg_ready_checks=0
+  fi
   sleep 0.25
 done
+if ((pg_ready_checks < 2)); then
+  printf 'postgres_stable_readiness_failed\n' >&2
+  docker logs "${PG_NAME}" >&2 || true
+  exit 1
+fi
 docker exec "${PG_NAME}" pg_isready -U postgres >/dev/null
 
 docker exec -i "${PG_NAME}" psql -X -v ON_ERROR_STOP=1 -U postgres <<'SQL'
@@ -90,6 +119,22 @@ create schema extensions;
 create extension pgcrypto schema extensions;
 SQL
 
+if [[ "${MADAR_E2E_SCALABILITY:-NO}" == "YES" ]]; then
+  docker run --rm --network "${NETWORK}" \
+    -v "${MADAR_E2E_SITE_PACKAGES}:/usr/local/lib/python3.12/site-packages:ro" \
+    madar-backend-test python -c '
+import json,psycopg
+with psycopg.connect("host=pg dbname=postgres user=authenticator password=fixture-password connect_timeout=3") as connection:
+    assert connection.execute("select current_user").fetchone()[0] == "authenticator"
+try:
+    psycopg.connect("host=pg dbname=postgres user=authenticator password=wrong-fixture-password connect_timeout=3")
+except psycopg.OperationalError:
+    print(json.dumps({"scram_correct_password":True,"wrong_password_refused":True}))
+else:
+    raise RuntimeError("disposable database did not enforce password authentication")
+' >"${ARTIFACT_DIR}/database-authentication.json"
+fi
+
 apply_range() {
   local minimum="$1" maximum="$2" migration number
   for migration in "${ROOT_DIR}"/web/database/migrations/*.sql; do
@@ -109,15 +154,18 @@ apply_range 115 141
 docker exec -i "${PG_NAME}" psql -X -v ON_ERROR_STOP=1 -U postgres <<SQL
 insert into auth.users(id,email,email_confirmed_at,confirmed_at) values
 ('${AUTH_ID}','browser@example.invalid',now(),now()),
+('${MEMBER_AUTH_ID}','member@example.invalid',now(),now()),
 ('${CROSS_AUTH_ID}','cross@example.invalid',now(),now());
 insert into public.tenants(tenant_id,brand_name,owner_name) values
 (7001,'Browser E2E','Owner'),(7002,'Cross tenant','Owner');
 insert into public.users(id,auth_id,first_name,last_name,email,tenant_id,account_kind,account_status)
 overriding system value values
 (7001,'${AUTH_ID}','Browser','Owner','browser@example.invalid',7001,'platform','active'),
+(7003,'${MEMBER_AUTH_ID}','Browser','Member','member@example.invalid',7001,'platform','active'),
 (7002,'${CROSS_AUTH_ID}','Cross','Owner','cross@example.invalid',7002,'platform','active');
 insert into public.tenant_memberships(tenant_id,user_id,auth_id,role,status) values
 (7001,7001,'${AUTH_ID}','owner','active'),
+(7001,7003,'${MEMBER_AUTH_ID}','member','active'),
 (7002,7002,'${CROSS_AUTH_ID}','owner','active');
 insert into public.builder_projects(id,tenant_id,owner_user_id,name,slug,status,draft_schema) values
 ('${PROJECT_ID}',7001,7001,'Browser API project','browser-api-project','draft','{"workspaceKind":"data"}'::jsonb),
@@ -129,6 +177,10 @@ SERVICE_JWT="$(docker run --rm -e JWT_SECRET="${JWT_SECRET}" madar-backend-test 
 ANON_JWT="$(docker run --rm -e JWT_SECRET="${JWT_SECRET}" madar-backend-test \
   python -c "import jwt,os,time;print(jwt.encode({'role':'anon','exp':int(time.time())+3600},os.environ['JWT_SECRET'],algorithm='HS256'))")"
 ACCESS_JWT="$(docker run --rm -e JWT_SECRET="${JWT_SECRET}" -e AUTH_ID="${AUTH_ID}" madar-backend-test \
+  python -c "import jwt,os,time;print(jwt.encode({'role':'authenticated','sub':os.environ['AUTH_ID'],'aud':'authenticated','exp':int(time.time())+3600},os.environ['JWT_SECRET'],algorithm='HS256'))")"
+MEMBER_JWT="$(docker run --rm -e JWT_SECRET="${JWT_SECRET}" -e AUTH_ID="${MEMBER_AUTH_ID}" madar-backend-test \
+  python -c "import jwt,os,time;print(jwt.encode({'role':'authenticated','sub':os.environ['AUTH_ID'],'aud':'authenticated','exp':int(time.time())+3600},os.environ['JWT_SECRET'],algorithm='HS256'))")"
+CROSS_JWT="$(docker run --rm -e JWT_SECRET="${JWT_SECRET}" -e AUTH_ID="${CROSS_AUTH_ID}" madar-backend-test \
   python -c "import jwt,os,time;print(jwt.encode({'role':'authenticated','sub':os.environ['AUTH_ID'],'aud':'authenticated','exp':int(time.time())+3600},os.environ['JWT_SECRET'],algorithm='HS256'))")"
 
 docker run -d --name "${REST_NAME}" --network "${NETWORK}" --network-alias rest \
@@ -147,6 +199,7 @@ docker run -d --name "${GATEWAY_NAME}" --network "${NETWORK}" --network-alias ga
   -v "${ROOT_DIR}/web/backend/tests/disposable_supabase_gateway.py:/fixture/gateway.py:ro" \
   -e POSTGREST_UPSTREAM=http://rest:3000 -e AUTH_TEST_TOKEN="${ACCESS_JWT}" \
   -e AUTH_TEST_USER_ID="${AUTH_ID}" -e AUTH_TEST_EMAIL=browser@example.invalid \
+  -e AUTH_TEST_SESSIONS="{\"${ACCESS_JWT}\":{\"id\":\"${AUTH_ID}\",\"email\":\"browser@example.invalid\"},\"${MEMBER_JWT}\":{\"id\":\"${MEMBER_AUTH_ID}\",\"email\":\"member@example.invalid\"},\"${CROSS_JWT}\":{\"id\":\"${CROSS_AUTH_ID}\",\"email\":\"cross@example.invalid\"}}" \
   madar-backend-test python /fixture/gateway.py >/dev/null
 
 docker run -d --name "${VAULT_NAME}" --network "${NETWORK}" --network-alias vault \
@@ -196,6 +249,14 @@ COMMON_ENV=(
   -e PRIVATE_CHARTS_DIR=/tmp/madar-private-reports
   -e HOME=/tmp -e MPLCONFIGDIR=/tmp/matplotlib -e PYTHONPATH=/app -e PYTHONFAULTHANDLER=1
 )
+if [[ "${MADAR_E2E_SCALABILITY:-NO}" == "YES" ]]; then
+  test -d "${MADAR_E2E_SITE_PACKAGES:?scalability requires verified site-packages}"
+  mkdir -p "${TEMP_DIR}/uploads"
+  COMMON_ENV+=(
+    -v "${MADAR_E2E_SITE_PACKAGES}:/usr/local/lib/python3.12/site-packages:ro"
+    -v "${TEMP_DIR}/uploads:/tmp/madar-e2e/uploads"
+  )
+fi
 
 docker run -d --name "${FIXTURE_NAME}" --network host --user "$(id -u):$(id -g)" \
   -v "${ROOT_DIR}/web/backend:/app:ro" -v "${TEMP_DIR}:/run/madar-e2e:ro" \
@@ -238,16 +299,23 @@ docker exec "${BACKEND_NAME}" python -c \
   cd "${ROOT_DIR}/web/frontend"
   VITE_DEV_PROXY_TARGET="http://127.0.0.1:${BACKEND_PORT}" \
   VITE_DEV_PROXY_REQUEST_ORIGIN="http://127.0.0.1:${FRONTEND_PORT}" \
-  npm run dev -- --host 127.0.0.1 --port "${FRONTEND_PORT}" >"${TEMP_DIR}/vite.log" 2>&1
+  npm run dev -- --host 127.0.0.1 --port "${VITE_PORT}" >"${TEMP_DIR}/vite.log" 2>&1
 ) &
 VITE_PID=$!
+if [[ "${MADAR_E2E_SCALABILITY:-NO}" == "YES" ]]; then
+  docker run -d --name "${NGINX_NAME}" --network host \
+    -v "${ROOT_DIR}/web/backend/tests/scalability-nginx.conf.template:/etc/nginx/templates/default.conf.template:ro" \
+    -e MADAR_FRONTEND_PORT="${FRONTEND_PORT}" -e MADAR_VITE_PORT="${VITE_PORT}" \
+    -e MADAR_BACKEND_PORT="${BACKEND_PORT}" \
+    nginx:alpine@sha256:4a73073bd557c65b759505da037898b61f1be6cbcc3c2c3aeac22d2a470c1752 >/dev/null
+fi
 for _ in $(seq 1 120); do
   curl -fsS "http://127.0.0.1:${FRONTEND_PORT}/" >/dev/null 2>&1 && break
   sleep 0.25
 done
 curl -fsS "http://127.0.0.1:${FRONTEND_PORT}/" >/dev/null
 
-if [[ "${MADAR_E2E_WEBHOOK_ONLY:-NO}" != "YES" && "${MADAR_E2E_REPORTING_ONLY:-NO}" != "YES" ]]; then
+if [[ "${MADAR_E2E_WEBHOOK_ONLY:-NO}" != "YES" && "${MADAR_E2E_REPORTING_ONLY:-NO}" != "YES" && "${MADAR_E2E_C5_CHECKPOINT_ONLY:-NO}" != "YES" ]]; then
 (
   cd "${ROOT_DIR}/web/frontend"
   MADAR_E2E_CONFIRM_ISOLATED=YES \
@@ -297,7 +365,7 @@ if [[ "${ready}" != true ]]; then
   exit 1
 fi
 
-if [[ "${MADAR_E2E_GOOGLE_ONLY:-NO}" != "YES" && "${MADAR_E2E_WEBHOOK_ONLY:-NO}" != "YES" && "${MADAR_E2E_REPORTING_ONLY:-NO}" != "YES" ]]; then
+if [[ "${MADAR_E2E_GOOGLE_ONLY:-NO}" != "YES" && "${MADAR_E2E_WEBHOOK_ONLY:-NO}" != "YES" && "${MADAR_E2E_REPORTING_ONLY:-NO}" != "YES" && "${MADAR_E2E_C5_CHECKPOINT_ONLY:-NO}" != "YES" ]]; then
 (
   cd "${ROOT_DIR}/web/frontend"
   MADAR_E2E_CONFIRM_ISOLATED=YES \
@@ -313,7 +381,7 @@ if [[ "${MADAR_E2E_GOOGLE_ONLY:-NO}" != "YES" && "${MADAR_E2E_WEBHOOK_ONLY:-NO}"
 )
 fi
 
-if [[ "${MADAR_E2E_WEBHOOK_ONLY:-NO}" != "YES" && "${MADAR_E2E_REPORTING_ONLY:-NO}" != "YES" ]]; then
+if [[ "${MADAR_E2E_WEBHOOK_ONLY:-NO}" != "YES" && "${MADAR_E2E_REPORTING_ONLY:-NO}" != "YES" && "${MADAR_E2E_C5_CHECKPOINT_ONLY:-NO}" != "YES" ]]; then
 (
   cd "${ROOT_DIR}/web/frontend"
   MADAR_E2E_CONFIRM_ISOLATED=YES \
@@ -417,7 +485,7 @@ if [[ "${ready}" != true ]]; then
   exit 1
 fi
 
-if [[ "${MADAR_E2E_REPORTING_ONLY:-NO}" != "YES" ]]; then
+if [[ "${MADAR_E2E_REPORTING_ONLY:-NO}" != "YES" && "${MADAR_E2E_C5_CHECKPOINT_ONLY:-NO}" != "YES" ]]; then
 (
   cd "${ROOT_DIR}/web/frontend"
   MADAR_E2E_CONFIRM_ISOLATED=YES \
@@ -485,5 +553,67 @@ fi
   MADAR_E2E_SPEC=business-reporting-live.spec.mjs \
   npx playwright test --config=playwright.data-sources-live.config.mjs
 )
+
+# C5 Steps 7-9 advance the same disposable tmpfs chain through candidate schemas
+# 165 and 166. The backend and control fixture remain loopback-only; delivery is
+# the explicit in-memory offline adapter and cannot contact a mail provider.
+docker rm -f "${BACKEND_NAME}" >/dev/null
+apply_range 165 166
+docker restart "${REST_NAME}" >/dev/null
+for _ in $(seq 1 60); do
+  docker run --rm --network "${NETWORK}" madar-backend-test \
+    python -c "import httpx;raise SystemExit(0 if httpx.get('http://rest:3000/',timeout=1).status_code<500 else 1)" \
+    >/dev/null 2>&1 && break
+  sleep 0.25
+done
+
+docker run -d --name "${BACKEND_NAME}" --network host --user "$(id -u):$(id -g)" \
+  -v "${ROOT_DIR}/web/backend:/app:ro" -v "${TEMP_DIR}:/run/madar-e2e:ro" \
+  -v "${REPORT_DIR}:/tmp/madar-private-reports" -w /app \
+  "${COMMON_ENV[@]}" -e CSRF_SECRET="$(openssl rand -hex 32)" \
+  -e SCHEMA_COMPATIBLE_MIN=166 -e SCHEMA_COMPATIBLE_MAX=166 -e SCHEMA_EXCLUDED_VERSIONS= \
+  -e FRONTEND_URLS="http://127.0.0.1:${FRONTEND_PORT}" \
+  -e FRONTEND_URL="http://127.0.0.1:${FRONTEND_PORT}" \
+  -e FRONTEND_PRIMARY_URL="http://127.0.0.1:${FRONTEND_PORT}" -e PORT="${BACKEND_PORT}" \
+  madar-backend-test python -m uvicorn app:app --host 127.0.0.1 --port "${BACKEND_PORT}" \
+  --workers "${MADAR_E2E_BACKEND_WORKERS:-1}" >/dev/null
+ready=false
+for _ in $(seq 1 120); do
+  if curl -fsS "http://127.0.0.1:${BACKEND_PORT}/health/recovery" >/dev/null 2>&1; then
+    ready=true
+    break
+  fi
+  sleep 0.25
+done
+if [[ "${ready}" != true ]]; then
+  printf 'schema166_backend_readiness_failed\n' >&2
+  docker logs "${BACKEND_NAME}" >&2 || true
+  exit 1
+fi
+
+if [[ "${MADAR_E2E_SCALABILITY:-NO}" == "YES" ]]; then
+  docker exec -d "${BACKEND_NAME}" python tests/scalability_checkpoint_fixture.py monitor
+fi
+
+(
+  cd "${ROOT_DIR}/web/frontend"
+  MADAR_E2E_CONFIRM_ISOLATED=YES \
+  MADAR_E2E_BASE_URL="http://127.0.0.1:${FRONTEND_PORT}" \
+  MADAR_E2E_DATABASE_ID="${DATABASE_ID}" MADAR_E2E_RUN_ID="${RUN_ID}-c5-steps-5-9" \
+  MADAR_E2E_MIGRATIONS_APPLIED_FROM_CLEAN=YES MADAR_E2E_EXTERNAL_DELIVERY_DISABLED=YES \
+  MADAR_E2E_ACCESS_TOKEN="${ACCESS_JWT}" MADAR_E2E_MEMBER_ACCESS_TOKEN="${MEMBER_JWT}" \
+  MADAR_E2E_CROSS_TENANT_ACCESS_TOKEN="${CROSS_JWT}" \
+  MADAR_E2E_CONTROL_URL="http://127.0.0.1:${CONTROL_PORT}" \
+  MADAR_E2E_CONTROL_TOKEN="${CONTROL_TOKEN}" MADAR_E2E_PROJECT_ID="${PROJECT_ID}" \
+  MADAR_E2E_CROSS_TENANT_PROJECT_ID="${CROSS_PROJECT_ID}" \
+  MADAR_E2E_PROVIDER_TOKEN="${PROVIDER_TOKEN}" MADAR_E2E_SCREENSHOT_DIR="${ARTIFACT_DIR}" \
+  MADAR_E2E_SPEC="${MADAR_E2E_FINAL_SPEC:-c5-steps-5-9-live.spec.mjs}" \
+  npx playwright test --config=playwright.data-sources-live.config.mjs --grep "${MADAR_E2E_FINAL_GREP:-.}"
+)
+
+if [[ "${MADAR_E2E_SCALABILITY:-NO}" == "YES" ]]; then
+  docker exec "${BACKEND_NAME}" python tests/scalability_checkpoint_fixture.py finish
+  cp "${REPORT_DIR}/scalability-metrics.json" "${ARTIFACT_DIR}/scalability-metrics.json"
+fi
 
 printf 'data_sources_browser_e2e_passed artifacts=%s\n' "${ARTIFACT_DIR}"

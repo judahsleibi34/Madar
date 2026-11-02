@@ -120,7 +120,9 @@ def cleanup(*,limit=100,apply=False):
     if apply:
         storage=private_bucket()
         for row in rows:
-            storage.remove([row['storage_key']])
-            service_supabase.rpc('finish_elearning_recording_cleanup',{'p_tenant_id':row['tenant_id'],'p_storage_key':row['storage_key']}).execute()
-            completed+=1
+            from services.account_work_fence import account_lock
+            with account_lock(row['tenant_id'],row['user_id'],client=service_supabase):
+                storage.remove([row['storage_key']])
+                service_supabase.rpc('finish_elearning_recording_cleanup',{'p_tenant_id':row['tenant_id'],'p_storage_key':row['storage_key']}).execute()
+                completed+=1
     return {'eligible':len(rows),'completed':completed,'dry_run':not apply}

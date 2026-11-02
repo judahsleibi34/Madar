@@ -58,6 +58,8 @@ zstandard==0.25.0
 email-validator==2.3.0
 pydantic[email]==2.13.4
 pandas==3.0.3
+duckdb==1.5.4
+polars==1.44.2
 seaborn==0.13.2
 matplotlib==3.11.0
 arabic-reshaper==3.0.1

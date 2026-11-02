@@ -32,6 +32,13 @@ def claimed_run(*, require_ready=False):
 
 
 class BiReportingServiceTests(unittest.TestCase):
+    def setUp(self):
+        # These tests isolate report execution with an opaque client stub. The
+        # candidate167 account fence has separate real SQL/HTTP acceptance.
+        guard = patch("services.account_recovery_service.require_processing_account")
+        guard.start()
+        self.addCleanup(guard.stop)
+
     def test_daily_weekly_monthly_and_dst_resolution_are_deterministic(self):
         spring = bi_reporting_service.next_occurrence(
             cadence="daily", timezone_name="America/New_York", local_time=time(2, 30),
@@ -89,6 +96,35 @@ class BiReportingServiceTests(unittest.TestCase):
         self.assertEqual(resolve.call_args.kwargs["version_id"], VERSION)
         self.assertEqual(analysis.call_args.kwargs["input_path"], "immutable.csv")
         self.assertIsNotNone(artifact)
+
+    @patch.object(bi_reporting_service.project_dataset_service, "get_project_dataset_freshness",
+                  return_value={"available": True, "resource": {}, "checkpoint": None})
+    @patch.object(bi_reporting_service.project_dataset_service, "resolve_project_dataset_version",
+                  return_value={"storage_identifier": "immutable.csv"})
+    @patch.object(bi_reporting_service.data_services, "run_assisted_analysis", return_value={"result": {
+        "tables": [{"rows": [{"period": "2026-03-08", "value": 2}]}],
+        "metadata": {"mappings_used": {"date_column": "observed_at", "timezone": "America/New_York",
+            "requested_start_date": "2026-03-08", "requested_end_date": "2026-03-08",
+            "selected_row_count": 2, "missing_date_count": 1, "invalid_date_count": 1,
+            "outside_period_count": 3, "partial_periods": True}},
+    }})
+    @patch.object(bi_reporting_service, "_write_csv_artifact", return_value={"storage_key": "x", "filename": "x.csv"})
+    def test_report_snapshot_preserves_period_and_structured_disclosures(
+            self, _artifact, analysis, _resolve, _freshness):
+        run = claimed_run()
+        run["definition_snapshot"]["widgets"][0]["analysis_spec"] = {
+            "operation": "date_aggregate", "date_column": "observed_at", "aggregation": "count",
+            "period": "day", "timezone": "America/New_York",
+            "start_date": "2026-03-08", "end_date": "2026-03-08",
+        }
+        status, snapshot, warnings, _ = bi_reporting_service.execute_run(run, client=object())
+        self.assertEqual(status, "completed")
+        self.assertEqual(analysis.call_args.kwargs["metric"]["start_date"], "2026-03-08")
+        self.assertEqual(snapshot["widgets"][0]["provenance"]["reporting_period"]["timezone"], "America/New_York")
+        self.assertEqual(run["definition_snapshot"]["widgets"][0]["analysis_spec"]["end_date"], "2026-03-08")
+        self.assertEqual({warning["code"] for warning in warnings}, {
+            "period_missing_dates", "period_invalid_dates", "period_outside_range", "period_partial",
+        })
 
     @patch.object(bi_reporting_service.project_dataset_service, "get_project_dataset_freshness",
                   return_value={"available": True, "resource": {"committed_revision": 8,

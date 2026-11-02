@@ -6,6 +6,7 @@ not introduce another storage or cursor path.
 """
 
 from __future__ import annotations
+from services.account_work_fence import scoped_work
 
 import logging
 from dataclasses import dataclass
@@ -212,6 +213,7 @@ def _credential_state_requires_attention(claim: dict, *, client=None) -> bool:
     return True
 
 
+@scoped_work("claim", "actor_user_id")
 async def execute_claim(
     claim: dict, *, lease_seconds: int = DEFAULT_LEASE_SECONDS,
     fixture_batch: int = 1, provider=None, client=None,
@@ -223,6 +225,8 @@ async def execute_claim(
     source_id = str(claim["source_id"])
     resource_id = str(claim["source_resource_id"])
     user_id = int(claim["actor_user_id"])
+    from services.account_recovery_service import require_processing_account
+    require_processing_account(tenant_id=tenant_id, user_id=user_id, client=database)
     run_id: str | None = None
     run_lease: str | None = None
     metadata_started = False
