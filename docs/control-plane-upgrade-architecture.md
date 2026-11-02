@@ -2892,3 +2892,13 @@ and all public business records remain hashed; schema/roles/ACLs remain bound.
 The plan also binds the names of those excluded preparation columns. Existing
 SQL-execution snapshots remain exact across every original column after writer
 fencing; they cannot opt into preparation normalization through their public API.
+
+Historical operator exclusion now distinguishes its ordinary named PostgreSQL
+volume from a Docker data-directory bind. The pure inventory permits only the
+fixed historical operator-volume spelling, local driver, canonical mountpoint and
+PGDATA destination to reach independent proof verification. Generic inventories,
+direct binds and unknown names/drivers/destinations retain refusal. Root observes
+the actual named volume's driver, empty options, realm/operator labels and every
+container reference, then binds that observation into the existing authenticated
+operator scope. Shared, foreign or bind-driver volumes refuse. No volume-name
+allowlist by itself authenticates an exclusion or authorizes a release.

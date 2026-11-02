@@ -363,7 +363,7 @@ def _actual_mounts(row):
     return sorted(result, key=lambda item: item['destination'])
 
 
-def _host_authority(row, mounts):
+def _host_authority(row, mounts, *, historical_operator=False):
     host = row.get('HostConfig', {})
     _require(isinstance(host, dict), 'schema150_container_host_config_invalid')
     capabilities = host.get('CapAdd') or []
@@ -371,11 +371,21 @@ def _host_authority(row, mounts):
              'schema150_container_capabilities_invalid')
     sensitive = ('/etc/madar', '/var/lib/madar-control-plane', '/opt/madar/control-plane',
                  '/var/run/docker.sock', '/run/docker.sock', '/var/lib/docker', '/var/lib/containerd')
+    def ordinary_operator_volume(mount):
+        # Pure syntax only: the root historical observer independently checks
+        # the actual volume driver/options/labels and all daemon references.
+        # Other inventories and direct Docker-directory binds keep refusing.
+        if not historical_operator or mount['type']!='volume':return False
+        raw=next((v for v in row.get('Mounts',[]) if v.get('Destination')==mount['destination']),{})
+        name=raw.get('Name','')
+        return (isinstance(name,str) and re.fullmatch(r'madar-operator-[a-f0-9-]{12}-database',name) is not None
+            and raw.get('Driver')=='local' and mount['source']=='/var/lib/docker/volumes/'+name+'/_data'
+            and mount['destination']=='/var/lib/postgresql/data' and not mount['read_only'])
     return (host.get('Privileged') is True or host.get('PidMode') == 'host'
             or host.get('NetworkMode') == 'host' or host.get('IpcMode') == 'host'
             or host.get('UTSMode') == 'host'
             or bool({cap.upper().removeprefix('CAP_') for cap in capabilities} & {'SYS_ADMIN', 'ALL'})
-            or any(any(_overlaps(mount['source'], source) for source in sensitive) for mount in mounts))
+            or any(not ordinary_operator_volume(mount) and any(_overlaps(mount['source'], source) for source in sensitive) for mount in mounts))
 
 
 def attest_containers(inventory, rows, *, phase, binding=None):
@@ -410,7 +420,7 @@ def attest_containers(inventory, rows, *, phase, binding=None):
         if identifier not in actors:
             exclusion = value['exclusions'][identifier]
             _require(row.get('Image') == exclusion['image'] and measured_spec_matches(row, exclusion['spec_sha256']), 'schema150_unrelated_identity_changed')
-            _require(not _host_authority(row, mounts), 'schema150_unrelated_actor_has_host_authority')
+            _require(not _host_authority(row, mounts,historical_operator=value['version']==2), 'schema150_unrelated_actor_has_host_authority')
             shared_network = any(name in value['target_networks'] or endpoint.get('NetworkID') in value['target_networks'].values()
                                  for name, endpoint in networks.items())
             shared_objects = any(_overlaps(mount['source'], root['source']) for mount in mounts for root in value['object_roots'].values())

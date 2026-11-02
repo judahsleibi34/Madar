@@ -321,6 +321,32 @@ class ActorInventoryTests(unittest.TestCase):
             with self.assertRaises(RuntimeError): inventory.validate_inventory(bad, scope)
 
 
+class HistoricalOperatorVolumeSyntaxTests(unittest.TestCase):
+    def test_only_historical_operator_named_data_volume_can_reach_independent_proof_check(self):
+        name='madar-operator-12345678-123-database'
+        actual=row('f'*64,'operator-database')
+        actual['Mounts']=[{'Type':'volume','Name':name,'Driver':'local',
+            'Source':'/var/lib/docker/volumes/'+name+'/_data','Destination':'/var/lib/postgresql/data','RW':True}]
+        (data,scope),rows=historical_fixture()
+        data['exclusions'][actual['Id']]={'image':actual['Image'],'spec_sha256':measured_spec(actual),'proof_sha256':'a'*64}
+        data,scope=repin(data,scope)
+        inventory.attest_containers(data,rows+[actual],phase='prepared',binding=scope)
+        # This pure observation does not verify the root enrollment proof.
+        # Nonhistorical data and direct/foreign engine mounts remain blocked.
+        (ordinary,ordinary_scope),ordinary_rows=fixture()
+        ordinary['exclusions'][actual['Id']]={'image':actual['Image'],'spec_sha256':measured_spec(actual),'proof_sha256':'a'*64}
+        ordinary,ordinary_scope=repin(ordinary,ordinary_scope)
+        with self.assertRaisesRegex(RuntimeError,'host_authority'):
+            inventory.attest_containers(ordinary,ordinary_rows+[actual],phase='prepared',binding=ordinary_scope)
+        for change in ({'Type':'bind'},{'Driver':'nfs'},{'Name':'unrelated-volume'},
+                {'Source':'/var/lib/docker'},{'Destination':'/run/docker.sock'}):
+            changed=copy.deepcopy(actual);changed['Mounts'][0].update(change)
+            edited=copy.deepcopy(data);edited['exclusions'][actual['Id']]['spec_sha256']=measured_spec(changed)
+            edited,bound=repin(edited,scope)
+            with self.subTest(change=change),self.assertRaisesRegex(RuntimeError,'host_authority'):
+                inventory.attest_containers(edited,rows+[changed],phase='prepared',binding=bound)
+
+
 def historical_fixture():
     (data,_),rows=fixture()
     from deployment.lib.completed_normal_profile import RECONCILED

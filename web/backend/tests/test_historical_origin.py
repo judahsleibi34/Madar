@@ -310,11 +310,15 @@ class IndependentOperatorScopeTests(unittest.TestCase):
         self.auth={'Id':'a'*64,'Name':'/operator-auth','Image':'sha256:'+'b'*64,
             'Config':{'Labels':{'com.madar.operator-fixture':'realm'},'Env':['GOTRUE_JWT_SECRET='+self.key.decode(),
                 'GOTRUE_DB_DATABASE_URL=postgres://supabase_auth_admin:test@operator-db:5432/operators']},
-            'HostConfig':{'Privileged':False,'PortBindings':None,'CapAdd':None},
+            'HostConfig':{'Privileged':False,'PortBindings':None,'CapAdd':None},'Mounts':[],
             'NetworkSettings':{'Networks':{'operator':{'NetworkID':'c'*64}}}}
         self.database=copy.deepcopy(self.auth);self.database.update(Id='d'*64,Name='/operator-database');self.database['NetworkSettings']['Networks']['operator']['Aliases']=['operator-db']
         self.service={'id':self.auth['Id'],'image':self.auth['Image'],'spec_sha256':'e'*64}
-        self.facts={'created_container_ids':[self.auth['Id'],self.database['Id']],'realm_id':'realm','auth_service':self.service,'network_id':'c'*64}
+        self.volume_name='madar-operator-realm-database';mountpoint='/var/lib/docker/volumes/'+self.volume_name+'/_data'
+        self.database['Mounts']=[{'Type':'volume','Name':self.volume_name,'Driver':'local','Source':mountpoint,'Destination':'/var/lib/postgresql/data','RW':True}]
+        self.volume={'Name':self.volume_name,'Driver':'local','Scope':'local','Mountpoint':mountpoint,'Options':None,
+            'Labels':{'com.madar.test.realm':'realm','com.madar.operator-fixture':'realm'}}
+        self.facts={'created_container_ids':[self.auth['Id'],self.database['Id']],'realm_id':'realm','auth_service':self.service,'network_id':'c'*64,'volume_name':self.volume_name}
         self.environment={'realm_id':'realm','database_system_identifier':'123456789','denied_database_identifiers':['987654321']}
         self.operator={'environment_id':'isolated-realm','database_system_identifier':'123456789','auth_service':self.service}
         self.policy_file=self.root/'operator-policy.json';self.policy_file.write_bytes(canonical(self.operator))
@@ -327,9 +331,22 @@ class IndependentOperatorScopeTests(unittest.TestCase):
         stack.enter_context(patch.object(auth,'RELEASE_OPERATOR_KEY',self.key_file))
         stack.enter_context(patch.object(resources,'measured_spec',lambda *_:'e'*64))
         self.native=stack.enter_context(patch.object(environment,'run',return_value=canonical(['operators','246813579',True])))
+        self.native.side_effect=lambda args:canonical([self.volume]) if args[:3]==['/usr/bin/docker','volume','inspect'] else self.native.return_value
     def observe(self):return origin.independent_operator_scope([self.auth,self.database],self.environment)
     def test_enrolled_operator_database_is_native_observed_and_separate(self):
         out=self.observe();self.assertEqual(out['database_system_identifier'],'246813579');self.assertEqual(len(out['actor_ids']),2)
+    def test_operator_volume_driver_options_labels_and_actual_references_refuse(self):
+        for change in ({'Driver':'nfs'},{'Options':{'type':'none','o':'bind','device':'/var/lib/docker'}},
+                {'Labels':{'com.madar.test.realm':'foreign'}},{'Mountpoint':'/var/lib/docker'}):
+            saved=copy.deepcopy(self.volume);self.volume.update(change)
+            with self.subTest(change=change),self.assertRaisesRegex(RuntimeError,'volume_configuration_invalid'):self.observe()
+            self.volume=saved
+        foreign=copy.deepcopy(self.database);foreign['Id']='f'*64
+        with self.assertRaisesRegex(RuntimeError,'volume_shared'):
+            origin.independent_operator_scope([self.auth,self.database,foreign],self.environment)
+        self.database['Mounts'][0]['Type']='bind'
+        with self.assertRaisesRegex(RuntimeError,'volume_mount_invalid'):self.observe()
+
     def test_operator_network_cannot_join_business_database_network(self):
         self.auth['NetworkSettings']['Networks']['business']={'NetworkID':'f'*64}
         with self.assertRaisesRegex(RuntimeError,'network_or_privilege_invalid'):self.observe()

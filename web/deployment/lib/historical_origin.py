@@ -102,6 +102,33 @@ def preservation_roots(db):
     finally:db.execute('ROLLBACK')
 
 
+def operator_database_volume(rows,database,facts,environment,run):
+    """Root reobservation, not an allowlist inferred from a volume's name."""
+    name=facts.get('volume_name')
+    if name!='madar-operator-'+environment['realm_id'][:12]+'-database':
+        raise RuntimeError('historical_origin_operator_volume_identity_invalid')
+    mounts=database.get('Mounts')
+    expected='/var/lib/docker/volumes/'+name+'/_data'
+    if (not isinstance(mounts,list) or len(mounts)!=1
+            or any(mounts[0].get(k)!=v for k,v in {'Type':'volume','Name':name,'Driver':'local',
+                'Source':expected,'Destination':'/var/lib/postgresql/data','RW':True}.items())):
+        raise RuntimeError('historical_origin_operator_volume_mount_invalid')
+    values=strict_json(run(['/usr/bin/docker','volume','inspect',name]))
+    if not isinstance(values,list) or len(values)!=1 or not isinstance(values[0],dict):
+        raise RuntimeError('historical_origin_operator_volume_identity_invalid')
+    value=values[0];labels=value.get('Labels') or {}
+    if (any(value.get(k)!=v for k,v in {'Name':name,'Driver':'local','Scope':'local','Mountpoint':expected}.items())
+            or value.get('Options') not in (None,{})
+            or labels.get('com.madar.test.realm')!=environment['realm_id']
+            or labels.get('com.madar.operator-fixture')!=environment['realm_id']):
+        raise RuntimeError('historical_origin_operator_volume_configuration_invalid')
+    if any(row['Id']!=database['Id'] and any(m.get('Name')==name or m.get('Source')==expected
+            for m in row.get('Mounts',[])) for row in rows):
+        raise RuntimeError('historical_origin_operator_volume_shared')
+    return {'name':name,'driver':'local','scope':'local','mountpoint':expected,
+        'options':{},'labels':labels,'database_container_id':database['Id']}
+
+
 def independent_operator_scope(rows,environment):
     """Prove the two enrolled test-identity actors cannot write the origin DB."""
     from .control_plane_upgrade_authorization import RELEASE_OPERATOR_POLICY,RELEASE_OPERATOR_KEY
@@ -138,6 +165,7 @@ def independent_operator_scope(rows,environment):
     key=protected(RELEASE_OPERATOR_KEY,private=True).read_bytes()
     if hashlib.sha256(config.get('GOTRUE_JWT_SECRET','').encode()).hexdigest()!=hashlib.sha256(key).hexdigest():
         raise RuntimeError('historical_origin_operator_authentication_key_changed')
+    volume=operator_database_volume(rows,database,facts,environment,run)
     observed=strict_json(run(['/usr/bin/docker','exec',database['Id'],'psql','-XqAt','-U','postgres','-d','operators','-c',
         """SELECT json_build_array(current_database(),system_identifier::text,
           EXISTS(SELECT 1 FROM pg_roles WHERE rolname='supabase_auth_admin'
@@ -148,7 +176,8 @@ def independent_operator_scope(rows,environment):
             or observed[1] in {environment['database_system_identifier'],*environment['denied_database_identifiers']}):
         raise RuntimeError('historical_origin_operator_database_not_independent')
     return {'actor_ids':sorted(ids),'database_system_identifier':observed[1],
-            'authentication_key_sha256':hashlib.sha256(key).hexdigest(),'network_id':facts['network_id']}
+            'authentication_key_sha256':hashlib.sha256(key).hexdigest(),'network_id':facts['network_id'],
+            'operator_database_volume':volume}
 
 
 def alert_template_control(system):
