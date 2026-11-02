@@ -108,6 +108,7 @@ class IndependentTransportTests(unittest.TestCase):
                 if path.name=='request.json':atomic_json(path.parent/'response.json',received_packet(value,p,target),exclusive=True)
             with patch.object(transport,'ROOT',root),patch.object(transport,'policy',return_value=(p,'1'*64)),\
                  patch('deployment.lib.control_plane_upgrade.require_root_directory',lambda path,**kw:path.mkdir(mode=0o700)),\
+                 patch.object(transport.shutil,'disk_usage',return_value=SimpleNamespace(free=20*1024**3)),\
                  patch.object(transport,'atomic_json',side_effect=publish),patch.object(transport,'protected',lambda path,**kw:path):
                 result=transport.replicate(context,io.BytesIO(b'synthetic authenticated archive'),Path('madar-20261102T200000Z'),'5'*64,'6'*64)
             self.assertEqual(result['namespace'],transport.NAMESPACE)
@@ -133,6 +134,8 @@ class RealArchiveReceiverTests(unittest.TestCase):
         (self.root/'receiver.key').write_bytes(self.target.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()))
         realpath=Path;self.enterContext(patch.object(receiver,'Path',side_effect=lambda p,*a:self.workspace if str(p)=='/opt/madar-recovery-tests' else realpath(p,*a)))
         self.enterContext(patch.object(receiver.os,'geteuid',return_value=0))
+        self.disk=SimpleNamespace(free=20*1024**3)
+        self.enterContext(patch.object(receiver.shutil,'disk_usage',return_value=self.disk))
         self.enterContext(patch('deployment.lib.control_plane_upgrade.require_root_directory',lambda p,**kw:p.mkdir(mode=0o700,exist_ok=True) if kw.get('create') else None))
         self.enterContext(patch('deployment.lib.provider_recovery_runtime.protected',lambda p,**kw:p))
         actual=Path.read_text
@@ -174,4 +177,10 @@ class RealArchiveReceiverTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'request_scope'):receiver.receive_enrolled_maintenance(self.run,forged,stream=stream)
         with self.assertRaisesRegex(RuntimeError,'signature_invalid'):
             receiver.receive_enrolled_maintenance(self.run,{'payload':self.q,'signature':base64.b64encode(b'f'*64).decode()},stream=stream)
+        self.assertFalse((self.root/'maintenance-attempts').exists());self.assertFalse((self.root/'maintenance-replicas').exists())
+
+    def test_measured_insufficient_space_refuses_before_consuming_receiver_attempt(self):
+        stream=self.stream();self.disk.free=1024
+        with self.assertRaisesRegex(RuntimeError,'receiver_headroom'):
+            receiver.receive_enrolled_maintenance(self.run,self.packet(),stream=stream)
         self.assertFalse((self.root/'maintenance-attempts').exists());self.assertFalse((self.root/'maintenance-replicas').exists())
