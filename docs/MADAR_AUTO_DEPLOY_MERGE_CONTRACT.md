@@ -2421,3 +2421,10 @@ Known-good boot recovery loads and verifies the unchanged recorded proxy route;
 it does not issue a new traffic promotion. Exact file bindings, loaded source and
 slot, worker ownership, health and policy remain mandatory. See the native
 ownership-drift finding in the control-plane architecture.
+
+
+Historical canonical preparation authenticates the actual enrolled provider
+configuration and read-only host inputs. It does not manufacture configuration
+files from a newer provider architecture. Ordinary completed-origin checks,
+independent restoration, approval and execution boundaries remain mandatory.
+See the historical configuration contract in the control-plane architecture.

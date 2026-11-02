@@ -70,8 +70,8 @@ def validate_inputs(plan,inventory,probes,model):
         raise RuntimeError('completed_package_controller_identity_changed')
     if plan.get('fixture_only') is not True or plan.get('production_authorization') is not False:
         raise RuntimeError('completed_package_test_request_only')
-    from deployment.lib.completed_normal_boot_actor import CONFIGURATIONS
-    if (set(plan['live_configuration_sha256'])!=set(CONFIGURATIONS)
+    from deployment.lib.completed_normal_boot_actor import configuration_names
+    if (set(plan['live_configuration_sha256'])!=configuration_names(plan)
             or any(not re.fullmatch('[0-9a-f]{64}',str(v)) for v in plan['live_configuration_sha256'].values())
             or any(not re.fullmatch('[0-9a-f]{64}',str(plan[k])) for k in
                 ('installed_controller_tree_sha256','origin_routing_sha256','proxy_nginx_sha256'))):

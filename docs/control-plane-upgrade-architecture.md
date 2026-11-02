@@ -2727,3 +2727,24 @@ resume. Native utility verification detected an actual open owned file and then
 observed no reference after closing it; that is not full guest-resume acceptance.
 A restoration hold remains enforced during resumed guest boot until independent
 receiver retirement is authenticated through the guest control channel.
+
+
+### Actual historical provider configuration bindings (2026-11-02)
+
+New historical enrollment captures all five original provider identities and
+immutable Docker specifications, including environment configuration. For each
+read-only host input it additionally authenticates the actual source path,
+filesystem identity, ownership, mode and contents through the existing isolated
+bind codec. Writable PostgreSQL/object data remains subject to backup and
+preservation contracts. No future native.env, Compose override or Envoy file is
+invented to represent a historical provider that did not use that layout.
+
+The existing immutable package/configuration guard uses the genuine signed
+historical observation, the original application/backup/database-transport file
+hashes, the independently prepared Node1 configuration hash and the original
+provider-input digest. Every provider ID/image/spec and read-only input is
+reobserved. Missing enrollment metadata, changed bytes/inodes, added inputs or a
+changed profile refuse. Ordinary completed origins retain their existing fixed
+configuration contract. This root-only read observer issues no authority and
+cannot substitute for independent restoration, exact approval or actual SQL
+execution. Its native canonical acceptance remains required.

@@ -19,6 +19,7 @@ SOURCE_FIELDS={'origin_kind','enrollment_root','enrollment_sha256','application_
                'controller_sha','schema','successor_intent_sha256'}
 ROLES=('backend','frontend','redis','parser-worker','remote-ingestion-worker',
        'notification-worker','calendar-sync-worker','data-deletion-worker')
+PROVIDERS=('supabase-db','supabase-auth','supabase-rest','supabase-storage','supabase-envoy')
 BOOT_UNIT_ROOT=Path('/etc/systemd/system')
 
 
@@ -299,6 +300,60 @@ def serving_observation(system,source_sha,slot):
     return result
 
 
+def provider_configurations(rows,scope):
+    """Capture actual original provider inputs, not a future provider layout.
+
+    Environment/configuration in each immutable Docker spec remains pinned.
+    Read-only host inputs additionally retain exact filesystem/content identity;
+    writable database/object data is handled by the separate backup contracts.
+    """
+    from .isolated_release_environment import measure_bind_source
+    from .completed_normal_resources import measured_spec
+    byname={r['Name'].removeprefix('/'):r for r in rows};result={}
+    for name in PROVIDERS:
+        row=byname.get(name)
+        if row is None:raise RuntimeError('historical_origin_provider_configuration_missing')
+        pinned=scope.get(row['Id'])
+        if (not isinstance(pinned,dict) or pinned.get('name')!=row['Name'] or pinned.get('image')!=row['Image']
+                or pinned.get('spec_sha256')!=measured_spec(row)):
+            raise RuntimeError('historical_origin_provider_configuration_changed')
+        inputs={}
+        for mount in row.get('Mounts',[]):
+            if mount['Type']!='bind' or mount['RW']:continue
+            measured=measure_bind_source(mount['Source'],mutable=False)
+            if pinned.get('binds',{}).get(mount['Destination'])!=measured:
+                raise RuntimeError('historical_origin_provider_configuration_changed')
+            inputs[mount['Destination']]=measured
+        result[name]={'id':row['Id'],'image':row['Image'],'spec_sha256':pinned['spec_sha256'],'read_only_inputs':inputs}
+    return result
+
+
+def verify_provider_configurations(binding,*,runtime=None):
+    """Root-only read observer for the existing immutable package guards."""
+    if os.geteuid()!=0:raise RuntimeError('historical_origin_configuration_root_required')
+    original=recorded_observation(binding);expected=original.get('provider_configurations')
+    if not isinstance(expected,dict) or set(expected)!=set(PROVIDERS):
+        raise RuntimeError('historical_origin_provider_configuration_enrollment_required')
+    if runtime is None:
+        from .emergency_routing_repair import Runtime
+        runtime=Runtime()
+    observed=runtime.inspect(list(PROVIDERS))
+    if set(observed)!=set(PROVIDERS):raise RuntimeError('historical_origin_provider_configuration_missing')
+    # Reuse the same capture codec with ONLY the independently signed original
+    # inputs. A live caller cannot supply a new source file or container spec.
+    scope={}
+    for name,row in expected.items():
+        sealed=original['runtime'].get('/'+name)
+        if (not isinstance(row,dict) or set(row)!={'id','image','spec_sha256','read_only_inputs'}
+                or sealed!={k:row[k] for k in ('id','image','spec_sha256')}
+                or not isinstance(row['read_only_inputs'],dict)):
+            raise RuntimeError('historical_origin_provider_configuration_binding_invalid')
+        scope[row['id']]={'name':'/'+name,'image':row['image'],'spec_sha256':row['spec_sha256'],'binds':row['read_only_inputs']}
+    if digest(provider_configurations(list(observed.values()),scope))!=digest(expected):
+        raise RuntimeError('historical_origin_provider_configuration_changed')
+    return digest(expected)
+
+
 def observe(system,p,environment):
     """Measure actual original state, never accept caller-provided PASS fields.
 
@@ -386,6 +441,7 @@ def observe(system,p,environment):
         'database_networks':{name: endpoint['NetworkID'] for name,endpoint in
             by_name['supabase-db']['NetworkSettings']['Networks'].items()},
         'runtime_scope_sha256':digest(environment['runtime_scope']),
+        'provider_configurations':provider_configurations(rows,environment['runtime_scope']),
         'boot_controls':boot_controls(system),
         'independent_operator_scope':operator_scope,
         'configuration_sha256':{

@@ -27,15 +27,43 @@ CONFIGURATIONS={key:(INPUTS[key],key in {'production_configuration','backup_conf
     for key in ('production_configuration','backup_configuration','native_configuration','native_compose','native_override',
                 'gateway_bootstrap','gateway_cds','gateway_lds')}
 CONFIGURATIONS['node1_configuration']=(Path('/etc/madar/node1-backup.env'),True)
+HISTORICAL_CONFIGURATIONS={key:CONFIGURATIONS[key] for key in
+    ('production_configuration','backup_configuration','node1_configuration')}
+HISTORICAL_CONFIGURATIONS['database_transport']=(Path('/etc/madar/automatic-database.dsn'),True)
+
+
+def configuration_names(document):
+    """Input shape only; authentic observations are required below."""
+    contract=document.get('admission_contract',{})
+    if not isinstance(contract,dict) or not isinstance(contract.get('source_roles',{}),dict):
+        raise RuntimeError('completed_upgrade_configuration_contract_invalid')
+    if contract.get('source_roles',{}).get('origin_kind')=='independently-enrolled-historical-bootstrap-origin':
+        return {*HISTORICAL_CONFIGURATIONS,'original_provider_configurations'}
+    return set(CONFIGURATIONS)
 
 def verify_live_configuration(document):
     """Hash independently measured configuration, never record its contents."""
     from deployment.lib.provider_recovery_runtime import file_digest
     expected=document.get('live_configuration_sha256')
-    if (not isinstance(expected,dict) or set(expected)!=set(CONFIGURATIONS)
+    if (not isinstance(expected,dict) or set(expected)!=configuration_names(document)
             or any(not re.fullmatch('[0-9a-f]{64}',str(h)) for h in expected.values())):
         raise RuntimeError('completed_upgrade_configuration_contract_invalid')
-    for key,(path,private) in CONFIGURATIONS.items():
+    selected=CONFIGURATIONS
+    if 'original_provider_configurations' in expected:
+        from deployment.lib.historical_origin import recorded_observation,verify_provider_configurations
+        from deployment.lib.completed_normal_admission import validate_provider_preparation
+        from deployment.lib.completed_normal_profile import RECONCILED
+        contract=document['admission_contract']
+        if validate_provider_preparation(dict(contract,plan_sha256=contract.get('plan_sha256','0'*64))) is not RECONCILED:
+            raise RuntimeError('completed_upgrade_historical_configuration_profile_invalid')
+        binding=contract['source_roles'];original=recorded_observation(binding)
+        for key,name in (('production_configuration','application'),('backup_configuration','backup'),('database_transport','database_transport')):
+            if expected[key]!=original['configuration_sha256'][name]:
+                raise RuntimeError('completed_upgrade_historical_configuration_changed')
+        if verify_provider_configurations(binding)!=expected['original_provider_configurations']:
+            raise RuntimeError('completed_upgrade_historical_configuration_changed')
+        selected=HISTORICAL_CONFIGURATIONS
+    for key,(path,private) in selected.items():
         if file_digest(readonly_configuration(path,private=private))!=expected[key]:
             raise RuntimeError('completed_upgrade_configuration_changed')
 
