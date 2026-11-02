@@ -2282,3 +2282,11 @@ CI scratch tmpfs is4GiB so the unchanged2GiB production disk reserve can hold.
 Calendar job fencing also uses the same explicit/module database client as the
 wrapped job. Canonical historical issuance remains closed at its distinct
 approval boundary; ordinary unregistered160 profiles cannot acquire authority.
+
+Canonical historical artifact verification keeps application and controller
+revisions distinct. When the exact candidate differs from the canonical160
+controller, build-input hashes come from the existing authenticated Git snapshot
+codec at that candidate commit, including commit/tree/blob integrity checks.
+Current checkout bytes and newer controller dependencies cannot relabel older
+images. GitHub source, CI, archive checksums and immutable image identity checks
+remain mandatory. This correction issues no execution or migration authority.

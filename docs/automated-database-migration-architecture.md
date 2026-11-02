@@ -2745,3 +2745,11 @@ The existing issuer refuses canonical execution credentials until its exact
 exceptional-approval bridge is integrated; fixture execute/forward modes and
 production registration remain closed. Native SQL leases resolve the exact
 enrolled provider bridge, never an alternate loopback control bridge.
+
+Canonical historical artifact verification keeps application and controller
+revisions distinct. When the exact candidate differs from the canonical160
+controller, build-input hashes come from the existing authenticated Git snapshot
+codec at that candidate commit, including commit/tree/blob integrity checks.
+Current checkout bytes and newer controller dependencies cannot relabel older
+images. GitHub source, CI, archive checksums and immutable image identity checks
+remain mandatory. This correction issues no execution or migration authority.

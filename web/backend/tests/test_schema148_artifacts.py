@@ -8,6 +8,8 @@ from pathlib import Path
 import sys
 import tempfile
 import tarfile
+import subprocess
+import zlib
 import unittest
 from unittest.mock import patch
 from types import SimpleNamespace
@@ -15,6 +17,55 @@ import zipfile
 sys.path.insert(0,os.getenv('MADAR_TEST_REPOSITORY_ROOT') or str(Path(__file__).resolve().parents[2]))
 from deployment.lib.schema148_artifacts import archive_runtime_identity,verify_archive,verify_required_ci,INPUTS,WORKFLOW,capture_candidate_archive
 from deployment.lib import schema148_artifacts as artifacts
+
+
+class DistinctApplicationSourceTests(unittest.TestCase):
+    """Use real Git objects, not caller-supplied image-input hashes."""
+    def setUp(self):
+        temporary=tempfile.TemporaryDirectory();self.addCleanup(temporary.cleanup)
+        self.root=Path(temporary.name);self.repo=self.root/'repository';self.repo.mkdir()
+        def git(*args):
+            return subprocess.check_output(['git', '-c', 'core.hooksPath=/dev/null', *args],
+                cwd=self.repo,stderr=subprocess.DEVNULL).decode().strip()
+        self.git=git
+        git('init','-q','--initial-branch=Saliba-Branch')
+        git('config','user.name','Saliba-codes')
+        git('config','user.email','75858844+Saliba-codes@users.noreply.github.com')
+        git('remote','add','origin','https://github.com/judahsleibi34/Madar.git')
+        self.original={}
+        for name in INPUTS:
+            path=self.repo/name;path.parent.mkdir(parents=True,exist_ok=True)
+            body=('original application '+name+'\n').encode();path.write_bytes(body)
+            self.original[name]=hashlib.sha256(body).hexdigest()
+        git('add','.');git('commit','-qm','Synthetic authenticated application inputs')
+        candidate=git('rev-parse','HEAD')
+        for name in INPUTS:(self.repo/name).write_text('different controller revision\n')
+        git('add','.');git('commit','-qm','Synthetic newer controller inputs')
+        from deployment.lib.completed_normal_profile import RECONCILED
+        self.actor=SimpleNamespace(contract={'operation':RECONCILED.operation,
+            'candidate':{'source_sha':candidate,'controller_sha':git('rev-parse','HEAD')}},
+            ops=SimpleNamespace(repo=self.repo),package=self.root/'package')
+
+    def test_new_controller_does_not_relabel_old_application_build_inputs(self):
+        self.assertEqual(artifacts.application_build_inputs(self.actor),self.original)
+
+    def test_mutable_checkout_cannot_change_candidate_input_hashes(self):
+        for name in INPUTS:(self.repo/name).write_text('uncommitted mutable substitution\n')
+        self.assertEqual(artifacts.application_build_inputs(self.actor),self.original)
+
+    def test_wrong_candidate_commit_or_foreign_repository_refuses(self):
+        candidate=self.actor.contract['candidate'];old=candidate['source_sha'];candidate['source_sha']='f'*40
+        with self.assertRaises(RuntimeError):artifacts.application_build_inputs(self.actor)
+        candidate['source_sha']=old;self.git('remote','set-url','origin','https://attacker.invalid/Madar.git')
+        with self.assertRaisesRegex(RuntimeError,'repository_invalid'):
+            artifacts.application_build_inputs(self.actor)
+
+    def test_corrupted_candidate_tree_is_not_trusted_by_its_filename(self):
+        tree=self.git('rev-parse',self.actor.contract['candidate']['source_sha']+'^{tree}')
+        path=self.repo/'.git/objects'/tree[:2]/tree[2:]
+        body=zlib.decompress(path.read_bytes());path.chmod(0o600)
+        path.write_bytes(zlib.compress(body[:-1]+bytes([body[-1]^1])))
+        with self.assertRaises(RuntimeError):artifacts.application_build_inputs(self.actor)
 
 class ArtifactTests(unittest.TestCase):
     def setUp(self):

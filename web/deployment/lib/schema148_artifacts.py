@@ -187,9 +187,32 @@ def provenance_inputs(actor,binding):
     candidate=actor.contract['candidate']['source_sha']
     verify_required_ci({workflow:api('workflows/'+workflow+'/runs?head_sha='+candidate+'&per_page=100')
         for workflow in ('backend-check.yml','frontend-check.yml')},candidate)
-    source=actor.package/'source'
-    inputs={relative:file_digest(readonly_configuration(source/relative,private=True)) for relative in INPUTS}
+    inputs=application_build_inputs(actor)
     return artifact,run,inputs
+
+
+def application_build_inputs(actor):
+    """Keep application build provenance separate from controller provenance.
+
+    Canonical historical preparation can use an already verified compatible
+    application revision with a newer controller. Authenticate the candidate's
+    actual commit, every tree and blob through the existing snapshot codec;
+    neither a mutable checkout nor the controller's dependency files describe
+    that image. GitHub artifact/run/CI authentication remains mandatory above.
+    Other profiles retain their original frozen-source behavior.
+    """
+    from .completed_normal_profile import RECONCILED
+    from .provider_recovery_runtime import readonly_configuration,file_digest
+    candidate=actor.contract['candidate']
+    if (actor.contract.get('operation')==RECONCILED.operation
+            and candidate['source_sha']!=candidate['controller_sha']):
+        from .completed_normal_package import snapshot
+        _,files=snapshot(actor.ops.repo,candidate['source_sha'])
+        if any(relative not in files for relative in INPUTS):
+            raise RuntimeError('schema148_application_build_inputs_missing')
+        return {relative:hashlib.sha256(files[relative][1]).hexdigest() for relative in INPUTS}
+    source=actor.package/'source'
+    return {relative:file_digest(readonly_configuration(source/relative,private=True)) for relative in INPUTS}
 
 
 def capture_candidate_archive(path,destination,artifact,run,*,source_sha,images,expected_inputs):
