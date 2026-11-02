@@ -427,6 +427,13 @@ def check_tenant_relationship_debt(
 
 
 
+_account_recovery_spec = importlib.util.spec_from_file_location(
+    "madar_unadmitted_account_recovery", Path(__file__).with_name("check_account_recovery_candidate.py"))
+_account_recovery = importlib.util.module_from_spec(_account_recovery_spec)
+_account_recovery_spec.loader.exec_module(_account_recovery)
+validated_account_recovery_entries = _account_recovery.validated_entries
+
+
 def check_production_lineage(errors: list[str]) -> None:
     import json
     pin = REPO_ROOT / "deployment/releases/production-001-099.json"
@@ -514,6 +521,7 @@ def check_production_lineage(errors: list[str]) -> None:
             retained_future.update({entry["number"]: entry for entry in validated_automated_reporting_entries(REPO_ROOT.parent)})
             retained_future.update({entry["number"]: entry for entry in validated_bi_team_sharing_entries(REPO_ROOT.parent)})
             retained_future.update({entry["number"]: entry for entry in validated_bi_report_delivery_lifecycle_entries(REPO_ROOT.parent)})
+            retained_future.update({entry["number"]: entry for entry in validated_account_recovery_entries(REPO_ROOT.parent)})
             learning=validate_learning_path(REPO_ROOT.parent)
             if learning['status']=='finalized':
                 learning_manifest=json.loads((REPO_ROOT.parent / learning['manifest_path']).read_text())

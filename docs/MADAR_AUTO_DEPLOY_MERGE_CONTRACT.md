@@ -2252,3 +2252,11 @@ The existing issuer refuses canonical execution credentials until its exact
 exceptional-approval bridge is integrated; fixture execute/forward modes and
 production registration remain closed. Native SQL leases resolve the exact
 enrolled provider bridge, never an alternate loopback control bridge.
+
+Latest-main source reconciliation (2026-11-02) retains the exact unselected167
+checksum/mirror and blocked account-erasure policy through its existing source
+validator. Migration and forward-release checks validate this candidate separately
+from the active146 descriptor; validation grants no migration or customer authority.
+Canonical147–164 bytes are unchanged.165 is now the BI team-sharing candidate, so
+the old off-chain deletion proposal's165 numbering is obsolete. No successor
+repair is selected or executed, and the approved upgrade target is not widened.

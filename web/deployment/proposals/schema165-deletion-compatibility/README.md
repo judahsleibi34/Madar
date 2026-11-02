@@ -1,5 +1,13 @@
 # Review proposal: schema165 deletion compatibility
 
+> Numbering status, 2026-11-02: this is a historical, nonexecutable proposal.
+> Current main assigns165 to BI team sharing and166 to BI report delivery;
+>167 is an unadmitted account-lifecycle candidate with a separate protocol3.
+> The SQL filename in this proposal is not available for canonical publication.
+> No replacement number, release selection, execution or target expansion is
+> authorized. Review must reconcile current lifecycle coverage and use explicit
+> capabilities rather than inferring compatibility from a schema lower bound.
+
 This directory is an unselected review proposal, outside both canonical migration
 trees and every operational manifest. The owner authorized preparation only on
 2026-10-29. Execution, publication as canonical migration165, changes to existing

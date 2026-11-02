@@ -4735,3 +4735,11 @@ behavior remains unchanged. Assessment cleanup and provider publication remain
 account-fenced through acknowledgement. These constraints do not alter ordinary
 resource Archive behavior or authorize log, backup, WAL/snapshot or provider-version
 retention exemptions.
+
+Latest-main source reconciliation (2026-11-02) retains the exact unselected167
+checksum/mirror and blocked account-erasure policy through its existing source
+validator. Migration and forward-release checks validate this candidate separately
+from the active146 descriptor; validation grants no migration or customer authority.
+Canonical147–164 bytes are unchanged.165 is now the BI team-sharing candidate, so
+the old off-chain deletion proposal's165 numbering is obsolete. No successor
+repair is selected or executed, and the approved upgrade target is not widened.
