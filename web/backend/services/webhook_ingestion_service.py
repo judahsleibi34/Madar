@@ -1,6 +1,7 @@
 """Fenced, provider-neutral webhook receipt and bounded background processing."""
 
 from __future__ import annotations
+from services.account_work_fence import scoped_work
 
 import hashlib
 import os
@@ -368,8 +369,11 @@ def _current_record(event: dict, record_id: str, *, client) -> dict | None:
     return rows[0] if rows else None
 
 
+@scoped_work("event", "actor_user_id")
 async def execute_event(event: dict, *, client=None) -> dict:
     database = client or service_supabase
+    from services.account_recovery_service import require_processing_account
+    require_processing_account(tenant_id=event["tenant_id"], user_id=event["actor_user_id"], client=database)
     run_id = None
     run_lease = None
     try:

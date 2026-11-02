@@ -1,5 +1,6 @@
 """Durable automated BI refresh and recurring reports for candidate schema 164."""
 from __future__ import annotations
+from services.account_work_fence import scoped_work
 
 import calendar
 import csv
@@ -19,7 +20,13 @@ from fastapi import HTTPException
 
 from data_analysis import services as data_services
 from database import service_supabase
-from services import bi_dashboard_service, project_dataset_service
+from services import (
+    bi_dashboard_service,
+    bi_report_delivery_service,
+    bi_report_export_service,
+    bi_sharing_service,
+    project_dataset_service,
+)
 from services.notification_service import create_tenant_notification_event
 from services.upload_config import get_private_charts_dir
 
@@ -277,8 +284,11 @@ def dispatch_due_schedules(*, now: datetime | None = None, limit: int = 20, clie
     database = client or service_supabase
     require_reporting_schema(client=database)
     current = (now or _now()).astimezone(timezone.utc)
-    rows = _rows(database.table("bi_report_schedules").select("*").eq("enabled", True)
-        .lte("next_run_at", current.isoformat()).order("next_run_at").limit(max(1, min(limit, MAX_BATCH))).execute())
+    if project_dataset_service.schema_version(client=database)==167:
+        rows=_rows(database.rpc("list_account_work167",{"p_kind":"schedules","p_limit":max(1,min(limit,MAX_BATCH)),"p_before":current.isoformat()}).execute())
+    else:
+        rows = _rows(database.table("bi_report_schedules").select("*").eq("enabled", True)
+            .lte("next_run_at", current.isoformat()).order("next_run_at").limit(max(1, min(limit, MAX_BATCH))).execute())
     results = []
     for schedule in rows:
         due = datetime.fromisoformat(str(schedule["next_run_at"]).replace("Z", "+00:00"))
@@ -305,8 +315,11 @@ def dispatch_due_schedules(*, now: datetime | None = None, limit: int = 20, clie
 def dispatch_data_refreshes(*, limit: int = 20, client=None) -> dict:
     database = client or service_supabase
     require_reporting_schema(client=database)
-    dashboards = _rows(database.table("bi_dashboards").select("id,tenant_id,project_id,creator_user_id,revision")
-        .eq("auto_refresh_enabled", True).order("updated_at").limit(max(1, min(limit, MAX_BATCH))).execute())
+    if project_dataset_service.schema_version(client=database)==167:
+        dashboards=_rows(database.rpc("list_account_work167",{"p_kind":"dashboards","p_limit":max(1,min(limit,MAX_BATCH)),"p_before":_now().isoformat()}).execute())
+    else:
+        dashboards = _rows(database.table("bi_dashboards").select("id,tenant_id,project_id,creator_user_id,revision")
+            .eq("auto_refresh_enabled", True).order("updated_at").limit(max(1, min(limit, MAX_BATCH))).execute())
     created = []
     for dashboard in dashboards:
         detail = bi_dashboard_service.get_dashboard(
@@ -342,11 +355,21 @@ def list_reports(*, tenant_id: int, project_id: str, user_id: int, limit: int = 
     require_reporting_schema(client=database)
     project_dataset_service.require_data_project(project_id, tenant_id=tenant_id, client=database)
     safe_limit = max(1, min(limit, MAX_REPORT_HISTORY))
+    fields = (
+        "id,dashboard_id,schedule_id,dashboard_revision,trigger_type,due_slot,status,version_vector,"
+        "warnings,error_code,artifact_filename,artifact_size_bytes,created_at,started_at,completed_at,"
+        "attempts,max_attempts"
+    )
+    if bi_report_delivery_service.delivery_available(client=database):
+        fields += ",artifact_deleted_at"
     rows = _rows(database.table("bi_report_runs")
-        .select("id,dashboard_id,schedule_id,dashboard_revision,trigger_type,due_slot,status,version_vector,warnings,error_code,artifact_filename,artifact_size_bytes,created_at,started_at,completed_at,attempts,max_attempts")
+        .select(fields)
         .eq("tenant_id", tenant_id).eq("project_id", project_dataset_service._safe_uuid(project_id))
         .eq("creator_user_id", user_id).is_("archived_at", "null").order("created_at", desc=True)
         .range(offset, offset + safe_limit).execute())
+    for row in rows:
+        row.setdefault("artifact_deleted_at", None)
+        row["access"] = {"is_owner": True, "permission": "owner", "can_edit": True, "can_share": True}
     return {"items": rows[:safe_limit], "pagination": {"limit": safe_limit, "offset": offset,
                                                          "has_more": len(rows) > safe_limit}}
 
@@ -355,14 +378,11 @@ def get_report(*, tenant_id: int, project_id: str, user_id: int, report_id: str,
                client=None, include_storage: bool = False) -> dict:
     database = client or service_supabase
     require_reporting_schema(client=database)
-    fields = "*" if include_storage else "id,dashboard_id,schedule_id,dashboard_revision,trigger_type,due_slot,status,definition_snapshot,version_vector,result_snapshot,warnings,error_code,artifact_filename,artifact_size_bytes,artifact_sha256,created_at,started_at,completed_at,attempts,max_attempts"
-    rows = _rows(database.table("bi_report_runs").select(fields)
-        .eq("id", project_dataset_service._safe_uuid(report_id, detail="Report was not found."))
-        .eq("tenant_id", tenant_id).eq("project_id", project_dataset_service._safe_uuid(project_id))
-        .eq("creator_user_id", user_id).is_("archived_at", "null").limit(1).execute())
-    if not rows:
-        raise HTTPException(status_code=404, detail="Report was not found.")
-    return rows[0]
+    context = bi_sharing_service.require_report_access(
+        tenant_id=tenant_id, project_id=project_id, user_id=user_id, report_id=report_id,
+        include_storage=include_storage, client=database,
+    )
+    return {**context["resource"], "access": context["access"]}
 
 
 def archive_report(*, tenant_id: int, project_id: str, user_id: int, report_id: str,
@@ -370,6 +390,10 @@ def archive_report(*, tenant_id: int, project_id: str, user_id: int, report_id: 
     database = client or service_supabase
     require_reporting_schema(client=database)
     project_dataset_service.require_data_project(project_id, tenant_id=tenant_id, client=database)
+    bi_sharing_service.require_report_access(
+        tenant_id=tenant_id, project_id=project_id, user_id=user_id, report_id=report_id,
+        owner_only=True, client=database,
+    )
     archived = database.rpc("archive_bi_report_run164", {
         "p_tenant_id": tenant_id,
         "p_project_id": project_dataset_service._safe_uuid(project_id),
@@ -381,9 +405,14 @@ def archive_report(*, tenant_id: int, project_id: str, user_id: int, report_id: 
 
 
 def report_artifact(*, tenant_id: int, project_id: str, user_id: int, report_id: str,
-                    client=None) -> tuple[Path, str]:
+                    client=None, request=None) -> tuple[Path, str]:
     report = get_report(tenant_id=tenant_id, project_id=project_id, user_id=user_id,
                         report_id=report_id, client=client, include_storage=True)
+    if request is not None:
+        from services.account_work_fence import protect_request
+        protect_request(request,tenant_id,int(report['creator_user_id']))
+    if report.get("artifact_deleted_at"):
+        raise HTTPException(status_code=410, detail="The report artifact has expired under its retention policy.")
     if report.get("status") != "completed" or not report.get("artifact_storage_key"):
         raise HTTPException(status_code=409, detail="The report export is not ready.")
     root = get_private_charts_dir().resolve()
@@ -396,6 +425,36 @@ def report_artifact(*, tenant_id: int, project_id: str, user_id: int, report_id:
     if digest != report["artifact_sha256"]:
         raise HTTPException(status_code=409, detail="Report export integrity check failed.")
     return path, report["artifact_filename"]
+
+
+def report_export_artifact(*, tenant_id: int, project_id: str, user_id: int,
+                           report_id: str, export_format: str, language: str,
+                           client=None, request=None) -> tuple[Path, str, str]:
+    """Authorize once, then render only the stored immutable result snapshot."""
+    report = get_report(
+        tenant_id=tenant_id, project_id=project_id, user_id=user_id,
+        report_id=report_id, client=client,
+    )
+    if request is not None:
+        from services.account_work_fence import protect_request
+        protect_request(request,tenant_id,int(report['creator_user_id']))
+    if report.get("artifact_deleted_at"):
+        raise HTTPException(status_code=410, detail="The report artifact has expired under its retention policy.")
+    try:
+        from services.account_work_fence import account_lock
+        with account_lock(tenant_id,int(report['creator_user_id'])):
+            return bi_report_export_service.write_export(
+                report=report, tenant_id=tenant_id, root=get_private_charts_dir(),
+                export_format=export_format, language=language,
+            )
+    except bi_report_export_service.ReportExportError as error:
+        status = 413 if error.args and error.args[0] in {
+            "report_export_row_limit_exceeded", "report_export_size_limit_exceeded",
+        } else 409
+        raise HTTPException(status_code=status, detail={
+            "code": error.args[0] if error.args else "report_export_failed",
+            "message": "The immutable report could not be exported safely.",
+        }) from error
 
 
 def claim_runs(*, worker_id: str, limit: int = 5, lease_seconds: int = 300,
@@ -445,7 +504,7 @@ def _report_rows(results: list[dict[str, Any]]) -> list[dict[str, str]]:
 def _write_csv_artifact(*, run: dict[str, Any], results: list[dict[str, Any]]) -> dict[str, Any]:
     rows = _report_rows(results)
     root = get_private_charts_dir().resolve()
-    temporary_root = root / ".report-tmp"
+    temporary_root = root / ".report-tmp" / f"tenant_{int(run['tenant_id'])}" / str(run["id"])
     temporary_root.mkdir(parents=True, exist_ok=True, mode=0o700)
     with tempfile.NamedTemporaryFile("w", encoding="utf-8-sig", newline="", dir=temporary_root,
                                      prefix="report-", suffix=".csv", delete=False) as output:
@@ -474,6 +533,8 @@ def _write_csv_artifact(*, run: dict[str, Any], results: list[dict[str, Any]]) -
 
 def execute_run(run: dict[str, Any], *, client=None) -> tuple[str, dict[str, Any], list[dict], dict | None]:
     database = client or service_supabase
+    from services.account_recovery_service import require_processing_account
+    require_processing_account(tenant_id=run["tenant_id"], user_id=run["creator_user_id"], client=database)
     definition = run.get("definition_snapshot") or {}
     widgets = definition.get("widgets") or []
     vector = {item.get("widget_id"): item for item in (run.get("version_vector") or [])}
@@ -483,7 +544,7 @@ def execute_run(run: dict[str, Any], *, client=None) -> tuple[str, dict[str, Any
     if len(widgets) > MAX_WIDGETS_PER_REPORT:
         raise ReportExecutionError("report_widget_limit_exceeded", retryable=False)
     results: list[dict[str, Any]] = []
-    warnings: list[dict[str, str]] = []
+    warnings: list[dict[str, Any]] = []
     freshness_notes: dict[str, dict[str, Any]] = {}
     require_ready = bool((definition.get("report_policy") or {}).get("require_ready_checkpoints"))
     deadline = monotonic_time.monotonic() + MAX_EXECUTION_SECONDS
@@ -534,16 +595,45 @@ def execute_run(run: dict[str, Any], *, client=None) -> tuple[str, dict[str, Any
                 input_path=persistent["storage_identifier"], cleaning_actions=[], question=None,
                 metric=analysis_spec, language="en", symbols={}, tenant_id=str(run["tenant_id"]),
                 user_id=str(run["creator_user_id"]),
+                dataset_version=persistent.get("version") or {},
+                dataset_identity={
+                    "project_id": run["project_id"],
+                    "dataset_id": selected["dataset_id"],
+                    "version_id": selected["dataset_version_id"],
+                },
             )
+            result = analysis.get("result", analysis)
+            mappings = ((result.get("metadata") or {}).get("mappings_used") or {}) \
+                if isinstance(result, dict) else {}
+            if analysis_spec["operation"] == "date_aggregate":
+                for code, field in (
+                    ("period_missing_dates", "missing_date_count"),
+                    ("period_invalid_dates", "invalid_date_count"),
+                    ("period_outside_range", "outside_period_count"),
+                ):
+                    count = int(mappings.get(field) or 0)
+                    if count:
+                        warnings.append({"code": code, "widget_id": str(widget["id"]), "count": count})
+                if mappings.get("partial_periods"):
+                    warnings.append({"code": "period_partial", "widget_id": str(widget["id"])})
+                if "selected_row_count" in mappings and int(mappings.get("selected_row_count") or 0) == 0:
+                    warnings.append({"code": "period_empty", "widget_id": str(widget["id"])})
             results.append({"widget_id": widget["id"], "title": widget["title"], "status": "ready",
-                            "result": analysis.get("result", analysis), "provenance": {
+                            "result": result, "provenance": {
                                 **selected, "project_id": run["project_id"],
                                 "operation": analysis_spec["operation"],
+                                "reporting_period": bi_dashboard_service.reporting_period_provenance(analysis_spec),
                             }})
         except HTTPException as error:
+            code = error.detail.get("code") if isinstance(error.detail, dict) else ""
+            bounded_error = code.startswith(("adaptive_analytics_", "analytics_", "scalable_csv_")) \
+                or code in {"large_format_unsupported", "large_cleaning_pipeline_unsupported",
+                            "large_freeform_analysis_unsupported", "large_metric_unsupported",
+                            "large_date_metric_limit_exceeded"}
+            reason = "analysis_not_supported" if bounded_error else "dataset_access_revoked"
             results.append({"widget_id": widget.get("id"), "title": widget.get("title"),
-                            "status": "needs_attention", "reason": "dataset_access_revoked"})
-            warnings.append({"code": "dataset_access_revoked", "widget_id": str(widget.get("id"))})
+                            "status": "needs_attention", "reason": reason})
+            warnings.append({"code": reason, "widget_id": str(widget.get("id"))})
         except (KeyError, TypeError, ValueError):
             results.append({"widget_id": widget.get("id"), "title": widget.get("title"),
                             "status": "needs_attention", "reason": "schema_incompatible"})
@@ -554,10 +644,13 @@ def execute_run(run: dict[str, Any], *, client=None) -> tuple[str, dict[str, Any
                 "generated_at": _now().isoformat(), "generic_analytics_disclosure": True,
                 "widgets": results, "version_vector": list(vector.values()),
                 "freshness": freshness_notes}
+    if ready:
+        require_processing_account(tenant_id=run["tenant_id"], user_id=run["creator_user_id"], client=database)
     artifact = _write_csv_artifact(run=run, results=results) if ready else None
     return status, snapshot, warnings, artifact
 
 
+@scoped_work("run", "creator_user_id")
 def process_claimed_run(run: dict[str, Any], *, client=None) -> dict[str, Any]:
     database = client or service_supabase
     now = _now()
@@ -574,7 +667,10 @@ def process_claimed_run(run: dict[str, Any], *, client=None) -> dict[str, Any]:
             "p_artifact_sha256": artifact["sha256"] if artifact else None,
             "p_now": now.isoformat(),
         }
-        completed = bool(getattr(database.rpc("complete_bi_report_run164", params).execute(), "data", None))
+        completion_rpc = "complete_bi_report_run166" if bi_report_delivery_service.delivery_available(
+            client=database
+        ) else "complete_bi_report_run164"
+        completed = bool(getattr(database.rpc(completion_rpc, params).execute(), "data", None))
         if not completed:
             if artifact:
                 (get_private_charts_dir() / artifact["storage_key"]).unlink(missing_ok=True)
@@ -621,8 +717,11 @@ def run_worker_batch(*, worker_id: str, limit: int = 5, lease_seconds: int = 300
 def retry_report(*, tenant_id: int, project_id: str, user_id: int, report_id: str,
                  client=None) -> dict:
     database = client or service_supabase
-    report = get_report(tenant_id=tenant_id, project_id=project_id, user_id=user_id,
-                        report_id=report_id, client=database, include_storage=True)
+    context = bi_sharing_service.require_report_access(
+        tenant_id=tenant_id, project_id=project_id, user_id=user_id, report_id=report_id,
+        owner_only=True, include_storage=True, client=database,
+    )
+    report = context["resource"]
     if report["status"] not in {"failed", "needs_attention"}:
         raise HTTPException(status_code=409, detail="This report is not eligible for retry.")
     if not report.get("dashboard_id"):

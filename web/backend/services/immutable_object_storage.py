@@ -11,6 +11,7 @@ import hashlib
 import os
 import re
 import socket
+import stat
 import tempfile
 from dataclasses import dataclass
 from enum import Enum
@@ -23,6 +24,7 @@ from uuid import uuid4
 import httpx
 
 from services.supabase_api_key import supabase_api_headers
+from services.upload_config import get_data_upload_dir
 
 IMMUTABLE_BUCKET = "madar-data-immutable"
 MAX_OBJECT_BYTES = 100 * 1024 * 1024
@@ -117,6 +119,29 @@ def _classify(error: Exception, *, missing: bool = False) -> ImmutableObjectErro
     return ImmutableObjectError(category, f"immutable_object_{category.value}")
 
 
+def private_scratch_root(*, tenant_id: int, descriptor: ImmutableObject) -> Path:
+    """Bind crash-leftover read/verification bytes to the immutable object.
+
+    Neither global temporary directories nor caller-supplied object paths can
+    identify ownership safely. The eraser derives this same private scope from
+    its sealed registry/reservation identity. Existing object-size caps remain.
+    """
+    validate_object_identity(tenant_id=tenant_id,descriptor=descriptor)
+    root=get_data_upload_dir()
+    root.mkdir(parents=True,exist_ok=True,mode=0o700)
+    identity=hashlib.sha256((descriptor.bucket+"/"+descriptor.object_key).encode()).hexdigest()
+    for component in (".immutable_scratch",f"tenant_{int(tenant_id)}","object_"+identity):
+        root=root/component
+        root.mkdir(exist_ok=True,mode=0o700)
+        info=root.lstat()
+        if not stat.S_ISDIR(info.st_mode) or info.st_mode&0o077:
+            raise ImmutableObjectError(ObjectErrorCategory.INVALID,"immutable_scratch_scope_unsafe")
+    from services.storage_quota_service import ensure_disk_capacity, StorageSafetyError
+    try:ensure_disk_capacity(root,incoming_bytes=descriptor.size_bytes)
+    except StorageSafetyError:raise ImmutableObjectError(ObjectErrorCategory.UNAVAILABLE,"immutable_scratch_capacity") from None
+    return root
+
+
 def _write_verified_stream(*, chunks, target_path: Path, descriptor: ImmutableObject,
                            cancelled) -> Path:
     """Write one provider response incrementally and publish only verified bytes."""
@@ -180,7 +205,7 @@ class SupabaseImmutableObjectStore:
              cancelled=lambda: False) -> bytes:
         """Compatibility helper; callers needing bounded memory use download_to_path."""
         validate_object_identity(tenant_id=tenant_id, descriptor=descriptor)
-        with tempfile.TemporaryDirectory(prefix="madar-immutable-read-") as root:
+        with tempfile.TemporaryDirectory(prefix="read-",dir=private_scratch_root(tenant_id=tenant_id,descriptor=descriptor)) as root:
             path = self.download_to_path(
                 tenant_id=tenant_id, descriptor=descriptor,
                 target_path=Path(root) / "object", cancelled=cancelled,
@@ -265,7 +290,7 @@ class SupabaseImmutableObjectStore:
 
     def verify(self, *, tenant_id: int, descriptor: ImmutableObject,
                cancelled=lambda: False) -> None:
-        with tempfile.TemporaryDirectory(prefix="madar-immutable-verify-") as root:
+        with tempfile.TemporaryDirectory(prefix="verify-",dir=private_scratch_root(tenant_id=tenant_id,descriptor=descriptor)) as root:
             self.download_to_path(
                 tenant_id=tenant_id, descriptor=descriptor,
                 target_path=Path(root) / "object", cancelled=cancelled,
@@ -324,7 +349,7 @@ class LoopbackHttpImmutableObjectStore:
         return f"{self.base_url}/{descriptor.bucket}/{descriptor.object_key}"
 
     def read(self, *, tenant_id: int, descriptor: ImmutableObject, cancelled=lambda: False) -> bytes:
-        with tempfile.TemporaryDirectory(prefix="madar-loopback-read-") as root:
+        with tempfile.TemporaryDirectory(prefix="read-",dir=private_scratch_root(tenant_id=tenant_id,descriptor=descriptor)) as root:
             path = self.download_to_path(
                 tenant_id=tenant_id, descriptor=descriptor,
                 target_path=Path(root) / "object", cancelled=cancelled,
@@ -347,7 +372,7 @@ class LoopbackHttpImmutableObjectStore:
 
     def verify(self, *, tenant_id: int, descriptor: ImmutableObject,
                cancelled=lambda: False) -> None:
-        with tempfile.TemporaryDirectory(prefix="madar-loopback-verify-") as root:
+        with tempfile.TemporaryDirectory(prefix="verify-",dir=private_scratch_root(tenant_id=tenant_id,descriptor=descriptor)) as root:
             self.download_to_path(
                 tenant_id=tenant_id, descriptor=descriptor,
                 target_path=Path(root) / "object", cancelled=cancelled,

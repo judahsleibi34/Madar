@@ -13,6 +13,12 @@ UPSTREAM = os.environ.get("POSTGREST_UPSTREAM", "http://rest:3000").rstrip("/")
 AUTH_TEST_TOKEN = os.environ.get("AUTH_TEST_TOKEN", "")
 AUTH_TEST_USER_ID = os.environ.get("AUTH_TEST_USER_ID", "")
 AUTH_TEST_EMAIL = os.environ.get("AUTH_TEST_EMAIL", "browser@example.invalid")
+try:
+    AUTH_TEST_SESSIONS = json.loads(os.environ.get("AUTH_TEST_SESSIONS", "{}"))
+except json.JSONDecodeError as error:
+    raise RuntimeError("AUTH_TEST_SESSIONS must be valid JSON") from error
+if not isinstance(AUTH_TEST_SESSIONS, dict):
+    raise RuntimeError("AUTH_TEST_SESSIONS must be a JSON object")
 HOP_HEADERS = {
     "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
     "te", "trailers", "transfer-encoding", "upgrade",
@@ -23,16 +29,20 @@ class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     def _proxy(self) -> None:
-        if self.path == "/auth/v1/user" and AUTH_TEST_TOKEN and AUTH_TEST_USER_ID:
+        if self.path == "/auth/v1/user" and (AUTH_TEST_SESSIONS or (AUTH_TEST_TOKEN and AUTH_TEST_USER_ID)):
             supplied = self.headers.get("authorization", "")
-            if supplied != f"Bearer {AUTH_TEST_TOKEN}":
+            token = supplied.removeprefix("Bearer ") if supplied.startswith("Bearer ") else ""
+            identity = AUTH_TEST_SESSIONS.get(token)
+            if identity is None and token == AUTH_TEST_TOKEN:
+                identity = {"id": AUTH_TEST_USER_ID, "email": AUTH_TEST_EMAIL}
+            if not isinstance(identity, dict) or not identity.get("id"):
                 self._json(401, {"message": "invalid fixture session"})
                 return
             self._json(200, {
-                "id": AUTH_TEST_USER_ID,
+                "id": str(identity["id"]),
                 "aud": "authenticated",
                 "role": "authenticated",
-                "email": AUTH_TEST_EMAIL,
+                "email": str(identity.get("email") or "browser@example.invalid"),
                 "created_at": "2026-01-01T00:00:00Z",
                 "email_confirmed_at": "2026-01-01T00:00:00Z",
                 "confirmed_at": "2026-01-01T00:00:00Z",

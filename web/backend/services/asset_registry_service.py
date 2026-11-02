@@ -29,12 +29,17 @@ def _retained_project_references(*, tenant_id: int, draft_schema: Any, published
     return references
 
 
-def register_builder_asset(*, tenant_id: int, uploader_user_id: int | None, storage_key: str, original_filename: str, managed_filename: str, mime_type: str, content: bytes | None = None, size_bytes: int | None = None, sha256_hex: str | None = None, client=None) -> dict[str, Any]:
+def register_builder_asset(*, tenant_id: int, owner_user_id: int, uploader_user_id: int | None, storage_key: str, original_filename: str, managed_filename: str, mime_type: str, content: bytes | None = None, size_bytes: int | None = None, sha256_hex: str | None = None, client=None) -> dict[str, Any]:
+    from services.builder_asset_storage import BUILDER_ASSET_BUCKET
+    if BUILDER_ASSET_BUCKET != "builder-assets":
+        raise ValueError("builder_asset_provider_unadmitted")
     match = ASSET_URL_PATTERN.fullmatch(f"/uploads/{storage_key}")
     if not match or int(match.group("tenant")) != int(tenant_id):
         raise ValueError("asset_storage_key_invalid")
     row = {
-        "tenant_id": int(tenant_id), "uploader_user_id": int(uploader_user_id) if uploader_user_id is not None else None,
+        "tenant_id": int(tenant_id), "owner_user_id": int(owner_user_id),
+        "ownership_status": "verified", "uploader_user_id": int(uploader_user_id) if uploader_user_id is not None else None,
+        "storage_backend": "supabase_builder_private", "storage_bucket": "builder-assets", "provider_object_key": storage_key,
         "storage_key": storage_key, "original_filename": Path(original_filename or "asset").name[:255],
         "managed_filename": managed_filename, "mime_type": mime_type,
         "size_bytes": int(size_bytes if size_bytes is not None else len(content or b"")),
@@ -391,47 +396,61 @@ def project_asset_is_persisted(*, tenant_id: int, storage_key: str, client=None)
 
 def cleanup_expired_builder_assets(*, storage_root: Path, limit: int = 100, dry_run: bool = True, client=None) -> dict[str, int]:
     database_client = client or service_supabase
-    response = database_client.table("builder_assets").select("id,tenant_id,storage_key,sha256").eq("status", "unreferenced").lte("retention_until", _now().isoformat()).limit(max(1, min(int(limit), 500))).execute()
+    response = database_client.table("builder_assets").select("id,tenant_id,owner_user_id,ownership_status,storage_key,sha256").eq("status", "unreferenced").lte("retention_until", _now().isoformat()).limit(max(1, min(int(limit), 500))).execute()
     eligible = deleted = skipped = missing_files = hash_mismatches = referenced = 0
     for row in getattr(response, "data", None) or []:
         eligible += 1
-        refs = database_client.table("builder_asset_references").select("asset_id").eq("asset_id", row["id"]).limit(1).execute()
-        if getattr(refs, "data", None) or project_asset_is_persisted(
-            tenant_id=int(row["tenant_id"]), storage_key=row["storage_key"], client=database_client,
-        ) or nonproject_asset_reference_count(
-            tenant_id=int(row["tenant_id"]), storage_key=row["storage_key"], client=database_client,
-        ):
-            skipped += 1; referenced += 1; continue
-        path = assert_path_within_root(storage_root / row["storage_key"], storage_root)
-        if path.exists() and not path.is_file():
+        if row.get("ownership_status") != "verified" or row.get("owner_user_id") is None:
             skipped += 1; continue
-        if path.is_file() and sha256_file(path) != row["sha256"]:
-            skipped += 1; hash_mismatches += 1; continue
-        if not path.exists():
-            missing_files += 1
-        if not dry_run:
-            # Recheck immediately before the irreversible file operation. The
-            # publication path creates a reference before marking an asset
-            # active, so a concurrent publish makes this item ineligible.
-            current = database_client.table("builder_assets").select("status,reference_count").eq("id", row["id"]).eq("tenant_id", int(row["tenant_id"])).limit(1).execute()
-            current_rows = getattr(current, "data", None) or []
-            if len(current_rows) != 1 or current_rows[0].get("status") != "unreferenced" or int(current_rows[0].get("reference_count") or 0) != 0:
-                skipped += 1; referenced += 1; continue
-            if project_asset_is_persisted(
-                tenant_id=int(row["tenant_id"]), storage_key=row["storage_key"], client=database_client,
-            ) or nonproject_asset_reference_count(
-                tenant_id=int(row["tenant_id"]), storage_key=row["storage_key"], client=database_client,
+        from services.account_work_fence import account_lock
+        from services.account_recovery_service import require_processing_account
+        scope=account_lock(int(row["tenant_id"]),int(row["owner_user_id"]),client=database_client)
+        try:
+            scope.__enter__()
+        except Exception:
+            skipped += 1; continue
+        try:
+            try:
+                require_processing_account(tenant_id=int(row["tenant_id"]),user_id=int(row["owner_user_id"]),client=database_client)
+            except Exception:
+                skipped += 1; continue
+            refs = database_client.table("builder_asset_references").select("asset_id").eq("asset_id", row["id"]).limit(1).execute()
+            if (
+                getattr(refs, "data", None)
+                or project_asset_is_persisted(tenant_id=int(row["tenant_id"]), storage_key=row["storage_key"], client=database_client)
+                or nonproject_asset_reference_count(tenant_id=int(row["tenant_id"]), storage_key=row["storage_key"], client=database_client)
             ):
                 skipped += 1; referenced += 1; continue
-            if path.is_file(): path.unlink()
-            release_storage(
-                tenant_id=int(row["tenant_id"]),
-                category="builder_asset",
-                storage_key=row["storage_key"],
-                client=database_client,
-            )
-            database_client.table("builder_assets").update({"status": "soft_deleted", "deleted_at": _now().isoformat(), "reference_count": 0}).eq("id", row["id"]).execute()
-            deleted += 1
+            path = assert_path_within_root(storage_root / row["storage_key"], storage_root)
+            if path.exists() and not path.is_file():
+                skipped += 1; continue
+            if path.is_file() and sha256_file(path) != row["sha256"]:
+                skipped += 1; hash_mismatches += 1; continue
+            if not path.exists():
+                missing_files += 1
+            if not dry_run:
+                # Recheck under the account fence immediately before unlink.
+                current = database_client.table("builder_assets").select("status,reference_count,owner_user_id,ownership_status").eq("id", row["id"]).eq("tenant_id", int(row["tenant_id"])).limit(1).execute()
+                current_rows = getattr(current, "data", None) or []
+                if (
+                    len(current_rows) != 1
+                    or current_rows[0].get("status") != "unreferenced"
+                    or int(current_rows[0].get("reference_count") or 0) != 0
+                    or current_rows[0].get("ownership_status") != "verified"
+                    or current_rows[0].get("owner_user_id") != row["owner_user_id"]
+                ):
+                    skipped += 1; referenced += 1; continue
+                if (
+                    project_asset_is_persisted(tenant_id=int(row["tenant_id"]), storage_key=row["storage_key"], client=database_client)
+                    or nonproject_asset_reference_count(tenant_id=int(row["tenant_id"]), storage_key=row["storage_key"], client=database_client)
+                ):
+                    skipped += 1; referenced += 1; continue
+                if path.is_file(): path.unlink()
+                release_storage(tenant_id=int(row["tenant_id"]), category="builder_asset", storage_key=row["storage_key"], client=database_client)
+                database_client.table("builder_assets").update({"status": "soft_deleted", "deleted_at": _now().isoformat(), "reference_count": 0}).eq("id", row["id"]).execute()
+                deleted += 1
+        finally:
+            scope.__exit__(None,None,None)
     return {
         "eligible": eligible, "deleted": deleted, "skipped": skipped,
         "referenced": referenced, "missing_files": missing_files,

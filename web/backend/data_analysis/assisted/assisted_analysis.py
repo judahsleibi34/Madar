@@ -1,6 +1,9 @@
 ﻿from __future__ import annotations
 
+from datetime import date, timedelta
+from numbers import Number
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import pandas as pd
 
@@ -142,12 +145,22 @@ class AssistedAnalysis(AnalysisBase):
             invalid_count = date_metadata["invalid_date_count"]
             if invalid_count:
                 report.warnings.append(
-                    f"{invalid_count} missing or invalid date values were excluded from date grouping."
+                    f"{invalid_count} invalid date values were excluded from date grouping."
+                )
+            if date_metadata["missing_date_count"]:
+                report.warnings.append(
+                    f"{date_metadata['missing_date_count']} missing date values were excluded from date grouping."
+                )
+            if date_metadata["outside_period_count"]:
+                report.warnings.append(
+                    f"{date_metadata['outside_period_count']} valid dated rows were outside the selected reporting period."
                 )
             if date_metadata["partial_periods"]:
                 report.warnings.append(
-                    "The first or last period may be partial for the selected dataset coverage."
+                    "The first or last grouped period is partial for the requested boundaries or observed dataset coverage."
                 )
+            if not rows:
+                report.warnings.append("No valid dated rows fall inside the selected reporting period.")
             report.set_summary(
                 f"Values were grouped by {date_metadata['period']} using the verified date field '{date_metadata['date_column']}'.",
                 f"تم تجميع القيم حسب {date_metadata['period']} باستخدام حقل التاريخ المتحقق منه '{date_metadata['date_column']}'.",
@@ -190,29 +203,72 @@ class AssistedAnalysis(AnalysisBase):
             raise ValueError("Unsupported date aggregation period")
         if aggregation not in {"count", "sum", "mean", "min", "max"}:
             raise ValueError("Unsupported date aggregation")
-        if timezone != "UTC":
-            raise ValueError("Only UTC date aggregation is currently supported")
+        try:
+            zone = ZoneInfo(timezone)
+        except (ZoneInfoNotFoundError, ValueError) as error:
+            raise ValueError("Reporting timezone must be a valid IANA timezone") from error
         self.validate_columns([date_column, value_column])
         if not date_column:
             raise ValueError("date_column is required")
         raw_dates = self.df[date_column]
-        dates = pd.to_datetime(raw_dates, errors="coerce", utc=True, format="mixed")
+
+        def parse_timestamp(value: object):
+            if pd.isna(value):
+                return pd.NaT
+            if isinstance(value, Number) and not isinstance(value, bool):
+                return pd.NaT
+            try:
+                timestamp = pd.Timestamp(value)
+                if timestamp.tzinfo is None:
+                    timestamp = timestamp.tz_localize(zone, ambiguous="raise", nonexistent="raise")
+                else:
+                    timestamp = timestamp.tz_convert(zone)
+                return timestamp.tz_convert("UTC")
+            except (TypeError, ValueError):
+                return pd.NaT
+
+        dates_utc = pd.to_datetime(raw_dates.map(parse_timestamp), errors="coerce", utc=True)
+        dates = dates_utc.dt.tz_convert(zone)
+        missing_count = int(raw_dates.isna().sum())
         non_missing_count = int(raw_dates.notna().sum())
-        invalid_count = int(dates.isna().sum())
+        invalid_count = int((raw_dates.notna() & dates.isna()).sum())
         if non_missing_count == 0 or int(dates.notna().sum()) == 0:
             raise ValueError("The selected date column has no valid values")
-        invalid_non_missing = int((raw_dates.notna() & dates.isna()).sum())
-        if invalid_non_missing and invalid_non_missing == non_missing_count:
+        if invalid_count and invalid_count == non_missing_count:
             raise ValueError("The selected date column is not a verified date field")
         if aggregation != "count" and not value_column:
             raise ValueError("value_column is required for this date aggregation")
 
+        start_text = str(metric.get("start_date") or "").strip()
+        end_text = str(metric.get("end_date") or "").strip()
+        if bool(start_text) != bool(end_text):
+            raise ValueError("Custom reporting periods require both start and end dates")
+        start_boundary = end_boundary = None
+        if start_text:
+            try:
+                start_value, end_value = date.fromisoformat(start_text), date.fromisoformat(end_text)
+                if start_value.isoformat() != start_text or end_value.isoformat() != end_text or start_value > end_value:
+                    raise ValueError
+                start_boundary = pd.Timestamp(start_value).tz_localize(zone, ambiguous="raise", nonexistent="raise")
+                end_boundary = pd.Timestamp(end_value + timedelta(days=1)).tz_localize(
+                    zone, ambiguous="raise", nonexistent="raise"
+                )
+            except (TypeError, ValueError) as error:
+                raise ValueError("Reporting period boundaries are invalid in the selected timezone") from error
+
+        valid_mask = dates.notna()
+        selected_mask = valid_mask.copy()
+        if start_boundary is not None and end_boundary is not None:
+            selected_mask &= (dates >= start_boundary) & (dates < end_boundary)
+        outside_period_count = int((valid_mask & ~selected_mask).sum())
+
         if period == "day":
             keys = dates.dt.strftime("%Y-%m-%d")
         else:
-            naive_dates = dates.dt.tz_convert("UTC").dt.tz_localize(None)
+            naive_dates = dates.dt.tz_localize(None)
             frequency = "W-SUN" if period == "week" else "M"
             keys = naive_dates.dt.to_period(frequency).astype("string")
+        keys = keys.where(selected_mask)
         work = pd.DataFrame({"period": keys})
         if aggregation == "count":
             work["value"] = 1
@@ -221,17 +277,41 @@ class AssistedAnalysis(AnalysisBase):
             work["value"] = self.numeric(value_column)
             grouped = work.dropna(subset=["period"]).groupby("period", sort=True)["value"].agg(aggregation)
         rows = grouped.reset_index(name="value").to_dict(orient="records")
-        if not rows:
+        if not rows and start_boundary is None:
             raise ValueError("No valid rows remain for date aggregation")
 
         valid_dates = dates.dropna()
         minimum = valid_dates.min()
         maximum = valid_dates.max()
-        partial_periods = False
-        if period == "month":
-            partial_periods = minimum.day != 1 or maximum.day != maximum.days_in_month
-        elif period == "week":
-            partial_periods = minimum.weekday() != 0 or maximum.weekday() != 6
+        selected_dates = dates[selected_mask].dropna()
+        selected_minimum = selected_dates.min() if not selected_dates.empty else None
+        selected_maximum = selected_dates.max() if not selected_dates.empty else None
+        partial_reasons: list[str] = []
+
+        def is_period_start(value) -> bool:
+            if period == "day":
+                return True
+            if period == "week":
+                return value.weekday() == 0
+            return value.day == 1
+
+        def is_period_end(value) -> bool:
+            if period == "day":
+                return True
+            if period == "week":
+                return value.weekday() == 6
+            return value.day == value.days_in_month
+
+        if start_boundary is not None:
+            if not is_period_start(start_boundary):
+                partial_reasons.append("requested_start_inside_period")
+            requested_end = end_boundary - pd.Timedelta(days=1)
+            if not is_period_end(requested_end):
+                partial_reasons.append("requested_end_inside_period")
+        if selected_minimum is not None and not is_period_start(selected_minimum):
+            partial_reasons.append("observed_coverage_starts_inside_period")
+        if selected_maximum is not None and not is_period_end(selected_maximum):
+            partial_reasons.append("observed_coverage_ends_inside_period")
         return rows, {
             "date_column": str(date_column),
             "value_column": str(value_column) if value_column else None,
@@ -239,9 +319,21 @@ class AssistedAnalysis(AnalysisBase):
             "period": period,
             "timezone": timezone,
             "invalid_date_count": invalid_count,
+            "missing_date_count": missing_count,
+            "excluded_date_count": invalid_count + missing_count,
+            "outside_period_count": outside_period_count,
+            "selected_row_count": int(selected_mask.sum()),
+            "total_row_count": int(len(raw_dates)),
+            "requested_start_date": start_text or None,
+            "requested_end_date": end_text or None,
+            "start_inclusive": start_boundary.isoformat() if start_boundary is not None else None,
+            "end_exclusive": end_boundary.isoformat() if end_boundary is not None else None,
             "coverage_start": minimum.isoformat(),
             "coverage_end": maximum.isoformat(),
-            "partial_periods": partial_periods,
+            "selected_coverage_start": selected_minimum.isoformat() if selected_minimum is not None else None,
+            "selected_coverage_end": selected_maximum.isoformat() if selected_maximum is not None else None,
+            "partial_periods": bool(partial_reasons),
+            "partial_period_reasons": partial_reasons,
         }
 
     def _aggregate(self, value_column: str, operation: str, group_column: str | None = None) -> list[dict[str, Any]]:

@@ -38,7 +38,8 @@ class FakeClient:
 
 def dashboard(policy="pinned"):
     return {
-        "id": DASHBOARD, "revision": 4,
+        "id": DASHBOARD, "revision": 4, "creator_user_id": 7,
+        "access": {"is_owner": True, "permission": "owner", "can_edit": True, "can_share": True},
         "widgets": [{
             "id": WIDGET, "widget_type": "kpi", "title": "Rows",
             "dataset_id": DATASET, "dataset_version_id": VERSION_1,
@@ -53,12 +54,16 @@ class BiDashboardServiceTests(unittest.TestCase):
     def test_analysis_layout_and_display_validation_are_allowlisted(self):
         self.assertEqual(bi_dashboard_service.validate_analysis_spec({
             "operation": "date_aggregate", "date_column": "date", "period": "month",
-            "aggregation": "count", "timezone": "UTC",
-        })["operation"], "date_aggregate")
+            "aggregation": "count", "timezone": "Asia/Hebron",
+            "start_date": "2026-01-01", "end_date": "2026-01-31",
+        })["timezone"], "Asia/Hebron")
         for invalid in (
             {"operation": "sql", "code": "select 1"},
             {"operation": "sum"},
-            {"operation": "date_aggregate", "date_column": "date", "timezone": "Asia/Hebron"},
+            {"operation": "date_aggregate", "date_column": "date", "timezone": "Mars/Olympus"},
+            {"operation": "date_aggregate", "date_column": "date", "start_date": "2026-01-01"},
+            {"operation": "date_aggregate", "date_column": "date", "start_date": "2026-02-01", "end_date": "2026-01-01"},
+            {"operation": "count", "start_date": "2026-01-01", "end_date": "2026-01-02"},
         ):
             with self.subTest(invalid=invalid), self.assertRaises(HTTPException) as denied:
                 bi_dashboard_service.validate_analysis_spec(invalid)
@@ -67,9 +72,19 @@ class BiDashboardServiceTests(unittest.TestCase):
             bi_dashboard_service.validate_layout({"x": 10, "y": 0, "w": 4, "h": 3})
         with self.assertRaises(HTTPException):
             bi_dashboard_service.validate_display_options({"html": "<script>"})
+        self.assertEqual(
+            bi_dashboard_service.validate_display_options({"show_table": False, "show_legend": True}),
+            {"show_table": False, "show_legend": True},
+        )
+        with self.assertRaises(HTTPException):
+            bi_dashboard_service.validate_display_options({"show_legend": "yes"})
 
     @patch.object(bi_dashboard_service, "dashboards_available", return_value=True)
-    def test_revision_conflicts_are_returned_as_http_409(self, _available):
+    @patch.object(bi_dashboard_service.bi_sharing_service, "require_dashboard_access", return_value={
+        "resource": {"id": DASHBOARD, "creator_user_id": 7},
+        "access": {"is_owner": True, "permission": "owner", "can_edit": True, "can_share": True},
+    })
+    def test_revision_conflicts_are_returned_as_http_409(self, _access, _available):
         client = FakeClient(error=RuntimeError("dashboard_revision_conflict SQLSTATE 40001"))
         with self.assertRaises(HTTPException) as conflict:
             bi_dashboard_service.update_dashboard(

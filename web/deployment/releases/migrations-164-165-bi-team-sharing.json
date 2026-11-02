@@ -1,0 +1,14 @@
+{
+  "manifest_version": 1,
+  "release_sha": "STAGING",
+  "migrations": [
+    {
+      "number": 165,
+      "from_schema": 164,
+      "to_schema": 165,
+      "path": "web/database/migrations/165_add_bi_team_sharing.sql",
+      "sha256": "966b0cc38f00aa3e6ed0bda4ad3a2280829347082bd564bad8732f27c762b1b7",
+      "compatibility": "expand-only"
+    }
+  ]
+}

@@ -26,7 +26,7 @@ from tests.entitlement_test_support import EntitlementTestState
 
 TENANT_A_USER = {
     "id": 1,
-    "tenant_id": "tenant-a",
+    "tenant_id": "1",
     "auth_id": "auth-user-1",
     "user_type": "user",
     "email": "user1@example.com",
@@ -40,7 +40,7 @@ TENANT_A_SECOND_USER = {
 TENANT_B_USER = {
     **TENANT_A_USER,
     "id": 3,
-    "tenant_id": "tenant-b",
+    "tenant_id": "2",
     "auth_id": "auth-user-3",
     "email": "user3@example.com",
 }
@@ -107,7 +107,9 @@ def fake_tenant_context(user=TENANT_A_USER, *, role="owner", status="active"):
 
 
 def build_data_client():
+    from services.account_work_fence import AccountWorkFenceMiddleware
     app = FastAPI()
+    app.add_middleware(AccountWorkFenceMiddleware)
     app.include_router(data_routes.router)
     app.include_router(cleaning_routes.router)
     app.include_router(analysis_routes.router)
@@ -154,9 +156,9 @@ def assert_no_private_path(test_case, response):
 
 class DataRouteAuthorizationMatrixTests(unittest.TestCase):
     def setUp(self):
-        self.entitlement_state = EntitlementTestState().activate_plan("tenant-a", "business")
-        self.entitlement_state.allow_capability("tenant-b", "data_import")
-        self.entitlement_state.allow_capability("tenant-b", "charts")
+        self.entitlement_state = EntitlementTestState().activate_plan("1", "business")
+        self.entitlement_state.allow_capability("2", "data_import")
+        self.entitlement_state.allow_capability("2", "charts")
         self.entitlement_patch = self.entitlement_state.installed()
         self.entitlement_patch.__enter__()
         self.client = build_data_client()
@@ -184,7 +186,7 @@ class DataRouteAuthorizationMatrixTests(unittest.TestCase):
             owner = self.client.post("/users/1/data/read", json=payload)
 
         self.assertEqual(owner.status_code, 200)
-        self.assertEqual(service.call_args.kwargs["tenant_id"], "tenant-a")
+        self.assertEqual(service.call_args.kwargs["tenant_id"], "1")
         self.assertEqual(service.call_args.kwargs["user_id"], "1")
 
         with self.auth_patches(TENANT_A_USER)[0]:
@@ -242,6 +244,51 @@ class DataRouteAuthorizationMatrixTests(unittest.TestCase):
                 None,
             ),
             (
+                "get",
+                "/users/2/data/projects/11111111-1111-4111-8111-111111111111/shared-dashboards",
+                None,
+            ),
+            (
+                "put",
+                "/users/2/data/projects/11111111-1111-4111-8111-111111111111/"
+                "dashboards/55555555-5555-4555-8555-555555555555/shares/3",
+                {"expected_revision": 1, "member_user_id": 3, "permission": "viewer"},
+            ),
+            (
+                "get",
+                "/users/2/data/projects/11111111-1111-4111-8111-111111111111/shared-reports",
+                None,
+            ),
+            (
+                "get",
+                "/users/2/data/projects/11111111-1111-4111-8111-111111111111/report-lifecycle",
+                None,
+            ),
+            (
+                "patch",
+                "/users/2/data/projects/11111111-1111-4111-8111-111111111111/"
+                "report-schedules/55555555-5555-4555-8555-555555555555/delivery",
+                {"expected_schedule_revision": 1, "enabled": True, "recipient_user_ids": [3]},
+            ),
+            (
+                "put",
+                "/users/2/data/projects/11111111-1111-4111-8111-111111111111/"
+                "reports/55555555-5555-4555-8555-555555555555/shares/3",
+                {"member_user_id": 3, "permission": "viewer"},
+            ),
+            (
+                "get",
+                "/users/2/data/projects/11111111-1111-4111-8111-111111111111/"
+                "reports/55555555-5555-4555-8555-555555555555/export.pdf?language=en",
+                None,
+            ),
+            (
+                "get",
+                "/users/2/data/projects/11111111-1111-4111-8111-111111111111/"
+                "reports/55555555-5555-4555-8555-555555555555/export.xlsx?language=ar",
+                None,
+            ),
+            (
                 "patch",
                 "/users/2/data/projects/11111111-1111-4111-8111-111111111111/"
                 "sources/33333333-3333-4333-8333-333333333333",
@@ -284,7 +331,7 @@ class DataRouteAuthorizationMatrixTests(unittest.TestCase):
              patch.object(
                  data_services,
                  "export_cleaned_dataframe",
-                 side_effect=RuntimeError(r"D:\Madar\private_uploads\tenant-a\user-1\secret.csv"),
+                 side_effect=RuntimeError(r"D:\Madar\private_uploads\1\user-1\secret.csv"),
              ):
             response = self.client.post(
                 "/users/1/cleaning/export",
@@ -298,7 +345,7 @@ class DataRouteAuthorizationMatrixTests(unittest.TestCase):
     def test_private_chart_route_blocks_cross_user_and_cross_tenant(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            chart_dir = root / "private_generated_charts" / "tenant_tenant-a" / "user_1"
+            chart_dir = root / "private_generated_charts" / "tenant_1" / "user_1"
             chart_dir.mkdir(parents=True)
             (chart_dir / "chart.png").write_bytes(b"\x89PNG\r\n\x1a\n")
 
@@ -323,7 +370,7 @@ class DataRouteAuthorizationMatrixTests(unittest.TestCase):
 class TenantScopedRouteAuthorizationMatrixTests(unittest.TestCase):
     def setUp(self):
         self.entitlement_state = EntitlementTestState().allow_capability(
-            "tenant-b", "response_management"
+            "2", "response_management"
         )
         self.entitlement_patch = self.entitlement_state.installed()
         self.entitlement_patch.__enter__()
@@ -334,7 +381,7 @@ class TenantScopedRouteAuthorizationMatrixTests(unittest.TestCase):
 
     def test_website_settings_requires_active_matching_user_context(self):
         with patch.object(website_routes, "require_active_tenant_member", return_value=tenant_context()), \
-             patch.object(website_routes, "ensure_settings_for_tenant", return_value={"tenant_id": "tenant-a"}):
+             patch.object(website_routes, "ensure_settings_for_tenant", return_value={"tenant_id": "1"}):
             owner = self.client.get("/users/1/website/settings")
             wrong_user = self.client.get("/users/2/website/settings")
 
@@ -352,7 +399,7 @@ class TenantScopedRouteAuthorizationMatrixTests(unittest.TestCase):
     def test_billing_checkout_requires_membership_and_matching_user_alias(self):
         checkout = {"subscription_type": "individual_builder", "plan": "pro", "builder_type": "data"}
         with patch.object(billing_routes, "require_active_tenant_member", return_value=tenant_context()), \
-             patch.object(billing_routes, "apply_pending_checkout_selection", return_value={"tenant_id": "tenant-a", **checkout}), \
+             patch.object(billing_routes, "apply_pending_checkout_selection", return_value={"tenant_id": "1", **checkout}), \
              patch.object(billing_routes, "record_audit_event"):
             canonical = self.client.post("/billing/checkout", json=checkout)
             wrong_user = self.client.post("/users/2/billing/checkout", json=checkout)
@@ -417,7 +464,7 @@ class UserAndAdminRouteAuthorizationMatrixTests(unittest.TestCase):
              patch.object(admin_user_routes, "list_users_with_features", return_value={"items": [], "users": [], "pagination": {}}), \
              patch.object(admin_profile_routes, "service_supabase"), \
              patch.object(admin_account_access_routes, "generate_permission_code", return_value={"success": True}), \
-             patch.object(admin_billing_routes, "apply_verified_billing_update", return_value={"tenant_id": "tenant-a", "id": "feature-1"}), \
+             patch.object(admin_billing_routes, "apply_verified_billing_update", return_value={"tenant_id": "1", "id": "feature-1"}), \
              patch.object(admin_billing_routes, "record_audit_event"):
             users = client.get("/admin/users")
             profile = client.post("/admin/profile/info")
@@ -550,10 +597,10 @@ class _BuilderFakeSupabase:
     def __init__(self):
         self.tables = {
             "builder_projects": [
-                {"id": "project-a", "tenant_id": "tenant-a", "status": "published", "draft_schema": {}}
+                {"id": "project-a", "tenant_id": "1", "status": "published", "draft_schema": {}}
             ],
             "builder_form_submissions": [
-                {"id": "submission-a", "tenant_id": "tenant-a", "project_id": "project-a"}
+                {"id": "submission-a", "tenant_id": "1", "project_id": "project-a"}
             ],
         }
 

@@ -77,13 +77,53 @@ class AssistedAnalysisTests(unittest.TestCase):
 
         self.assertEqual(result["tables"][0]["rows"], [{"period": "2026-01", "value": 30}])
         mappings = result["metadata"]["mappings_used"]
-        self.assertEqual(mappings["invalid_date_count"], 2)
+        self.assertEqual(mappings["invalid_date_count"], 1)
+        self.assertEqual(mappings["missing_date_count"], 1)
         self.assertTrue(mappings["partial_periods"])
-        self.assertEqual(len(result["warnings"]), 2)
+        self.assertEqual(len(result["warnings"]), 3)
+
+    def test_custom_period_uses_local_inclusive_dates_across_dst(self):
+        df = pd.DataFrame({
+            "observed_at": [
+                "2026-03-08T04:30:00Z", "2026-03-08T05:30:00Z",
+                "2026-03-09T03:30:00Z", "2026-03-09T04:30:00Z",
+            ],
+        })
+        result = AssistedAnalysis(df).custom_metric({
+            "operation": "date_aggregate", "date_column": "observed_at",
+            "aggregation": "count", "period": "day", "timezone": "America/New_York",
+            "start_date": "2026-03-08", "end_date": "2026-03-08",
+        })
+        self.assertEqual(result["tables"][0]["rows"], [{"period": "2026-03-08", "value": 2}])
+        mappings = result["metadata"]["mappings_used"]
+        self.assertEqual(mappings["outside_period_count"], 2)
+        self.assertEqual(mappings["selected_row_count"], 2)
+        self.assertEqual(mappings["start_inclusive"], "2026-03-08T00:00:00-05:00")
+        self.assertEqual(mappings["end_exclusive"], "2026-03-09T00:00:00-04:00")
+
+    def test_custom_period_returns_honest_empty_result(self):
+        result = AssistedAnalysis(pd.DataFrame({"date": ["2026-01-01"]})).custom_metric({
+            "operation": "date_aggregate", "date_column": "date", "period": "month",
+            "timezone": "UTC", "start_date": "2027-01-01", "end_date": "2027-01-31",
+        })
+        self.assertEqual(result["tables"][0]["rows"], [])
+        self.assertEqual(result["metadata"]["mappings_used"]["selected_row_count"], 0)
+        self.assertTrue(any("No valid dated rows" in warning for warning in result["warnings"]))
+
+    def test_custom_period_rejects_nonexistent_local_boundary(self):
+        with self.assertRaisesRegex(ValueError, "boundaries are invalid"):
+            AssistedAnalysis(pd.DataFrame({"date": ["2011-12-29"]})).custom_metric({
+                "operation": "date_aggregate", "date_column": "date", "period": "day",
+                "timezone": "Pacific/Apia", "start_date": "2011-12-30", "end_date": "2011-12-30",
+            })
 
     def test_date_aggregate_rejects_unverified_date_field(self):
         with self.assertRaisesRegex(ValueError, "no valid values|not a verified date"):
             AssistedAnalysis(pd.DataFrame({"date": ["x", "y"]})).custom_metric({
+                "operation": "date_aggregate", "date_column": "date",
+            })
+        with self.assertRaisesRegex(ValueError, "no valid values|not a verified date"):
+            AssistedAnalysis(pd.DataFrame({"date": [1, 2]})).custom_metric({
                 "operation": "date_aggregate", "date_column": "date",
             })
 

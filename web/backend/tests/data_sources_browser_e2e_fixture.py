@@ -141,8 +141,8 @@ class ProviderHandler(JsonHandler):
         if cursor == "cursor-2":
             self.json_response(200, {
                 "records": [
-                    {"id": "C", "version": 2, "event_id": "event-C-2", "data": {"name": "C", "value": 35}},
-                    {"id": "E", "version": 1, "event_id": "event-E-1", "data": {"name": "E", "value": 50}},
+                    {"id": "C", "version": 2, "event_id": "event-C-2", "data": {"name": "C", "value": 35, "occurred_at": "2026-03-09T03:30:00Z"}},
+                    {"id": "E", "version": 1, "event_id": "event-E-1", "data": {"name": "E", "value": 50, "occurred_at": "2026-03-10T04:00:00Z"}},
                     {"id": "D", "deleted": True, "version": 2, "event_id": "event-D-2"},
                 ],
                 "sync_cursor": "cursor-3",
@@ -150,22 +150,22 @@ class ProviderHandler(JsonHandler):
         elif cursor == "cursor-1":
             self.json_response(200, {
                 "records": [
-                    {"id": "B", "version": 2, "event_id": "event-B-2", "data": {"name": "B", "value": 25}},
-                    {"id": "D", "version": 1, "event_id": "event-D-1", "data": {"name": "D", "value": 40}},
+                    {"id": "B", "version": 2, "event_id": "event-B-2", "data": {"name": "B", "value": 25, "occurred_at": "2026-03-08T07:30:00Z"}},
+                    {"id": "D", "version": 1, "event_id": "event-D-1", "data": {"name": "D", "value": 40, "occurred_at": None}},
                     {"id": "A", "deleted": True, "version": 2, "event_id": "event-A-2"},
                 ],
                 "sync_cursor": "cursor-2",
             })
         elif cursor is None and continuation == "page-2":
             self.json_response(200, {
-                "records": [{"id": "C", "version": 1, "event_id": "event-C-1", "data": {"name": "C", "value": 30}}],
+                "records": [{"id": "C", "version": 1, "event_id": "event-C-1", "data": {"name": "C", "value": 30, "occurred_at": "2026-03-09T03:30:00Z"}}],
                 "sync_cursor": "cursor-1",
             })
         elif cursor is None:
             self.json_response(200, {
                 "records": [
-                    {"id": "A", "version": 1, "event_id": "event-A-1", "data": {"name": "A", "value": 10}},
-                    {"id": "B", "version": 1, "event_id": "event-B-1", "data": {"name": "B", "value": 20}},
+                    {"id": "A", "version": 1, "event_id": "event-A-1", "data": {"name": "=CMD", "value": 10, "occurred_at": "2026-03-08T06:30:00Z"}},
+                    {"id": "B", "version": 1, "event_id": "event-B-1", "data": {"name": "B", "value": 20, "occurred_at": "2026-03-08T07:30:00Z"}},
                 ],
                 "next_page_token": "page-2",
             })
@@ -250,6 +250,19 @@ class ControlHandler(JsonHandler):
                 result = self.run_worker_process("run_bi_report_worker.py", payload)
             elif self.path == "/control/report-scheduler":
                 result = self.run_report_scheduler(payload)
+            elif self.path == "/control/delivery-worker":
+                result = self.run_delivery_worker(payload)
+            elif self.path == "/control/cleanup-worker":
+                result = self.run_cleanup_worker(payload)
+            elif self.path == "/control/force-delivery-due":
+                result = self.force_delivery_due(payload)
+            elif self.path == "/control/expire-report":
+                result = self.expire_report(payload)
+            elif self.path == "/control/report-export-evidence":
+                result = self.report_export_evidence(payload)
+            elif self.path == "/control/scalability":
+                from tests.scalability_checkpoint_fixture import scoped_action
+                result = scoped_action(payload, tenant_id=TENANT_ID, project_id=PROJECT_ID)
             elif self.path == "/control/crash-webhook-worker":
                 result = self.crash_webhook_worker()
             elif self.path == "/control/expire-webhook-leases":
@@ -324,10 +337,102 @@ class ControlHandler(JsonHandler):
         from database import service_supabase as database
 
         if payload.get("force_due"):
+            slot = max(1, min(int(payload.get("force_due_slot", 1)), 28))
             database.table("bi_report_schedules").update({
-                "next_run_at": "2000-01-01T00:00:00Z",
+                "next_run_at": f"2000-01-{slot:02d}T00:00:00Z",
             }).eq("tenant_id", TENANT_ID).eq("project_id", PROJECT_ID).execute()
         return self.run_worker_process("run_bi_report_scheduler.py", payload)
+
+    @staticmethod
+    def _scoped_report(report_id: object) -> dict:
+        from database import service_supabase as database
+
+        value = str(report_id or "")
+        reports = rows(database.table("bi_report_runs").select("*")
+            .eq("id", value).eq("tenant_id", TENANT_ID).eq("project_id", PROJECT_ID)
+            .limit(1).execute())
+        if not reports:
+            raise ValueError("report is outside the fixture scope")
+        return reports[0]
+
+    @staticmethod
+    def run_delivery_worker(payload: dict) -> dict:
+        from services.bi_report_delivery_service import OfflineTestEmailAdapter, run_delivery_batch
+
+        failure_code = str(payload.get("failure_code") or "").strip() or None
+        adapter = OfflineTestEmailAdapter(failure_code=failure_code)
+        result = run_delivery_batch(
+            worker_id="browser-e2e-delivery", adapter=adapter,
+            limit=max(1, min(int(payload.get("limit", 10)), 25)),
+        )
+        return {**result, "delivered": adapter.delivered}
+
+    @staticmethod
+    def run_cleanup_worker(payload: dict) -> dict:
+        from services.bi_report_delivery_service import run_cleanup_batch
+
+        return run_cleanup_batch(
+            worker_id="browser-e2e-cleanup",
+            limit=max(1, min(int(payload.get("limit", 10)), 25)),
+        )
+
+    @classmethod
+    def force_delivery_due(cls, payload: dict) -> dict:
+        from database import service_supabase as database
+
+        report = cls._scoped_report(payload.get("report_id"))
+        response = database.table("bi_report_deliveries").update({
+            "available_at": "2000-01-01T00:00:00Z",
+        }).eq("report_id", report["id"]).eq("tenant_id", TENANT_ID).eq(
+            "project_id", PROJECT_ID
+        ).in_("status", ["pending", "retry_pending"]).execute()
+        return {"updated": len(rows(response))}
+
+    @classmethod
+    def expire_report(cls, payload: dict) -> dict:
+        from database import service_supabase as database
+
+        report = cls._scoped_report(payload.get("report_id"))
+        database.table("bi_report_runs").update({
+            "completed_at": "2000-01-01T00:00:00Z",
+        }).eq("id", report["id"]).eq("tenant_id", TENANT_ID).eq(
+            "project_id", PROJECT_ID
+        ).execute()
+        jobs = rows(database.table("bi_report_cleanup_jobs").update({
+            "available_at": "2000-01-02T00:00:00Z",
+        }).eq("report_id", report["id"]).eq("tenant_id", TENANT_ID).eq(
+            "project_id", PROJECT_ID
+        ).execute())
+        return {"report_id": report["id"], "cleanup_jobs": len(jobs)}
+
+    @classmethod
+    def report_export_evidence(cls, payload: dict) -> dict:
+        from pathlib import Path
+        from openpyxl import load_workbook
+        from services.upload_config import get_private_charts_dir
+
+        report = cls._scoped_report(payload.get("report_id"))
+        root = get_private_charts_dir().resolve()
+        report_dir = (root / "reports" / f"tenant_{TENANT_ID}" / str(report["id"])).resolve()
+        if root not in report_dir.parents:
+            raise ValueError("report export path escaped fixture root")
+        pdfs = sorted((report_dir / "exports").glob("*-ar.pdf"))
+        workbooks = sorted((report_dir / "exports").glob("*-ar.xlsx"))
+        if len(pdfs) != 1 or len(workbooks) != 1:
+            raise ValueError("expected one Arabic PDF and XLSX export")
+        workbook = load_workbook(workbooks[0], data_only=False)
+        values = [cell.value for sheet in workbook.worksheets for row in sheet.iter_rows() for cell in row]
+        version_ids = {str(item.get("dataset_version_id")) for item in report.get("version_vector") or []}
+        return {
+            "pdf_magic": pdfs[0].read_bytes().startswith(b"%PDF-"),
+            "pdf_private": pdfs[0].stat().st_mode & 0o077 == 0,
+            "xlsx_private": workbooks[0].stat().st_mode & 0o077 == 0,
+            "xlsx_rtl": all(sheet.sheet_view.rightToLeft for sheet in workbook.worksheets),
+            "xlsx_no_formulas": not any(cell.data_type == "f" for sheet in workbook.worksheets for row in sheet.iter_rows() for cell in row),
+            "xlsx_formula_escaped": any(str(value or "").startswith("'=") for value in values),
+            "xlsx_has_versions": version_ids.issubset({str(value) for value in values}),
+            "xlsx_has_arabic": any(any("\u0600" <= character <= "\u06ff" for character in str(value or "")) for value in values),
+        }
 
     @staticmethod
     def run_worker_process(script: str, payload: dict) -> dict:

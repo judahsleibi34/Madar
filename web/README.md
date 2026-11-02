@@ -202,6 +202,8 @@ process and reset on restart; use the normal Redis-backed runtime for production
 - `BUILDER_ASSET_UPLOAD_RATE_LIMIT_WINDOW_SECONDS`
 - `MAX_REQUEST_BODY_BYTES`
 - `MAX_BUILDER_ASSET_REQUEST_BODY_BYTES`
+- `MAX_DATASET_REQUEST_BODY_BYTES`
+- `MAX_CONCURRENT_DATASET_UPLOADS`
 - `MAX_JSON_BODY_BYTES`
 - `MAX_SMALL_JSON_BODY_BYTES`
 - `MAX_DATA_JSON_BODY_BYTES`
@@ -279,17 +281,26 @@ The backend fails startup if `DATA_UPLOAD_DIR` or `PRIVATE_CHARTS_DIR` is config
 
 Large CSV uploads are streamed to private storage and summarized with chunked
 metadata extraction instead of full in-memory DataFrames. Defaults are
-`MAX_DATASET_UPLOAD_BYTES=209715200`, `LARGE_DATASET_THRESHOLD_BYTES=52428800`,
+`MAX_DATASET_UPLOAD_BYTES=250000000`, `LARGE_DATASET_THRESHOLD_BYTES=52428800`,
 `MAX_FULL_DATAFRAME_BYTES=52428800`, `CSV_CHUNK_SIZE_ROWS=3000`, and
 `MAX_PREVIEW_ROWS=120`. Duplicate tracking defaults to
 `CSV_DUPLICATE_TRACK_ROWS=100000` row signatures. Excel files above
 `MAX_EXCEL_UPLOAD_BYTES=52428800` are
 rejected with guidance to convert to CSV because Excel parsing is not chunked.
+Dataset multipart requests have a separate 251,048,576-byte envelope and two
+concurrent request slots per backend process. CSV bytes are copied to a private
+partial file in 1 MiB chunks while SHA-256 is calculated, then atomically renamed;
+failed/cancelled streams are removed and expired Madar partials are reclaimed on
+the next upload. Disk-floor admission reserves headroom for both admitted target
+copies. Global multipart and Excel limits are unchanged.
 When `PARSER_ISOLATED_WORKER_ENABLED=true`, bounded full-dataframe parsing is
 delegated to the internal `parser-worker` service. The worker has read-only
 access to private uploads, no outbound network, and container CPU, memory, PID,
 capability, and filesystem restrictions. Readiness verifies the worker identity
 and health endpoint; the flag alone is not sufficient.
+Large local CSV uploads use the same worker's `csv_metadata` operation, which
+performs chunked metadata extraction in its killable one-job child and returns
+only bounded metadata. It does not return or retain the full dataset.
 
 AI provider usage is enforced at `POST /users/{user_id}/analysis/ai` in
 `backend/data_analysis/routes/analysis_routes.py` before provider calls are

@@ -41,11 +41,11 @@ const detailA = {
   dataset_version_id: "version-a2",
   file_path: "general.csv",
   rows: 3,
-  columns: ["category", "amount", "note"],
+  columns: ["category", "amount", "note", "created_at"],
   preview: [
-    { category: "North", amount: 12, note: "Ready" },
-    { category: "South", amount: 7, note: "" },
-    { category: "East", amount: 4, note: "Review" },
+    { category: "North", amount: 12, note: "Ready", created_at: "2026-03-08T05:30:00Z" },
+    { category: "South", amount: 7, note: "", created_at: "2026-03-09T03:30:00Z" },
+    { category: "East", amount: 4, note: "Review", created_at: null },
   ],
 };
 const versionsA = [
@@ -54,7 +54,7 @@ const versionsA = [
 ];
 const explorationA = {
   rows: detailA.preview,
-  columns: [{ name: "category", technical_type: "text" }, { name: "amount", technical_type: "number" }, { name: "note", technical_type: "text" }],
+  columns: [{ name: "category", technical_type: "text" }, { name: "amount", technical_type: "number" }, { name: "note", technical_type: "text" }, { name: "created_at", technical_type: "datetime" }],
   pagination: { limit: 50, offset: 0, returned: 3, total: 3, has_more: false },
   provenance: { dataset_version_id: "version-a2" },
 };
@@ -65,16 +65,22 @@ const profileResponses = {
     numeric_columns: { amount: { count: 3, unique_count: 3, min: 4, max: 12, mean: 7.67, sum: 23 } },
     categorical_columns: { category: { count: 3, unique_count: 3 }, note: { count: 2, unique_count: 2 } },
   },
-  "missing-report": { category: { missing_count: 0, missing_percentage: 0 }, amount: { missing_count: 0, missing_percentage: 0 }, note: { missing_count: 1, missing_percentage: 33.33 } },
-  "column-types": { category: "object", amount: "float64", note: "object" },
+  "missing-report": { category: { missing_count: 0, missing_percentage: 0 }, amount: { missing_count: 0, missing_percentage: 0 }, note: { missing_count: 1, missing_percentage: 33.33 }, created_at: { missing_count: 1, missing_percentage: 33.33 } },
+  "column-types": { category: "object", amount: "float64", note: "object", created_at: "datetime64[ns]" },
 };
 
 function installDefaultApi() {
   apiFetch.mockImplementation(async (url, options = {}) => {
     if (url.endsWith("/datasets?limit=100")) return json({ available: true, items: datasetItems });
     if (url.endsWith("/dashboards?limit=100")) return json({ available: true, items: [] });
+    if (url.endsWith("/shared-dashboards")) return json({ available: true, items: [] });
     if (url.endsWith("/report-schedules")) return json({ available: true, items: [] });
     if (url.endsWith("/reports?limit=50")) return json({ available: true, items: [] });
+    if (url.endsWith("/shared-reports")) return json({ available: true, items: [] });
+    if (url.endsWith("/report-lifecycle") && !options.method) return json({ available: true, settings: { retention_days: 90, cleanup_enabled: false, revision: 0 } });
+    if (url.endsWith("/deliveries") && !options.method) return json({ available: true, items: [] });
+    if (url.endsWith("/delivery") && !options.method) return json({ available: true, config: { enabled: false, revision: 0 }, recipient_user_ids: [], members: [{ id: 8, first_name: "Sam", last_name: "Member", email: "sam@example.com" }] });
+    if (url.endsWith("/shares") && !options.method) return json({ items: [], members: [{ id: 8, first_name: "Sam", last_name: "Member", email: "sam@example.com" }] });
     if (url.endsWith("/dashboards") && options.method === "POST") return json({ id: "dashboard-1", name: "General operations dashboard", description: "", revision: 1 }, 201);
     if (url.endsWith("/dashboards/dashboard-1")) return json({ id: "dashboard-1", name: "General operations dashboard", description: "", revision: 1, widgets: [] });
     if (url.endsWith("/dashboards/dashboard-1/widgets") && options.method === "POST") return json({
@@ -99,14 +105,19 @@ function installDefaultApi() {
     }
     if (url.includes("/analysis/projects/project-1/datasets/dataset-a/versions/version-a2/assist")) {
       const payload = JSON.parse(options.body);
+      const dateBased = payload.metric.operation === "date_aggregate";
       return json({
         provenance: { project_id: "project-1", dataset_id: "dataset-a", dataset_version_id: "version-a2", content_hash: "abc123" },
         result: {
           title: payload.metric.label,
           summary: "The selected generic operation was calculated.",
-          kpis: payload.metric.group_column ? [] : [{ label: payload.metric.label, value: 23, display_value: "23" }],
-          tables: [{ title: payload.metric.label, rows: payload.metric.group_column ? [{ category: "North", value: 12 }, { category: "South", value: 7 }] : [{ value: 23 }] }],
-          charts: payload.metric.group_column ? [{ title: payload.metric.label, type: "bar", x: "category", y: "value", data: [{ category: "North", value: 12 }, { category: "South", value: 7 }] }] : [],
+          kpis: payload.metric.group_column || dateBased ? [] : [{ label: payload.metric.label, value: 23, display_value: "23" }],
+          tables: [{ title: payload.metric.label, rows: dateBased ? [{ period: "2026-03-08", value: 2 }] : payload.metric.group_column ? [{ category: "North", value: 12 }, { category: "South", value: 7 }] : [{ value: 23 }] }],
+          charts: dateBased ? [{ title: payload.metric.label, type: "line", x: "period", y: "value", data: [{ period: "2026-03-08", value: 2 }] }] : payload.metric.group_column ? [{ title: payload.metric.label, type: "bar", x: "category", y: "value", data: [{ category: "North", value: 12 }, { category: "South", value: 7 }] }] : [],
+          metadata: dateBased ? { mappings_used: { date_column: "created_at", timezone: payload.metric.timezone,
+            requested_start_date: payload.metric.start_date, requested_end_date: payload.metric.end_date,
+            selected_row_count: 2, missing_date_count: 1, invalid_date_count: 0,
+            outside_period_count: 0, partial_periods: false } } : undefined,
         },
       });
     }
@@ -159,7 +170,7 @@ describe("BusinessIntelligenceWorkspace", () => {
     expect(screen.getByText("South")).toBeTruthy();
     const exploreCall = apiFetch.mock.calls.findLast(([url]) => url.endsWith("/explore"));
     expect(JSON.parse(exploreCall[1].body)).toMatchObject({ filters: [{ field: "category", operator: "eq", value: "South" }], sort: [{ field: "amount", direction: "asc" }] });
-    expect(screen.getByText((_, element) => element.textContent === "1 (33.33%)")).toBeTruthy();
+    expect(screen.getAllByText((_, element) => element.textContent === "1 (33.33%)")).toHaveLength(2);
     expect(screen.getByText("float64")).toBeTruthy();
   });
 
@@ -203,12 +214,48 @@ describe("BusinessIntelligenceWorkspace", () => {
     expect(screen.getAllByText("North").length).toBeGreaterThan(0);
   });
 
+  it("runs and saves a timezone-aware custom period against the immutable version", async () => {
+    renderWorkspace();
+    await screen.findByRole("heading", { name: "General operations" });
+    fireEvent.click(screen.getByRole("tab", { name: "Metrics" }));
+    const operationSelect = screen.getAllByLabelText("Operation").find((element) => element.tagName === "SELECT");
+    fireEvent.change(operationSelect, { target: { value: "date_aggregate" } });
+    const dateSelect = screen.getByLabelText("Verified date column");
+    await waitFor(() => expect([...dateSelect.options].map((option) => option.value)).toContain("created_at"));
+    fireEvent.change(dateSelect, { target: { value: "created_at" } });
+    fireEvent.change(screen.getByLabelText("Start date"), { target: { value: "2026-03-08" } });
+    fireEvent.change(screen.getByLabelText("End date"), { target: { value: "2026-03-08" } });
+    fireEvent.change(screen.getByLabelText("Reporting timezone (IANA)"), { target: { value: "America/New_York" } });
+    const runButton = screen.getByRole("button", { name: "Run calculation" });
+    await waitFor(() => expect(runButton.disabled).toBe(false));
+    fireEvent.click(runButton);
+
+    expect(await screen.findByText("2026-03-08 — 2026-03-08")).toBeTruthy();
+    const analysisCall = apiFetch.mock.calls.findLast(([url]) => url.includes("/analysis/projects/"));
+    expect(JSON.parse(analysisCall[1].body).metric).toMatchObject({
+      operation: "date_aggregate", date_column: "created_at", period: "month",
+      aggregation: "count", timezone: "America/New_York",
+      start_date: "2026-03-08", end_date: "2026-03-08",
+    });
+
+    fireEvent.click(screen.getByRole("tab", { name: "Dashboard" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create dashboard" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Add current result" }));
+    const widgetCall = apiFetch.mock.calls.findLast(([url, options]) => url.endsWith("/dashboards/dashboard-1/widgets") && options.method === "POST");
+    expect(JSON.parse(widgetCall[1].body).analysis_spec).toMatchObject({
+      start_date: "2026-03-08", end_date: "2026-03-08", timezone: "America/New_York",
+    });
+  });
+
   it("clears prior results on version context changes and ignores stale responses", async () => {
     let resolveFirst;
     const firstDetail = new Promise((resolve) => { resolveFirst = resolve; });
     apiFetch.mockImplementation(async (url) => {
       if (url.endsWith("/datasets?limit=100")) return json({ available: true, items: datasetItems });
       if (url.endsWith("/dashboards?limit=100")) return json({ available: true, items: [] });
+      if (url.endsWith("/shared-dashboards") || url.endsWith("/shared-reports")) return json({ available: true, items: [] });
+      if (url.endsWith("/report-lifecycle")) return json({ available: true, settings: { retention_days: 90, cleanup_enabled: false, revision: 0 } });
+      if (url.endsWith("/report-schedules") || url.endsWith("/reports?limit=50")) return json({ available: true, items: [] });
       if (url.endsWith("/datasets/dataset-a/versions?limit=100")) return json({ available: true, items: versionsA });
       if (url.endsWith("/datasets/dataset-b/versions?limit=100")) return json({ available: true, items: [datasetItems[1].latest_version] });
       if (url.endsWith("/datasets/dataset-a/freshness") || url.endsWith("/datasets/dataset-b/freshness")) return json({ available: false });
@@ -278,6 +325,81 @@ describe("BusinessIntelligenceWorkspace", () => {
     });
   });
 
+  it("edits and persists widget presentation and renders verified line data accessibly", async () => {
+    const widget = {
+      id: "widget-1", title: "Monthly count", widget_type: "line", dataset_id: "dataset-a",
+      dataset_version_id: "version-a2", version_policy: "pinned",
+      analysis_spec: { operation: "date_aggregate", date_column: "created_at", aggregation: "count", period: "month", timezone: "UTC" },
+      layout_config: { x: 0, y: 2, w: 8, h: 6 }, display_options: { show_table: true, show_legend: true },
+    };
+    const baseApi = apiFetch.getMockImplementation();
+    apiFetch.mockImplementation(async (url, options = {}) => {
+      if (url.endsWith("/dashboards?limit=100")) return json({ available: true, items: [{ id: "dashboard-1", name: "Operations" }] });
+      if (url.endsWith("/dashboards/dashboard-1") && !options.method) return json({ id: "dashboard-1", name: "Operations", description: "", revision: 3, widgets: [widget] });
+      if (url.endsWith("/widgets/widget-1/execute")) return json({
+        status: "ready", provenance: { dataset_version_id: "version-a2", version_number: 2 },
+        result: { charts: [{ title: "Monthly count", type: "line", x: "period", y: "value", data: [{ period: "2026-09", value: 4 }, { period: "2026-10", value: 7 }] }], tables: [{ rows: [{ period: "2026-09", value: 4 }, { period: "2026-10", value: 7 }] }] },
+      });
+      if (url.endsWith("/widgets/widget-1") && options.method === "PATCH") {
+        const payload = JSON.parse(options.body);
+        return json({ dashboard: { revision: 4 }, widget: { ...widget, ...payload, id: "widget-1" } });
+      }
+      return baseApi(url, options);
+    });
+
+    renderWorkspace();
+    await screen.findByRole("heading", { name: "General operations" });
+    fireEvent.click(screen.getByRole("tab", { name: "Dashboard" }));
+    expect(await screen.findByRole("img", { name: "Monthly count" })).toBeTruthy();
+    expect(screen.getByText("Series: value")).toBeTruthy();
+    const editorSummary = screen.getAllByText("Save widget").find((element) => element.tagName === "SUMMARY");
+    fireEvent.click(editorSummary);
+    const editor = within(editorSummary.closest("details"));
+    fireEvent.change(editor.getByLabelText("Widget title"), { target: { value: "Verified monthly volume" } });
+    fireEvent.change(editor.getByLabelText("Presentation"), { target: { value: "bar" } });
+    fireEvent.change(editor.getByLabelText("Widget width"), { target: { value: "6" } });
+    fireEvent.click(editor.getByLabelText("Show accessible data table"));
+    fireEvent.click(editor.getByRole("button", { name: "Save widget" }));
+
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith(expect.stringContaining("/widgets/widget-1"), expect.objectContaining({ method: "PATCH" })));
+    const patchCall = apiFetch.mock.calls.find(([url, options]) => url.endsWith("/widgets/widget-1") && options.method === "PATCH");
+    expect(JSON.parse(patchCall[1].body)).toMatchObject({
+      expected_revision: 3, title: "Verified monthly volume", widget_type: "bar",
+      layout_config: { x: 0, y: 2, w: 6, h: 6 }, display_options: { show_table: false, show_legend: true },
+      dataset_version_id: "version-a2",
+    });
+  });
+
+  it("shares a dashboard only with an existing workspace member using explicit permissions", async () => {
+    const baseApi = apiFetch.getMockImplementation();
+    let shared = false;
+    apiFetch.mockImplementation(async (url, options = {}) => {
+      if (url.endsWith("/dashboards?limit=100")) return json({ available: true, items: [{ id: "dashboard-1", name: "Operations", revision: 3 }] });
+      if (url.endsWith("/dashboards/dashboard-1") && !options.method) return json({ id: "dashboard-1", name: "Operations", description: "", revision: shared ? 4 : 3, widgets: [] });
+      if (url.endsWith("/dashboards/dashboard-1/shares") && !options.method) return json({
+        items: shared ? [{ id: "share-1", member_user_id: 8, permission: "editor", revision: 1, member: { id: 8, first_name: "Sam", last_name: "Member", email: "sam@example.com" } }] : [],
+        members: [{ id: 8, first_name: "Sam", last_name: "Member", email: "sam@example.com" }],
+      });
+      if (url.endsWith("/dashboards/dashboard-1/shares/8") && options.method === "PUT") {
+        shared = true;
+        return json({ dashboard: { id: "dashboard-1", revision: 4 } });
+      }
+      return baseApi(url, options);
+    });
+
+    renderWorkspace();
+    await screen.findByRole("heading", { name: "General operations" });
+    fireEvent.click(screen.getByRole("tab", { name: "Dashboard" }));
+    const member = await screen.findByRole("combobox", { name: "Workspace member" });
+    fireEvent.change(member, { target: { value: "8" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Permission" }), { target: { value: "editor" } });
+    fireEvent.click(screen.getByRole("button", { name: "Share" }));
+
+    await screen.findByText("sam@example.com · Editor");
+    const shareCall = apiFetch.mock.calls.find(([url, options]) => url.endsWith("/shares/8") && options.method === "PUT");
+    expect(JSON.parse(shareCall[1].body)).toEqual({ expected_revision: 3, member_user_id: 8, permission: "editor" });
+  });
+
   it("keeps tab controls keyboard focusable", async () => {
     renderWorkspace();
     await screen.findByRole("heading", { name: "General operations" });
@@ -320,10 +442,40 @@ describe("BusinessIntelligenceWorkspace", () => {
     expect(screen.getByText(/version-a2/)).toBeTruthy();
     expect(screen.getByText(/business meaning, units, currencies/i)).toBeTruthy();
     expect(screen.getByRole("link", { name: "Download CSV" }).getAttribute("href")).toContain("/reports/report-1/export.csv");
+    expect(screen.getByRole("link", { name: "Download PDF" }).getAttribute("href")).toContain("/reports/report-1/export.pdf?language=en");
+    expect(screen.getByRole("link", { name: "Download XLSX" }).getAttribute("href")).toContain("/reports/report-1/export.xlsx?language=en");
     vi.spyOn(window, "confirm").mockReturnValue(true);
     fireEvent.click(screen.getByRole("button", { name: "Archive report" }));
     await waitFor(() => expect(apiFetch).toHaveBeenCalledWith(
       expect.stringContaining("/reports/report-1"), expect.objectContaining({ method: "DELETE" }),
     ));
+  });
+
+  it("configures opt-in member delivery and bounded private retention", async () => {
+    const baseApi = apiFetch.getMockImplementation();
+    apiFetch.mockImplementation(async (url, options = {}) => {
+      if (url.endsWith("/dashboards?limit=100")) return json({ available: true, items: [{ id: "dashboard-1", name: "Operations" }] });
+      if (url.endsWith("/dashboards/dashboard-1") && !options.method) return json({ id: "dashboard-1", name: "Operations", revision: 2, widgets: [] });
+      if (url.endsWith("/report-schedules") && !options.method) return json({ available: true, items: [{ id: "schedule-1", name: "Weekly", revision: 3, cadence: "weekly", local_time: "09:00", timezone: "UTC", enabled: true }] });
+      if (url.endsWith("/report-schedules/schedule-1/delivery") && !options.method) return json({ available: true, config: { enabled: false, revision: 0 }, recipient_user_ids: [], members: [{ id: 8, first_name: "Sam", last_name: "Member", email: "sam@example.com" }] });
+      if (url.endsWith("/report-schedules/schedule-1/delivery") && options.method === "PATCH") return json({ schedule: { id: "schedule-1", name: "Weekly", revision: 4 }, config: { enabled: true, revision: 1 } });
+      if (url.endsWith("/report-lifecycle") && options.method === "PATCH") return json({ retention_days: 30, cleanup_enabled: true, revision: 1 });
+      return baseApi(url, options);
+    });
+    renderWorkspace();
+    await screen.findByRole("heading", { name: "General operations" });
+    fireEvent.click(screen.getByRole("tab", { name: "Reports" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Configure delivery" }));
+    fireEvent.click(await screen.findByLabelText(/Sam Member/));
+    fireEvent.click(screen.getByLabelText("Deliver completed scheduled reports"));
+    fireEvent.click(screen.getByRole("button", { name: "Save delivery" }));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith(expect.stringContaining("/schedule-1/delivery"), expect.objectContaining({ method: "PATCH" })));
+    const deliveryCall = apiFetch.mock.calls.find(([url, options]) => url.endsWith("/schedule-1/delivery") && options.method === "PATCH");
+    expect(JSON.parse(deliveryCall[1].body)).toEqual({ expected_schedule_revision: 3, enabled: true, recipient_user_ids: [8] });
+
+    fireEvent.change(screen.getByLabelText("Retention days"), { target: { value: "30" } });
+    fireEvent.click(screen.getByLabelText("Delete private report artifacts after retention"));
+    fireEvent.click(screen.getByRole("button", { name: "Save retention" }));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith(expect.stringContaining("/report-lifecycle"), expect.objectContaining({ method: "PATCH" })));
   });
 });

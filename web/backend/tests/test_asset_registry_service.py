@@ -77,10 +77,17 @@ class Client:
 
 
 class AssetRegistryTests(unittest.TestCase):
+    def setUp(self):
+        self.registration = patch("services.account_work_fence._registration_allowed", return_value=True)
+        self.processing = patch("services.account_recovery_service.require_processing_account", return_value={"account_status": "active"})
+        self.registration.start(); self.processing.start()
+        self.addCleanup(self.registration.stop); self.addCleanup(self.processing.stop)
+
     def test_register_hashes_content_and_never_uses_original_path(self):
         client = Client()
         row = asset_registry_service.register_builder_asset(
             tenant_id=7,
+            owner_user_id=3,
             uploader_user_id=3,
             storage_key="tenant_7/builder_assets/0123456789abcdef0123456789abcdef.png",
             original_filename="../../logo.png",
@@ -92,6 +99,17 @@ class AssetRegistryTests(unittest.TestCase):
         self.assertEqual(row["sha256"], hashlib.sha256(b"image").hexdigest())
         self.assertEqual(row["original_filename"], "logo.png")
         self.assertNotIn("..", row["storage_key"])
+
+    def test_unqualified_builder_provider_bucket_is_refused_before_registration(self):
+        from services import builder_asset_storage
+        with patch.object(builder_asset_storage,"BUILDER_ASSET_BUCKET","legacy-builder-bucket"):
+            with self.assertRaisesRegex(ValueError,"provider_unadmitted"):
+                asset_registry_service.register_builder_asset(
+                    tenant_id=7,owner_user_id=3,uploader_user_id=3,
+                    storage_key="tenant_7/builder_assets/0123456789abcdef0123456789abcdef.png",
+                    original_filename="logo.png",managed_filename="0123456789abcdef0123456789abcdef.png",
+                    mime_type="image/png",content=b"image",client=Client(),
+                )
 
     def test_failed_upload_registration_rollback_is_tenant_scoped(self):
         client = Client()
@@ -185,7 +203,7 @@ class AssetRegistryTests(unittest.TestCase):
         client = Client()
         key = "tenant_7/builder_assets/0123456789abcdef0123456789abcdef.png"
         client.data["builder_assets"] = [{
-            "id": "asset-1", "tenant_id": 7, "storage_key": key,
+            "id": "asset-1", "tenant_id": 7, "owner_user_id": 3, "ownership_status": "verified", "storage_key": key,
             "status": "unreferenced", "reference_count": 0,
             "retention_until": "2020-01-01T00:00:00+00:00",
             "sha256": hashlib.sha256(b"image").hexdigest(),
@@ -427,7 +445,7 @@ class AssetRegistryTests(unittest.TestCase):
             path.parent.mkdir(parents=True)
             path.write_bytes(b"image")
             client.data["builder_assets"] = [{
-                "id": "asset-1", "tenant_id": 7, "storage_key": key, "status": "unreferenced",
+                "id": "asset-1", "tenant_id": 7, "owner_user_id": 3, "ownership_status": "verified", "storage_key": key, "status": "unreferenced",
                 "retention_until": (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(),
                 "sha256": hashlib.sha256(b"image").hexdigest(),
             }]
@@ -439,6 +457,26 @@ class AssetRegistryTests(unittest.TestCase):
             self.assertEqual(applied["deleted"], 1)
             self.assertFalse(path.exists())
 
+    def test_cleanup_racing_deactivation_preserves_then_reactivation_allows(self):
+        from services.account_work_fence import account_lock, publish_hold
+        client = Client()
+        with tempfile.TemporaryDirectory() as root:
+            storage = Path(root);key = "tenant_7/builder_assets/0123456789abcdef0123456789abcdef.png"
+            path=storage/key;path.parent.mkdir(parents=True);path.write_bytes(b"recoverable")
+            client.data["builder_assets"]=[{
+                "id":"asset-1","tenant_id":7,"owner_user_id":3,"ownership_status":"verified",
+                "storage_key":key,"status":"unreferenced","reference_count":0,
+                "retention_until":"2020-01-01T00:00:00+00:00","sha256":hashlib.sha256(b"recoverable").hexdigest(),
+            }]
+            with account_lock(7,3,exclusive=True) as marker:
+                publish_hold(marker,{"action":"deactivate"})
+                frozen=asset_registry_service.cleanup_expired_builder_assets(storage_root=storage,client=client,dry_run=False)
+                self.assertEqual(frozen["deleted"],0);self.assertTrue(path.exists())
+                marker.unlink()
+            with patch.object(asset_registry_service,"release_storage",return_value=True):
+                resumed=asset_registry_service.cleanup_expired_builder_assets(storage_root=storage,client=client,dry_run=False)
+            self.assertEqual(resumed["deleted"],1);self.assertFalse(path.exists())
+
     def test_cleanup_refuses_hash_mismatch(self):
         client = Client()
         with tempfile.TemporaryDirectory() as root:
@@ -448,7 +486,7 @@ class AssetRegistryTests(unittest.TestCase):
             path.parent.mkdir(parents=True)
             path.write_bytes(b"tampered")
             client.data["builder_assets"] = [{
-                "id": "asset-2", "tenant_id": 7, "storage_key": key, "status": "unreferenced",
+                "id": "asset-2", "tenant_id": 7, "owner_user_id": 3, "ownership_status": "verified", "storage_key": key, "status": "unreferenced",
                 "retention_until": "2020-01-01T00:00:00+00:00",
                 "sha256": hashlib.sha256(b"original").hexdigest(),
             }]
@@ -466,7 +504,7 @@ class AssetRegistryTests(unittest.TestCase):
             path.parent.mkdir(parents=True)
             path.write_bytes(b"image")
             client.data["builder_assets"] = [{
-                "id": "asset-1", "tenant_id": 7, "storage_key": key,
+                "id": "asset-1", "tenant_id": 7, "owner_user_id": 3, "ownership_status": "verified", "storage_key": key,
                 "status": "unreferenced", "reference_count": 0,
                 "retention_until": "2020-01-01T00:00:00+00:00",
                 "sha256": hashlib.sha256(b"image").hexdigest(),

@@ -461,6 +461,9 @@ def get_authenticated_user_row(
 
     user_data = user_response.data
 
+    from services.account_erasure_service import require_backend_session
+    require_backend_session(auth_id=auth_user_id, token=next_access_token, client=service_supabase, request=request, user=user_data)
+
     if auth_user_email_is_verified(auth_user):
         provider_email = canonical_auth_email(auth_user)
         from services.provider_recovery import require_existing_account
@@ -512,6 +515,11 @@ def get_authenticated_user_row(
                 if response is not None:
                     response.headers["X-Madar-Admin-Account-Access"] = "true"
 
+                from services.account_recovery_service import require_processing_account
+                from services.account_work_fence import protect_request
+                if request.scope.get("state",{}).get("account_work_middleware"):
+                    protect_request(request,target_user["tenant_id"],target_user["id"])
+                    require_processing_account(tenant_id=target_user["tenant_id"],user_id=target_user["id"],client=service_supabase)
                 return auth_user, target_user
 
         except HTTPException:

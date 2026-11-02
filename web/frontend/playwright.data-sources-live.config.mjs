@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+import path from "node:path";
 import { assertIsolatedE2EEnvironment } from "./e2e/safety.mjs";
 
 const isolated = assertIsolatedE2EEnvironment(process.env);
@@ -17,6 +18,7 @@ for (const name of ["MADAR_E2E_CONTROL_URL"]) {
 }
 
 export default defineConfig({
+  outputDir: path.join(process.env.MADAR_E2E_SCREENSHOT_DIR, `${isolated.runId}-artifacts`),
   testDir: "./e2e",
   testMatch: process.env.MADAR_E2E_SPEC || "data-sources-live.spec.mjs",
   timeout: 8 * 60 * 1000,

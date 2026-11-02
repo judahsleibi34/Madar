@@ -1,0 +1,15 @@
+{
+  "release_metadata_version": 1,
+  "deployment_profile": "bi-team-sharing164-165",
+  "schema": {
+    "compatible_min": 164,
+    "compatible_max": 165,
+    "target": 165,
+    "migration_class": "expand-only",
+    "rollback_compatible_min": 164,
+    "rollback_compatible_max": 164
+  },
+  "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
+  "migration_manifest": "migrations-164-165-bi-team-sharing.json",
+  "notes": "Unselected schema164 to schema165 candidate. Adds private owner-managed dashboard viewer/editor shares and immutable report viewer shares for active same-tenant workspace members. Access remains tenant/project scoped, revision checked, non-public, and service-role mediated. The active release remains schema146. No migration, deployment, public link, external delivery, or production mutation is activated by this metadata."
+}

@@ -1,0 +1,15 @@
+{
+  "release_metadata_version": 1,
+  "deployment_profile": "account-lifecycle166-167-unadmitted",
+  "schema": {
+    "compatible_min": 166,
+    "compatible_max": 167,
+    "target": 167,
+    "migration_class": "coordinated",
+    "rollback_compatible_min": 167,
+    "rollback_compatible_max": 167
+  },
+  "migration_policy": "blocked-pending-account-erasure-acceptance",
+  "migration_manifest": "migrations-166-167-account-recovery.json",
+  "notes": "Unpublished candidate167. Explicit Deactivate (2160-hour recovery) and immediate Delete. Owner-approved permanent erasure includes owned credential/audit/identity/lifecycle history with no default exemption. Normal audit protections stay intact; protocol3 scopes, provider/worker/upload fences, independent absence checks and safe coordination retirement are required. Unmapped workspaces, shared ownership, legacy scratch and unsupported adapters fail closed. Both customer actions remain unadmitted; active146 and published SQL are unchanged. Coordinated binary/worker cutover required; old binaries lack live-session verification. No automatic migration, production authority, or pre167 binary rollback is admitted."
+}

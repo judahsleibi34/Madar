@@ -115,6 +115,8 @@ def create_deletion_request(
     requested_by_user_id: int, retention_until: str | None = None, client=None,
 ) -> dict[str, Any]:
     database_client = client or service_supabase
+    if request_type == "user":
+        raise HTTPException(status_code=409, detail="Choose Deactivate Account or Delete Account explicitly.")
     try:
         response = database_client.rpc("create_data_deletion_request", {
             "p_request_type": request_type,
@@ -132,11 +134,10 @@ def create_deletion_request(
     return public_request_status(row, include_target=True)
 
 
-def request_user_deletion(*, target_user_id: int, requested_by_user_id: int, client=None) -> dict[str, Any]:
-    return create_deletion_request(
-        request_type="user", target_user_id=target_user_id, target_tenant_id=None,
-        requested_by_user_id=requested_by_user_id, client=client,
-    )
+def request_user_deletion(*, target_user_id: int, requested_by_user_id: int, client=None, request=None) -> dict[str, Any]:
+    from services.account_erasure_service import request_action, action_status
+    return action_status(request_action(user_id=target_user_id, actor_id=requested_by_user_id,
+        action="delete", client=client or service_supabase, request=request))
 
 
 def request_tenant_deletion(*, target_tenant_id: int, requested_by_user_id: int, client=None) -> dict[str, Any]:
@@ -154,6 +155,7 @@ def public_request_status(row: dict[str, Any], *, include_target: bool = False) 
         "phase": row.get("current_phase"),
         "attempt_count": int(row.get("attempt_count") or 0),
         "retry_after": row.get("retry_after"),
+        "retention_until": row.get("retention_until"),
         "last_error_code": safe_code(row.get("last_error_code"), "") or None,
         "verification_status": row.get("verification_status"),
         "retained_classes": row.get("retained_classes") or [],
@@ -371,7 +373,13 @@ def _unlink_host_resource(resource: dict[str, Any]) -> None:
     import stat
     root = HOST_RESOURCE_ROOTS[resource["resource_kind"]]().resolve()
     parts = str(resource["resource_key"]).split("/")
-    _safe_host_path(resource)
+    source_path = _safe_host_path(resource)
+    if resource["resource_kind"] == "host_dataset":
+        try:
+            from services.parquet_cache_service import remove_for_source
+            remove_for_source(source_path, storage_root=root)
+        except Exception as error:
+            raise DeletionStepError("derived_artifact_cleanup_failed") from error
     descriptors = []
     try:
         descriptor = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)

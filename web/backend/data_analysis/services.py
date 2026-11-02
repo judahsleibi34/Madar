@@ -1,11 +1,15 @@
 import logging
 import os
 import re
+import hashlib
+import json
+import time
 from io import StringIO
 from pathlib import Path
 from uuid import uuid4
 
 import pandas as pd
+import requests
 from fastapi import HTTPException, UploadFile
 
 from data_analysis.assisted.assisted_analysis import AssistedAnalysis
@@ -54,8 +58,9 @@ from services.upload_config import (
 logger = logging.getLogger(__name__)
 
 PREVIEW_LIMIT = 100
-MAX_DATASET_UPLOAD_BYTES = int(os.getenv("MAX_DATASET_UPLOAD_BYTES", str(200 * 1024 * 1024)))
+MAX_DATASET_UPLOAD_BYTES = int(os.getenv("MAX_DATASET_UPLOAD_BYTES", "250000000"))
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(MAX_DATASET_UPLOAD_BYTES)))
+MAX_CONCURRENT_DATASET_UPLOADS = max(1, int(os.getenv("MAX_CONCURRENT_DATASET_UPLOADS", "2")))
 LARGE_DATASET_THRESHOLD_BYTES = int(os.getenv("LARGE_DATASET_THRESHOLD_BYTES", str(50 * 1024 * 1024)))
 MAX_FULL_DATAFRAME_BYTES = int(os.getenv("MAX_FULL_DATAFRAME_BYTES", str(50 * 1024 * 1024)))
 CSV_CHUNK_SIZE_ROWS = int(os.getenv("CSV_CHUNK_SIZE_ROWS", "3000"))
@@ -63,6 +68,8 @@ MAX_PREVIEW_ROWS = int(os.getenv("MAX_PREVIEW_ROWS", "120"))
 MAX_EXCEL_UPLOAD_BYTES = int(os.getenv("MAX_EXCEL_UPLOAD_BYTES", str(50 * 1024 * 1024)))
 CSV_DUPLICATE_TRACK_ROWS = int(os.getenv("CSV_DUPLICATE_TRACK_ROWS", "100000"))
 UPLOAD_CHUNK_SIZE = 1024 * 1024
+STALE_UPLOAD_PART_SECONDS = int(os.getenv("STALE_UPLOAD_PART_SECONDS", str(24 * 60 * 60)))
+MAX_STALE_PARTS_PER_UPLOAD = 64
 ALLOWED_UPLOAD_EXTENSIONS = {".csv", ".xls", ".xlsx"}
 ALLOWED_CHART_EXTENSIONS = {".png", ".jpg", ".jpeg", ".svg", ".pdf", ".html"}
 ALLOWED_UPLOAD_CONTENT_TYPES = {
@@ -249,13 +256,36 @@ def validate_upload_content_type(content_type: str | None) -> None:
         )
 
 
-async def stream_upload_to_private_file(file: UploadFile, target_path: Path, *, progress_callback=None) -> int:
+def cleanup_stale_upload_parts(upload_dir: Path, *, now: float | None = None) -> int:
+    """Remove only expired partial files created by Madar's streaming writer."""
+    removed = 0
+    cutoff = (time.time() if now is None else float(now)) - STALE_UPLOAD_PART_SECONDS
+    for pattern in (".*.csv.uploading", ".*.xls.uploading", ".*.xlsx.uploading"):
+        for candidate in upload_dir.glob(pattern):
+            try:
+                if candidate.is_file() and candidate.stat().st_mtime < cutoff:
+                    candidate.unlink()
+                    removed += 1
+                    if removed >= MAX_STALE_PARTS_PER_UPLOAD:
+                        return removed
+            except FileNotFoundError:
+                continue
+            except OSError:
+                logger.warning("data.upload.stale_partial_cleanup_failed", extra={"path": candidate.name})
+    return removed
+
+
+async def stream_upload_to_private_file(
+    file: UploadFile, target_path: Path, *, progress_callback=None,
+) -> tuple[int, str]:
     bytes_written = 0
     chunks_since_progress = 0
     max_upload_bytes = min(MAX_DATASET_UPLOAD_BYTES, MAX_UPLOAD_BYTES)
+    digest = hashlib.sha256()
+    partial_path = target_path.with_name(f".{target_path.name}.uploading")
 
     try:
-        with target_path.open("wb") as output:
+        with partial_path.open("xb") as output:
             while True:
                 chunk = await file.read(UPLOAD_CHUNK_SIZE)
 
@@ -271,12 +301,16 @@ async def stream_upload_to_private_file(file: UploadFile, target_path: Path, *, 
                         detail="Uploaded file is too large.",
                     )
 
+                digest.update(chunk)
                 output.write(chunk)
                 if progress_callback is not None and chunks_since_progress >= 16:
                     progress_callback()
                     chunks_since_progress = 0
-    except Exception:
-        target_path.unlink(missing_ok=True)
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(partial_path, target_path)
+    except BaseException:
+        partial_path.unlink(missing_ok=True)
         raise
 
     if bytes_written == 0:
@@ -286,7 +320,7 @@ async def stream_upload_to_private_file(file: UploadFile, target_path: Path, *, 
             detail="Uploaded file is empty.",
         )
 
-    return bytes_written
+    return bytes_written, digest.hexdigest()
 
 
 def _update_dtype_map(current: dict[str, str], chunk: pd.DataFrame) -> None:
@@ -342,39 +376,43 @@ def extract_csv_metadata(file_path: Path, *, original_filename: str | None = Non
 
     for encoding in DataReadingNormal.CSV_ENCODINGS:
         try:
-            chunks = pd.read_csv(
+            with pd.read_csv(
                 file_path,
                 encoding=encoding,
                 chunksize=CSV_CHUNK_SIZE_ROWS,
                 on_bad_lines="error",
-            )
+            ) as chunks:
+                for chunk in chunks:
+                    chunks_since_progress += 1
+                    if progress_callback is not None and chunks_since_progress >= 32:
+                        progress_callback()
+                        chunks_since_progress = 0
+                    if not columns:
+                        columns = [str(column) for column in chunk.columns]
+                        if len(columns) > DataReadingNormal.MAX_COLUMNS:
+                            raise HTTPException(
+                                status_code=413,
+                                detail="CSV column count exceeds the supported upload limit.",
+                            )
+                        missing_counts = {column: 0 for column in columns}
 
-            for chunk in chunks:
-                chunks_since_progress += 1
-                if progress_callback is not None and chunks_since_progress >= 32:
-                    progress_callback()
-                    chunks_since_progress = 0
-                if not columns:
-                    columns = [str(column) for column in chunk.columns]
-                    missing_counts = {column: 0 for column in columns}
+                    row_count += int(len(chunk))
+                    _update_dtype_map(dtypes, chunk)
+                    chunk_duplicates, duplicate_limited = _exact_duplicate_count_from_hashes(
+                        chunk,
+                        seen_hashes,
+                        max_tracked_rows=CSV_DUPLICATE_TRACK_ROWS,
+                    )
+                    duplicate_count += chunk_duplicates
+                    duplicate_count_limited = duplicate_count_limited or duplicate_limited
 
-                row_count += int(len(chunk))
-                _update_dtype_map(dtypes, chunk)
-                chunk_duplicates, duplicate_limited = _exact_duplicate_count_from_hashes(
-                    chunk,
-                    seen_hashes,
-                    max_tracked_rows=CSV_DUPLICATE_TRACK_ROWS,
-                )
-                duplicate_count += chunk_duplicates
-                duplicate_count_limited = duplicate_count_limited or duplicate_limited
+                    chunk_missing = chunk.isna().sum()
+                    for column in columns:
+                        missing_counts[column] = missing_counts.get(column, 0) + int(chunk_missing.get(column, 0))
 
-                chunk_missing = chunk.isna().sum()
-                for column in columns:
-                    missing_counts[column] = missing_counts.get(column, 0) + int(chunk_missing.get(column, 0))
-
-                preview_needed = MAX_PREVIEW_ROWS - sum(len(frame) for frame in preview_frames)
-                if preview_needed > 0:
-                    preview_frames.append(chunk.head(preview_needed))
+                    preview_needed = MAX_PREVIEW_ROWS - sum(len(frame) for frame in preview_frames)
+                    if preview_needed > 0:
+                        preview_frames.append(chunk.head(preview_needed))
 
             preview_df = pd.concat(preview_frames, ignore_index=True) if preview_frames else pd.DataFrame(columns=columns)
             return sanitize_for_json(
@@ -403,6 +441,8 @@ def extract_csv_metadata(file_path: Path, *, original_filename: str | None = Non
             )
         except UnicodeDecodeError as error:
             last_error = error
+        except HTTPException:
+            raise
         except (pd.errors.ParserError, ValueError) as error:
             last_error = error
             break
@@ -414,6 +454,61 @@ def extract_csv_metadata(file_path: Path, *, original_filename: str | None = Non
         status_code=400,
         detail=f"Could not parse CSV file: {last_error}",
     )
+
+
+def extract_csv_metadata_via_worker(
+    file_path: Path, *, original_filename: str, tenant_id: str, user_id: str,
+) -> dict:
+    worker_url = os.getenv("PARSER_WORKER_URL", "http://parser-worker:8092/parse").strip()
+    timeout_seconds = max(
+        1.0, min(float(os.getenv("PARSER_WORKER_TIMEOUT_SECONDS", "60")), 300.0),
+    )
+    max_result_bytes = 2 * 1024 * 1024
+    try:
+        response = requests.post(
+            worker_url,
+            json={
+                "operation": "csv_metadata", "input_path": str(file_path),
+                "original_filename": original_filename,
+                "tenant_id": str(tenant_id), "user_id": str(user_id),
+            },
+            timeout=(2.0, timeout_seconds), stream=True, allow_redirects=False,
+        )
+    except (OSError, requests.RequestException) as error:
+        raise HTTPException(status_code=503, detail={
+            "code": "parser_worker_unavailable",
+            "message": "The isolated CSV metadata worker is unavailable.",
+        }) from error
+    try:
+        if response.status_code == 503:
+            raise HTTPException(status_code=503, detail={
+                "code": "parser_worker_busy",
+                "message": "The isolated CSV metadata capacity is currently in use.",
+            }, headers={"Retry-After": "1"})
+        if response.status_code != 200:
+            raise HTTPException(status_code=422, detail={
+                "code": "csv_metadata_rejected",
+                "message": "The CSV could not be inspected safely.",
+            })
+        declared = response.headers.get("Content-Length")
+        if declared and int(declared) > max_result_bytes:
+            raise HTTPException(status_code=413, detail="CSV metadata result is too large.")
+        payload = response.raw.read(max_result_bytes + 1, decode_content=False)
+        if len(payload) > max_result_bytes:
+            raise HTTPException(status_code=413, detail="CSV metadata result is too large.")
+        result = json.loads(payload.decode("utf-8"))
+        if not isinstance(result, dict) or result.get("format") != "csv" \
+                or not isinstance(result.get("rows"), int) \
+                or not isinstance(result.get("columns"), list):
+            raise ValueError("invalid_csv_metadata_result")
+        return result
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError, TypeError) as error:
+        raise HTTPException(status_code=503, detail={
+            "code": "parser_worker_invalid_response",
+            "message": "The isolated CSV metadata worker returned an invalid response.",
+        }) from error
+    finally:
+        response.close()
 
 
 def build_dataset_response(df, *, file_path: str, original_filename: str | None = None):
@@ -472,12 +567,17 @@ async def process_upload(
 
     unique_filename = f"{uuid4().hex}{file_extension}"
     upload_dir = get_user_upload_dir(tenant_id, user_id)
+    cleanup_stale_upload_parts(upload_dir)
     try:
-        ensure_disk_capacity(upload_dir, incoming_bytes=min(MAX_DATASET_UPLOAD_BYTES, MAX_UPLOAD_BYTES))
+        ensure_disk_capacity(
+            upload_dir,
+            incoming_bytes=min(MAX_DATASET_UPLOAD_BYTES, MAX_UPLOAD_BYTES)
+            * MAX_CONCURRENT_DATASET_UPLOADS,
+        )
     except StorageSafetyError as error:
         raise HTTPException(status_code=507, detail={"code": error.code, "message": "Storage capacity is unavailable."}) from error
     file_path = upload_dir / unique_filename
-    file_size = await stream_upload_to_private_file(
+    file_size, content_hash = await stream_upload_to_private_file(
         file, file_path, progress_callback=lifecycle_heartbeat
     )
     if lifecycle_heartbeat is not None:
@@ -555,11 +655,17 @@ async def process_upload(
                 "preview_rows": 0,
                 "preview_is_partial": bool(row_count),
             }
-        elif file_extension == ".csv" and not DataReadingNormal._isolated_parser_enabled():
-            response = extract_csv_metadata(
-                file_path, original_filename=filename,
-                progress_callback=lifecycle_heartbeat,
-            )
+        elif file_extension == ".csv":
+            if DataReadingNormal._isolated_parser_enabled():
+                response = extract_csv_metadata_via_worker(
+                    file_path, original_filename=filename,
+                    tenant_id=tenant_id, user_id=user_id,
+                )
+            else:
+                response = extract_csv_metadata(
+                    file_path, original_filename=filename,
+                    progress_callback=lifecycle_heartbeat,
+                )
         else:
             _raise_if_full_dataframe_blocked(file_path, operation="dataset preview")
             reader = DataCleaning(str(file_path), tenant_id=tenant_id, user_id=user_id)
@@ -575,7 +681,6 @@ async def process_upload(
         raise
 
     storage_key = f"tenant_{tenant_id}/user_{user_id}/{unique_filename}"
-    content_hash = sha256_file(file_path)
     shared_descriptor = None
     shared_store = None
     if shared_immutable:
@@ -990,7 +1095,66 @@ def run_assisted_analysis(
     symbols: dict,
     tenant_id: str,
     user_id: str,
+    dataset_version: dict | None = None,
+    dataset_identity: dict | None = None,
 ):
+    from services import adaptive_analytics_service
+
+    authorized_path = authorize_dataset_input_path(
+        input_path, tenant_id=tenant_id, user_id=user_id, require_small=False,
+        operation="adaptive deterministic analytics",
+    )
+    authorized_file = Path(authorized_path)
+    actual_size = authorized_file.stat().st_size if authorized_file.is_file() else 0
+    version = dataset_version if isinstance(dataset_version, dict) else {}
+    metadata = version.get("file_metadata") if isinstance(version.get("file_metadata"), dict) else {}
+    declared_rows = metadata.get("rows") if isinstance(metadata.get("rows"), int) else None
+    declared_size = int(version.get("size_bytes") or 0)
+    effective_size = max(actual_size, declared_size)
+    file_format = authorized_file.suffix.lower().lstrip(".") or Path(input_path).suffix.lower().lstrip(".")
+    operation = str((metric or {}).get("operation") or "").lower() if isinstance(metric, dict) else None
+    decision = adaptive_analytics_service.select_engine(
+        workload="metric", file_format=file_format, size_bytes=effective_size,
+        row_count=declared_rows, operation=operation,
+        has_grouping=bool(isinstance(metric, dict) and metric.get("group_column")),
+        cleaning_actions=bool(cleaning_actions), has_question=bool(question),
+    )
+    if decision.engine == "unsupported":
+        status = 413 if decision.reason in {
+            "large_format_unsupported", "scalable_csv_limit_exceeded",
+            "large_cleaning_pipeline_unsupported", "large_freeform_analysis_unsupported",
+            "large_metric_unsupported", "large_date_metric_limit_exceeded",
+        } else 503
+        raise HTTPException(status_code=status, detail={
+            "code": decision.reason,
+            "message": "This dataset operation is not supported by a bounded compatible analytics engine.",
+        })
+    if decision.engine == "polars":
+        metric_source = authorized_file
+        metric_source_format = "csv"
+        identity = dataset_identity if isinstance(dataset_identity, dict) else {}
+        if all(identity.get(key) for key in (
+            "project_id", "dataset_id", "version_id",
+        )) and version.get("content_hash"):
+            from services import parquet_cache_service
+            artifact = parquet_cache_service.get_existing(
+                source_path=str(authorized_file), tenant_id=int(tenant_id),
+                user_id=int(user_id), project_id=str(identity["project_id"]),
+                dataset_id=str(identity["dataset_id"]), version_id=str(identity["version_id"]),
+                source_hash=str(version["content_hash"]), source_size=actual_size,
+                declared_rows=declared_rows,
+            )
+            if artifact is not None and parquet_cache_service.is_metric_compatible(
+                artifact, dict(metric or {}),
+            ):
+                metric_source = artifact.path
+                metric_source_format = "parquet"
+        return adaptive_analytics_service.run_large_metric(
+            authorized_path=str(metric_source), metric=dict(metric or {}), language=language,
+            symbols=symbols, declared_rows=declared_rows,
+            source_size_bytes=effective_size, source_format=metric_source_format,
+        )
+
     cleaner = build_authorized_cleaner(input_path, tenant_id=tenant_id, user_id=user_id)
     df = cleaner.apply_pipeline(cleaning_actions) if cleaning_actions else cleaner.read()
     df, preparation_warnings = cleaner.prepare_dataframe(df)
@@ -1012,6 +1176,8 @@ def run_assisted_analysis(
                 "symbols": symbols,
                 "profiles": cleaner.profile_dataframe(df),
                 "ai_connected": False,
+                "analytics_engine": "pandas",
+                "engine_reason": decision.reason,
             },
             "result": result,
         }

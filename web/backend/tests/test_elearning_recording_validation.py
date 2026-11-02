@@ -67,7 +67,7 @@ class RecordingBodyLimitTests(unittest.TestCase):
     def test_large_or_chunked_recordings_use_the_bounded_request_middleware(self):
         from services.request_body_limits import select_request_body_limit,RequestBodyLimitConfig,ASSESSMENT_RECORDING_BODY_BYTES
         path='/elearning/assessment-attempts/'+str(uuid4())+'/recordings/'+str(uuid4())
-        config=RequestBodyLimitConfig(12*1024*1024,252*1024*1024,3*1024*1024,256*1024,1024*1024)
+        config=RequestBodyLimitConfig(12*1024*1024,252*1024*1024,251048576,3*1024*1024,256*1024,1024*1024)
         self.assertEqual(select_request_body_limit(method='POST',path=path,content_type='multipart/form-data',config=config),ASSESSMENT_RECORDING_BODY_BYTES)
-        config=RequestBodyLimitConfig(1024,4096,256,64,128)
+        config=RequestBodyLimitConfig(1024,4096,4096,256,64,128)
         self.assertEqual(select_request_body_limit(method='POST',path=path,content_type='multipart/form-data',config=config),1024)
