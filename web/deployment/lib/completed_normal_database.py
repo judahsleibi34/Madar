@@ -63,18 +63,23 @@ def observe_native(contract,runtime, *, allow_pending=False):
     if not measured_spec_matches(row,expected['spec_sha256']):
         raise RuntimeError('completed_normal_native_database_configuration_changed')
     networks=row['NetworkSettings']['Networks']
-    if set(networks)!={expected['network_name']}:
+    topology={expected['network_name']:expected['network_id']}
+    if contract.get('source_roles',{}).get('origin_kind')=='independently-enrolled-historical-bootstrap-origin':
+        from deployment.lib.historical_origin import database_networks
+        topology=database_networks(contract)
+    if set(networks)!=set(topology):
         raise RuntimeError('completed_normal_native_database_network_changed')
-    network=networks[expected['network_name']]
-    if network.get('NetworkID')!=expected['network_id']:
-        # Docker can retain declarations but clear endpoints on a stopped
-        # container. The intended network object is still mandatory below.
-        if (row['State']['Running'] or network.get('NetworkID')!='' or network.get('EndpointID')
-                or network.get('IPAddress') or row['State'].get('Status') not in {'created','exited'}):
+    for name,identity in topology.items():
+        network=networks[name]
+        if network.get('NetworkID')!=identity:
+            # Docker can retain declarations but clear stopped endpoints. The
+            # exact independently enrolled network object remains mandatory.
+            if (row['State']['Running'] or network.get('NetworkID')!='' or network.get('EndpointID')
+                    or network.get('IPAddress') or row['State'].get('Status') not in {'created','exited'}):
+                raise RuntimeError('completed_normal_native_database_network_changed')
+        objects=json.loads(runtime.command(['docker','network','inspect',name]))
+        if len(objects)!=1 or objects[0]['Id']!=identity:
             raise RuntimeError('completed_normal_native_database_network_changed')
-    objects=json.loads(runtime.command(['docker','network','inspect',expected['network_name']]))
-    if len(objects)!=1 or objects[0]['Id']!=expected['network_id']:
-        raise RuntimeError('completed_normal_native_database_network_changed')
     if not row['State']['Running'] or row['State'].get('Health',{}).get('Status')!='healthy':
         if allow_pending:
             from deployment.lib.emergency_routing_repair import AvailabilityFailure

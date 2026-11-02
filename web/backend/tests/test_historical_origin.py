@@ -370,6 +370,8 @@ class HistoricalControllerConsumerTests(unittest.TestCase):
             r['HostConfig']['RestartPolicy']['Name']='no';r['Image']=self.contract['origin']['images']['frontend' if role=='frontend' else 'backend']
             self.rows[r['Id']]=r;runtimes['/madar-'+self.contract['origin']['slot']+'-'+role]={'id':r['Id'],'image':r['Image'],'spec_sha256':measured_spec(r)}
         self.observed={'database':{'schema':146,'system_identifier':self.contract['database']['system_identifier']},
+            'database_networks':{self.contract['database']['network_name']:self.contract['database']['network_id'],
+                'historical-control':'7'*64},
             'known_good':{'slot':self.contract['origin']['slot']},'worker_authority':{'generation':self.contract['origin']['worker_generation']},'runtime':runtimes}
         self.enterContext(patch.object(origin,'recorded_observation',return_value=self.observed))
         self.runtime=Mock();self.runtime.inspect.side_effect=lambda ids:{i:self.rows[i] for i in ids if i in self.rows}
@@ -401,6 +403,29 @@ class HistoricalControllerConsumerTests(unittest.TestCase):
         with patch.object(admission.os,'geteuid',return_value=1000),patch.object(admission,'require_fresh_authorization') as authority,patch.object(admission,'credential_witness',return_value=value):
             self.assertEqual(admission.origin_runtime(self.contract),value['original_runtime']);admission.verify_history(self.contract)
             self.assertEqual(authority.call_count,2)
+
+    def test_network_topology_is_explicit_signed_data_not_configuration_hash(self):
+        expected=self.observed['database_networks']
+        self.assertEqual(origin.enrolled_database_networks(self.contract),expected)
+        for changed in (None,{},dict(expected,foreign='x'*64),
+                {self.contract['database']['network_name']:'0'*64},
+                dict(expected,duplicate=self.contract['database']['network_id'])):
+            with self.subTest(changed=changed),self.assertRaisesRegex(RuntimeError,'database_networks_changed'):
+                origin.validate_database_networks(self.contract,changed)
+        del self.observed['database_networks']
+        with self.assertRaisesRegex(RuntimeError,'database_networks_changed'):
+            origin.enrolled_database_networks(self.contract)
+
+    def test_child_networks_require_fresh_context_bound_issuer_witness(self):
+        from deployment.lib import completed_normal_admission as admission
+        value=origin.history_witness(self.contract)
+        with patch.object(origin.os,'geteuid',return_value=1000),patch.object(admission,'require_fresh_authorization') as authority,patch.object(admission,'credential_witness',return_value=value) as witness:
+            self.assertEqual(origin.database_networks(self.contract),self.observed['database_networks'])
+            authority.assert_called_once_with(self.contract)
+            witness.assert_called_once_with('historical_origin','historical_origin_sha256')
+            value['database']={}
+            with self.assertRaisesRegex(RuntimeError,'child_history_changed'):
+                origin.database_networks(self.contract)
 
 
 class HistoricalFenceRecordTests(HistoricalControllerConsumerTests):

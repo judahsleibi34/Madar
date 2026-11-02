@@ -360,6 +360,8 @@ def observe(system,p,environment):
         'bootstrap_sha256':digest(bootstrap),'known_good':known,'worker_authority':owner,
         'serving':serving,
         'runtime':{r['Name']:{'id':r['Id'],'image':r['Image'],'spec_sha256':measured_spec(r)} for r in rows},
+        'database_networks':{name: endpoint['NetworkID'] for name,endpoint in
+            by_name['supabase-db']['NetworkSettings']['Networks'].items()},
         'runtime_scope_sha256':digest(environment['runtime_scope']),
         'boot_controls':boot_controls(system),
         'independent_operator_scope':operator_scope,
@@ -594,15 +596,59 @@ def history_witness(contract):
     """Nonsecret projection issued only by the existing root credential path."""
     return {'source_roles':contract['source_roles'],'origin':contract['origin'],
             'database':contract['database'],'historical_files':contract['historical_files'],
-            'original_runtime':original_runtime(contract)}
+            'original_runtime':original_runtime(contract),
+            'database_networks':enrolled_database_networks(contract)}
+
+
+def validate_database_networks(contract,networks):
+    """Exact enrolled topology, not permission to attach another DB network."""
+    from .schema150_actor_inventory import DEFAULT_NETWORK
+    from .completed_normal_profile import RECONCILED
+    expected=contract['database']
+    if (contract.get('operation')!=RECONCILED.operation or type(contract.get('version')) is not int
+            or contract['version']!=RECONCILED.version
+            or contract.get('source_roles',{}).get('origin_kind')!=KIND
+            or expected.get('network_name')!=DEFAULT_NETWORK or not isinstance(networks,dict)
+            or not 1<=len(networks)<=16
+            or any(not isinstance(name,str) or not re.fullmatch('[a-zA-Z0-9_.-]{1,128}',name)
+                or not re.fullmatch('[a-f0-9]{64}',str(identity)) for name,identity in networks.items())
+            or len(set(networks.values()))!=len(networks)
+            or networks.get(DEFAULT_NETWORK)!=expected.get('network_id')):
+        raise RuntimeError('historical_origin_database_networks_changed')
+    return dict(networks)
+
+
+def enrolled_database_networks(contract):
+    observed=recorded_observation(contract['source_roles'])
+    if observed.get('database',{}).get('system_identifier')!=contract['database']['system_identifier']:
+        raise RuntimeError('historical_origin_database_networks_changed')
+    return validate_database_networks(contract,observed.get('database_networks'))
+
+
+def database_networks(contract):
+    """Root enrollment DATA or a fresh root-issued nonsecret child witness.
+
+    Docker's configuration hash excludes endpoint identities. Both the native
+    provider bridge and any independently enrolled loopback control bridge must
+    therefore have their actual IDs bound separately. Older enrollments without
+    that observation cannot acquire this new capability.
+    """
+    from .completed_normal_admission import require_fresh_authorization,credential_witness
+    if os.geteuid()==0:
+        return enrolled_database_networks(contract)
+    require_fresh_authorization(contract)
+    value=credential_witness('historical_origin','historical_origin_sha256')
+    validate_history_witness(contract,value)
+    return validate_database_networks(contract,value['database_networks'])
 
 
 def validate_history_witness(contract,value):
     from .completed_normal_admission import validate_provider_preparation
     validate_provider_preparation(contract)
-    if (not isinstance(value,dict) or set(value)!={'source_roles','origin','database','historical_files','original_runtime'}
+    if (not isinstance(value,dict) or set(value)!={'source_roles','origin','database','historical_files','original_runtime','database_networks'}
             or any(value[k]!=contract[k] for k in ('source_roles','origin','database','historical_files'))):
         raise RuntimeError('historical_origin_child_history_changed')
+    validate_database_networks(contract,value['database_networks'])
     runtime=value['original_runtime']
     if (not isinstance(runtime,dict) or set(runtime)!={'origin_kind','source_sha','images','worker_generation','runtimes'}
             or runtime['origin_kind']!=KIND or runtime['source_sha']!=contract['source_roles']['application_sha']

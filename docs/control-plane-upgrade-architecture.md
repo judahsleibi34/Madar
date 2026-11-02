@@ -2539,3 +2539,13 @@ synthetic delayed outbox job that ages into the historical backlog alarm. This
 change applies before new baseline capture/enrollment; previously captured
 failed restoration data and its receipts are never rewritten or declared PASS.
 Readiness thresholds, canonical SQL and source application images are unchanged.
+
+Historical native database observation now binds every bridge ID separately
+from the Docker configuration hash. The original provider bridge remains the
+mandatory primary endpoint; an enrolled control bridge is accepted only in the
+exact canonical historical profile. Root uses signed enrollment DATA, and the
+deployment child requires the existing fresh context-bound issuer witness.
+Extra, missing, substituted or unobserved networks refuse; ordinary completed
+origins retain their single-network contract. Older enrollments without this
+new observation cannot acquire it implicitly. This source correction does not
+issue canonical execution authority or establish protected-upgrade acceptance.
