@@ -2864,3 +2864,10 @@ The root-private probe input is still hashed into the signed historical origin
 observation. Existing consumed enrollment is not rewritten to select a new probe
 contract or controller. Fresh controller/enrollment and native readmission after
 repeated reboot are required before canonical admission can use this correction.
+Clean QEMU shutdown may remove its PID file. The original supervisor accepts
+that absence only after observing its original child exit, the old PID disappear,
+and the exact owned disk, guest, filesystem scope and unextended run deadline.
+A surviving PID file must remain private, regular, singly linked, owned by the
+test user and contain the original PID. Symlink or PID substitution refuses.
+Disk reference checks and fresh positive guest identity still precede recovery.
+

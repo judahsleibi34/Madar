@@ -608,13 +608,13 @@ class AutomaticReleaseGuest:
                 or type(current.get('max_lifetime_seconds')) is not int or not 0<current['max_lifetime_seconds']<=10800
                 or time.time()>=datetime.fromisoformat(current['created_at']).timestamp()+current['max_lifetime_seconds']):
             raise RuntimeError('automatic_guest_resume_run_expired_or_changed')
-        for name in ('guest.qcow2','seed.iso','identity','known_hosts','qemu.pid','qemu.log'):
+        for name in ('guest.qcow2','seed.iso','identity','known_hosts','qemu.log'):
             path=self.directory/name;metadata=path.lstat()
             if (path.is_symlink() or not stat.S_ISREG(metadata.st_mode) or metadata.st_uid!=1000
                     or metadata.st_nlink!=1 or metadata.st_mode&0o077):
                 raise RuntimeError('automatic_guest_resume_file_ownership_changed')
         pidfile=self.directory/'qemu.pid'
-        if pidfile.read_text().strip()!=str(self.pid):raise RuntimeError('automatic_guest_resume_pidfile_changed')
+        self.verify_inactive_pidfile(pidfile,self.pid)
         # This host's psmisc fuser does not accept a standalone "--".
         # The already verified absolute owned path cannot become an option.
         references=subprocess.run(['/usr/bin/sudo','-n','/usr/bin/fuser','-I',str(self.directory/'guest.qcow2')],
@@ -633,9 +633,27 @@ class AutomaticReleaseGuest:
             target=self.evidence/('private-guest-poweroff-'+str(cycles+1)+'-'+name)
             with target.open('xb') as out:out.write(path.read_bytes()[-65536:])
             target.chmod(0o600);path.unlink()
-        old=self.pid;pidfile.unlink();self.pid=None;self.process=None
+        old=self.pid;pidfile.unlink(missing_ok=True);self.pid=None;self.process=None
         facts=self.launch();self.record.update(power_cycles=cycles+1,resumed_from_pid=old);self.save()
         return facts
+
+    @staticmethod
+    def verify_inactive_pidfile(path,pid):
+        # QEMU removes its PID file on clean exit. Its absence is acceptable
+        # only AFTER the original Popen exited, /proc was checked and the exact
+        # owned disk/scope/lifetime were verified above. A surviving file still
+        # has to describe that original process; never follow a substituted link.
+        try:metadata=path.lstat()
+        except FileNotFoundError:return
+        if (not stat.S_ISREG(metadata.st_mode) or metadata.st_uid!=1000
+                or metadata.st_nlink!=1 or metadata.st_mode&0o077):
+            raise RuntimeError('automatic_guest_resume_pidfile_ownership_changed')
+        descriptor=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK|os.O_CLOEXEC)
+        with os.fdopen(descriptor,'rb') as source:
+            actual=os.fstat(source.fileno());value=source.read(33).strip()
+            if ((actual.st_dev,actual.st_ino)!=(metadata.st_dev,metadata.st_ino)
+                    or value!=str(pid).encode()):
+                raise RuntimeError('automatic_guest_resume_pidfile_changed')
 
     def pin_restoration_resume(self):
         """Read the actual stopped source's root hold over its pinned SSH link."""
