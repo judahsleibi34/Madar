@@ -14,6 +14,7 @@ from deployment.lib.completed_normal_admission import digest as context_digest
 from deployment.lib.migration_inventory import digest,canonical
 from deployment.lib.migration_risk import Risk
 import test_historical_origin as origin_fixtures
+import test_schema160_release as canonical_fixtures
 
 
 class CanonicalExceptionalReviewTests(unittest.TestCase):
@@ -34,8 +35,10 @@ class CanonicalExceptionalReviewTests(unittest.TestCase):
         self.driver.contract=self.contract;self.driver.document=self.document;self.driver.profile=RECONCILED
         self.driver.controller=self.contract['candidate']['controller_sha'];self.driver.ops=self.system
         self.driver.package=SOURCE_PACKAGES/('normal-source-'+self.document['source_bundle_sha256'])
-        repository=Path(os.getenv('MADAR_TEST_REPOSITORY_ROOT') or Path(__file__).resolve().parents[3])
-        self.driver.actor=SimpleNamespace(measure=Mock(return_value=(self.document,repository)))
+        # Use the existing canonical byte fixture in both native repo layout
+        # and CI's deliberately narrow read-only mount layout.
+        captured=canonical_fixtures.Schema160ReleaseTests();captured.setUp();self.addCleanup(captured.doCleanups)
+        self.driver.actor=SimpleNamespace(measure=Mock(return_value=(self.document,captured.root)))
         self.driver.preflight=Mock(return_value={'authorization_consumed':False})
         self.system.canonical_exceptional_driver=self.driver
         self.operator={'operator_auth_id':str(uuid.uuid4()),'policy_sha256':'d'*64,'session_id_sha256':'e'*64,'aal':'aal2'}
