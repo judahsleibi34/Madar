@@ -137,6 +137,12 @@ class SourceHoldConsumption(unittest.TestCase):
         self.assertIs(result['application_started'],False)
         with self.assertRaises(FileNotFoundError):self.release()
 
+    def test_parent_inspection_reobserves_stopped_source_without_consuming_hold(self):
+        with patch.object(recovery,'run') as effect:
+            self.assertEqual(recovery.inspect_independent_restoration_hold(self.model.system),self.hold)
+        effect.assert_not_called();self.assertTrue(self.path.exists())
+        self.assertFalse((self.model.journal/'restoration-retirements').exists())
+
     def test_crash_after_consumption_can_finish_only_exact_same_hold(self):
         original=Path.unlink
         def interrupt(path,*args,**kw):

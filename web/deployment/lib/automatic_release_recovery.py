@@ -217,7 +217,7 @@ def require_historical_boundary(binding,system):
                 raise RuntimeError('automatic_recovery_historical_consumed_operation_requires_recovery')
 
 
-def verify_receiver_retirement(hold,packet,*,now=None):
+def validate_restoration_hold(hold,*,now=None):
     """Verify the independently pinned receiver, not a caller's cleanup flag.
 
     The source hold is root-private and pinned before source poweroff. Neither
@@ -225,8 +225,6 @@ def verify_receiver_retirement(hold,packet,*,now=None):
     Expired holds remain blocking until independently resolved; they never clear
     themselves. A retirement receipt does not certify application restoration.
     """
-    import base64
-    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
     now=int(time.time()) if now is None else now
     local={'version','kind','hold_id','environment_id','guest_uuid','machine_id','root_filesystem_uuid',
         'controller_sha','controller_tree_sha256','historical_origin','known_good_sha256',
@@ -253,6 +251,21 @@ def verify_receiver_retirement(hold,packet,*,now=None):
         if not re.fullmatch('[a-f0-9]{64}',str(hold[name])):raise RuntimeError('automatic_recovery_restore_hold_digest_invalid')
     if any(not re.fullmatch('[a-f0-9]{40}',str(hold[n])) for n in ('source_sha','controller_sha')):
         raise RuntimeError('automatic_recovery_restore_hold_source_invalid')
+    try:
+        import base64
+        if len(base64.b64decode(hold['receiver_public_key'],validate=True))!=32:raise ValueError()
+    except (ValueError,TypeError):raise RuntimeError('automatic_recovery_restore_hold_key_invalid') from None
+    return hold
+
+
+def verify_receiver_retirement(hold,packet,*,now=None):
+    import base64
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+    now=int(time.time()) if now is None else now
+    validate_restoration_hold(hold,now=now)
+    bound={'run_id','receiver_id','operation_id','manifest_sha256','source_guest_uuid','source_sha',
+        'source_database_system_identifier','source_physical_host_uuid','receiver_physical_host_uuid',
+        'receiver_filesystem_uuid','receiver_enrollment_sha256','source_origin_sha256'}
     if not isinstance(packet,dict) or set(packet)!={'payload','signature','receiver_public_key'}:
         raise RuntimeError('automatic_recovery_receiver_retirement_packet_invalid')
     try:
@@ -275,6 +288,40 @@ def verify_receiver_retirement(hold,packet,*,now=None):
     return value
 
 
+def observe_restoration_hold(system,hold):
+    """Read-only source observation, shared by parent pinning and consumption."""
+    if os.geteuid()!=0:raise RuntimeError('automatic_recovery_restore_hold_root_required')
+    from .historical_origin import restored_context
+    validate_restoration_hold(hold)
+    p,host=policy(system)
+    if (p.get('version')!=2 or any(hold[k]!=p[k] for k in
+            ('environment_id','guest_uuid','machine_id','root_filesystem_uuid','controller_sha','controller_tree_sha256','historical_origin'))
+            or hold['expires_at']>p['expires_at']):
+        raise RuntimeError('automatic_recovery_restore_hold_policy_changed')
+    source=historical_context(hold['historical_origin'])
+    original=restored_context(hold['historical_origin'],source,now=int(time.time()))
+    manifest=read(ROOT/'known-good.json')
+    if (digest(manifest)!=hold['known_good_sha256'] or manifest.get('kind')!='historical-bootstrap-known-good-recovery'
+            or manifest.get('historical_origin')!=hold['historical_origin']
+            or original['source_sha']!=hold['source_sha'] or original['host']['guest_uuid']!=hold['guest_uuid']
+            or original['database']['system_identifier']!=hold['source_database_system_identifier']
+            or host['database_system_identifier']!=hold['source_database_system_identifier']
+            or digest(source)!=hold['source_origin_sha256']):
+        raise RuntimeError('automatic_recovery_restore_hold_origin_changed')
+    rows=inspect_all();verify_runtime_scope(host['runtime_scope'],rows)
+    if any(r['State'].get('Running') is not False for r in rows):
+        raise RuntimeError('automatic_recovery_restore_hold_source_not_stopped')
+    verify_fence(p['control_interface'])
+
+
+def inspect_independent_restoration_hold(system):
+    from .historical_origin import operation_locks
+    with operation_locks(system) as guard:
+        hold=read(ROOT/'independent-restore-in-progress.json')
+        observe_restoration_hold(system,hold);guard()
+        return hold
+
+
 def release_independent_restoration_hold(system,packet):
     """Release only the exact source hold after verified off-host retirement.
 
@@ -283,29 +330,12 @@ def release_independent_restoration_hold(system,packet):
     before starting any of them. Existing SQL/approval interlocks stay intact.
     """
     if os.geteuid()!=0:raise RuntimeError('automatic_recovery_restore_hold_root_required')
-    from .historical_origin import operation_locks,restored_context
+    from .historical_origin import operation_locks
     from .control_plane_upgrade import require_root_directory
     with operation_locks(system) as guard:
         path=ROOT/'independent-restore-in-progress.json';hold=read(path)
         value=verify_receiver_retirement(hold,packet)
-        p,host=policy(system)
-        if (p.get('version')!=2 or any(hold[k]!=p[k] for k in
-                ('environment_id','guest_uuid','machine_id','root_filesystem_uuid','controller_sha','controller_tree_sha256','historical_origin'))
-                or hold['expires_at']>p['expires_at']):
-            raise RuntimeError('automatic_recovery_restore_hold_policy_changed')
-        original=restored_context(hold['historical_origin'],historical_context(hold['historical_origin']),now=int(time.time()))
-        manifest=read(ROOT/'known-good.json')
-        if (digest(manifest)!=hold['known_good_sha256'] or manifest.get('kind')!='historical-bootstrap-known-good-recovery'
-                or manifest.get('historical_origin')!=hold['historical_origin']
-                or original['source_sha']!=hold['source_sha'] or original['host']['guest_uuid']!=hold['guest_uuid']
-                or original['database']['system_identifier']!=hold['source_database_system_identifier']
-                or host['database_system_identifier']!=hold['source_database_system_identifier']
-                or digest(historical_context(hold['historical_origin']))!=hold['source_origin_sha256']):
-            raise RuntimeError('automatic_recovery_restore_hold_origin_changed')
-        rows=inspect_all();verify_runtime_scope(host['runtime_scope'],rows)
-        if any(r['State'].get('Running') is not False for r in rows):
-            raise RuntimeError('automatic_recovery_restore_hold_source_not_stopped')
-        guard();verify_fence(p['control_interface'])
+        observe_restoration_hold(system,hold);guard()
         record={'operation':'release-independent-restoration-source-hold','hold_sha256':digest(hold),
             'retirement_receipt_sha256':digest(packet),'receiver_id':value['receiver_id'],
             'migration_sql_executed':False,'deployment_authority_issued':False,'application_started':False}

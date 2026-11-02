@@ -441,6 +441,13 @@ class AutomaticReleaseGuest:
             raise RuntimeError('automatic_guest_owned_node2_manifest_required')
         parent=Path('/opt/madar-development/scratch/codex-runs')/self.run_id
         if value['scratch']!=str(parent) or parent.is_symlink():raise RuntimeError('automatic_guest_scratch_changed')
+        from datetime import datetime
+        lifetime=value.get('max_lifetime_seconds');created=datetime.fromisoformat(value['created_at'])
+        if (created.tzinfo is None or type(lifetime) is not int or not 0<lifetime<=10800
+                or not created.timestamp()<=time.time()<created.timestamp()+lifetime):
+            raise RuntimeError('automatic_guest_bounded_lifetime_required')
+        self.deadline=created.timestamp()+lifetime
+        self.monotonic_deadline=time.monotonic()+min(lifetime,self.deadline-time.time())
         private_directory(parent)
         self.directory=parent/'guest';self.directory.mkdir(mode=0o700)
         self.evidence=Path(value['evidence']);private_directory(self.evidence)
@@ -629,6 +636,93 @@ class AutomaticReleaseGuest:
         old=self.pid;pidfile.unlink();self.pid=None;self.process=None
         facts=self.launch();self.record.update(power_cycles=cycles+1,resumed_from_pid=old);self.save()
         return facts
+
+    def pin_restoration_resume(self):
+        """Read the actual stopped source's root hold over its pinned SSH link."""
+        from deployment.lib.automatic_release_recovery import validate_restoration_hold
+        from deployment.lib.migration_inventory import digest
+        self.require_owned_pid()
+        if 'restoration_hold' in self.record:raise RuntimeError('automatic_guest_restoration_already_pinned')
+        code="""import sys,json
+sys.path.insert(0,'/opt/madar/control-plane')
+from deployment.lib.automatic_release_recovery import inspect_independent_restoration_hold
+from deployment.lib.control_plane_upgrade import SystemOperations
+print(json.dumps(inspect_independent_restoration_hold(SystemOperations()),sort_keys=True))
+"""
+        import shlex
+        hold=json.loads(self.command(self.ssh_args()+[shlex.join(['sudo','-n','python3','-I','-B','-c',code])],timeout=60))
+        validate_restoration_hold(hold)
+        if hold['guest_uuid']!=self.uuid:raise RuntimeError('automatic_guest_restoration_hold_wrong_guest')
+        self.record['restoration_hold']=hold;self.save()
+        return {'operation':'pin-independent-restoration-source-hold','hold_sha256':digest(hold),
+            'guest_uuid':self.uuid,'deployment_authority_issued':False}
+
+    def resume_after_receiver_retirement(self,packet,hold_sha):
+        """One bounded parent resume; source root separately verifies retirement."""
+        from deployment.lib.automatic_release_recovery import verify_receiver_retirement
+        from deployment.lib.migration_inventory import canonical,digest
+        from deployment.lib.migration_executor import atomic_json
+        hold=self.record.get('restoration_hold')
+        if not isinstance(hold,dict) or digest(hold)!=hold_sha or hold['guest_uuid']!=self.uuid:
+            raise RuntimeError('automatic_guest_restoration_hold_not_pinned')
+        verify_receiver_retirement(hold,packet)
+        consumed=self.evidence/'restoration-resume-consumed.json'
+        atomic_json(consumed,{'operation':'resume-owned-guest-after-independent-retirement','run_id':self.run_id,
+            'guest_uuid':self.uuid,'hold_sha256':hold_sha,'retirement_receipt_sha256':digest(packet),
+            'previous_pid':self.pid,'consumed_at':int(time.time()),'production_authority_issued':False},exclusive=True)
+        self.resume_after_poweroff()
+        # Boot sees the existing hold and must keep every actor stopped. This
+        # command grants no deployment authority and does not itself start them.
+        raw=self.command(self.ssh_args()+['sudo -n /usr/local/sbin/madar-control-plane-upgrade --release-independent-restore-hold'],
+            data=canonical(packet),timeout=60)
+        released=json.loads(raw)
+        if (released.get('hold_sha256')!=hold_sha or released.get('retirement_receipt_sha256')!=digest(packet)
+                or any(released.get(k) is not False for k in ('application_started','migration_sql_executed','deployment_authority_issued'))):
+            raise RuntimeError('automatic_guest_restoration_hold_release_invalid')
+        result={'operation':'resumed-owned-guest-after-independent-retirement','run_id':self.run_id,
+            'guest_uuid':self.uuid,'hold_sha256':hold_sha,'retirement_receipt_sha256':digest(packet),
+            'hold_release':released,'application_recovery_pending':True,'deployment_authority_issued':False}
+        atomic_json(self.evidence/'restoration-resume-completed.json',result,exclusive=True)
+        return result
+
+    def service_control(self):
+        """Exact parent-owned IPC; no new process can adopt an existing disk."""
+        from deployment.lib.migration_inventory import strict_json
+        from deployment.lib.migration_executor import atomic_json
+        path=self.directory.parent/'guest-control-request.json'
+        if not path.exists() and not path.is_symlink():return None
+        private_directory(self.directory.parent);raw=read(path,maximum=65536);request=strict_json(raw)
+        common={'version','kind','run_id','guest_uuid','nonce','action'}
+        action=request.get('action') if isinstance(request,dict) else None
+        fields=common|({'hold_sha256','retirement_receipt'} if action=='resume-after-retirement' else set())
+        if (not isinstance(request,dict) or set(request)!=fields or type(request['version']) is not int or request['version']!=1
+                or request['kind']!='owned-guest-control' or request['run_id']!=self.run_id or request['guest_uuid']!=self.uuid
+                or action not in {'pin-independent-restoration','resume-after-retirement'}):
+            raise RuntimeError('automatic_guest_control_scope_invalid')
+        import uuid
+        if str(uuid.UUID(request['nonce']))!=request['nonce']:raise RuntimeError('automatic_guest_control_nonce_invalid')
+        if len(list(self.evidence.glob('guest-control-*.consumed.json')))>=4:
+            raise RuntimeError('automatic_guest_control_budget_exceeded')
+        consumed=self.evidence/('guest-control-'+request['nonce']+'.consumed.json')
+        atomic_json(consumed,request,exclusive=True)
+        result=(self.pin_restoration_resume() if action=='pin-independent-restoration' else
+            self.resume_after_receiver_retirement(request['retirement_receipt'],request['hold_sha256']))
+        atomic_json(path.parent/('guest-control-response-'+request['nonce']+'.json'),result,exclusive=True)
+        if read(path,maximum=65536)!=raw:raise RuntimeError('automatic_guest_control_request_replaced')
+        path.unlink()
+        return result
+
+    def supervise(self):
+        """Run in the original bounded parent, retaining the original Popen."""
+        try:
+            while time.time()<self.deadline and time.monotonic()<self.monotonic_deadline:
+                stop=self.directory.parent/'stop-owned-guest.json'
+                if stop.exists() or stop.is_symlink():
+                    if json.loads(read(stop,maximum=1024))!={'run_id':self.run_id,'guest_uuid':self.uuid,'stop':True}:
+                        raise RuntimeError('automatic_guest_stop_scope_invalid')
+                    break
+                self.service_control();time.sleep(.5)
+        finally:self.close()
 
     def close(self):
         if self.directory.is_symlink() or self.directory.parent.name!=self.run_id:

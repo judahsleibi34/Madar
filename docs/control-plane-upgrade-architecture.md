@@ -2823,3 +2823,20 @@ evidence. Compact transfer journals are bounded; exhaustion refuses further runs
 until exact-owned retirement. Parent orchestration, physical receiver acceptance
 and the complete canonical operation still require native testing. Source/archive
 tests do not establish schema160 acceptance or production authorization.
+
+The existing owned KVM helper now provides a bounded control loop in the original
+supervisor process. Before source poweroff it pins the actual root hold observed
+over the original guest's pinned SSH link, under the source controller's normal
+locks and stopped-actor checks. A fresh receiver signature for that exact hold is
+required before the same original `Popen` owner can consume a resume attempt and
+relaunch the same verified inactive disk. It does not create a new supervisor or
+extend the original three-hour lifetime. A fixed, private, nonce-consumed IPC
+channel accepts only pin/resume actions for that exact guest/run; malformed,
+foreign or replayed requests refuse and the supervisor's teardown still runs.
+
+After boot, the parent sends the retirement receipt to the existing installed
+root hold-release action. It does not remove the hold itself, bypass boot checks
+or issue deployment/migration authority. The application's recovery remains a
+separate existing controller operation. A failed or consumed resume never becomes
+a fresh attempt implicitly. Native physical-retirement and guest-resume testing
+remains required; modeled process/SSH tests are not that acceptance evidence.

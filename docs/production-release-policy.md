@@ -4931,3 +4931,10 @@ SSH/mount contract is unchanged. A signed replica receipt proves receipt only,
 and cannot replace independent application restoration or release approval.
 See the transport contract and remaining native acceptance requirement in the
 control-plane architecture.
+
+Independent restoration source restart remains under the original disposable
+guest supervisor and the existing root recovery controller. The parent must pin
+the actual stopped-source hold before poweroff and authenticate retirement before
+resuming the owned inactive disk. Nonce-consumed control cannot extend the run's
+lifetime or adopt an unknown guest. It does not automatically start the application
+or create any production authority. Native acceptance remains outstanding.
