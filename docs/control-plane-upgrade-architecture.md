@@ -2871,3 +2871,9 @@ A surviving PID file must remain private, regular, singly linked, owned by the
 test user and contain the original PID. Symlink or PID substitution refuses.
 Disk reference checks and fresh positive guest identity still precede recovery.
 
+Historical immutable package preparation measures the customer baseline through
+`historical_preparation_baseline`. This root-only read observer requires genuine
+historical enrollment and the exact live schema146 database, and shares the SQL
+and identity checks used by execution. It does not register a provisional
+operation merely to calculate its future plan digest. Ordinary execution, boot
+and migration snapshot entrypoints retain their strict registered-profile gate.
