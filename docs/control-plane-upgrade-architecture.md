@@ -2718,3 +2718,12 @@ policy. It never calls a new promotion or changes the upstream file's ownership,
 inode, mode or bytes. A changed route, wrong loaded identity or failed readiness
 still fences writers. This correction requires fresh native repeated-reboot
 acceptance; its component tests do not replace that test.
+
+
+The Node2 disk-reference utility check uses the platform-supported read-only
+`fuser -I` invocation against an already authenticated absolute owned path. An
+unsupported option, missing utility, active reference or any diagnostic refuses
+resume. Native utility verification detected an actual open owned file and then
+observed no reference after closing it; that is not full guest-resume acceptance.
+A restoration hold remains enforced during resumed guest boot until independent
+receiver retirement is authenticated through the guest control channel.

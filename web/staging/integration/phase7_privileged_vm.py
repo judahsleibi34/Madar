@@ -576,8 +576,9 @@ class AutomaticReleaseGuest:
     def resume_after_poweroff(self):
         """Restart this owned inactive disk, not a clone or a fresh authority.
 
-        The caller retires any independent receiver and releases its source hold
-        first. Existing guest controller/boot policy decides whether actors may
+        The caller retires any independent receiver first. A source hold remains
+        enforced during boot and is released through the authenticated guest
+        control channel only after receiver retirement. Existing boot policy decides whether actors may
         start. This method cannot bypass that policy or extend the run lifetime.
         """
         if (self.process is None or self.process.poll() is None or type(self.pid) is not int or self.pid<=0
@@ -607,7 +608,9 @@ class AutomaticReleaseGuest:
                 raise RuntimeError('automatic_guest_resume_file_ownership_changed')
         pidfile=self.directory/'qemu.pid'
         if pidfile.read_text().strip()!=str(self.pid):raise RuntimeError('automatic_guest_resume_pidfile_changed')
-        references=subprocess.run(['/usr/bin/sudo','-n','/usr/bin/fuser','--',str(self.directory/'guest.qcow2')],
+        # This host's psmisc fuser does not accept a standalone "--".
+        # The already verified absolute owned path cannot become an option.
+        references=subprocess.run(['/usr/bin/sudo','-n','/usr/bin/fuser','-I',str(self.directory/'guest.qcow2')],
             capture_output=True,timeout=10,env={'PATH':os.defpath,'HOME':'/nonexistent'})
         if references.returncode!=1 or references.stdout.strip() or references.stderr.strip():
             raise RuntimeError('automatic_guest_resume_disk_referenced_or_unverified')
