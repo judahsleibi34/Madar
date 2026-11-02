@@ -882,6 +882,7 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
         ):
             operations.resolve_candidate(self.SHA, dry_run=False)
 
+
         def divergent_result(label, *args, **kwargs):
             value = git_result(label, *args, **kwargs)
             if label == "git_ancestry":
@@ -893,6 +894,28 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
             upgrade.UpgradeError, "candidate_not_descendant_of_production"
         ):
             operations.resolve_candidate(self.SHA, dry_run=False)
+
+    def test_installed_library_import_closure_has_no_source_only_dependencies(self):
+        import ast,re
+        body=INSTALLER_PATH.read_text()
+        manifest=re.search(r'declare -a tracked_files=\(\n(.*?)\n\)',body,re.S)
+        self.assertIsNotNone(manifest)
+        tracked={line.strip() for line in manifest[1].splitlines() if line.strip() and not line.lstrip().startswith('#')}
+        missing=set();library=WEB_ROOT/'deployment/lib'
+        for relative in sorted(p for p in tracked if p.startswith('lib/') and p.endswith('.py')):
+            for node in ast.walk(ast.parse((WEB_ROOT/'deployment'/relative).read_text())):
+                names=[]
+                if isinstance(node,ast.ImportFrom):
+                    if node.level==1:names=[node.module.split('.')[0]] if node.module else [a.name for a in node.names]
+                    elif node.level==0 and node.module=='deployment.lib':names=[a.name for a in node.names]
+                    elif node.level==0 and node.module and node.module.startswith('deployment.lib.'):
+                        names=[node.module.split('.')[2]]
+                elif isinstance(node,ast.Import):
+                    names=[a.name.split('.')[2] for a in node.names if a.name.startswith('deployment.lib.')]
+                for name in names:
+                    if (library/(name+'.py')).is_file() and 'lib/'+name+'.py' not in tracked:
+                        missing.add((relative,'lib/'+name+'.py'))
+        self.assertEqual(missing,set(),'An installed controller must contain its library dependency closure')
 
     def test_real_remote_tracking_bundle_stages_exact_detached_candidate(self):
         with tempfile.TemporaryDirectory() as root:

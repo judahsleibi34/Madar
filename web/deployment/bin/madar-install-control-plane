@@ -59,7 +59,9 @@ declare -a tracked_files=(
   lib/completed_normal_baseline.py
   lib/completed_normal_admission.py
   lib/completed_normal_package.py
+  lib/completed_normal_private_provider.py
   lib/isolated_release_environment.py
+  lib/isolated_github_observation.py
   lib/schema148_consumers.py
   lib/schema148_artifacts.py
   lib/schema148_release.py

@@ -2691,3 +2691,11 @@ anonymous sealed address/maintenance-role fd with no supplementary groups.
 Default production address discovery keeps its strict single-network/no-port
 Compose contract. Preflight and post-capture reobservation use the same exact
 historical contract; this grants neither SQL migration nor backup success.
+
+
+Native historical acceptance found source-only controller dependencies missing
+from the explicit installer inventory. The installer now includes the isolated
+GitHub reader and the existing private-provider verifier. A dependency-closure
+check parses imports of every installed library, so source tests cannot silently
+succeed with a module absent from the installed controller. A controller marker
+alone does not substitute for installed file/manifest verification.
