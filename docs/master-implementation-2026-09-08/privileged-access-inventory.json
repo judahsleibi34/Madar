@@ -1138,6 +1138,58 @@
       "path": "web/backend/services/project_source_ingestion_service.py",
       "boundary": "tenant/project/source/resource/operation-scoped149\u2013152 ingestion and reconciliation RPCs, lease/token/version checks; no blind replay of uncertain storage/provider effects.",
       "review_scope": "Integration classification of published main cf444303; not independent production security approval."
+    },
+    {
+      "path": "web/backend/routes/data_deletion_routes.py",
+      "boundary": "Account self-actions derive the current regular-user identity and require current-session AAL2; recovery/status administrative actions require application system-admin AAL2. Candidate167 capability/admission gates and exact request identity still apply. This is application account authority, never infrastructure release approval.",
+      "reviewed_functions": [
+        "recover_account",
+        "deactivate_own_account",
+        "close_own_account",
+        "account_action_status"
+      ]
+    },
+    {
+      "path": "web/backend/services/account_work_fence.py",
+      "boundary": "Internal shared-filesystem work fences receive trusted tenant/user scope from authenticated callers or independently loaded resource ownership. At candidate167 lock registration uses account_fence_registration167 under the shared registration lock, serialized with final account retirement; unknown schemas refuse. Legacy146\u2013166 registration does not claim protocol3 admission. Service-role access and a lock filename alone are not end-user authorization.",
+      "reviewed_functions": [
+        "_registration_allowed",
+        "account_lock",
+        "calendar_work",
+        "notification_work",
+        "protect_request"
+      ]
+    },
+    {
+      "path": "web/backend/services/bi_report_delivery_service.py",
+      "boundary": "Trusted tenant/project/actor inputs and owner-scoped schedule queries govern configuration; delivery and cleanup workers use exact lease token/fence RPCs with immediate database authorization rechecks. Account work fencing, same-tenant active membership, private artifact path/hash checks and explicit adapter selection remain required. No live message provider or production cleanup activation is authorized by this inventory.",
+      "reviewed_functions": [
+        "get_delivery_config",
+        "configure_delivery",
+        "configure_lifecycle",
+        "process_delivery",
+        "process_cleanup"
+      ]
+    },
+    {
+      "path": "web/backend/services/bi_sharing_service.py",
+      "boundary": "Authenticated Data Project callers supply trusted tenant/project/actor scope. Dashboard/report reads filter exact tenant/project/resource/owner or recipient-share identity; owner-only operations and SQL share-management RPCs retain active same-tenant membership/revision checks. Private artifact metadata is exposed only to the explicitly authorized server-side read path. Service-role access is not proof of caller membership.",
+      "reviewed_functions": [
+        "require_dashboard_access",
+        "require_report_access",
+        "list_dashboard_shares",
+        "set_dashboard_share",
+        "revoke_dashboard_share",
+        "set_report_share",
+        "revoke_report_share"
+      ]
+    },
+    {
+      "path": "web/backend/workers/account_lifecycle_worker.py",
+      "boundary": "Internal protocol3 account-erasure client is opt-in through ACCOUNT_LIFECYCLE_WORKER_ENABLED and invokes the existing capability/lease/ownership-gated run_batch service. Import does not start it. Candidate167 customer admission, provider/restore-floor acceptance and coordinated fleet installation remain unadmitted; this path confers no tenant-admin infrastructure or migration authority.",
+      "reviewed_functions": [
+        "main"
+      ]
     }
   ],
   "related_privileged_paths": [
@@ -1378,6 +1430,19 @@
       "evidence": "docs/architecture-phase7-2026-10-18/privileged-inventory-review.md",
       "live_database_role_inspection": false,
       "production_mutations": false
+    },
+    {
+      "date": "2026-11-02",
+      "source": "8053f817b76b8ac80997991c10fc5b13f5c152f0",
+      "reason": "Classify five newly introduced direct privileged references after latest-main integration; checker unchanged.",
+      "added_paths": [
+        "web/backend/routes/data_deletion_routes.py",
+        "web/backend/services/account_work_fence.py",
+        "web/backend/services/bi_report_delivery_service.py",
+        "web/backend/services/bi_sharing_service.py",
+        "web/backend/workers/account_lifecycle_worker.py"
+      ],
+      "limitations": "Source access-boundary classification only; route/SQL/provider/native authorization acceptance remains separate. No deployment or customer admission."
     }
   ]
 }

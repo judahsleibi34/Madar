@@ -4743,3 +4743,9 @@ from the active146 descriptor; validation grants no migration or customer author
 Canonical147–164 bytes are unchanged.165 is now the BI team-sharing candidate, so
 the old off-chain deletion proposal's165 numbering is obsolete. No successor
 repair is selected or executed, and the approved upgrade target is not widened.
+
+The privileged-client inventory now classifies the five direct application
+references introduced by main: account routes, filesystem work fencing, BI
+sharing/delivery and the opt-in account lifecycle worker. The unchanged checker
+covers97 direct-reference files. Classification is source review, not route/SQL
+acceptance or permission to activate candidate167, its worker or any provider.
