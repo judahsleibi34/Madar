@@ -156,6 +156,11 @@ def assert_no_private_path(test_case, response):
 
 class DataRouteAuthorizationMatrixTests(unittest.TestCase):
     def setUp(self):
+        # This route matrix uses a compatible schema160 fixture, not a live
+        # service-key client. Real account locks and owner/tenant denial remain.
+        self.schema_patch = patch("services.project_dataset_service.schema_version", return_value=160)
+        self.schema_patch.start()
+        self.addCleanup(self.schema_patch.stop)
         self.entitlement_state = EntitlementTestState().activate_plan("1", "business")
         self.entitlement_state.allow_capability("2", "data_import")
         self.entitlement_state.allow_capability("2", "charts")

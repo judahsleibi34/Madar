@@ -166,8 +166,10 @@ def scoped_work(argument, user_field, *, tenant_field="tenant_id"):
         signature = inspect.signature(function)
         def context(args, kwargs):
             bound = signature.bind(*args, **kwargs)
+            bound.apply_defaults()
             row = bound.arguments[argument]
-            return account_lock(row[tenant_field], row[user_field])
+            client = bound.arguments.get("client") or function.__globals__.get("service_supabase")
+            return account_lock(row[tenant_field], row[user_field], client=client)
         if inspect.iscoroutinefunction(function):
             @wraps(function)
             async def asynchronous(*args, **kwargs):
@@ -187,7 +189,9 @@ def account_file_work(function):
     @wraps(function)
     def wrapped(*args, **kwargs):
         bound = signature.bind(*args, **kwargs)
-        with account_lock(bound.arguments["tenant_id"], bound.arguments["user_id"]):
+        bound.apply_defaults()
+        client = bound.arguments.get("client") or function.__globals__.get("service_supabase")
+        with account_lock(bound.arguments["tenant_id"], bound.arguments["user_id"], client=client):
             return function(*args, **kwargs)
     return wrapped
 

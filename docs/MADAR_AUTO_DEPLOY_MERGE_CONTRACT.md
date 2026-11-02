@@ -2266,3 +2266,10 @@ references introduced by main: account routes, filesystem work fencing, BI
 sharing/delivery and the opt-in account lifecycle worker. The unchanged checker
 covers97 direct-reference files. Classification is source review, not route/SQL
 acceptance or permission to activate candidate167, its worker or any provider.
+
+Job and file work-fence decorators preserve the same explicit database client
+used by the wrapped operation, including signature defaults. They must not
+validate one account environment through the global client while performing
+work against another. Client propagation changes no schema capability, lease,
+registration, tenant or account-status requirement. Refused registration still
+prevents every wrapped effect; protocol3 customer admission remains disabled.
