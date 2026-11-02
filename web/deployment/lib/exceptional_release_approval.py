@@ -212,6 +212,8 @@ def create_canonical(system):
             review={'why':'Exact independently enrolled coordinated historical146→160 transition requires administrator approval.',
                 'origin':'Truthful historical enrollment; no prior modern completion or write grant is claimed.',
                 'source_sha':value['source_sha'],'controller_sha':value['controller_sha'],
+                'controller_source_selection':document.get('isolated_controller_source',
+                    {'kind':'authenticated-github-main','repository':'judahsleibi34/Madar','source_sha':value['controller_sha']}),
                 'context_sha256':value['context_sha256'],'plan_sha256':value['plan_sha256'],
                 'database_system_identifier':driver.contract['database']['system_identifier'],
                 'origin_schema':146,'target_schema':160,'images':driver.contract['candidate']['images'],

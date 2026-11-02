@@ -4886,3 +4886,10 @@ observation transport described in `control-plane-upgrade-architecture.md`.
 It reuses independent test trust and carries only fresh authenticated raw API
 metadata. It cannot approve a release, waive CI/staging, admit production or
 weaken the execution firewall. Canonical protected acceptance remains required.
+
+
+An exact registered historical KVM rehearsal may stage its authenticated,
+unmerged controller via `isolated_controller_source`. This remains explicitly
+a test source selection, preserves the real GitHub origin/main and converges
+on the existing bundle/installer path. Production still requires authenticated
+main selection. See the control-plane architecture's isolated-source contract.

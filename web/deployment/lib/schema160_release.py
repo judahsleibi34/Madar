@@ -177,6 +177,37 @@ def admitted_manifest(root, contract):
             from_schema=r['from_schema'],to_schema=r['to_schema'],compatibility=r['compatibility']) for r in raw['migrations']))
 
 
+def isolated_controller_source(selection,contract,operations):
+    """Authenticate a test controller without claiming it is GitHub main.
+
+    This exact registered historical rehearsal cannot merge its controller into
+    main first. The root-frozen operation names the development controller and
+    actual GitHub commit/tree. Production and ordinary source resolution keep
+    their main ancestry contract; neither origin/main nor its URL is rewritten.
+    """
+    import os,re
+    from .isolated_github_observation import api
+    from .completed_normal_package import snapshot
+    from .migration_inventory import REPOSITORY
+    fields={'version','kind','repository','source_branch','source_sha','tree_oid'}
+    if (os.geteuid()!=0 or not isinstance(selection,dict) or set(selection)!=fields
+            or type(selection['version']) is not int or selection['version']!=1
+            or selection['kind']!='isolated-historical-controller-source'
+            or selection['repository']!=REPOSITORY or selection['source_branch']!='Saliba-Branch'
+            or any(not re.fullmatch('[a-f0-9]{40}',str(selection[k])) for k in ('source_sha','tree_oid'))
+            or selection['source_sha']!=contract.get('candidate',{}).get('controller_sha')
+            or operations.installed_sha()!=selection['source_sha']):
+        raise RuntimeError('schema160_isolated_controller_source_invalid')
+    isolated_registration(contract)
+    authentication=api('repos/'+REPOSITORY+'/commits/'+selection['source_sha'],operations=operations,
+        label='isolated_controller_source')
+    tree,_=snapshot(operations.repo,selection['source_sha'])
+    if (authentication.get('sha')!=selection['source_sha'] or tree!=selection['tree_oid']
+            or authentication.get('commit',{}).get('tree',{}).get('sha')!=tree):
+        raise RuntimeError('schema160_isolated_controller_source_changed')
+    return selection['source_sha']
+
+
 def expected_protocols(schema):
     if type(schema) is not int or schema not in SCHEMAS:
         raise RuntimeError('schema160_database_schema_invalid')

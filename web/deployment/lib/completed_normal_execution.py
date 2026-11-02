@@ -276,11 +276,16 @@ class CompletedNormalUpgrade:
         verify_live_configuration(self.document)
 
     def canonical_main(self):
+        if self.document.get('isolated_controller_source') is not None:
+            raise RuntimeError('isolated_controller_is_not_github_main')
         from deployment.lib.control_plane_upgrade import validate_immutable_release_selection
         selection=self.document.get('immutable_release_selection')
         return self.controller if selection is None else validate_immutable_release_selection(selection,self.controller)
 
     def verify_candidate_remote(self):
+        if self.document.get('isolated_controller_source') is not None:
+            self.ops.resolve_candidate(self.controller,dry_run=True,**self.source_options())
+            return
         # Read-only: production refs are fetched only by the approved installer.
         # A moving main must reject before timer, boot or controller effects.
         remote=self.ops.madar_git('completed_upgrade_candidate_remote','ls-remote',
@@ -288,6 +293,19 @@ class CompletedNormalUpgrade:
         expected=self.canonical_main()
         if remote!=[expected,'refs/heads/main']:
             raise RuntimeError('completed_upgrade_candidate_remote_changed')
+
+    def source_options(self):
+        selected=self.document.get('isolated_controller_source')
+        if selected is not None:
+            from deployment.lib.completed_normal_profile import RECONCILED
+            from deployment.lib.historical_origin import KIND
+            if (self.profile is not RECONCILED or self.contract['source_roles'].get('origin_kind')!=KIND
+                    or self.document.get('fixture_only') is not True or self.document.get('production_authorization') is not False
+                    or self.document.get('immutable_release_selection') is not None):
+                raise RuntimeError('isolated_controller_source_not_historical_rehearsal')
+            return {'isolated_selection':selected,'isolated_contract':self.contract}
+        selection=self.document.get('immutable_release_selection')
+        return {} if selection is None else {'immutable_selection':selection}
 
     def preflight(self, *, locked=False):
         """No authorization consumption, service effects, or live SQL writes."""
@@ -463,8 +481,7 @@ class CompletedNormalUpgrade:
 
     def install_controller(self):
         self.actor.source();self.actor.installation.installed()
-        selection=self.document.get('immutable_release_selection')
-        options={} if selection is None else {'immutable_selection':selection}
+        options=self.source_options()
         self.ops.resolve_candidate(self.controller,dry_run=False,**options)
         transaction,staged=self.ops.stage_candidate(self.controller,**options)
         tree=self.ops.static_preflight(staged)

@@ -2661,3 +2661,21 @@ no isolated transport is enrolled. Unknown endpoints and production environments
 cannot enroll this policy. Root journals retain bounded observation hashes and
 failures; the owned run retires its request workspace. Positive guest/parent
 transport and protected canonical execution still require native acceptance.
+
+
+### Isolated controller source versus GitHub main (2026-11-02)
+
+The exact root-registered historical rehearsal may name an
+`isolated_controller_source` in its immutable plan. This identifies the actual
+Saliba-Branch controller commit/tree and is displayed in administrator review.
+It is never described as GitHub main. The existing resolver requires the exact
+installed controller, positive isolated registration, real authenticated GitHub
+commit/tree metadata and a full local Git-object snapshot. Staging then uses
+its existing exclusive selected-ref and bundle path. The canonical GitHub origin
+URL and actual origin/main remain unchanged; no network-ref substitution occurs.
+
+The ordinary resolver and immutable-main-ancestor contract remain mandatory for
+production. Mixed source modes, a changed tree/source/registration, an ordinary
+completed-origin operation, or production use refuse. The exact package, CI,
+staging, recovery, AAL2 approval and protected execution gates are still required.
+This source transport is not unattended real-GitHub-main dispatch acceptance.

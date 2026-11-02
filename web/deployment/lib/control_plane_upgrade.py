@@ -1895,9 +1895,25 @@ class SystemOperations:
             raise UpgradeError("recovery_checkout_advance_failed")
         self.require_clean_repository()
 
-    def resolve_candidate(self, approved_sha: str, *, dry_run: bool, immutable_selection=None) -> None:
+    def resolve_candidate(self, approved_sha: str, *, dry_run: bool, immutable_selection=None,
+                          isolated_selection=None,isolated_contract=None) -> None:
         if self.repository_origin() != EXPECTED_CONTRACT["MADAR_CANONICAL_GIT_REMOTE"]:
             raise UpgradeError("canonical_git_remote_mismatch")
+        if isolated_selection is not None or isolated_contract is not None:
+            if immutable_selection is not None or isolated_selection is None or isolated_contract is None:
+                raise UpgradeError('isolated_source_selection_ambiguous')
+            from deployment.lib.schema160_release import isolated_controller_source
+            if isolated_controller_source(isolated_selection,isolated_contract,self)!=approved_sha:
+                raise UpgradeError('isolated_source_selected_commit_changed')
+            # Root registration, GitHub metadata and every Git object have been
+            # verified. This local test transport creates no remote main claim.
+            if self.madar_git('git_isolated_ancestry','merge-base','--is-ancestor',
+                    self.repository_head(),approved_sha,check=False).returncode!=0:
+                raise UpgradeError('candidate_not_descendant_of_production')
+            self.require_clean_repository()
+            if self.repository_origin()!=EXPECTED_CONTRACT['MADAR_CANONICAL_GIT_REMOTE']:
+                raise UpgradeError('canonical_git_remote_changed')
+            return
         selected = immutable_selection is not None
         canonical = validate_immutable_release_selection(immutable_selection,approved_sha) if selected else approved_sha
         if dry_run:
@@ -2403,15 +2419,20 @@ class SystemOperations:
         ):
             raise UpgradeError("failed_upgrade_automation_not_quiesced")
 
-    def stage_candidate(self, approved_sha: str, *, immutable_selection=None) -> tuple[Path, Path]:
+    def stage_candidate(self, approved_sha: str, *, immutable_selection=None,
+                        isolated_selection=None,isolated_contract=None) -> tuple[Path, Path]:
+        selected=immutable_selection is not None or isolated_selection is not None or isolated_contract is not None
+        options={'immutable_selection':immutable_selection}
+        if isolated_selection is not None or isolated_contract is not None:
+            options.update(isolated_selection=isolated_selection,isolated_contract=isolated_contract)
+        if selected:self.resolve_candidate(approved_sha,dry_run=True,**options)
         self.prepare_upgrade_roots()
         transaction = Path(tempfile.mkdtemp(prefix=f"{approved_sha[:12]}-", dir=self.staging_root))
         os.chmod(transaction, 0o700)
         bundle = transaction / "candidate.bundle"
         candidate = transaction / "repository"
         reference = "refs/remotes/origin/main"
-        if immutable_selection is not None:
-            self.resolve_candidate(approved_sha,dry_run=True,immutable_selection=immutable_selection)
+        if selected:
             reference = SELECTED_RELEASE_REF
             # Exclusive temporary ref: never rewrite origin/main or silently
             # replace another operation's selection. Locks protect this phase.
@@ -2422,7 +2443,7 @@ class SystemOperations:
                 str(bundle), reference,
             )
         finally:
-            if immutable_selection is not None:
+            if selected:
                 self.madar_git('git_unselect_release','update-ref','-d',reference,approved_sha)
         bundle_heads = self.staging_git(
             "git_bundle_heads", "bundle", "list-heads", str(bundle)
