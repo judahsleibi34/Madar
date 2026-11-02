@@ -19,6 +19,7 @@ SOURCE_FIELDS={'origin_kind','enrollment_root','enrollment_sha256','application_
                'controller_sha','schema','successor_intent_sha256'}
 ROLES=('backend','frontend','redis','parser-worker','remote-ingestion-worker',
        'notification-worker','calendar-sync-worker','data-deletion-worker')
+BOOT_UNIT_ROOT=Path('/etc/systemd/system')
 
 
 def bootstrap_record(path):
@@ -141,9 +142,30 @@ def independent_operator_scope(rows,environment):
             'authentication_key_sha256':hashlib.sha256(key).hexdigest(),'network_id':facts['network_id']}
 
 
+def alert_template_control(system):
+    """An uninstantiated template has no systemctl-show unit properties."""
+    instances=system.command('historical_alert_instances',['systemctl','list-units',
+        '--all','--plain','--no-legend','--no-pager','madar-ops-alert@*.service']).stdout
+    if instances.strip():raise RuntimeError('historical_origin_alert_instances_require_review')
+    fragment=BOOT_UNIT_ROOT/'madar-ops-alert@.service';directory=BOOT_UNIT_ROOT/'madar-ops-alert@.service.d'
+    if directory.is_symlink():raise RuntimeError('historical_origin_alert_template_path_invalid')
+    dropins=[]
+    if directory.exists():
+        metadata=directory.stat()
+        if not directory.is_dir() or metadata.st_uid!=0 or metadata.st_mode&0o022:
+            raise RuntimeError('historical_origin_alert_template_path_invalid')
+        dropins=sorted(directory.iterdir())
+        if len(dropins)>32 or any(not p.name.endswith('.conf') for p in dropins):
+            raise RuntimeError('historical_origin_alert_template_path_invalid')
+    # A template is configuration, not an observed inactive process. Do not
+    # invent a systemd unit state or instantiate one merely to measure it.
+    return {'fragment':str(fragment),'dropins':list(map(str,dropins)),
+        'state':{'enabled':'static','active':None},'instances':[]}
+
+
 def boot_controls(system):
     """Measure original supervisors as DATA before any successor is admitted."""
-    names=[]
+    names=[];file_states={}
     raw=system.command('historical_boot_units',['systemctl','list-unit-files','--no-legend','--no-pager',
         'madar-*.service','madar-*.timer']).stdout
     for line in raw.splitlines():
@@ -153,10 +175,22 @@ def boot_controls(system):
                 and fields[0]!='madar-ops-alert@.service'):
             raise RuntimeError('historical_origin_boot_unit_inventory_invalid')
         names.append(fields[0])
+        if fields[0]=='madar-ops-alert@.service':
+            if len(fields)<2 or fields[1]!='static':
+                raise RuntimeError('historical_origin_alert_template_state_invalid')
+            file_states[fields[0]]=fields[1]
     if not 1<=len(names)<=64 or len(names)!=len(set(names)):
         raise RuntimeError('historical_origin_boot_unit_budget')
     files={};units={};templates={}
     for name in sorted(names):
+        if name in file_states:
+            control=alert_template_control(system)
+            for path in (control['fragment'],*control['dropins']):
+                captured=protected(Path(path));metadata=captured.stat()
+                files[path]={'sha256':hashlib.sha256(captured.read_bytes()).hexdigest(),
+                    'uid':metadata.st_uid,'mode':metadata.st_mode&0o7777}
+            templates[name]=control
+            continue
         raw=system.command('historical_boot_unit',['systemctl','show',name,
             '--property=FragmentPath,DropInPaths,LoadState,ActiveState,UnitFileState']).stdout
         fields=dict(line.split('=',1) for line in raw.splitlines() if '=' in line)
@@ -168,18 +202,11 @@ def boot_controls(system):
             path=Path(raw_path)
             if not path.is_relative_to('/etc/systemd/system') and not path.is_relative_to('/opt/madar/control-plane'):
                 raise RuntimeError('historical_origin_boot_fragment_scope_invalid')
-            metadata=protected(path).stat()
-            files[raw_path]={'sha256':hashlib.sha256(path.read_bytes()).hexdigest(),'uid':metadata.st_uid,'mode':metadata.st_mode&0o7777}
+            captured=protected(path);metadata=captured.stat()
+            files[raw_path]={'sha256':hashlib.sha256(captured.read_bytes()).hexdigest(),'uid':metadata.st_uid,'mode':metadata.st_mode&0o7777}
         control={'fragment':fields['FragmentPath'],'dropins':fields['DropInPaths'].split(),
             'state':{'enabled':fields['UnitFileState'],'active':fields['ActiveState']}}
-        if name=='madar-ops-alert@.service':
-            # An uninstantiated alert template is authenticated configuration,
-            # not a running supervisor that systemctl stop can address. Never
-            # omit its bytes or treat arbitrary templates as reviewed actors.
-            if fields['UnitFileState']!='static' or fields['ActiveState']!='inactive':
-                raise RuntimeError('historical_origin_alert_template_state_invalid')
-            templates[name]=control
-        else:units[name]=control
+        units[name]=control
     if 'madar-release-proxy.service' not in units:raise RuntimeError('historical_origin_proxy_boot_missing')
     return {'files':files,'units':units,**({'templates':templates} if templates else {})}
 
@@ -682,7 +709,11 @@ def verify_actor_inventory(contract,inventory,rows):
             raise RuntimeError('historical_origin_inventory_exclusion_changed')
     controls=observed['boot_controls']
     for name,template in controls.get('templates',{}).items():
-        if name!='madar-ops-alert@.service' or template['state']!={'enabled':'static','active':'inactive'}:
+        if (name!='madar-ops-alert@.service' or template['state']!={'enabled':'static','active':None}
+                or template.get('instances')!=[]):
+            raise RuntimeError('historical_origin_alert_template_changed')
+        from .control_plane_upgrade import SystemOperations
+        if alert_template_control(SystemOperations())!=template:
             raise RuntimeError('historical_origin_alert_template_changed')
         for path in (template['fragment'],*template['dropins']):
             record=controls['files'][path];actual=protected(Path(path));metadata=actual.stat()

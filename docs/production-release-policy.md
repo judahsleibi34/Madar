@@ -4774,9 +4774,16 @@ Current checkout bytes and newer controller dependencies cannot relabel older
 images. GitHub source, CI, archive checksums and immutable image identity checks
 remain mandatory. This correction issues no execution or migration authority.
 
-Historical boot enrollment records the installed static, inactive
+Historical boot enrollment records the installed static, uninstantiated
 madar-ops-alert@.service template as authenticated configuration, separately
 from concrete stoppable supervisors. Its fragment/drop-in bytes, ownership and
 mode remain mandatory during provider-inventory attestation. Unknown templates
-and active template observations refuse. This fixes native enrollment without
+and unexpected instantiated alerts refuse. This fixes native enrollment without
 inventing a runnable template instance or weakening writer fencing.
+
+Native systemd observation distinguishes an uninstantiated alert template
+from a concrete unit: systemctl show cannot observe a template's process state.
+Enrollment captures its exact static unit-file identity and root-protected
+fragment/drop-ins, with an explicit nonapplicable active state. Any loaded alert
+instance requires review. Provider attestation reobserves that absence and the
+exact template configuration; no alert instance is started for measurement.
