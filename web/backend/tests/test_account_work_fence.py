@@ -148,3 +148,19 @@ class AccountJobDatabaseBindingTests(unittest.TestCase):
         with patch.object(fence,'account_lock',side_effect=AccountWorkBusy('wrong_database_or_account')):
             with self.assertRaises(AccountWorkBusy):job({'tenant_id':1,'owner_user_id':2},client=object())
         self.assertEqual(calls,[])
+
+
+class CalendarJobDatabaseBindingTests(unittest.TestCase):
+    def test_calendar_schema_observation_uses_the_job_client_and_refuses_unknown_schema(self):
+        from services import account_work_fence as fence
+        from unittest.mock import sentinel
+        calls=[]
+        @fence.calendar_work
+        def job(row,*,client):calls.append('effect')
+        with patch('services.project_dataset_service.schema_version',return_value=160) as schema:
+            job({'tenant_id':1},client=sentinel.database)
+            schema.assert_called_once_with(client=sentinel.database)
+        self.assertEqual(calls,['effect'])
+        with patch('services.project_dataset_service.schema_version',return_value=0):
+            with self.assertRaises(HTTPException):job({'tenant_id':1},client=sentinel.database)
+        self.assertEqual(calls,['effect'])

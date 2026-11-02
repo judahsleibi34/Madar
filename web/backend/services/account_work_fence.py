@@ -198,9 +198,13 @@ def account_file_work(function):
 
 def calendar_work(function):
     """Fence a claimed calendar job through provider effects and acknowledgement."""
+    signature=inspect.signature(function)
     @wraps(function)
     def wrapped(job, *args, **kwargs):
-        from database import service_supabase
+        bound=signature.bind(job,*args,**kwargs);bound.apply_defaults()
+        service_supabase=bound.arguments.get('client') or function.__globals__.get('service_supabase')
+        if service_supabase is None:
+            from database import service_supabase
         from services.project_dataset_service import schema_version
         from services.account_recovery_service import require_processing_account
         version=schema_version(client=service_supabase)

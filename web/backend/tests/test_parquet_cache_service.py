@@ -47,6 +47,8 @@ def _write_csv(path: Path, rows: int = 20_000) -> str:
 
 class ParquetCacheServiceTests(unittest.TestCase):
     def setUp(self):
+        from tests.account_schema_fixture import install_legacy_schema
+        install_legacy_schema(self)
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)

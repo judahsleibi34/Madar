@@ -30,6 +30,8 @@ def resolved(*, size=100, rows=4):
 
 class VersionedAnalyticsTests(unittest.TestCase):
     def setUp(self):
+        from tests.account_schema_fixture import install_legacy_schema
+        install_legacy_schema(self)
         self.frame = pd.DataFrame({
             "name": ["C", "A", "B", "D"],
             "amount": [30, 10, 20, None],

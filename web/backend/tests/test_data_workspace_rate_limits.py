@@ -14,11 +14,13 @@ from tests.entitlement_test_support import EntitlementTestState
 
 
 def fake_require_active_tenant_user_id(user_id, request, response):
-    return SimpleNamespace(user_id=int(user_id), tenant_id="tenant-a")
+    return SimpleNamespace(user_id=int(user_id), tenant_id="101")
 
 
 class DataWorkspaceRateLimitTests(unittest.TestCase):
     def setUp(self):
+        from tests.account_schema_fixture import install_legacy_schema
+        install_legacy_schema(self)
         rate_limit_service._store = None
         rate_limit_service._memory_store = InMemoryRateLimitStore()
         self.audit_patch = patch("services.audit_service.record_security_event")
@@ -29,7 +31,7 @@ class DataWorkspaceRateLimitTests(unittest.TestCase):
             side_effect=fake_require_active_tenant_user_id,
         )
         self.auth_patch.start()
-        self.entitlement_state = EntitlementTestState().activate_plan("tenant-a", "business")
+        self.entitlement_state = EntitlementTestState().activate_plan("101", "business")
         self.entitlement_patch = self.entitlement_state.installed()
         self.entitlement_patch.__enter__()
 
@@ -42,6 +44,8 @@ class DataWorkspaceRateLimitTests(unittest.TestCase):
 
     def build_client(self):
         app = FastAPI()
+        from services.account_work_fence import AccountWorkFenceMiddleware
+        app.add_middleware(AccountWorkFenceMiddleware)
         app.include_router(data_routes.router)
         app.include_router(cleaning_routes.router)
         app.include_router(analysis_routes.router)
@@ -240,7 +244,7 @@ class DataWorkspaceRateLimitTests(unittest.TestCase):
         payload = {"input_path": "https://example.com/data.csv"}
         overrides = (
             '{"1":{"read":{"limit":5,"window_seconds":60}},'
-            '"tenant:tenant-a:user:1":{"read":{"limit":1,"window_seconds":60}}}'
+            '"tenant:101:user:1":{"read":{"limit":1,"window_seconds":60}}}'
         )
 
         with self.rate_limit_config(

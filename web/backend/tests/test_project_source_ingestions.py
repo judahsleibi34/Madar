@@ -75,6 +75,9 @@ class FakeClient:
         self.rpc_calls = []
 
     def table(self, name):
+        if name=='application_schema_state' and name not in self.tables:
+            from tests.account_schema_fixture import SchemaStateQuery
+            return SchemaStateQuery(149)
         return FakeQuery(self.tables.get(name, []))
 
     def rpc(self, name, params):

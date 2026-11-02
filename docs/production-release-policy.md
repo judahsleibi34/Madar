@@ -4756,3 +4756,12 @@ validate one account environment through the global client while performing
 work against another. Client propagation changes no schema capability, lease,
 registration, tenant or account-status requirement. Refused registration still
 prevents every wrapped effect; protocol3 customer admission remains disabled.
+
+Latest-main regression fixtures now declare their real legacy unit-test schema
+through a read-only catalog row and include the required account work middleware.
+They retain session/AAL2, account, tenant and real filesystem-lock behavior;
+unknown production schemas and candidate167 admission are not relaxed. The
+CI scratch tmpfs is4GiB so the unchanged2GiB production disk reserve can hold.
+Calendar job fencing also uses the same explicit/module database client as the
+wrapped job. Canonical historical issuance remains closed at its distinct
+approval boundary; ordinary unregistered160 profiles cannot acquire authority.

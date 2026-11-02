@@ -73,6 +73,7 @@ class FakeQuery:
 class FakeSupabase:
     def __init__(self):
         self.tables = {
+            "users": [{"id":user,"tenant_id":7,"account_status":"active"} for user in (11,12,13)],
             "tenant_memberships": [
                 {"tenant_id": 7, "user_id": 11, "role": "owner", "status": "active"},
                 {"tenant_id": 7, "user_id": 12, "role": "member", "status": "active"},
@@ -85,6 +86,9 @@ class FakeSupabase:
         }
 
     def table(self, table_name):
+        if table_name=='application_schema_state':
+            from tests.account_schema_fixture import SchemaStateQuery
+            return SchemaStateQuery()
         return FakeQuery(self, table_name)
 
     def rpc(self, name, payload):

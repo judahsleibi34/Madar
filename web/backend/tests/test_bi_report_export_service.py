@@ -50,6 +50,10 @@ def immutable_report():
 
 
 class BiReportExportServiceTests(unittest.TestCase):
+    def setUp(self):
+        from tests.account_schema_fixture import install_legacy_schema
+        install_legacy_schema(self)
+
     def test_arabic_pdf_is_private_bounded_and_uses_immutable_snapshot(self):
         with tempfile.TemporaryDirectory() as directory:
             path, filename, media_type = bi_report_export_service.write_export(

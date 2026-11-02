@@ -29,6 +29,11 @@ class FakeClient:
         self.error = error
         self.calls = []
 
+    def table(self, name):
+        if name!='application_schema_state':raise AssertionError('unexpected fixture table')
+        from tests.account_schema_fixture import SchemaStateQuery
+        return SchemaStateQuery()
+
     def rpc(self, name, params):
         self.calls.append((name, params))
         if self.error:
@@ -51,6 +56,10 @@ def dashboard(policy="pinned"):
 
 
 class BiDashboardServiceTests(unittest.TestCase):
+    def setUp(self):
+        from tests.account_schema_fixture import install_legacy_schema
+        install_legacy_schema(self)
+
     def test_analysis_layout_and_display_validation_are_allowlisted(self):
         self.assertEqual(bi_dashboard_service.validate_analysis_spec({
             "operation": "date_aggregate", "date_column": "date", "period": "month",

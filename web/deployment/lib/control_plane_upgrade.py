@@ -2868,7 +2868,8 @@ print(hashlib.sha256(keys[0].encode()).hexdigest())
             from deployment.lib.completed_normal_profile import profile
             selected_profile = profile(completed_normal_contract)
             from deployment.lib.completed_normal_profile import RECONCILED
-            if selected_profile is RECONCILED:
+            if (selected_profile is RECONCILED and completed_normal_contract['source_roles'].get('origin_kind')
+                    == 'independently-enrolled-historical-bootstrap-origin'):
                 # Technical isolated registration cannot issue execution rights.
                 # The canonical exceptional issuer bridge must be implemented
                 # and accepted before this credential boundary may open.

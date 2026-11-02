@@ -54,6 +54,10 @@ class FakeStorage:
 
 
 class ImmutableObjectStorageTests(unittest.TestCase):
+    def setUp(self):
+        from tests.account_schema_fixture import install_legacy_schema
+        install_legacy_schema(self)
+
     def test_direct_transport_streams_verifies_retries_and_cleans_partial_files(self):
         class ByteStream(httpx.SyncByteStream):
             def __init__(self, content): self.content = content

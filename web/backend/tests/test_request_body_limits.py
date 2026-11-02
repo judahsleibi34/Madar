@@ -83,6 +83,10 @@ def build_body_limit_client(
 
 
 class RequestBodyLimitTests(unittest.TestCase):
+    def setUp(self):
+        from tests.account_schema_fixture import install_legacy_schema
+        install_legacy_schema(self)
+
     def assert_payload_too_large(self, response):
         self.assertEqual(response.status_code, 413)
         self.assertEqual(response.json(), {"detail": "Request body too large"})

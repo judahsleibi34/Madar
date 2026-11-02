@@ -60,6 +60,9 @@ class _FakeServiceSupabase:
         self.user = user
 
     def table(self, name):
+        if name=='application_schema_state':
+            from tests.account_schema_fixture import SchemaStateQuery
+            return SchemaStateQuery()
         if name != "users":
             raise AssertionError(f"unexpected table {name}")
         return _FakeUsersQuery(self.user)
