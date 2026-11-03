@@ -5008,3 +5008,13 @@ signature, source history, full functional acceptance, backup age and the
 receiver enrollment/receipt expiry remain mandatory. Changing policy invalidates
 existing bound approval/evidence; it cannot extend an issued receipt. No live
 policy or existing signed inventory is changed by this source capability.
+
+Canonical historical consumption runs the complete existing preflight through
+the independently measured driver with both actual deployment locks held. The
+consumption verifier owns that scan; duplicate scans before it are omitted only
+on this exact historical path. No authority or maintenance effect occurs before
+the full locked technical revalidation passes. Ordinary maintenance keeps its
+previous order. Approval issuance rechecks current operator/session, independent
+policy/key and request/admission expiry after technical review, then records its
+actual issue time. Existing approvals are never extended; request/approval caps
+remain600/300 seconds. Expiry, changed identity/policy or failed gates refuse.

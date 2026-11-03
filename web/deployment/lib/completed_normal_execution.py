@@ -730,14 +730,19 @@ class CompletedNormalUpgrade:
         if (self.profile not in (DELETION, RECONCILED) or not callable(self.maintenance_acceptance_guard)
                 or not callable(self.maintenance_activation_guard) or not callable(self.maintenance_original_guard)):
             raise RuntimeError('schema150_independent_private_verifiers_required')
-        self.preflight()
+        historical=self.contract['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin'
+        # Canonical consumption performs the complete preflight through the
+        # measured driver under both existing locks. Do not repeat that same
+        # scan before handing control to the independent consumption verifier.
+        if not historical:self.preflight()
         self.lock=acquire_lock(self.ops.upgrade_root/'upgrade.lock',create=False)
         try:
-            self.preflight(locked=True)
-            historical=self.contract['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin'
+            if not historical:self.preflight(locked=True)
             if historical:
                 from deployment.lib.exceptional_release_approval import verify_canonical_execution,execution_event
                 self.ops.automatic_upgrade_lock=self.lock
+                if self.ops.deploy_lock_descriptor is None:
+                    self.ops.deploy_lock_descriptor=acquire_lock(self.ops.state_root/'deploy.lock',create=False)
                 value=getattr(self.ops,'canonical_exceptional_admission',None)
                 if not isinstance(value,dict) or value.get('contract')!=self.contract:
                     raise RuntimeError('schema160_exceptional_execution_approval_required')

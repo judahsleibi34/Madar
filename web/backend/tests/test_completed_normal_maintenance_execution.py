@@ -97,6 +97,30 @@ def maintenance_fixture(test, selected=RECONCILED, *, system_identifier=None):
 
 
 class MaintenanceExecutionTests(unittest.TestCase):
+    def test_historical_execution_revalidates_locked_before_any_privileged_effect(self):
+        from deployment.lib import exceptional_release_approval as approval
+        f=maintenance_fixture(self)
+        f.contract['source_roles']['origin_kind']='independently-enrolled-historical-bootstrap-origin'
+        f.ops.canonical_exceptional_admission={'contract':f.contract,'request_id':'model'}
+        def preflight(*,locked=False):
+            self.assertTrue(locked)
+            self.assertIsNotNone(f.driver.lock)
+            self.assertIsNotNone(f.ops.deploy_lock_descriptor)
+            f.effect('preflight_locked')
+        f.driver.preflight=Mock(side_effect=preflight)
+        def refuse(*args,**kw):
+            # The existing canonical verifier owns this exact full locked scan.
+            f.driver.preflight(locked=True)
+            self.assertEqual(f.calls,['preflight_locked'])
+            self.assertIsNotNone(f.ops.deploy_lock_descriptor)
+            raise RuntimeError('independent_locked_gate_refused')
+        with patch.object(approval,'verify_canonical_execution',side_effect=refuse) as verify:
+            with self.assertRaisesRegex(RuntimeError,'independent_locked_gate_refused'):f.driver._execute()
+        f.driver.preflight.assert_called_once_with(locked=True)
+        verify.assert_called_once()
+        self.assertFalse(f.driver.quiesced)
+        for effect in ('quiesce','admit','parent_sql','service_prepare'):self.assertNotIn(effect,f.calls)
+
     def test_original_schema146_grant_is_preserved_without_target_range_widening(self):
         from deployment.lib import completed_normal_profile as profiles
         contract=deletion_contract()

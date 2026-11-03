@@ -464,6 +464,17 @@ def decide(system,request_id,action,token,confirmation):
             # Deliberate approval revalidates exact artifacts/state as well as identity.
             observed=reobserve_review(system,request['admission'])
             if observed!=request['admission']:raise RuntimeError('exceptional_technical_observation_changed')
+            # Approval has not been issued yet. Recheck identity/policy and
+            # request expiry after potentially expensive technical observation.
+            current,current_key=policy(system)
+            if current!=p or not hmac.compare_digest(current_key,key):raise RuntimeError('exceptional_policy_changed')
+            fresh=system.authenticate_operator(token)
+            if any(fresh[k]!=operator[k] for k in ('operator_auth_id','policy_sha256','session_id_sha256')):
+                raise RuntimeError('exceptional_current_operator_changed')
+            operator=fresh;now=int(time.time())
+            if now>=min(request['expires_at'],request['admission']['expires_at']):
+                event(path,key,'EXPIRED',{'request_sha256':digest(request)})
+                raise RuntimeError('exceptional_request_expired')
             approval={'version':1,'approval_id':str(uuid.uuid4()),'request_sha256':digest(request),
                 'admission_sha256':request['admission_sha256'],'policy_sha256':digest(p),
                 'operator':operator,'issuer':'installed-root-release-issuer','issued_at':now,

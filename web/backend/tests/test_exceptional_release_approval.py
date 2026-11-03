@@ -87,9 +87,39 @@ class ApprovalJournalTests(unittest.TestCase):
         self.assertEqual(a.inspect(self.system,self.request_id)['state'],'AWAITING_ADMIN_APPROVAL')
         self.approve();out=a.inspect(self.system,self.request_id)
         self.assertEqual(out['state'],'APPROVED');self.assertFalse(out['consumed'])
-        self.system.authenticate_operator.assert_called_once_with('secret-not-in-journal')
+        self.assertEqual(self.system.authenticate_operator.call_count,2)
+        self.system.authenticate_operator.assert_called_with('secret-not-in-journal')
         self.system.reobserve_automatic_admission.assert_called_once_with(self.value)
         self.assertNotIn('secret-not-in-journal',json.dumps(out))
+
+    def test_issue_time_follows_revalidation_without_extending_frozen_deadline(self):
+        started=int(time.time());clock=[started]
+        def observe(value):clock[0]+=30;return value
+        self.system.reobserve_automatic_admission.side_effect=observe
+        with patch.object(a.time,'time',side_effect=lambda:clock[0]):self.approve()
+        signed=a.verified(self.folder/'approval.json',self.key)
+        self.assertEqual(signed['issued_at'],started+30)
+        self.assertEqual(signed['expires_at'],min(self.request['expires_at'],self.value['expires_at'],started+150))
+
+    def test_policy_key_or_session_change_during_review_never_issues_approval(self):
+        for changed in ((dict(self.policy,max_approval_seconds=119),self.key),
+                        (self.policy,b'different-independent-key')):
+            with self.subTest(changed=changed[0]),patch.object(a,'policy',side_effect=[(self.policy,self.key),changed]):
+                with self.assertRaisesRegex(RuntimeError,'policy_changed'):self.approve()
+            self.assertFalse((self.folder/'approval.json').exists())
+        self.system.authenticate_operator.side_effect=[self.operator,dict(self.operator,session_id_sha256='f'*64)]
+        with self.assertRaisesRegex(RuntimeError,'current_operator_changed'):self.approve()
+        self.assertFalse((self.folder/'approval.json').exists())
+
+    def test_expiry_or_revoked_identity_during_review_never_issues_approval(self):
+        self.system.authenticate_operator.side_effect=[self.operator,RuntimeError('release_operator_current_identity_unverified')]
+        with self.assertRaisesRegex(RuntimeError,'identity_unverified'):self.approve()
+        self.assertFalse((self.folder/'approval.json').exists())
+        self.system.authenticate_operator.side_effect=None
+        clock=[int(time.time())]
+        self.system.reobserve_automatic_admission.side_effect=lambda value:(clock.__setitem__(0,clock[0]+1000) or value)
+        with patch.object(a.time,'time',side_effect=lambda:clock[0]),self.assertRaisesRegex(RuntimeError,'request_expired'):self.approve()
+        self.assertFalse((self.folder/'approval.json').exists())
 
     def test_failed_live_inventory_does_not_hide_audit_or_allow_approval(self):
         with patch.object(a,'policy',side_effect=RuntimeError('isolated_release_runtime_inventory_changed')):

@@ -86,7 +86,8 @@ class CanonicalExceptionalReviewTests(unittest.TestCase):
         status=approval.inspect(self.system,result['request_id'])
         self.assertEqual(status['state'],'APPROVED');self.assertFalse(status['consumed'])
         self.assertEqual(self.driver.preflight.call_count,2)
-        self.system.authenticate_operator.assert_called_once_with('stdin-token')
+        self.assertEqual(self.system.authenticate_operator.call_count,2)
+        self.system.authenticate_operator.assert_called_with('stdin-token')
         self.assertNotIn('stdin-token',json.dumps(status))
         with self.assertRaisesRegex(RuntimeError,'coordinator_lock_required'):
             approval.verify_execution(status['request']['admission'],self.system,consume=True,token='stdin-token')

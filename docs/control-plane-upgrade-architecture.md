@@ -2979,3 +2979,13 @@ technical checks outlasted the600-second observation budget. The old signed
 receipt/approval are retained unchanged. No existing policy is widened in place;
 a new independently enrolled policy/source, fresh restoration and new approval
 must establish the longer explicitly bounded physical-acceptance contract.
+
+Canonical historical consumption runs the complete existing preflight through
+the independently measured driver with both actual deployment locks held. The
+consumption verifier owns that scan; duplicate scans before it are omitted only
+on this exact historical path. No authority or maintenance effect occurs before
+the full locked technical revalidation passes. Ordinary maintenance keeps its
+previous order. Approval issuance rechecks current operator/session, independent
+policy/key and request/admission expiry after technical review, then records its
+actual issue time. Existing approvals are never extended; request/approval caps
+remain600/300 seconds. Expiry, changed identity/policy or failed gates refuse.
