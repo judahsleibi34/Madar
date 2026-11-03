@@ -45,6 +45,8 @@ class HistoricalPhysicalRecoveryTests(unittest.TestCase):
         f.trust.pop('completion_sha256');f.trust.update(version=2,schema=146,
             historical_origin=copy.deepcopy(self.binding),source_origin_sha256=digest(self.context))
         f.seal_receiver()
+        self.modern_functional=copy.deepcopy(f.receipt['functional_acceptance'])
+        self.native_historical_acceptance()
 
     def check(self,*,binding=True):
         f=self.fixture
@@ -101,7 +103,7 @@ class HistoricalPhysicalRecoveryTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'application_unaccepted'):self.check()
 
     def test_changed_original_private_objects_tenant_or_mfa_refuse(self):
-        for key in ('tenant_isolation','original_mfa_totp','anonymous_storage_denied'):
+        for key in ('tenant_isolation','original_mfa_totp_AAL2','anonymous_storage_denied'):
             self.fixture.receipt['functional_acceptance'][key]=False;self.fixture.seal_receiver()
             with self.subTest(key=key),self.assertRaisesRegex(RuntimeError,'application_unaccepted'):self.check()
             self.fixture.receipt['functional_acceptance'][key]=True
@@ -150,6 +152,12 @@ class HistoricalPhysicalRecoveryTests(unittest.TestCase):
                 ('limitations',['No preserved populated forms/reservations/calendar fixtures were present in this origin; those required Milestone C scenarios remain incomplete.'])]:
             f.receipt['functional_acceptance']=copy.deepcopy(original);f.receipt['functional_acceptance'][key]=value;f.seal_receiver()
             with self.subTest(key=key),self.assertRaisesRegex(RuntimeError,'application_unaccepted'):self.check()
+
+    def test_modern_boolean_report_cannot_replace_historical_subject_evidence(self):
+        f=self.fixture
+        f.receipt['functional_acceptance']=copy.deepcopy(self.modern_functional)
+        f.receipt['functional_acceptance']['schema']=146;f.seal_receiver()
+        with self.assertRaisesRegex(RuntimeError,'application_unaccepted'):self.check()
 
     def test_historical_format_does_not_waive_common_signature_runtime_or_freshness(self):
         self.native_historical_acceptance();f=self.fixture

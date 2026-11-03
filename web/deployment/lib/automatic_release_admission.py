@@ -272,9 +272,7 @@ def physical_recovery_evidence(recovery,policy,origin_source,protocols,*,now,his
     if (any(type(v) is not int for v in times) or not times[0]<=times[1]<=times[2]<=now
             or now-times[0]>policy['recovery_max_age_seconds'] or now-times[2]>policy['evidence_max_age_seconds']):
         raise RuntimeError('automatic_physical_recovery_stale')
-    historical_functional=(historical and functional.get('acceptance_scope')==
-        'historical146-full-preserved-business-application')
-    if historical_functional:
+    if historical:
         verify_historical_restored_functional(functional,origin,origin_source,
             trust['database_system_identifier'])
         return True
