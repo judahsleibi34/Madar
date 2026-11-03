@@ -933,6 +933,8 @@ def prepare_historical_boot_prerequisites(system):
     p,host=policy(system)
     with operation_locks(system):
         scope=_historical_boot_scope(system,p,host,unsigned=True)
+        require_root_directory(ROOT,create=True)
+        _sync_directory(ROOT.parent)
         require_root_directory(BOOT_PREREQUISITES,create=True)
         _sync_directory(BOOT_PREREQUISITES.parent)
         initial={'version':1,'kind':'isolated-historical-boot-prerequisites','scope':scope,'bootstrap_policy':p}

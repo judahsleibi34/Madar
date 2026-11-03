@@ -2925,3 +2925,7 @@ known-good sealing follows enrollment without changing its signed boot preimage
 or extending the original policy lifetime. Ordinary completed-release recovery
 installation retains its existing pathway. Real reboot remains a separate
 operational acceptance requirement.
+
+First installation creates and syncs the existing automatic-recovery parent
+before its historical prerequisite journal. A missing parent must be handled
+by that ordered protected creation, never by an unchecked recursive mkdir.

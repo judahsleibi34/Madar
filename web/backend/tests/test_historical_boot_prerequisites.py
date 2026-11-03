@@ -26,13 +26,14 @@ class HistoricalBootPrerequisiteTests(unittest.TestCase):
         self.host={'database_container_id':'e'*64,'database_system_identifier':'123456789'}
         self.barrier={'fragment':'/etc/systemd/system/madar-isolated-fence.service','dropins':[],
             'state':{'enabled':'enabled','active':'active'}}
+        self.enterContext(patch.object(recovery,'ROOT',self.journal))
         self.enterContext(patch.object(recovery,'BOOT_PREREQUISITES',self.journal/'historical-boot-prerequisites'))
         self.enterContext(patch.object(recovery.admission,'ROOT',self.root/'admissions'))
         self.enterContext(patch.object(recovery,'policy',side_effect=lambda *_:(copy.deepcopy(self.p),copy.deepcopy(self.host))))
         self.enterContext(patch.object(recovery,'readonly_configuration',side_effect=lambda p,**_:Path(p)))
         self.enterContext(patch.object(origin,'bootstrap_record',side_effect=lambda p:json.loads(p.read_bytes())))
         self.enterContext(patch.object(origin,'operation_locks',return_value=nullcontext()))
-        self.enterContext(patch('deployment.lib.control_plane_upgrade.require_root_directory',side_effect=lambda p,**kw:Path(p).mkdir(parents=True,exist_ok=True)))
+        self.enterContext(patch('deployment.lib.control_plane_upgrade.require_root_directory',side_effect=lambda p,**kw:Path(p).mkdir(mode=0o700,parents=False,exist_ok=True)))
         self.enterContext(patch.object(origin,'network_barrier_control',side_effect=lambda _:copy.deepcopy(self.barrier)))
         self.enterContext(patch.object(recovery,'read',side_effect=lambda p,**_:json.loads(Path(p).read_bytes())))
         units=self.root/'unit';units.write_text('fixed-unit')
@@ -121,3 +122,9 @@ class HistoricalBootPrerequisiteTests(unittest.TestCase):
         self.setup();self.p.update(version=2,expires_at=4001)
         with self.assertRaisesRegex(RuntimeError,'scope_changed'):self.require()
         self.p['expires_at']=3999;self.require()
+
+    def test_first_install_creates_recovery_parent_before_attempt_journal(self):
+        self.journal.rmdir()
+        ready=self.setup()
+        self.assertEqual(self.require(),ready)
+        self.assertTrue((self.journal/'historical-boot-prerequisites/scope.json').exists())
