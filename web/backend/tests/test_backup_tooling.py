@@ -362,6 +362,25 @@ class BackupToolingTests(unittest.TestCase):
         with self.assertRaisesRegex(rehearsal.RehearsalError, 'unsupported_restore_preload'):
             rehearsal.rehearse(Path('/unneeded'), 'postgres@sha256:'+'a'*64, postgres_preload=('untrusted',))
 
+    def test_statistics_preload_does_not_invent_absent_worker_libraries(self):
+        with tempfile.TemporaryDirectory() as root:
+            backup=Path(root)
+            (backup/'database.dump').write_bytes(b'unit fixture')
+            (backup/'manifest.json').write_text('{"backup_id":"fixture","created_at":"fixture","database":{"schema_version":146}}')
+            commands=[]
+            def run(command,*,phase,**kwargs):
+                commands.append((command,phase))
+                if phase=='role_prerequisites':raise rehearsal.RehearsalError('stop_before_restore')
+                return ''
+            with mock.patch.object(rehearsal,'run',side_effect=run),mock.patch.object(
+                    rehearsal.subprocess,'run',return_value=SimpleNamespace(returncode=0)):
+                with self.assertRaisesRegex(rehearsal.RehearsalError,'stop_before_restore'):
+                    rehearsal.rehearse(backup,'postgres@sha256:'+'a'*64,postgres_preload=('pg_stat_statements',))
+            startup=next(command for command,phase in commands if phase=='database_start')
+            self.assertIn('shared_preload_libraries=pg_stat_statements',startup[-1])
+            self.assertNotIn('pg_cron',startup[-1]);self.assertNotIn('pg_net',startup[-1])
+            self.assertIn('disposable_cleanup',[phase for _,phase in commands])
+
     def test_coordinated_logical_roles_are_nologin_and_never_replay_credentials(self):
         with tempfile.TemporaryDirectory() as directory:
             backup = Path(directory)

@@ -131,7 +131,7 @@ def rehearse(backup: Path, image: str, migration: Path | None = None, *, target_
     if len(set(new_tables)) != len(new_tables) or any(not re.fullmatch(r"[a-z][a-z0-9_]*", table) for table in new_tables):
         raise RehearsalError("invalid_expected_new_tables")
     if (len(postgres_preload) != len(set(postgres_preload))
-            or any(name not in {"pg_cron", "pg_net"} for name in postgres_preload)):
+            or any(name not in {"pg_cron", "pg_net", "pg_stat_statements"} for name in postgres_preload)):
         raise RehearsalError("unsupported_restore_preload")
     regular_source(str(backup / "database.dump"))
     migration_mount = readonly_file_mount(str(migration), "/migration.sql") if migration else None

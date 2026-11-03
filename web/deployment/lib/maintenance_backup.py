@@ -80,6 +80,33 @@ def readonly_query(adapter, body):
         "SET LOCAL statement_timeout='60s';\n"+body+'\nCOMMIT;')
 
 
+def restore_preload(context):
+    """Observe the fenced source's bounded PostgreSQL library requirements.
+
+    Extension installation can require a preload even if a source configuration
+    is incomplete. Never infer that every historical image ships pg_cron/net,
+    nor load an arbitrary source-selected shared library in the restore target.
+    The existing source/authority/quiescence guards surround this observation.
+    """
+    adapter=require_context(context)
+    allowed={'pg_cron','pg_net','pg_stat_statements'}
+    value=json.loads(readonly_query(adapter,"SELECT json_build_object('installed',"
+        "coalesce((SELECT json_agg(extname ORDER BY extname) FROM pg_extension WHERE "
+        "extname IN ('pg_cron','pg_net','pg_stat_statements')),'[]'::json),"
+        "'configured',current_setting('shared_preload_libraries'))::text;"))
+    if (not isinstance(value,dict) or set(value)!={'installed','configured'}
+            or not isinstance(value['installed'],list)
+            or any(type(name) is not str or name not in allowed for name in value['installed'])
+            or value['installed']!=sorted(set(value['installed']))
+            or type(value['configured']) is not str):
+        raise RuntimeError('maintenance_backup_restore_preload_invalid')
+    configured=[name.strip() for name in value['configured'].split(',')] if value['configured'].strip() else []
+    if (len(configured)!=len(set(configured)) or any(name not in allowed for name in configured)):
+        raise RuntimeError('maintenance_backup_restore_preload_unsupported')
+    require_context(context)
+    return tuple(sorted(set(value['installed'])|set(configured)))
+
+
 def recovery_context(context):
     return {'origin_source_sha':context.contract['source_roles']['application_sha'],
         'origin_images':context.contract['origin']['images'],'candidate_images':context.contract['candidate']['images'],

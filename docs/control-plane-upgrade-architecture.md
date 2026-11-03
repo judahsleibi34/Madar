@@ -1,5 +1,14 @@
 # Privileged control-plane upgrade architecture
 
+The fenced maintenance backup observes its source PostgreSQL extension inventory
+and configured preload libraries through the existing concrete provider's
+read-only connection, guarded by source, authority and quiescence checks. The
+restore permits only pg_cron, pg_net and pg_stat_statements; unknown libraries or
+malformed observations refuse. Historical images do not implicitly acquire
+pg_cron/net dependencies. When present, their existing scheduler-disable and
+unreachable-database checks remain mandatory in the networkless restore target.
+This changes no migration authority, backup format or independent recovery gate.
+
 The package producer binds `proxy_runtime` from the validated original actor
 inventory before hashing or freezing the plan. It independently reobserves that
 proxy by ID, image, specification and running state around publication. A

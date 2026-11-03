@@ -95,6 +95,11 @@ class CompletedNormalBackupContext:
         from deployment.lib.maintenance_backup import expected_manifest
         return expected_manifest(self,backup)
 
+    def restore_preload(self):
+        if self.provider_adapter is None:raise RuntimeError('completed_backup_maintenance_context_required')
+        from deployment.lib.maintenance_backup import restore_preload
+        return restore_preload(self)
+
     def role_names(self):
         # Read role NAMES from the current native database. Passwords,
         # attributes and memberships are never copied into this inventory.

@@ -19,8 +19,53 @@ from deployment.lib.maintenance_backup import seal_capture, private_copy
 from deployment.lib.schema150_object_inventory import measure_roots,archive_roots
 from deployment.lib.schema150_actor_inventory import REQUIRED_OBJECT_ROOTS
 from deployment.lib import completed_normal_profile as profiles
+from deployment.lib import maintenance_backup
 from deployment.lib.schema150_release import admitted_manifest
 from deployment.lib.completed_normal_admission import digest as profiles_json_digest
+
+
+class MaintenanceRestorePreloadTests(unittest.TestCase):
+    def observe(self,value):
+        context=object();adapter=object()
+        with patch.object(maintenance_backup,'require_context',return_value=adapter) as guard,\
+                patch.object(maintenance_backup,'readonly_query',return_value=json.dumps(value)) as query:
+            result=maintenance_backup.restore_preload(context)
+        self.assertEqual(guard.call_args_list,[unittest.mock.call(context),unittest.mock.call(context)])
+        self.assertIs(query.call_args.args[0],adapter)
+        self.assertIn('pg_extension',query.call_args.args[1])
+        return result
+
+    def test_historical_image_requires_only_its_observed_statistics_library(self):
+        self.assertEqual(self.observe({'installed':['pg_stat_statements'],'configured':'pg_stat_statements'}),('pg_stat_statements',))
+
+    def test_plain_database_does_not_require_absent_worker_libraries(self):
+        self.assertEqual(self.observe({'installed':[],'configured':''}),())
+
+    def test_installed_workers_require_safe_preloads_even_if_configuration_omits_them(self):
+        self.assertEqual(self.observe({'installed':['pg_cron','pg_net'],'configured':' pg_stat_statements '}),
+                         ('pg_cron','pg_net','pg_stat_statements'))
+
+    def test_unknown_library_malformed_inventory_and_duplicate_requirements_refuse(self):
+        for value in ({'installed':[],'configured':'untrusted'},
+                      {'installed':[],'configured':'pg_cron,pg_cron'},
+                      {'installed':[],'configured':'pg_net,'},
+                      {'installed':['untrusted'],'configured':''},
+                      {'installed':['pg_net','pg_cron'],'configured':''},
+                      {'installed':['pg_net','pg_net'],'configured':''},
+                      {'installed':None,'configured':''},
+                      {'installed':[],'configured':[]},
+                      {'installed':[],'configured':'','pass':True}):
+            with self.subTest(value=value),self.assertRaisesRegex(RuntimeError,'maintenance_backup_restore_preload_'):
+                self.observe(value)
+
+    def test_source_or_authority_guard_failure_never_falls_back(self):
+        with patch.object(maintenance_backup,'require_context',side_effect=RuntimeError('source_changed')),\
+                patch.object(maintenance_backup,'readonly_query') as query:
+            with self.assertRaisesRegex(RuntimeError,'source_changed'):maintenance_backup.restore_preload(object())
+        query.assert_not_called()
+        with patch.object(maintenance_backup,'require_context',side_effect=[object(),RuntimeError('fence_changed')]),\
+                patch.object(maintenance_backup,'readonly_query',return_value='{"installed":[],"configured":""}'):
+            with self.assertRaisesRegex(RuntimeError,'fence_changed'):maintenance_backup.restore_preload(object())
 
 
 class MaintenanceBackupTests(unittest.TestCase):

@@ -330,7 +330,8 @@ def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_con
         role_names=tuple(sorted(set(re.findall(r'^CREATE ROLE ([a-zA-Z_][a-zA-Z0-9_]*);$',roles.read_text(),re.MULTILINE))))
     if maintenance_digest is None and not {'anon','authenticated','service_role'}.issubset(role_names):
         raise RuntimeError('normal_backup_restore_role_inventory_missing')
-    restore=rehearse(backup,digests[0],postgres_preload=('pg_cron','pg_net'),additional_roles=role_names,
+    preload=(completed_context.restore_preload() if maintenance_digest is not None else ('pg_cron','pg_net'))
+    restore=rehearse(backup,digests[0],postgres_preload=preload,additional_roles=role_names,
         **({'maintenance_manifest_sha256':maintenance_digest} if maintenance_digest is not None else {}))
     if restore.get('status')!='logical_database_and_file_restore_passed' or restore.get('backup_schema')!=expected_schema:
         raise RuntimeError('normal_backup_actual_restore_incomplete')
