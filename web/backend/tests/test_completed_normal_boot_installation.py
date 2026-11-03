@@ -82,6 +82,56 @@ class CompletedBootInstallationTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError,'historical_recovery_unit_changed'):
                 m.CompletedNormalBootInstallation(contract,document,self.installer.package,lambda:None,self.ops,units=self.units,admissions=self.path/'admissions')
 
+    def test_historical_restart_preflight_and_install_count_the_actual_static_actor(self):
+        from test_historical_origin import HistoricalPreparationBindingTests
+        from deployment.lib.completed_normal_profile import RECONCILED
+        from deployment.lib.automatic_release_recovery import unit_definitions
+        # Real private fixture files: the historical origin has the static
+        # restart service, rather than fictional completed-release boot units.
+        for path in list(self.units.rglob('*')):
+            if path.is_file() and path != self.units/m.PROXY:
+                path.unlink()
+        contract=HistoricalPreparationBindingTests().contract()
+        document=copy.deepcopy(self.installer.document)
+        name='madar-known-good-recovery.service';fragment=str(m.UNITS/name)
+        body=unit_definitions()[name].encode()
+        (self.units/name).write_bytes(body);(self.units/name).chmod(0o644)
+        barrier=self.units/'madar-isolated-fence.service'
+        barrier.write_text(unit_definitions()[barrier.name]);barrier.chmod(0o644)
+        barrier_before=barrier.read_bytes()
+        state={'enabled':'enabled','active':'inactive'}
+        proxy=str(m.UNITS/m.PROXY)
+        baseline={'files':{proxy:document['boot_resources']['files'][proxy],
+            fragment:{'sha256':hashlib.sha256(body).hexdigest(),'uid':0,'mode':0o644}},
+            'proxy_dropins':[],'old_units':[name],'old_unit_dropins':{name:[]},
+            'unit_states':{m.PROXY:self.ops.systemctl_state(m.PROXY),name:state}}
+        document['boot_resources']=baseline;contract['plan_sha256']=admission.digest(document)
+        observed={'boot_controls':{'files':copy.deepcopy(baseline['files']),'units':{
+            m.PROXY:{'state':baseline['unit_states'][m.PROXY],'dropins':[]},
+            name:{'fragment':fragment,'dropins':[],'state':state}}}}
+        self.ops.states[name]=state.copy()
+        with patch.object(m,'profile',return_value=RECONCILED),patch(
+                'deployment.lib.historical_origin.recorded_observation',return_value=observed):
+            instance=m.CompletedNormalBootInstallation(contract,document,self.installer.package,
+                lambda:None,self.ops,units=self.units,admissions=self.path/'admissions')
+        instance.preflight(read_only=True)
+        self.assertEqual(self.ops.calls,[])
+        (self.units/name).unlink()
+        with self.assertRaisesRegex(RuntimeError,'legacy_unit_inventory_changed'):
+            instance.preflight(read_only=True)
+        (self.units/name).write_bytes(body+b'# unexpected modification\n')
+        (self.units/name).chmod(0o644)
+        with self.assertRaisesRegex(RuntimeError,'exact_preimage_changed'):
+            instance.preflight(read_only=True)
+        (self.units/name).write_bytes(body)
+        self.ops.installation=instance;instance.root.mkdir()
+        instance.install()
+        self.assertEqual(barrier.read_bytes(),barrier_before)
+        self.assertFalse((self.units/(barrier.name+'.d')).exists())
+        self.assertEqual(self.ops.systemctl_state(name)['enabled'],'disabled')
+        self.assertFalse(any(args[:2] in (['systemctl','start'],['systemctl','restart'])
+                             for _,args in self.ops.calls))
+
     def test_application_successor_preserves_verified_older_compatible_boot_actor(self):
         from test_completed_normal_application_release import application_contract
         contract=application_contract();document=copy.deepcopy(self.installer.document)

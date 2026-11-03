@@ -173,6 +173,12 @@ class CompletedNormalBootInstallation:
         if self.profile is not LEGACY:
             legacy.update(p.name for p in self.units.glob('madar-compatible-normal-boot-*.service') if p.name!=self.name)
         if (self.units/'madar-emergency-routing.service').exists():legacy.add('madar-emergency-routing.service')
+        if self.contract['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin':
+            # The constructor authenticated this static actor against the
+            # signed historical inventory and exact unit definition. Count
+            # its real file here too; it has no context-derived legacy name.
+            recovery=self.units/'madar-known-good-recovery.service'
+            if recovery.exists() or recovery.is_symlink():legacy.add(recovery.name)
         if legacy!=set(self.baseline['old_units']):raise RuntimeError('completed_boot_legacy_unit_inventory_changed')
         for raw,expected in self.baseline['files'].items():
             path=self.units/Path(raw).relative_to(UNITS)

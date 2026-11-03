@@ -1,5 +1,14 @@
 # Privileged control-plane upgrade architecture
 
+Historical boot supersession counts the authenticated static
+`madar-known-good-recovery.service` in its live preflight inventory, as well as
+the older context-named boot actors. The signed historical record, exact unit
+bytes, loaded state and drop-in inventories remain mandatory. The early
+isolation service is preserved and receives no supersession drop-in. Missing
+or modified restart services still refuse before installation; completed-release
+origins retain their existing inventory rules. This correction alone provides
+no migration authority or protected-upgrade acceptance.
+
 Canonical160 target backup now precedes private recovery/handoff in the existing
 maintenance coordinator. It retains the concrete provider fence and original
 role/object preimages through the actual backup pipeline. Numeric160 support is
