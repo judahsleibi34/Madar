@@ -22,7 +22,7 @@ nonce=str(uuid.uuid4());work=root/'owned-fixture';work.mkdir(mode=0o700)
 print(json.dumps({'native_fixture_owner':nonce,'work_root':str(root),'source_sha':source_sha,'worktree_clean':worktree_clean}),flush=True)
 signal.signal(signal.SIGTERM,lambda signum,frame:sys.exit(128+signum))
 image='postgres@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73'
-image_id=image.split('@')[1];label='com.madar.native.restore.preflight='+nonce
+image_id=None;label='com.madar.native.restore.preflight='+nonce
 source='madar-native-restore-source-'+nonce[:12]
 tools=work/'tools';tools.mkdir(mode=0o700)
 # Label every new container, including the existing rehearsal helper's target.
@@ -58,6 +58,13 @@ report={'kind':'native-synthetic-maintenance-restore-regression','source_sha':so
         'canonical_migration_sql_executed':False,'source_application_acceptance_claimed':False}
 removed=[]
 try:
+    # A registry manifest digest and its platform-specific config image ID are
+    # different identities. Resolve the pinned reference, then bind every owned
+    # container to both its exact requested reference and that actual ID.
+    pinned=json.loads(command(['/usr/bin/docker','image','inspect',image]))
+    assert len(pinned)==1 and image in pinned[0]['RepoDigests']
+    image_id=pinned[0]['Id'];assert re.fullmatch('sha256:[a-f0-9]{64}',image_id)
+    report['database_image_id']=image_id
     command(['docker','run','--detach','--pull=never','--name',source,'--network','none',
         '--user','65534:65534','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges',
         '--memory','2g','--cpus','2','--pids-limit','128',
@@ -170,7 +177,7 @@ SELECT setval(pg_get_serial_sequence('public.native_restore_records','id'),42,tr
             ids=command(['/usr/bin/docker','ps','-aq','--filter','label='+label]).split()
             rows=json.loads(command(['/usr/bin/docker','inspect',*ids]))
             selected=[r for r in rows if re.fullmatch('/madar-restore-rehearsal-[a-f0-9]{12}',r['Name'])]
-            assert len(selected)==1 and selected[0]['Image']==image_id
+            assert len(selected)==1 and selected[0]['Image']==image_id and selected[0]['Config']['Image']==image
             target=selected[0];assert target['Config']['Labels']['com.madar.native.restore.preflight']==nonce
             command(['/usr/bin/docker','exec','-i',target['Id'],'psql','-XqAt','-h','/tmp','-U',roles,'-d','postgres','-v','ON_ERROR_STOP=1'],input=sql)
             injected.append(target['Id'])
@@ -198,7 +205,8 @@ finally:
     ids=command(['/usr/bin/docker','ps','-aq','--filter','label='+label]).split()
     for cid in ids:
         row=json.loads(command(['/usr/bin/docker','inspect',cid]))[0]
-        assert row['Config']['Labels']['com.madar.native.restore.preflight']==nonce and row['Image']==image_id
+        assert (row['Config']['Labels']['com.madar.native.restore.preflight']==nonce
+                and row['Image']==image_id and row['Config']['Image']==image)
         assert row['Name']=='/'+source or re.fullmatch('/madar-(restore-rehearsal|native-toc)-[a-f0-9]{12}',row['Name'])
         command(['/usr/bin/docker','rm','--force',cid]);removed.append(cid)
     assert not command(['/usr/bin/docker','ps','-aq','--filter','label='+label]).strip()
