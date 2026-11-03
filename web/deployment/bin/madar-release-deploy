@@ -676,9 +676,13 @@ class DockerGitOperations:
             if selected_profile is RECONCILED:
                 # Candidate-only URL; the original gateway/configuration is
                 # retained. Credentials and TLS choice remain protected inputs.
-                from deployment.lib.completed_normal_private_provider import require_calendar_environment
+                from deployment.lib.completed_normal_private_provider import require_calendar_environment,historical_calendar_environment
                 gateway=selected['containers']['provider-gateway']
-                env['SUPABASE_URL']='http://'+gateway+':8000'
+                if admission['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin':
+                    env=historical_calendar_environment(env,gateway_name=gateway,
+                        system_identifier=admission['database']['system_identifier'])
+                else:
+                    env['SUPABASE_URL']='http://'+gateway+':8000'
                 require_calendar_environment(env,gateway_name=gateway,
                     system_identifier=admission['database']['system_identifier'])
         return env

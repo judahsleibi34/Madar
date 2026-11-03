@@ -1,5 +1,23 @@
 # Madar production release acceptance policy
 
+## Historical calendar connection preparation
+
+Before historical enrollment, independently configure the existing native
+`authenticator` connection as an explicit URI for `supabase-db:5432/postgres`,
+its exact cluster identifier and an approved TLS mode. These are protected
+original configuration inputs; the controller discovers no password and grants
+no database privilege. A missing connection still blocks the upgrade.
+
+For an authenticated historical canonical160 origin only, the existing renderer
+projects that fixed native hostname onto its exact context-derived private
+gateway. It preserves credentials, database, TLS and cluster identity, then runs
+the unchanged final gateway binding check. This avoids a circular dependency
+between the signed original configuration, plan digest and gateway name. The
+original file and original runtime remain unchanged. Ordinary origins retain
+their existing direct binding requirements. Private gateway topology, actual
+transport/role/ACL acceptance, administrator approval and all recovery gates
+remain mandatory; rendering is not operational acceptance.
+
 ## Canonical target recovery checkpoint
 
 The maintenance coordinator captures its schema160 checkpoint after all committed

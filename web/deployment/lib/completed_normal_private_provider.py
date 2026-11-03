@@ -6,6 +6,7 @@ Its internal client bridge is separate from the measured original provider
 bridge. The original public gateway is never used for private acceptance.
 """
 from urllib.parse import urlsplit,parse_qs,unquote
+import re
 
 NATIVE_NETWORK='madar-local-supabase_default'
 CLIENT_NETWORK='madar-supabase-client'
@@ -22,21 +23,52 @@ def environment(items):
     return result
 
 
-def require_calendar_environment(env, *, gateway_name, system_identifier):
-    """Require explicit protected credentials/config; never discover or grant them."""
+def _calendar_uri(env, *, hostname, system_identifier):
+    if (not isinstance(env,dict) or not isinstance(system_identifier,str)
+            or not re.fullmatch('[1-9][0-9]{0,31}',system_identifier)):
+        raise RuntimeError('completed_private_calendar_transport_invalid')
     try:
         uri=urlsplit(env.get('MADAR_CALENDAR_DATABASE_DSN',''))
         options=parse_qs(uri.query,strict_parsing=True,keep_blank_values=True)
         if (uri.scheme not in {'postgres','postgresql'} or uri.fragment
                 or unquote(uri.username or '')!='authenticator' or not uri.password
-                or uri.hostname!=gateway_name or uri.port!=5432 or uri.path!='/postgres'
+                or uri.netloc.count('@')!=1 or uri.hostname!=hostname or uri.port!=5432 or uri.path!='/postgres'
                 or set(options)!={'sslmode'} or options['sslmode'] not in
                    (['disable'],['require'],['verify-ca'],['verify-full'])
-                or env.get('MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER')!=system_identifier
-                or env.get('SUPABASE_URL')!='http://'+gateway_name+':8000'):
+                or env.get('MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER')!=system_identifier):
             raise ValueError()
     except (ValueError,TypeError):
         raise RuntimeError('completed_private_calendar_transport_invalid') from None
+    return uri
+
+
+def historical_calendar_environment(env, *, gateway_name, system_identifier):
+    """Project one signed native connection onto the exact successor gateway.
+
+    The gateway name contains the final context digest. Putting that name into
+    the signed original configuration would make the plan hash circular. Only
+    this fixed internal hostname changes; credentials, database, TLS and cluster
+    identity must already be explicit protected original inputs. No connection,
+    credential discovery, role grant or source configuration mutation occurs.
+    """
+    if (not isinstance(env,dict) or env.get('SUPABASE_URL')!='http://madar-supabase:8000'
+            or not isinstance(gateway_name,str) or not re.fullmatch(
+                r'madar-schema160-[a-f0-9]{16}-(blue|green)-provider-gateway',gateway_name)):
+        raise RuntimeError('completed_private_calendar_transport_invalid')
+    uri=_calendar_uri(env,hostname='supabase-db',system_identifier=system_identifier)
+    result=dict(env)
+    result['MADAR_CALENDAR_DATABASE_DSN']=uri._replace(
+        netloc=uri.netloc.rsplit('@',1)[0]+'@'+gateway_name+':5432').geturl()
+    result['SUPABASE_URL']='http://'+gateway_name+':8000'
+    require_calendar_environment(result,gateway_name=gateway_name,system_identifier=system_identifier)
+    return result
+
+
+def require_calendar_environment(env, *, gateway_name, system_identifier):
+    """Require explicit protected credentials/config; never discover or grant them."""
+    _calendar_uri(env,hostname=gateway_name,system_identifier=system_identifier)
+    if env.get('SUPABASE_URL')!='http://'+gateway_name+':8000':
+        raise RuntimeError('completed_private_calendar_transport_invalid')
 
 
 def verify_gateway(row, *, source_sha, image):

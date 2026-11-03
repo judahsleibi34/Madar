@@ -1,5 +1,13 @@
 # Privileged control-plane upgrade architecture
 
+Historical calendar preparation pins the native connection before signing the
+origin. The canonical renderer changes only its fixed internal hostname to the
+context-derived gateway after validating the explicit credential, database, TLS
+and cluster binding. The final measured backend and unique private gateway DNS
+owner are still independently verified. See the historical calendar connection
+section of `production-release-policy.md`; no source file or signed origin is
+rewritten during candidate rendering.
+
 Historical boot supersession counts the authenticated static
 `madar-known-good-recovery.service` in its live preflight inventory, as well as
 the older context-named boot actors. The signed historical record, exact unit

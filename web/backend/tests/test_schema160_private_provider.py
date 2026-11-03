@@ -22,6 +22,68 @@ from test_completed_normal_compose import cli,WEB
 
 
 class PrivateProviderTests(unittest.TestCase):
+    def test_historical_calendar_projection_breaks_no_hash_or_credential_boundary(self):
+        source={'SUPABASE_URL':'http://madar-supabase:8000',
+            'MADAR_CALENDAR_DATABASE_DSN':'postgresql://authenticator:synthetic%40private@supabase-db:5432/postgres?sslmode=require',
+            'MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER':'731','UNRELATED':'unchanged'}
+        before=copy.deepcopy(source)
+        for context,slot in (('a'*16,'blue'),('b'*16,'green')):
+            gateway='madar-schema160-'+context+'-'+slot+'-provider-gateway'
+            projected=provider.historical_calendar_environment(source,gateway_name=gateway,system_identifier='731')
+            self.assertEqual(projected['MADAR_CALENDAR_DATABASE_DSN'],source['MADAR_CALENDAR_DATABASE_DSN'].replace('@supabase-db:', '@'+gateway+':'))
+            self.assertEqual(projected['SUPABASE_URL'],'http://'+gateway+':8000')
+            self.assertEqual(projected['UNRELATED'],'unchanged')
+            provider.require_calendar_environment(projected,gateway_name=gateway,system_identifier='731')
+        self.assertEqual(source,before)
+
+    def test_historical_calendar_projection_refuses_missing_or_unapproved_transport(self):
+        gateway='madar-schema160-'+'a'*16+'-blue-provider-gateway'
+        env={'SUPABASE_URL':'http://madar-supabase:8000',
+            'MADAR_CALENDAR_DATABASE_DSN':'postgresql://authenticator:synthetic-private@supabase-db:5432/postgres?sslmode=disable',
+            'MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER':'731'}
+        faults=[{},dict(env,SUPABASE_URL='http://foreign-provider:8000'),
+            dict(env,MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER='732')]
+        for before,after in (('authenticator:','postgres:'),('synthetic-private@','@'),
+                ('supabase-db','foreign-db'),('/postgres?','/other?'),('5432','6432'),
+                ('sslmode=disable','sslmode=prefer'),('sslmode=disable','sslmode=disable&hostaddr=192.0.2.1'),
+                ('sslmode=disable','sslmode=disable&sslmode=require'),('synthetic-private','raw@private')):
+            faults.append(dict(env,MADAR_CALENDAR_DATABASE_DSN=env['MADAR_CALENDAR_DATABASE_DSN'].replace(before,after)))
+        for bad in faults:
+            with self.assertRaisesRegex(RuntimeError,'calendar_transport_invalid') as error:
+                provider.historical_calendar_environment(bad,gateway_name=gateway,system_identifier='731')
+            self.assertNotIn('synthetic-private',str(error.exception))
+        for name in ('foreign-gateway','madar-schema160-'+'a'*16+'-blue-provider-gateway:5432'):
+            with self.assertRaisesRegex(RuntimeError,'calendar_transport_invalid'):
+                provider.historical_calendar_environment(env,gateway_name=name,system_identifier='731')
+
+    def test_actual_historical_renderer_projects_only_the_pinned_native_calendar_endpoint(self):
+        import tempfile
+        from test_historical_origin import HistoricalPreparationBindingTests
+        contract=HistoricalPreparationBindingTests().contract();slot=contract['candidate']['slot']
+        selected=allocation(contract,slot,preparation150=True)
+        with tempfile.TemporaryDirectory() as directory:
+            config=Path(directory)/'synthetic.env';config.write_text('SUPABASE_URL=http://madar-supabase:8000\n')
+            ops=cli.DockerGitOperations(WEB.parent,Path(directory),config,
+                cli.Compatibility(146,160,160,'coordinated',160,160))
+            ops.release_root=WEB.parent;ops.read_only_model_contract=contract
+            ops.schema_version=lambda:146
+            images={'backend':'backend@'+contract['candidate']['images']['backend'],
+                'frontend':'frontend@'+contract['candidate']['images']['frontend'],
+                'worker':'backend@'+contract['candidate']['images']['backend'],'build_timestamp':'2026-11-03T00:00:00Z'}
+            configured={'SUPABASE_URL':'http://madar-supabase:8000','MADAR_STORAGE_ROOT':str(Path(directory)/'storage'),
+                'MADAR_CALENDAR_DATABASE_DSN':'postgresql://authenticator:synthetic-native@supabase-db:5432/postgres?sslmode=require',
+                'MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER':contract['database']['system_identifier']}
+            with patch.dict(os.environ,configured),patch(
+                    'deployment.lib.completed_normal_admission.require_candidate_authority',
+                    side_effect=AssertionError('read-only rendering cannot issue authority')):
+                result=ops._environment(contract['candidate']['source_sha'],slot,images,workers_active=False)
+            gateway=selected['containers']['provider-gateway']
+            provider.require_calendar_environment(result,gateway_name=gateway,
+                system_identifier=contract['database']['system_identifier'])
+            self.assertEqual(result['MADAR_CALENDAR_DATABASE_DSN'],
+                configured['MADAR_CALENDAR_DATABASE_DSN'].replace('@supabase-db:', '@'+gateway+':'))
+            self.assertNotIn('authority.json',result['MADAR_CALENDAR_DATABASE_DSN'])
+
     def test_gateway_is_a_canonical_only_candidate_not_an_admitted_profile(self):
         value=reconciled_contract()
         self.assertEqual(len(candidate_roles(value)),9)
