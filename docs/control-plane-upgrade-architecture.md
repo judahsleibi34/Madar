@@ -2989,3 +2989,13 @@ previous order. Approval issuance rechecks current operator/session, independent
 policy/key and request/admission expiry after technical review, then records its
 actual issue time. Existing approvals are never extended; request/approval caps
 remain600/300 seconds. Expiry, changed identity/policy or failed gates refuse.
+
+Boot supersession can precede controller installation when the independently
+measured origin controller is already the exact target revision. The boot source
+guard accepts that pre-installation state only when controller SHA, original
+measured tree, target tree, checkout, immutable package, configuration and durable
+operation authorization all match. It creates no installation intent. A changed
+controller, an existing malformed intent, or advanced candidate/migration state
+without the real intent still refuses. The current consumed native attempt
+stopped at this missing-future-intent boundary before SQL; its approval remains
+consumed/RECOVERY_REQUIRED and cannot authorize the corrected source.

@@ -5023,3 +5023,11 @@ The native synthetic PostgreSQL port test waits for the final TCP server and a
 successful SQL round trip within its existing bounded readiness window. The
 image's temporary Unix-only initialization server is not accepted as readiness.
 A timeout remains a failure and exact-owned teardown runs on termination.
+
+An unchanged, independently measured controller is distinct from a newly
+installed target controller. Before candidate or migration effects, identical
+origin/target SHA and tree bindings may be observed without inventing a future
+installation-intent record. All package/configuration/authorization checks stay
+mandatory; existing intents are verified, and changed controllers or advanced
+stages require the actual protected installation record. This fixes ordering,
+not authority consumption, replay, source identity or production admission.

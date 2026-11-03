@@ -101,14 +101,25 @@ class CompletedNormalBootActor:
         current=protected(INPUTS['controller']).read_text().strip();tree=controller_tree_digest()
         candidate=self.contract['candidate'];origin=self.contract['source_roles']
         if current==candidate['controller_sha']:
-            if tree!=candidate['controller_tree_sha256']:
+            same_origin=current==origin['controller_sha']
+            if (tree!=candidate['controller_tree_sha256']
+                    or same_origin and tree!=self.document['installed_controller_tree_sha256']):
                 raise RuntimeError('completed_upgrade_boot_installed_tree_changed')
-            intent=json.loads(protected(self.root/'controller-installation-intent.json',private=True).read_text())
-            if intent!={'operation':self.profile.operation,'context_sha256':digest(self.contract),
-                'from_controller':origin['controller_sha'],'to_controller':candidate['controller_sha'],
-                'old_tree_sha256':self.document['installed_controller_tree_sha256'],
-                'new_tree_sha256':candidate['controller_tree_sha256']}:
-                raise RuntimeError('completed_upgrade_boot_controller_installation_changed')
+            intent_path=self.root/'controller-installation-intent.json'
+            intent_present=intent_path.exists() or intent_path.is_symlink()
+            advanced=any((self.root/name).exists() or (self.root/name).is_symlink()
+                for name in ('candidate-runtime.json','migration-intent.json'))
+            # The same independently measured controller may already be the
+            # target before boot supersession. Its future installation intent
+            # cannot be required here or synthesized as historical evidence.
+            if not same_origin or intent_present or advanced:
+                if not intent_present:raise RuntimeError('completed_upgrade_boot_controller_installation_changed')
+                intent=json.loads(protected(intent_path,private=True).read_text())
+                if intent!={'operation':self.profile.operation,'context_sha256':digest(self.contract),
+                    'from_controller':origin['controller_sha'],'to_controller':candidate['controller_sha'],
+                    'old_tree_sha256':self.document['installed_controller_tree_sha256'],
+                    'new_tree_sha256':candidate['controller_tree_sha256']}:
+                    raise RuntimeError('completed_upgrade_boot_controller_installation_changed')
         elif (current!=origin['controller_sha'] or tree!=self.document['installed_controller_tree_sha256']
                 or (self.root/'candidate-runtime.json').exists() or (self.root/'migration-intent.json').exists()):
             raise RuntimeError('completed_upgrade_boot_controller_identity_changed')
