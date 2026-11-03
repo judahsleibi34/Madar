@@ -38,6 +38,31 @@ def inputs():
 
 
 class InputTests(unittest.TestCase):
+    def test_supplied_proxy_binding_must_equal_the_validated_original_inventory(self):
+        args=inputs();plan,inventory,_,_=args
+        expected=producer.proxy_binding(inventory)
+        plan['proxy_runtime']=dict(expected)
+        producer.validate_inputs(*args)
+        for key,bad in (('id','f'*64),('image','sha256:'+'f'*64),('spec_sha256','f'*64),('unexpected',True)):
+            plan['proxy_runtime']=dict(expected,**{key:bad})
+            with self.subTest(key=key),self.assertRaisesRegex(RuntimeError,'proxy_binding_changed'):
+                producer.validate_inputs(*args)
+
+    def test_proxy_is_reobserved_by_id_image_spec_and_live_state(self):
+        _,inventory,_,_=inputs();binding=producer.proxy_binding(inventory)
+        from test_schema150_actor_inventory import fixture
+        from deployment.lib.completed_normal_resources import measured_spec
+        (_,scope),rows=fixture();row=next(r for r in rows if r['Id']==binding['id'])
+        runtime=Mock();runtime.inspect.return_value={row['Id']:row}
+        self.assertEqual(producer.observe_proxy(inventory,runtime),binding)
+        saved=copy.deepcopy(row)
+        for change in (lambda r:r.update(Id='f'*64),lambda r:r.update(Name='/foreign-proxy'),
+                lambda r:r.update(Image='sha256:'+'f'*64),lambda r:r['State'].update(Running=False),
+                lambda r:r['State'].update(Restarting=True),lambda r:r['Config']['Env'].append('CHANGED=1')):
+            row=copy.deepcopy(saved);change(row);runtime.inspect.return_value={row['Id']:row}
+            with self.assertRaisesRegex(RuntimeError,'proxy_runtime_changed'):
+                producer.observe_proxy(inventory,runtime)
+
     def test_entrypoints_are_protected_control_plane_inputs(self):
         from deployment.lib.control_plane_upgrade import PROTECTED_PATHS
         for path in ('web/scripts/prepare_completed_normal_package.py','web/scripts/continue_completed_normal_upgrade.py'):
@@ -115,6 +140,8 @@ class PublisherTests(unittest.TestCase):
         self.assertEqual(result['operation_id'],plan['operation_id'])
         self.assertEqual(result['attempt_id'],plan['attempt_id'])
         self.assertEqual(result['context_sha256'],digest(dict(plan['admission_contract'],plan_sha256=digest(plan))))
+        self.assertEqual(plan['proxy_runtime'],producer.proxy_binding(self.args[1]))
+        self.assertNotIn('proxy_runtime',self.args[0])
         self.assertEqual((path/'original-provider-probes.json').stat().st_mode&0o777,0o400)
         self.assertEqual(source.stat().st_mode&0o777,0o500)
         self.assertFalse(result['authority_issued']);self.assertFalse(result['operational_admission'])

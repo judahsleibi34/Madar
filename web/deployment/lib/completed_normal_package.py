@@ -82,6 +82,9 @@ def validate_inputs(plan,inventory,probes,model):
         'inventory_sha256':contract['writer_inventory_sha256'],'system_identifier':contract['database']['system_identifier'],
         'source_schema':146,'target_schema':160}
     validate_inventory(inventory,binding)
+    proxy=proxy_binding(inventory)
+    if 'proxy_runtime' in plan and plan['proxy_runtime']!=proxy:
+        raise RuntimeError('completed_package_proxy_binding_changed')
     if (inventory['version']==1 and inventory['exclusions']) or any(k.startswith('candidate:') for k in inventory['containers']):
         raise RuntimeError('completed_package_original_inventory_required')
     from deployment.lib.completed_normal_private_acceptance import validate_subjects
@@ -105,6 +108,30 @@ def validate_inputs(plan,inventory,probes,model):
         if not isinstance(row,dict) or row.get('image') not in permitted:
             raise RuntimeError('completed_package_candidate_image_changed')
     return contract
+
+
+def proxy_binding(inventory):
+    """Only the proxy in the already validated original inventory is eligible."""
+    actor=inventory.get('containers',{}).get('proxy')
+    if (not isinstance(actor,dict) or actor.get('name')!='madar-release-proxy'
+            or actor.get('generation')!='proxy' or actor.get('source_sha') is not None
+            or not re.fullmatch('[a-f0-9]{64}',str(actor.get('id')))
+            or not re.fullmatch('sha256:[a-f0-9]{64}',str(actor.get('image')))
+            or not re.fullmatch('[a-f0-9]{64}',str(actor.get('spec_sha256')))):
+        raise RuntimeError('completed_package_proxy_binding_required')
+    return {name:actor[name] for name in ('id','image','spec_sha256')}
+
+
+def observe_proxy(inventory,runtime):
+    from deployment.lib.completed_normal_resources import measured_spec_matches
+    expected=proxy_binding(inventory);rows=runtime.inspect([expected['id']])
+    row=next(iter(rows.values())) if len(rows)==1 else None
+    if (row is None or row['Id']!=expected['id'] or row['Name']!='/madar-release-proxy'
+            or row['Image']!=expected['image'] or not row['State']['Running']
+            or row['State'].get('Restarting')
+            or not measured_spec_matches(row,expected['spec_sha256'])):
+        raise RuntimeError('completed_package_proxy_runtime_changed')
+    return expected
 
 
 def observe_origin(contract,runtime,state_root=Path('/var/lib/madar/releases')):
@@ -192,6 +219,8 @@ def freeze(base,source_sha,tree,files,plan,inventory,probes,model,authentication
     nonce=nonce or str(uuid.uuid4());operation=str(uuid.uuid4())
     if str(uuid.UUID(nonce))!=nonce:raise RuntimeError('completed_package_attempt_invalid')
     contract=validate_inputs(plan,inventory,probes,model)
+    # Bind before hashing; never retrofit a frozen plan or signed inventory.
+    plan=dict(plan,proxy_runtime=proxy_binding(inventory))
     if (source_sha!=plan['controller_source_sha'] or not re.fullmatch('[0-9a-f]{40}',str(tree))
             or authentication.get('sha')!=source_sha
             or authentication.get('commit',{}).get('tree',{}).get('sha')!=tree):
@@ -262,7 +291,7 @@ def prepare(repository,plan,inventory,probes,model):
     if (contract['database']['container_id']!=environment['database_container_id']
             or contract['database']['system_identifier']!=environment['database_system_identifier']):
         raise RuntimeError('completed_package_guest_database_changed')
-    runtime=Runtime();original=observe_origin(contract,runtime)
+    runtime=Runtime();original=observe_origin(contract,runtime);proxy=observe_proxy(inventory,runtime)
     from deployment.lib.isolated_github_observation import api
     sha=plan['controller_source_sha']
     authentication=api('repos/judahsleibi34/Madar/commits/'+sha)
@@ -276,4 +305,5 @@ def prepare(repository,plan,inventory,probes,model):
     final_contract=dict(plan['admission_contract'],plan_sha256=result['plan_sha256'])
     capture_original_inventory(package,final_contract,runtime,source_guard=guard)
     if observe_origin(contract,runtime)!=original:raise RuntimeError('completed_package_original_application_changed')
+    if observe_proxy(inventory,runtime)!=proxy:raise RuntimeError('completed_package_proxy_runtime_changed')
     return result

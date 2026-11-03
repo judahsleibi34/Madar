@@ -8,6 +8,13 @@ from deployment.lib.completed_normal_boot_actor import CompletedNormalBootActor
 
 
 class ProxyIdentityTests(unittest.TestCase):
+    def test_missing_or_malformed_binding_refuses_before_runtime_inspection(self):
+        for value in (None,{},dict(self.actor.document['proxy_runtime'],extra=True),
+                dict(self.actor.document['proxy_runtime'],id='not-an-id')):
+            self.actor.document={} if value is None else {'proxy_runtime':value}
+            self.actor.runtime.inspect=lambda ids:self.fail('invalid binding reached runtime inspection')
+            with self.assertRaisesRegex(RuntimeError,'proxy_binding_missing_or_invalid'):
+                self.actor.proxy_identity()
     def setUp(self):
         self.row={'Id':'a'*64,'Image':'sha256:'+'b'*64,'Config':{'Env':[]},
             'HostConfig':{'Dns':None,'Privileged':False},

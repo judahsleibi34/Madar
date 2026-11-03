@@ -209,7 +209,12 @@ class CompletedNormalBootActor:
         self.maintenance()
     def proxy_identity(self):
         from deployment.lib.completed_normal_resources import measured_spec_matches
-        expected=self.document['proxy_runtime']
+        expected=self.document.get('proxy_runtime')
+        if (not isinstance(expected,dict) or set(expected)!={'id','image','spec_sha256'}
+                or not re.fullmatch('[a-f0-9]{64}',str(expected.get('id')))
+                or not re.fullmatch('sha256:[a-f0-9]{64}',str(expected.get('image')))
+                or not re.fullmatch('[a-f0-9]{64}',str(expected.get('spec_sha256')))):
+            raise RuntimeError('completed_upgrade_boot_proxy_binding_missing_or_invalid')
         rows=self.runtime.inspect([expected['id']])
         row=next(iter(rows.values())) if len(rows)==1 else None
         if (row is None or row['Id']!=expected['id'] or row['Image']!=expected['image']

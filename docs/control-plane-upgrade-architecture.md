@@ -1,5 +1,13 @@
 # Privileged control-plane upgrade architecture
 
+The package producer binds `proxy_runtime` from the validated original actor
+inventory before hashing or freezing the plan. It independently reobserves that
+proxy by ID, image, specification and running state around publication. A
+caller-supplied mismatch refuses; missing or malformed bindings in older
+packages receive a fixed diagnostic before runtime inspection. This never
+retrofits an immutable package or a signed historical inventory, and grants no
+execution authority.
+
 Historical calendar preparation pins the native connection before signing the
 origin. The canonical renderer changes only its fixed internal hostname to the
 context-derived gateway after validating the explicit credential, database, TLS
