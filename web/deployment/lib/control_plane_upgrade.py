@@ -38,6 +38,7 @@ if str(PACKAGE_ROOT) not in sys.path:
     sys.path.insert(0, str(PACKAGE_ROOT))
 
 from control_plane_filesystem import (
+    OPERATIONAL_SCRIPTS,
     FilesystemPreflightError,
     require_root_protected_directory,
     require_root_protected_ancestry,
@@ -2678,16 +2679,7 @@ class SystemOperations:
             raise UpgradeError("installed_provenance_mismatch")
         self.production_repository_guard("guard_candidate", approved_sha)
         parse_contract(self.contract_path)
-        for relative in PROTECTED_PATHS:
-            if not relative.startswith('web/scripts/') or relative.endswith('madar_alert_hook.sh'):
-                continue
-            name = Path(relative).name
-            installed = Path('/usr/local/lib/madar') / name
-            canonical = self.control_root / 'scripts' / name
-            if (installed.is_symlink() or not installed.is_file() or installed.stat().st_uid != 0
-                    or stat.S_IMODE(installed.stat().st_mode) != 0o755
-                    or sha256_file(installed) != sha256_file(canonical)):
-                raise UpgradeError('installed_backup_helper_integrity_invalid')
+        self.verify_installed_operational_helpers()
         for path in self.control_root.rglob("*"):
             if path.is_symlink() or path.stat().st_uid != 0:
                 raise UpgradeError("installed_control_plane_ownership_invalid")
@@ -2733,6 +2725,23 @@ class SystemOperations:
             or str(self.contract_path) not in service
         ):
             raise UpgradeError("installed_systemd_contract_invalid")
+
+    def verify_installed_operational_helpers(self, *, helper_root=Path('/usr/local/lib/madar')) -> None:
+        # PROTECTED_PATHS also contains the frozen-package producer/continuation
+        # scripts. They are source integrity inputs, not installed backup aliases.
+        # Keep their source hashing unchanged and verify exactly the installer
+        # contract here. Both installed copies must remain root-owned executables.
+        for name in OPERATIONAL_SCRIPTS:
+            installed = helper_root / name
+            canonical = self.control_root / 'scripts' / name
+            try:
+                valid = all(not p.is_symlink() and p.is_file() and p.stat().st_uid == 0
+                    and stat.S_IMODE(p.stat().st_mode) == 0o755 for p in (installed, canonical))
+                valid = valid and sha256_file(installed) == sha256_file(canonical)
+            except OSError:
+                valid = False
+            if not valid:
+                raise UpgradeError('installed_backup_helper_integrity_invalid')
 
     def verify_install(self, approved_sha: str, backup: Path) -> None:
         self.verify_installed_controller(approved_sha)

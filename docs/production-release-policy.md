@@ -5031,3 +5031,5 @@ installation-intent record. All package/configuration/authorization checks stay
 mandatory; existing intents are verified, and changed controllers or advanced
 stages require the actual protected installation record. This fixes ordering,
 not authority consumption, replay, source identity or production admission.
+
+Installed operational helper verification uses the shared filesystem-installation contract, cross-checked against the existing installer array. The protected package producer and continuation scripts remain in PROTECTED_PATHS and immutable package verification; they are not backup-helper aliases and are not installed into /usr/local/lib/madar. Both real copies of every declared operational helper still require root ownership, mode0755, regular non-symlink files and identical bytes. Native95f363a7 passed boot supersession then exposed this contract mismatch before migration; its consumed authority remains recovery-required and is never reused for this correction.
