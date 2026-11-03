@@ -151,12 +151,39 @@ def isolated_registration(contract):
         from .control_plane_upgrade_authorization import require_upgrade_authorization
         require_upgrade_authorization(p['controller_sha'],required_operation=RECONCILED.operation,
             required_schema=146,required_context_digest=digest(contract),require_rehearsal=True)
-        if (Path('/sys/class/dmi/id/product_uuid').read_text().strip().lower()!=p['guest_uuid']
-                or Path('/etc/machine-id').read_text().strip()!=p['machine_id']
-                or run(['/usr/bin/systemd-detect-virt']).decode().strip()!='kvm'
-                or run(['/usr/bin/findmnt','-n','-o','UUID','/']).decode().strip()!=p['root_filesystem_uuid']):
-            raise RuntimeError('schema160_isolated_registration_host_changed')
+        from .completed_normal_admission import credential_witness
+        verify_child_host_identity(p,credential_witness('canonical_host_identity','canonical_host_identity_sha256'))
     return p
+
+
+def root_child_host_identity(contract):
+    """Project an actually reobserved host through the existing root issuer."""
+    import os
+    if os.geteuid()!=0:raise RuntimeError('schema160_host_identity_root_required')
+    p=isolated_registration(contract) # Rechecks actual DMI, filesystem and isolation.
+    return {'version':1,'kind':'root-observed-canonical-child-host',
+        'context_sha256':p['context_sha256'],'guest_uuid':p['guest_uuid'],
+        'machine_id':p['machine_id'],'root_filesystem_uuid':p['root_filesystem_uuid'],
+        'boot_id':Path('/proc/sys/kernel/random/boot_id').read_text().strip()}
+
+
+def verify_child_host_identity(registration,witness):
+    """Called only after fresh canonical authorization and witness hash checks.
+
+    DMI is root-only on ordinary Linux guests. Its actual root observation is
+    carried in LoadCredential, not made readable or replaced by caller input.
+    The child independently reobserves the boot, machine, filesystem and KVM.
+    """
+    from .isolated_release_environment import run
+    fields={'version','kind','context_sha256','guest_uuid','machine_id','root_filesystem_uuid','boot_id'}
+    if (not isinstance(witness,dict) or set(witness)!=fields or type(witness.get('version')) is not int
+            or witness['version']!=1 or witness['kind']!='root-observed-canonical-child-host'
+            or any(witness[k]!=registration[k] for k in ('context_sha256','guest_uuid','machine_id','root_filesystem_uuid'))
+            or witness['boot_id']!=Path('/proc/sys/kernel/random/boot_id').read_text().strip()
+            or Path('/etc/machine-id').read_text().strip()!=registration['machine_id']
+            or run(['/usr/bin/systemd-detect-virt']).decode().strip()!='kvm'
+            or run(['/usr/bin/findmnt','-n','-o','UUID','/']).decode().strip()!=registration['root_filesystem_uuid']):
+        raise RuntimeError('schema160_isolated_registration_host_changed')
 
 
 def admitted_manifest(root, contract):

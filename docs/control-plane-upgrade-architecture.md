@@ -1,5 +1,14 @@
 # Privileged control-plane upgrade architecture
 
+Canonical historical child credentials additionally carry a nonsecret host
+identity witness. The root issuer reobserves actual DMI, machine/root filesystem
+and effect isolation before each issuance; its public interlock binds the witness
+digest. After verifying the fresh credential and live parent/boot lease, the
+unprivileged child verifies that projection plus its actual boot, machine,
+filesystem and KVM identity. Linux's root-only DMI permissions are unchanged.
+Missing/changed projections, foreign hosts and stale boots refuse; no caller
+PASS or permissions change substitutes for the root's actual observation.
+
 The governed release child selects canonical historical admission from the
 existing protected interlock even when provider-recovery.json never existed.
 Selection invokes the unchanged full admission verifier: exact application,

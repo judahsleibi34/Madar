@@ -1,5 +1,11 @@
 # Madar production release acceptance policy
 
+The historical child receives actual root-observed DMI identity only through
+the existing digest-bound systemd credential. Root rechecks the complete host
+and isolation at issuance; the child also reobserves current boot, machine,
+filesystem and KVM. The live parent lease remains mandatory. No DMI permission
+widening or standalone identity file/flag authorizes deployment.
+
 A markerless enrolled historical origin may enter only the existing canonical
 admission verifier selected by its protected interlock. The actual candidate
 application SHA remains distinct from the approved controller SHA. The full

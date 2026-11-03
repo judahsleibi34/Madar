@@ -2907,6 +2907,8 @@ print(hashlib.sha256(keys[0].encode()).hexdigest())
                 # exact operation in this parent/boot/lock window.
                 from deployment.lib.exceptional_release_approval import require_canonical_execution
                 witnesses['canonical_exceptional_approval']=require_canonical_execution(self,completed_normal_contract)
+                from deployment.lib.schema160_release import root_child_host_identity
+                witnesses['canonical_host_identity']=root_child_host_identity(completed_normal_contract)
             if completed_normal_mode is not None and (selected_profile is not RECONCILED
                     or completed_normal_mode not in {'prepare','activate','adopt'}):
                 raise UpgradeError('completed_maintenance_child_scope_invalid')
@@ -2994,6 +2996,7 @@ print(hashlib.sha256(keys[0].encode()).hexdigest())
             witness_hashes['migration_resumption_sha256']=digest(migration_resumption)
         if 'canonical_exceptional_approval' in witnesses:
             witness_hashes['canonical_exceptional_approval_sha256']=digest(witnesses['canonical_exceptional_approval'])
+            witness_hashes['canonical_host_identity_sha256']=digest(witnesses['canonical_host_identity'])
         token = secrets.token_urlsafe(32)
         descriptor, temporary = tempfile.mkstemp(prefix=".authorized.", dir=self.runtime_root)
         try:

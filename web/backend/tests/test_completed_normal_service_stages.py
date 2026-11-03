@@ -177,6 +177,8 @@ class CompletedNormalServiceTests(unittest.TestCase):
             stack.enter_context(patch.object(admission,'measure_provider_record',return_value={'MODEL':'provider'}))
             stack.enter_context(patch.object(historical_origin,'history_witness',return_value={'original_runtime':runtime}))
             issue=stack.enter_context(patch.object(exceptional_release_approval,'require_canonical_execution',return_value=lease))
+            stack.enter_context(patch('deployment.lib.schema160_release.root_child_host_identity',
+                return_value={'MODEL':'root host identity; verified separately'}))
             stack.enter_context(patch.object(m,'require_root_directory'))
             ops=object.__new__(m.SystemOperations);ops.runtime_root=root/'runtime';ops.runtime_root.mkdir()
             ops.authorization_file=ops.runtime_root/'credential';ops.interlock_file=root/'interlock';ops.state_root=root/'state'
