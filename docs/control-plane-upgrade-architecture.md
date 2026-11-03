@@ -3038,3 +3038,22 @@ Primary API/implementation references:
 https://www.freedesktop.org/software/systemd/man/255/org.freedesktop.systemd1.html
 https://github.com/systemd/systemd/blob/v255/src/core/dbus.c
 https://github.com/systemd/systemd/blob/v255/src/basic/bus-label.c
+
+### Sealed database endpoint for fenced backup children (2026-11-03)
+
+Native51ee6019 completed all original-provider fencing and quiescence, then the
+mandatory pre-migration dump child failed before SQL. The maintenance branch
+invokes the existing ordinary dump helper directly, without scheduled()'s
+libpq projection. It passed the protected descriptor but omitted PGHOSTADDR,
+leaving PGHOST=supabase-db to host DNS. The real restricted child reproduced
+`could not translate host name`; the same READ ONLY query with the observed
+bound address reached the exact source cluster as supabase_admin. No dump or
+consumed operation was retried.
+
+The shared capture dispatcher now supplies PGHOSTADDR from the same newly
+created root-observed sealed descriptor before either capture branch. A caller
+PGHOSTADDR cannot replace it. Original PGHOST/role validation, empty supplementary
+groups, no-new-privileges, read-only database options, inherited sealed FD and
+post-capture database/address reobservation remain required. This does not alter
+backup format, credentials, grants, retention, replication or SQL authority.
+Corrected-source full protected acceptance is still required.

@@ -275,6 +275,11 @@ def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_con
     try:
         address = json.loads(os.pread(descriptor,4096,0))['address']
         env[backup_support.LOCAL_DATABASE_FD] = str(descriptor)
+        # The fenced maintenance path calls the ordinary dump helper directly,
+        # without scheduled()'s libpq environment projection. The Docker alias
+        # is not host DNS. Use the same root-observed sealed endpoint, including
+        # when an input configuration supplied a different PGHOSTADDR.
+        env['PGHOSTADDR'] = address
         if completed_context is not None and getattr(completed_context,'provider_adapter',None) is not None:
             maintenance_capture=completed_context.capture_fenced(env,descriptor,identity)
         elif recovery_context is None:
