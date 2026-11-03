@@ -4963,3 +4963,9 @@ business acceptance and secure historical login are mandatory. They claim no
 protocol2 delivery or infrastructure-administrator behavior at schema146.
 Partial historical acceptance, altered subjects or modern field aliases refuse;
 ordinary completed-release functional acceptance remains unchanged.
+
+Protected supervisor quiescence uses native unit types: live service MainPID and
+ControlPID, or PID-less timers with no pending job. Fenced units must remain
+inactive/dead. Historical ExecMainPID alone is neither a current writer nor proof
+of quiescence. Signed unit inventory, source hashes and enablement checks remain
+mandatory.

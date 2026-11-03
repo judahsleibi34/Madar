@@ -52,7 +52,8 @@ class OriginalInventoryCaptureTests(unittest.TestCase):
             self.assertNotIn('UPDATE ',kwargs['input']);self.assertNotIn('ALTER ',kwargs['input'])
             return json.dumps(self.roles if 'pg_authid' in kwargs['input'] else [self.contract['database']['system_identifier'],146])
         if args[:2]==['systemctl','show']:
-            return f'FragmentPath={self.fragment}\nDropInPaths=\nUnitFileState=enabled\nJob=\nControlPID=0\n'
+            state=f'FragmentPath={self.fragment}\nDropInPaths=\nUnitFileState=enabled\nActiveState=inactive\nSubState=dead\nJob=\n'
+            return state+('MainPID=0\nControlPID=0\n' if args[2].endswith('.service') else '')
         self.fail('Unexpected command: '+repr(args))
 
     def capture(self):return adapter.capture_original_inventory(self.package,self.contract,self.runtime,source_guard=self.guard)
@@ -101,3 +102,33 @@ class OriginalInventoryCaptureTests(unittest.TestCase):
         with patch.object(adapter.os,'geteuid',return_value=1000):
             with self.assertRaisesRegex(RuntimeError,'root_package_required'):self.capture()
         self.runtime.command.assert_not_called()
+
+
+class SupervisorProcessObservationTests(unittest.TestCase):
+    def state(self,**changes):
+        return {'ActiveState':'inactive','SubState':'dead','Job':'','MainPID':'0','ControlPID':'0',**changes}
+
+    def test_completed_oneshot_uses_live_main_pid_not_historical_exec_pid(self):
+        fields=self.state(ExecMainPID='789012')
+        self.assertTrue(adapter.supervisor_idle('madar-known-good-recovery.service',fields,stopped=True))
+        fields['MainPID']='789012'
+        self.assertFalse(adapter.supervisor_idle('madar-known-good-recovery.service',fields,stopped=True))
+
+    def test_native_timer_absence_is_not_a_missing_service_pid(self):
+        fields={'ActiveState':'inactive','SubState':'dead','Job':''}
+        self.assertTrue(adapter.supervisor_idle('madar-backup.timer',fields,stopped=True))
+        self.assertFalse(adapter.supervisor_idle('madar-backup.service',fields,stopped=True))
+        for key in ('MainPID','ControlPID','ExecMainPID'):
+            self.assertFalse(adapter.supervisor_idle('madar-backup.timer',dict(fields,**{key:'0'})))
+
+    def test_pending_control_process_failed_or_activating_units_refuse(self):
+        for changes in ({'Job':'123'},{'ControlPID':'12'},{'ActiveState':'failed'},
+                {'ActiveState':'activating'},{'MainPID':''},{'MainPID':'-1'},{'MainPID':'01'},
+                {'MainPID':'9999999999'}):
+            self.assertFalse(adapter.supervisor_idle('madar-backup.service',self.state(**changes)))
+        self.assertFalse(adapter.supervisor_idle('madar-backup.timer',{'ActiveState':'inactive','SubState':'dead','Job':'123'}))
+
+    def test_fencing_still_requires_timer_to_be_inactive_and_dead(self):
+        fields={'ActiveState':'active','SubState':'waiting','Job':''}
+        self.assertTrue(adapter.supervisor_idle('madar-backup.timer',fields))
+        self.assertFalse(adapter.supervisor_idle('madar-backup.timer',fields,stopped=True))

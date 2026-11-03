@@ -183,6 +183,30 @@ def role_measurements(snapshot):
     return result
 
 
+
+def supervisor_idle(name,fields,*,stopped=False):
+    """Use live service PIDs; timer units have no process properties.
+
+    ExecMainPID records the last service process even after successful oneshot
+    completion. It cannot prove a currently running writer. Missing live PID
+    properties still refuse a SERVICE; they are not defaulted to zero. A timer
+    must expose no PID properties and must have no queued job; after fencing,
+    both types must actually be inactive/dead.
+    """
+    if fields.get('Job')!='' or fields.get('ActiveState') not in {'active','inactive'}:
+        return False
+    if name.endswith('.service'):
+        pid=fields.get('MainPID')
+        if (fields.get('ControlPID')!='0' or not isinstance(pid,str)
+                or not re.fullmatch(r'0|[1-9][0-9]{0,9}',pid) or int(pid)>2147483647
+                or stopped and pid!='0'):
+            return False
+    elif name.endswith('.timer'):
+        if any(k in fields for k in ('MainPID','ControlPID','ExecMainPID')):return False
+    else:return False
+    return not stopped or (fields.get('ActiveState')=='inactive' and fields.get('SubState')=='dead')
+
+
 def capture_original_inventory(package, contract, runtime, *, source_guard):
     """Publish independently reobserved preparation, never operation authority.
 
@@ -253,7 +277,7 @@ def capture_original_inventory(package, contract, runtime, *, source_guard):
             raise RuntimeError('schema160_inventory_original_roles_changed')
         for name, expected in inventory['supervisors'].items():
             text = runtime.command(['systemctl', 'show', name,
-                '--property=FragmentPath,DropInPaths,UnitFileState,ActiveState,SubState,Job,ExecMainPID,ControlPID', '--no-pager'])
+                '--property=FragmentPath,DropInPaths,UnitFileState,ActiveState,SubState,Job,MainPID,ControlPID', '--no-pager'])
             fields = dict(line.split('=', 1) for line in text.splitlines() if '=' in line)
             fragment = Path(fields.get('FragmentPath', ''))
             if not fragment.is_absolute():
@@ -262,7 +286,7 @@ def capture_original_inventory(package, contract, runtime, *, source_guard):
                 for path in fields.get('DropInPaths', '').split()}
             if (hashlib.sha256(protected(fragment).read_bytes()).hexdigest() != expected['fragment_sha256']
                     or digest(dropins) != expected['dropins_sha256'] or fields.get('UnitFileState') != expected['enabled']
-                    or fields.get('Job') != '' or fields.get('ControlPID') != '0'):
+                    or not supervisor_idle(name,fields)):
                 raise RuntimeError('schema160_inventory_supervisor_changed_or_pending')
         return ids, measure_roots(inventory['object_roots'], phase='identity')
 
@@ -517,7 +541,7 @@ class Schema150ProviderAdapter:
         return all(r['role'] in roles and r['address'] in addresses and r['address'] is not None for r in sessions)
 
     def _unit(self, name):
-        value = self.runtime.command(['systemctl', 'show', name, '--property=FragmentPath,DropInPaths,UnitFileState,ActiveState,SubState,Job,ExecMainPID,ControlPID', '--no-pager'])
+        value = self.runtime.command(['systemctl', 'show', name, '--property=FragmentPath,DropInPaths,UnitFileState,ActiveState,SubState,Job,MainPID,ControlPID', '--no-pager'])
         fields = dict(row.split('=',1) for row in value.splitlines() if '=' in row)
         fragment = Path(fields.get('FragmentPath',''))
         expected = self.inventory['supervisors'][name]
@@ -540,8 +564,7 @@ class Schema150ProviderAdapter:
     def _supervisors_stopped(self):
         for name in self.inventory['supervisors']:
             state=self._unit(name)
-            if (state.get('ActiveState')!='inactive' or state.get('SubState')!='dead'
-                    or state.get('Job')!='' or state.get('ExecMainPID')!='0' or state.get('ControlPID')!='0'):
+            if not supervisor_idle(name,state,stopped=True):
                 raise RuntimeError('schema150_provider_supervisor_not_quiescent')
         return True
 

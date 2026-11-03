@@ -2938,3 +2938,10 @@ receipt fields or claim protocol2 notification delivery on146. An independent
 restore is not release approval or a protected upgrade completion. After an
 intentional restoration hold, restart through the existing recovery systemd
 service so successful recovery also restores its recorded inactive unit state.
+
+Original supervisor capture and fencing distinguish native systemd service and
+timer properties. Services require an observed live MainPID and zero ControlPID;
+completed oneshots may retain a historical ExecMainPID. Timers expose no PID
+properties and retain strict pending-job and inactive/dead fencing checks. Every
+signed timer stays in the original universe; no missing service PID defaults to
+zero and no unit is omitted to satisfy preparation.
