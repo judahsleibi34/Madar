@@ -17,9 +17,8 @@ class InterlockPermissionTests(unittest.TestCase):
         self.value={'status':'authorized_cycle','rehearsal_sha256':'a'*64}
         for path in (self.interlock,self.private):path.write_text(json.dumps(self.value));path.chmod(0o600)
         self.enterContext(patch.object(adapter,'UPGRADE_INTERLOCK',self.interlock))
-        original=Path.stat;self.bad_owner=None
-        def root_metadata(path,*args,**kwargs):
-            result=original(path,*args,**kwargs)
+        original=Path.stat;original_lstat=Path.lstat;self.bad_owner=None
+        def root_metadata(path,result):
             if path.is_relative_to(self.root) or path in self.root.parents:
                 values=list(result);values[4]=12345 if path==self.bad_owner else 0
                 # Temporary test ancestry is not an operational root path.
@@ -27,7 +26,8 @@ class InterlockPermissionTests(unittest.TestCase):
                 if path in self.root.parents:values[0]=stat.S_IFMT(result.st_mode)|0o755
                 return os.stat_result(values)
             return result
-        self.enterContext(patch.object(Path,'stat',root_metadata))
+        self.enterContext(patch.object(Path,'stat',lambda p,*a,**kw:root_metadata(p,original(p,*a,**kw))))
+        self.enterContext(patch.object(Path,'lstat',lambda p,*a,**kw:root_metadata(p,original_lstat(p,*a,**kw))))
 
     def test_exact_public_root_interlock_accepts_issuer_mode_without_credential_material(self):
         self.interlock.chmod(0o644)
@@ -36,7 +36,7 @@ class InterlockPermissionTests(unittest.TestCase):
 
     def test_all_other_inputs_remain_private_even_with_interlock_basename(self):
         for path in (self.private,self.root/'other'/'in-progress.json'):
-            path.parent.mkdir(exist_ok=True);path.write_text('{}');path.chmod(0o644)
+            path.parent.mkdir(mode=0o700,exist_ok=True);path.write_text('{}');path.chmod(0o644)
             with self.subTest(path=path),self.assertRaisesRegex(RuntimeError,'file_not_private'):
                 adapter.private_json(path)
             path.chmod(0o600);self.assertEqual(adapter.private_json(path),{})
@@ -56,9 +56,15 @@ class InterlockPermissionTests(unittest.TestCase):
         self.interlock.unlink();self.interlock.write_bytes(b'x'*(2*1024**2+1));self.interlock.chmod(0o644)
         with self.assertRaisesRegex(RuntimeError,'private_input_limit'):adapter.private_json(self.interlock)
 
+    def test_public_interlock_still_requires_nonwritable_ancestry(self):
+        self.interlock.chmod(0o644);self.root.chmod(0o770)
+        try:
+            with self.assertRaisesRegex(RuntimeError,'untrusted'):adapter.private_json(self.interlock)
+        finally:self.root.chmod(0o700)
+
     def test_public_interlock_cannot_replace_missing_or_forged_private_credential(self):
         from deployment.lib import control_plane_upgrade_authorization as authorization
-        from test_completed_normal_model import reconciled_contract
+        from test_schema160_release import reconciled_contract
         actor=adapter.Schema150ProviderAdapter.__new__(adapter.Schema150ProviderAdapter)
         actor.contract=reconciled_contract()
         actor.binding={'controller_sha':actor.contract['candidate']['controller_sha'],'context_sha256':'a'*64}
@@ -67,7 +73,7 @@ class InterlockPermissionTests(unittest.TestCase):
             'operation':actor.contract['operation'],'schema':146,'context_sha256':'a'*64,
             'rehearsal_sha256':actor.contract['rehearsal_sha256'],
             'authorization_sha256':hashlib.sha256(b'correct-synthetic-token').hexdigest()}));self.interlock.chmod(0o644)
-        credentials=self.root/'credentials';credentials.mkdir()
+        credentials=self.root/'credentials';credentials.mkdir(mode=0o700)
         def verify(sha,**kwargs):
             return authorization.require_upgrade_authorization(sha,interlock=self.interlock,**kwargs)
         with patch.object(adapter.os,'geteuid',return_value=0),patch.object(adapter,'require_upgrade_authorization',verify),\
@@ -76,7 +82,9 @@ class InterlockPermissionTests(unittest.TestCase):
             for kind in ('missing','forged'):
                 if kind=='forged':
                     path=credentials/'madar-control-plane-upgrade'
-                    path.write_text(json.dumps({'approved_sha':actor.binding['controller_sha'],'token':'wrong-synthetic-token'}));path.chmod(0o600)
+                    path.write_text(json.dumps({'approved_sha':actor.binding['controller_sha'],'token':'wrong-synthetic-token',
+                        'operation':actor.contract['operation'],'schema':146,'context_sha256':'a'*64,
+                        'rehearsal_sha256':actor.contract['rehearsal_sha256']}));path.chmod(0o600)
                 with self.subTest(kind=kind),self.assertRaisesRegex(RuntimeError,'exclusive_interlock'):
                     actor.require_authority(actor.binding,purpose='prepare')
             read.assert_not_called();actor._database_identity.assert_not_called()
