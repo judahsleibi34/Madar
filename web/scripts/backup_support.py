@@ -208,7 +208,7 @@ def verify_maintenance(root: Path, *, expected_sha256: str | None = None) -> dic
     value = json.loads(body)
     keys = {'version','binding','stage','schema','bootstrap_role','roles_sha256','roles_snapshot_sha256',
             'objects_sha256','objects_measurement','database_fingerprint','recovery','authority_issued'}
-    if (not isinstance(value,dict) or set(value)!=keys or type(value['version']) is not int or value['version']!=1
+    if (not isinstance(value,dict) or set(value)!=keys or type(value['version']) is not int or value['version'] not in (1,2)
             or value['authority_issued'] is not False or value['stage'] not in {'pre-migration','post-migration'}
             or type(value['schema']) is not int or value['schema']<=0
             or not re.fullmatch('[a-zA-Z_][a-zA-Z0-9_]*',str(value['bootstrap_role']))
@@ -317,13 +317,14 @@ ROLE_SNAPSHOT_SQL = """SELECT json_build_object(
  '[]'::json) FROM pg_db_role_setting s LEFT JOIN pg_database d ON d.oid=s.setdatabase));"""
 
 
-def database_snapshot(query) -> list:
+def database_snapshot(query, *, acl_semantics=False) -> list:
     """Measure data, sequences and role-based ownership/ACLs, with no raw rows.
 
     query is a fixed code-owned read-only transport, never serialized evidence.
     Callers must retain quiescence; bounded server timeouts fail on large data
     instead of claiming a partial recovery. Restore cluster OIDs may differ.
     """
+    if type(acl_semantics) is not bool:raise BackupError('maintenance_acl_semantics_invalid')
     rows=json.loads(query("SELECT coalesce(json_agg(json_build_object('schema',n.nspname,'name',c.relname,"
         "'kind',c.relkind) ORDER BY n.nspname,c.relname),'[]'::json) FROM pg_class c JOIN pg_namespace n "
         "ON n.oid=c.relnamespace WHERE n.nspname IN ('public','auth','storage') AND c.relkind IN ('r','p','S');"))
@@ -342,14 +343,20 @@ def database_snapshot(query) -> list:
             statements.append("SELECT json_build_array('"+name+"',count(*),encode(sha256(convert_to(coalesce("
                 "string_agg(h,'' ORDER BY h COLLATE \"C\"),''),'UTF8')),'hex'))::text FROM "
                 "(SELECT encode(sha256(convert_to(to_jsonb(t)::text,'UTF8')),'hex') h FROM "+table+' t) rows;')
-    statements.append("SELECT json_build_object('database',(SELECT json_build_array(datname,datdba::regrole::text,datacl) "
+    database_acl="coalesce(datacl,acldefault('d',datdba))" if acl_semantics else 'datacl'
+    relation_acl=("CASE WHEN c.relkind IN ('r','p','v','m','f','S') THEN coalesce(c.relacl,"
+        "acldefault(CASE WHEN c.relkind='S' THEN 'S' ELSE 'r' END::\"char\",c.relowner)) ELSE c.relacl END"
+        if acl_semantics else 'c.relacl')
+    schema_acl="coalesce(nspacl,acldefault('n',nspowner))" if acl_semantics else 'nspacl'
+    function_acl="coalesce(p.proacl,acldefault('f',p.proowner))" if acl_semantics else 'p.proacl'
+    statements.append("SELECT json_build_object('database',(SELECT json_build_array(datname,datdba::regrole::text,"+database_acl+") "
         "FROM pg_database WHERE datname=current_database()),'relations',(SELECT json_agg(json_build_array(n.nspname,"
-        "c.relname,c.relkind,c.relowner::regrole::text,c.relacl,c.relrowsecurity,c.relforcerowsecurity) "
+        "c.relname,c.relkind,c.relowner::regrole::text,"+relation_acl+",c.relrowsecurity,c.relforcerowsecurity) "
         "ORDER BY n.nspname,c.relname) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
         "WHERE n.nspname IN ('public','auth','storage')),'schemas',(SELECT json_agg(json_build_array(nspname,"
-        "nspowner::regrole::text,nspacl) ORDER BY nspname) FROM pg_namespace WHERE nspname IN ('public','auth','storage')),"
+        "nspowner::regrole::text,"+schema_acl+") ORDER BY nspname) FROM pg_namespace WHERE nspname IN ('public','auth','storage')),"
         "'functions',(SELECT json_agg(json_build_array(n.nspname,p.proname,pg_get_function_identity_arguments(p.oid),"
-        "p.proowner::regrole::text,p.proacl,p.prosecdef,p.proconfig,pg_get_functiondef(p.oid)) ORDER BY "
+        "p.proowner::regrole::text,"+function_acl+",p.prosecdef,p.proconfig,pg_get_functiondef(p.oid)) ORDER BY "
         "n.nspname,p.proname,pg_get_function_identity_arguments(p.oid)) FROM pg_proc p JOIN pg_namespace n "
         "ON n.oid=p.pronamespace WHERE n.nspname IN ('public','auth','storage') AND p.prokind IN ('f','p')))::text;")
     raw=query('\n'.join(statements))
@@ -357,7 +364,9 @@ def database_snapshot(query) -> list:
     if len(packet)!=len(rows)+1:raise BackupError('maintenance_database_fingerprint_incomplete')
     # pg_restore may emit semantically identical ACL items in a different array
     # order. Keep every privilege/grantee/grantor token (including duplicates),
-    # and distinguish NULL/default ACLs from an explicitly empty ACL.
+    # In v2 PostgreSQL expands only NULL/default ACLs above. An explicitly
+    # empty ACL stays empty; every privilege, grant option and grantor survives.
+    # V1 retains its original raw catalog representation for old signed inputs.
     metadata=packet[-1]
     grants=[(metadata['database'],2)]
     for key,index in (('relations',4),('schemas',2),('functions',4)):
@@ -370,8 +379,8 @@ def database_snapshot(query) -> list:
     return packet
 
 
-def database_fingerprint(query) -> str:
-    packet=database_snapshot(query)
+def database_fingerprint(query, *, acl_semantics=False) -> str:
+    packet=database_snapshot(query,acl_semantics=acl_semantics)
     return hashlib.sha256(json.dumps(packet,sort_keys=True,separators=(',',':'),ensure_ascii=True).encode()).hexdigest()
 
 

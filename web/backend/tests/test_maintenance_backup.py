@@ -110,12 +110,30 @@ class MaintenanceBackupTests(unittest.TestCase):
     def test_native_forest_and_original_roles_are_bound_in_ordinary_backup(self):
         digest=self.seal();outer=backup.verify(self.data)
         value=backup.verify_maintenance(self.data,expected_sha256=digest)
+        self.assertEqual(value['version'],1)
         self.assertEqual(outer['maintenance_backup'],'maintenance/manifest.json')
         self.assertEqual(value['binding'],self.binding);self.assertFalse(value['authority_issued'])
         self.assertEqual((self.data/'maintenance/roles.sql').read_bytes(),self.roles)
         with tarfile.open(self.data/'maintenance/objects.tar.gz','r:gz') as archive:
             members=archive.getmembers();self.assertFalse(any(m.name.startswith('database/') for m in members))
             self.assertTrue(any('madar.xattrs.base64' in m.pax_headers for m in members))
+
+    def test_version2_explicitly_binds_acl_semantics_without_rewriting_version1(self):
+        digest=self.seal(database_fingerprint_version=2)
+        self.assertEqual(backup.verify_maintenance(self.data,expected_sha256=digest)['version'],2)
+        path=self.data/'maintenance/manifest.json';value=json.loads(path.read_bytes());value['version']=1
+        path.write_text(json.dumps(value))
+        with self.assertRaisesRegex(backup.BackupError,'manifest_changed'):
+            backup.verify_maintenance(self.data,expected_sha256=digest)
+
+    def test_unknown_or_boolean_fingerprint_versions_refuse(self):
+        for version in (0,3,True,'2'):
+            with self.subTest(version=version),self.assertRaisesRegex(RuntimeError,'fingerprint_version_invalid'):
+                self.seal(database_fingerprint_version=version)
+        self.assertFalse((self.data/'maintenance').exists())
+        self.seal();path=self.data/'maintenance/manifest.json';value=json.loads(path.read_bytes());value['version']=3
+        path.write_text(json.dumps(value))
+        with self.assertRaisesRegex(backup.BackupError,'manifest_invalid'):backup.verify_maintenance(self.data)
 
     def migration_context(self):
         """Actual files/archives/flock, MODEL authority and restore/replica results.
@@ -280,5 +298,25 @@ class MaintenanceBackupTests(unittest.TestCase):
         self.assertEqual(a,backup.database_fingerprint(query(['owner=arwdDxt/owner','reader=r/owner'])))
         self.assertNotEqual(a,backup.database_fingerprint(query(['reader=rw/owner','owner=arwdDxt/owner'])))
         self.assertNotEqual(backup.database_fingerprint(query(None)),backup.database_fingerprint(query([])))
+
+    def test_only_explicit_v2_observation_expands_postgresql_acl_defaults(self):
+        def exercise(semantic):
+            calls=[]
+            def query(body):
+                calls.append(body)
+                if len(calls)==1:return '[{"schema":"public","name":"fixture","kind":"r"}]'
+                return '["fixture",1,"'+('a'*64)+'"]\n'+json.dumps({'database':['postgres','owner',[]],
+                    'relations':[],'schemas':[],'functions':[]})
+            backup.database_snapshot(query,acl_semantics=semantic)
+            return calls[-1]
+        self.assertNotIn('acldefault(',exercise(False))
+        sql=exercise(True)
+        for expression in ("acldefault('d',datdba)","acldefault('n',nspowner)","acldefault('f',p.proowner)",
+                "CASE WHEN c.relkind='S' THEN 'S' ELSE 'r' END"):
+            self.assertIn(expression,sql)
+        self.assertIn('c.relrowsecurity,c.relforcerowsecurity',sql)
+        self.assertIn('pg_get_functiondef(p.oid)',sql)
+        with self.assertRaisesRegex(backup.BackupError,'acl_semantics_invalid'):
+            backup.database_snapshot(lambda _:self.fail('invalid mode must refuse before SQL'),acl_semantics=1)
 
 if __name__=='__main__':unittest.main()

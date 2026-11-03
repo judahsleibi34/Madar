@@ -1,5 +1,13 @@
 # Madar production release acceptance policy
 
+New fenced maintenance backups use version2 fingerprint semantics for PostgreSQL
+ACL defaults. The independently pinned maintenance manifest selects the same
+comparison on source and restore; callers cannot choose a permissive mode.
+Version1 archives retain their original interpretation. Unknown versions refuse.
+Version2 still requires exact privileges/grantors/options, ownership, RLS,
+function definitions, rows and sequences; empty ACLs remain distinct from NULL
+defaults. This grants no release authority and changes no historical archive.
+
 ## Historical calendar connection preparation
 
 Before historical enrollment, independently configure the existing native

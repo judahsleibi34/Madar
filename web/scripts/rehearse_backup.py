@@ -251,7 +251,7 @@ def rehearse(backup: Path, image: str, migration: Path | None = None, *, target_
             psql.insert(psql.index('-At'),'-q')
             if json.loads(query(backup_support.ROLE_SNAPSHOT_SQL))!=original_roles:
                 raise RehearsalError('maintenance_original_role_state_mismatch')
-            if backup_support.database_fingerprint(query)!=maintenance['database_fingerprint']:
+            if backup_support.database_fingerprint(query,acl_semantics=maintenance['version']==2)!=maintenance['database_fingerprint']:
                 raise RehearsalError('maintenance_database_fingerprint_mismatch')
             result.update(role_attributes_restored=True,ownership_and_acls_restored=True,
                 database_fingerprint_verified=True,maintenance_manifest_sha256=maintenance_manifest_sha256)

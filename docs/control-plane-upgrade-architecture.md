@@ -1,5 +1,16 @@
 # Privileged control-plane upgrade architecture
 
+New fenced maintenance captures use manifest version2 for ACL-semantic database
+fingerprints. PostgreSQL's `acldefault` expands NULL ACLs by object kind and owner;
+an equivalent explicit owner grant can therefore survive pg_dump's canonical
+representation. Explicitly empty ACLs, privileges, grant options, grantors,
+owners, RLS flags, function definitions and row/sequence fingerprints remain
+distinct and verified. Source and restored observations use the same version.
+Version1 signed archives retain their original raw-ACL interpretation; no old
+manifest, checksum or receipt is rewritten. Unknown versions refuse.
+See PostgreSQL17 [access privilege functions](https://www.postgresql.org/docs/17/functions-info.html#FUNCTIONS-INFO-ACCESS-TABLE)
+and [privileges](https://www.postgresql.org/docs/17/ddl-priv.html).
+
 The fenced maintenance backup observes its source PostgreSQL extension inventory
 and configured preload libraries through the existing concrete provider's
 read-only connection, guarded by source, authority and quiescence checks. The
