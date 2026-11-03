@@ -1,5 +1,14 @@
 # Privileged control-plane upgrade architecture
 
+The governed release child selects canonical historical admission from the
+existing protected interlock even when provider-recovery.json never existed.
+Selection invokes the unchanged full admission verifier: exact application,
+controller, credential/interlock digest, live parent lease, historical enrollment
+and provider witness remain mandatory. It creates no historical marker and does
+not equate the application SHA with the controller SHA. A missing/foreign
+credential or a modern origin on this markerless path refuses; ordinary release
+authorization and existing provider-recovery behavior remain unchanged.
+
 Backup publication configuration and the preceding LATEST marker are checked in
 the existing read-only preflight before approval consumption, then reobserved
 before capture/publication. Legacy unprefixed backup keys do not satisfy the

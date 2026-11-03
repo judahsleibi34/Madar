@@ -1,5 +1,12 @@
 # Madar production release acceptance policy
 
+A markerless enrolled historical origin may enter only the existing canonical
+admission verifier selected by its protected interlock. The actual candidate
+application SHA remains distinct from the approved controller SHA. The full
+fresh credential, canonical operation lease and exact original witness are still
+required; an interlock or environment flag alone grants no rights. No synthetic
+provider-recovery marker, historical completion or old write grant is created.
+
 Protected backup publication requires the explicit MADAR_BACKUP_DIR and
 MADAR_BACKUP_FRESHNESS_MARKER configuration in pre-approval read-only validation.
 No legacy key alias or scoped capture override can satisfy this publication

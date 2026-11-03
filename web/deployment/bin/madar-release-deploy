@@ -2698,7 +2698,10 @@ def main() -> int:
         from deployment.lib.completed_normal_admission import require_admission
         admission = require_admission(state_root, normalized_sha)
     else:
-        require_upgrade_authorization(normalized_sha)
+        from deployment.lib.completed_normal_admission import historical_child_admission
+        admission = historical_child_admission(state_root,normalized_sha)
+        if admission is None:
+            require_upgrade_authorization(normalized_sha)
     reject_ordinary_operation(state_root, normalized_sha)
     env_file = Path(os.environ["MADAR_ENV_FILE"]).resolve()
     if args.refresh_active_workers or args.refresh_active_runtime:

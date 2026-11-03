@@ -546,6 +546,28 @@ def publish_admission(contract: dict, operations, state_root: Path, *, admission
     return root
 
 
+def historical_child_admission(state_root: Path, application_sha: str) -> dict | None:
+    """Select existing admission from a protected canonical historical interlock.
+
+    Historical origins never had provider-recovery.json. Its absence must not
+    confuse the independently authorized controller SHA with the application
+    SHA. The public interlock selects only the verifier; its fresh credential,
+    parent lease, scope and historical witness must still pass that verifier.
+    """
+    from deployment.lib.control_plane_upgrade_authorization import UPGRADE_INTERLOCK
+    from deployment.lib.provider_recovery_runtime import protected
+    if not UPGRADE_INTERLOCK.exists() and not UPGRADE_INTERLOCK.is_symlink():
+        return None
+    interlock=json.loads(protected(UPGRADE_INTERLOCK).read_bytes())
+    if interlock.get('operation')!=RECONCILED.operation:
+        return None
+    contract=require_admission(state_root,application_sha)
+    from deployment.lib.historical_origin import KIND
+    if contract['source_roles'].get('origin_kind')!=KIND:
+        raise RuntimeError('completed_normal_historical_child_origin_required')
+    return contract
+
+
 def require_admission(state_root: Path, application_sha: str | None, *, admissions: Path = ADMISSIONS) -> dict:
     """Credential-bound admission at every real deploy and migration entrypoint."""
     from deployment.lib.control_plane_upgrade_authorization import UPGRADE_INTERLOCK
