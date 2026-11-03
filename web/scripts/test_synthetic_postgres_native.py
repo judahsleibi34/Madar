@@ -14,7 +14,25 @@ SCRIPTS = Path(__file__).resolve().parent
 IMAGE = 'postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73'
 
 
+def wait_for_postgres(identity, *, timeout=60):
+    # The image's init server accepts Unix sockets only, then shuts down.
+    # Observe the final TCP server and an actual SQL round trip, not initdb.
+    deadline=time.monotonic()+timeout
+    while True:
+        try:
+            docker('exec',identity,'pg_isready','-h','127.0.0.1','-U','postgres','-d','postgres')
+            result=docker('exec',identity,'psql','-X','-h','127.0.0.1','-U','postgres','-d','postgres','-Atc','select 1')
+            if result.strip()!='1':raise RuntimeError('synthetic_postgres_native_query_invalid')
+            return
+        except subprocess.CalledProcessError:
+            if time.monotonic()>=deadline:raise
+            time.sleep(0.25)
+
+
 def main():
+    def stop(signum, frame):
+        raise SystemExit(128+signum)
+    signal.signal(signal.SIGTERM,stop)
     children, scopes = [], []
     occupied = socket.socket()
     try:
@@ -54,18 +72,9 @@ read -r done
             record = observe(*scope)
             assert port(record) == observed_port and observed_port != '55446'
             ports.append(observed_port)
-            deadline = time.monotonic() + 60
-            while True:
-                try:
-                    docker('exec', record['Id'], 'pg_isready', '-U', 'postgres')
-                    break
-                except subprocess.CalledProcessError:
-                    if time.monotonic() >= deadline:
-                        raise
-                    time.sleep(0.25)
+            wait_for_postgres(record['Id'])
             with socket.create_connection(('127.0.0.1', int(observed_port)), timeout=5):
                 pass
-            assert docker('exec', record['Id'], 'psql', '-X', '-U', 'postgres', '-Atc', 'select 1').strip() == '1'
         assert len(set(ports)) == 2
         # Normal trap cleanup and hard interruption with exact supervisor cleanup.
         children[0].communicate('done\n', timeout=20)

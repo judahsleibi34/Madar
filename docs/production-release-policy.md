@@ -5018,3 +5018,8 @@ previous order. Approval issuance rechecks current operator/session, independent
 policy/key and request/admission expiry after technical review, then records its
 actual issue time. Existing approvals are never extended; request/approval caps
 remain600/300 seconds. Expiry, changed identity/policy or failed gates refuse.
+
+The native synthetic PostgreSQL port test waits for the final TCP server and a
+successful SQL round trip within its existing bounded readiness window. The
+image's temporary Unix-only initialization server is not accepted as readiness.
+A timeout remains a failure and exact-owned teardown runs on termination.

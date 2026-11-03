@@ -23,6 +23,27 @@ RECORD = {'Id': CID, 'Name': '/' + NAME, 'Config': {'Image': IMAGE, 'Labels': {
 
 
 class SyntheticPostgresTests(unittest.TestCase):
+    def test_native_readiness_uses_final_tcp_server_and_bounded_sql_round_trip(self):
+        spec=importlib.util.spec_from_file_location('native_port_test',SCRIPTS/'test_synthetic_postgres_native.py')
+        native=importlib.util.module_from_spec(spec)
+        import sys
+        with patch.dict(sys.modules,{'synthetic_postgres':pg}):spec.loader.exec_module(native)
+        calls=[];attempts=[0]
+        def run(*args):
+            calls.append(args)
+            self.assertIn('-h',args);self.assertEqual(args[args.index('-h')+1],'127.0.0.1')
+            if args[2]=='pg_isready':
+                attempts[0]+=1
+                if attempts[0]==1:raise subprocess.CalledProcessError(2,args)
+                return 'accepting connections'
+            if attempts[0]==2:raise subprocess.CalledProcessError(2,args)
+            return '1\n'
+        with patch.object(native,'docker',side_effect=run),patch.object(native.time,'sleep'):
+            native.wait_for_postgres(CID)
+        self.assertEqual(attempts[0],3)
+        with patch.object(native,'docker',side_effect=subprocess.CalledProcessError(2,'docker')),patch.object(native.time,'monotonic',side_effect=[0,61]),self.assertRaises(subprocess.CalledProcessError):
+            native.wait_for_postgres(CID)
+
     def test_loopback_port_is_actual_docker_allocation(self):
         self.assertEqual(pg.port(RECORD), '49182')
         for bindings in (None, [], [{'HostIp': '0.0.0.0', 'HostPort': '49182'}],

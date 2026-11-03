@@ -7,10 +7,10 @@ BACKEND_TEST_IMAGE="${BACKEND_TEST_IMAGE:-madar-backend-test}"
 source "$SCRIPT_DIR/synthetic_postgres.sh"
 synthetic_postgres_start "synthetic-commercial-099"
 for attempt in $(seq 1 60); do
-  if docker exec "$CONTAINER_NAME" pg_isready -U postgres >/dev/null 2>&1; then break; fi
+  if docker exec "$CONTAINER_NAME" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1; then break; fi
   sleep 1
 done
-docker exec "$CONTAINER_NAME" pg_isready -U postgres >/dev/null
+docker exec "$CONTAINER_NAME" pg_isready -h 127.0.0.1 -U postgres >/dev/null
 docker exec -e PGOPTIONS='-c client_min_messages=warning' -i "$CONTAINER_NAME" psql -X -U postgres -v ON_ERROR_STOP=1 -q <<'SQL'
 create role anon nologin;
 create role authenticated nologin;
