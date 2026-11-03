@@ -15,16 +15,24 @@ import test_schema150_provider_adapter as fixtures
 
 
 STOPPED = {'ActiveState': 'inactive', 'SubState': 'dead', 'Job': '',
-           'ExecMainPID': '0', 'ControlPID': '0'}
+           'MainPID': '0', 'ControlPID': '0'}
 
 
 class SupervisorQuiescenceTests(unittest.TestCase):
     def component(self, **kwargs):
-        return fixtures.ConcreteAdapterTests.component(self, **kwargs)
+        values=fixtures.ConcreteAdapterTests.component(self, **kwargs)
+        actor=values[0];actor.inventory['supervisors']=dict(sorted(actor.inventory['supervisors'].items()))
+        return values
+
+    def unit_state(self,name,**changed):
+        result=dict(STOPPED)
+        if name.endswith('.timer'):
+            result.pop('MainPID');result.pop('ControlPID')
+        result.update(changed);return result
 
     def test_only_complete_inactive_dead_observation_is_accepted(self):
         actor, _, _, _ = self.component(stage='fenced')
-        actor._unit = Mock(return_value=dict(STOPPED))
+        actor._unit = Mock(side_effect=self.unit_state)
         self.assertTrue(actor._supervisors_stopped())
         self.assertEqual(actor._unit.call_count, len(actor.inventory['supervisors']))
         actor.runtime.command.assert_not_called()
@@ -34,10 +42,10 @@ class SupervisorQuiescenceTests(unittest.TestCase):
         mutations = ({'ActiveState': 'active'}, {'ActiveState': 'activating'},
                      {'ActiveState': 'deactivating'}, {'ActiveState': 'failed'},
                      {'SubState': 'running'}, {'Job': '271'}, {'Job': 'start'},
-                     {'ExecMainPID': '123'}, {'ControlPID': '123'},
-                     {'ExecMainPID': 0}, {'ControlPID': None})
+                     {'MainPID': '123'}, {'ControlPID': '123'},
+                     {'MainPID': 0}, {'ControlPID': None})
         for changed in mutations:
-            actor._unit = Mock(return_value={**STOPPED, **changed})
+            actor._unit = Mock(side_effect=lambda name:self.unit_state(name,**changed))
             with self.subTest(changed=changed), self.assertRaisesRegex(RuntimeError, 'supervisor_not_quiescent'):
                 actor._supervisors_stopped()
         actor.runtime.command.assert_not_called()
@@ -45,8 +53,9 @@ class SupervisorQuiescenceTests(unittest.TestCase):
     def test_missing_systemd_properties_never_mean_stopped(self):
         actor, _, _, _ = self.component(stage='fenced')
         for missing in STOPPED:
-            observed = dict(STOPPED); observed.pop(missing)
-            actor._unit = Mock(return_value=observed)
+            def observed(name):
+                fields=self.unit_state(name);fields.pop(missing,None);return fields
+            actor._unit = Mock(side_effect=observed)
             with self.subTest(missing=missing), self.assertRaisesRegex(RuntimeError, 'supervisor_not_quiescent'):
                 actor._supervisors_stopped()
 
@@ -58,7 +67,7 @@ class SupervisorQuiescenceTests(unittest.TestCase):
             journal.append('effect_intent', {'step': step})
             journal.append('effect_complete', {'step': step})
         journal.append('effect_intent', {'step': 'fence_supervisors'})
-        actor._unit = Mock(return_value={**STOPPED, 'ActiveState': 'active'})
+        actor._unit = Mock(side_effect=lambda name:self.unit_state(name,ActiveState='active'))
         model = lifecycle.ProviderMaintenance150(scope, journal, actor)
         before = journal.read()
         with self.assertRaisesRegex(RuntimeError, 'supervisor_not_quiescent'):
@@ -69,7 +78,7 @@ class SupervisorQuiescenceTests(unittest.TestCase):
 
     def test_migration_quiescence_refuses_supervisor_before_sql_or_object_capture(self):
         actor, scope, _, _ = self.component(stage='fenced')
-        actor._unit = Mock(return_value={**STOPPED, 'Job': '271'})
+        actor._unit = Mock(side_effect=lambda name:self.unit_state(name,Job='271'))
         actor._sql = Mock(side_effect=AssertionError('database must not be queried'))
         actor._object_preservation = Mock(side_effect=AssertionError('object bytes must not be captured'))
         with self.assertRaisesRegex(RuntimeError, 'supervisor_not_quiescent'):
@@ -79,7 +88,7 @@ class SupervisorQuiescenceTests(unittest.TestCase):
 
     def test_private_boundary_does_not_assert_supervisor_fencing_from_barrier_alone(self):
         actor, scope, _, _ = self.component(stage='private')
-        actor._unit = Mock(return_value={**STOPPED, 'ControlPID': '271'})
+        actor._unit = Mock(side_effect=lambda name:self.unit_state(name,ControlPID='271'))
         actor._sessions = Mock(side_effect=AssertionError('sessions must not be queried'))
         with self.assertRaisesRegex(RuntimeError, 'supervisor_not_quiescent'):
             actor.observe_private_boundary(scope)
