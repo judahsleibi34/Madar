@@ -48,6 +48,9 @@ os.environ['PATH']=str(tools)+':'+os.environ['PATH']
 
 def command(args,*,input=None,timeout=90):
     return subprocess.check_output(args,input=input,text=True,stderr=subprocess.PIPE,timeout=timeout)
+def volume_absent(name):
+    # A daemon failure cannot be misreported as successful deletion.
+    return name not in command(['/usr/bin/docker','volume','ls','--format','{{.Name}}']).splitlines()
 def query(sql):
     return command(['docker','exec','-i',source,'psql','-XqAt','-h','/tmp','-U','supabase_admin','-d','postgres','-v','ON_ERROR_STOP=1'],input=sql)
 def readonly(sql):
@@ -172,13 +175,14 @@ SELECT setval(pg_get_serial_sequence('public.native_restore_records','id'),42,tr
         'changed_function':"CREATE OR REPLACE FUNCTION public.native_restore_identity() RETURNS integer LANGUAGE sql IMMUTABLE AS 'SELECT 2';",
     }
     for case,sql in mutations.items():
-        injected=[]
+        injected=[];target_volumes=[]
         def altered_target(query,**options):
             ids=command(['/usr/bin/docker','ps','-aq','--filter','label='+label]).split()
             rows=json.loads(command(['/usr/bin/docker','inspect',*ids]))
             selected=[r for r in rows if re.fullmatch('/madar-restore-rehearsal-[a-f0-9]{12}',r['Name'])]
             assert len(selected)==1 and selected[0]['Image']==image_id and selected[0]['Config']['Image']==image
             target=selected[0];assert target['Config']['Labels']['com.madar.native.restore.preflight']==nonce
+            target_volumes.extend(m['Name'] for m in target['Mounts'] if m['Type']=='volume')
             command(['/usr/bin/docker','exec','-i',target['Id'],'psql','-XqAt','-h','/tmp','-U',roles,'-d','postgres','-v','ON_ERROR_STOP=1'],input=sql)
             injected.append(target['Id'])
             return real_fingerprint(query,**options)
@@ -190,12 +194,14 @@ SELECT setval(pg_get_serial_sequence('public.native_restore_records','id'),42,tr
             else:raise AssertionError('unsafe restored state accepted:'+case)
         finally:backup_support.database_fingerprint=real_fingerprint
         assert len(injected)==1 and subprocess.run(['/usr/bin/docker','inspect',injected[0]],capture_output=True).returncode!=0
+        for volume in target_volumes:
+            assert volume_absent(volume)
         negative[case]='REFUSED_REAL_RESTORED_TARGET'
     assert backup_support.database_fingerprint(readonly,acl_semantics=True)==fingerprint
     assert backup_support.database_fingerprint(readonly)==raw_fingerprint
     report.update(status='PASS',actual_restore=result,source_database_unchanged=True,
         version1_representation_refusal_preserved=True,version2_restore_passed=True,
-        native_negative_refusals=negative,worktree_clean=worktree_clean,
+        native_negative_refusals=negative,anonymous_restore_volumes_removed=True,worktree_clean=worktree_clean,
         source_file_hashes={str(p.relative_to(repo)):hashlib.sha256(p.read_bytes()).hexdigest() for p in
             (Path(__file__).resolve(),repo/'web/scripts/backup_support.py',repo/'web/scripts/rehearse_backup.py',repo/'web/deployment/lib/maintenance_backup.py')})
 except BaseException as error:
@@ -208,7 +214,10 @@ finally:
         assert (row['Config']['Labels']['com.madar.native.restore.preflight']==nonce
                 and row['Image']==image_id and row['Config']['Image']==image)
         assert row['Name']=='/'+source or re.fullmatch('/madar-(restore-rehearsal|native-toc)-[a-f0-9]{12}',row['Name'])
-        command(['/usr/bin/docker','rm','--force',cid]);removed.append(cid)
+        volumes=[m['Name'] for m in row['Mounts'] if m['Type']=='volume']
+        command(['/usr/bin/docker','rm','--force','--volumes',cid]);removed.append(cid)
+        for volume in volumes:
+            assert volume_absent(volume)
     assert not command(['/usr/bin/docker','ps','-aq','--filter','label='+label]).strip()
     report['owned_containers_removed']=True;report['remaining_owned_containers']=0
     report['logical_bytes_removed']=sum(p.stat().st_size for p in work.rglob('*') if p.is_file())

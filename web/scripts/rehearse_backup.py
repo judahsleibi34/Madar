@@ -363,7 +363,9 @@ WHERE table_schema='public' AND table_name='ecommerce_order_items'
     finally:
         try:
             if created:
-                run(["docker", "rm", "--force", name], phase="disposable_cleanup")
+                # Only this newly created target owns the image-declared
+                # anonymous volumes. Remove them with its container, too.
+                run(["docker", "rm", "--force", "--volumes", name], phase="disposable_cleanup")
                 result["disposable_target_removed"] = True
         finally:
             scratch_dump.cleanup()

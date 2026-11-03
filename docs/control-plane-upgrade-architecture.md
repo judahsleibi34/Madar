@@ -1,5 +1,10 @@
 # Privileged control-plane upgrade architecture
 
+Disposable logical-restore cleanup removes the exact newly created target and
+its image-declared anonymous volumes. Required backup archives and operational
+volumes are outside that scope. Native CI verifies volume absence through a
+successful daemon listing, so daemon failure cannot masquerade as cleanup.
+
 New fenced maintenance captures use manifest version2 for ACL-semantic database
 fingerprints. PostgreSQL's `acldefault` expands NULL ACLs by object kind and owner;
 an equivalent explicit owner grant can therefore survive pg_dump's canonical

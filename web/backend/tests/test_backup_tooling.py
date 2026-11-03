@@ -380,6 +380,8 @@ class BackupToolingTests(unittest.TestCase):
             self.assertIn('shared_preload_libraries=pg_stat_statements',startup[-1])
             self.assertNotIn('pg_cron',startup[-1]);self.assertNotIn('pg_net',startup[-1])
             self.assertIn('disposable_cleanup',[phase for _,phase in commands])
+            cleanup=next(command for command,phase in commands if phase=='disposable_cleanup')
+            self.assertIn('--volumes',cleanup)
 
     def test_coordinated_logical_roles_are_nologin_and_never_replay_credentials(self):
         with tempfile.TemporaryDirectory() as directory:
