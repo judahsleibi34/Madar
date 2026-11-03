@@ -1,5 +1,14 @@
 # Privileged control-plane upgrade architecture
 
+Backup publication configuration and the preceding LATEST marker are checked in
+the existing read-only preflight before approval consumption, then reobserved
+before capture/publication. Legacy unprefixed backup keys do not satisfy the
+protected contract. Only an independently enrolled canonical historical origin's
+first pre-migration capture may have no previous marker: the journal explicitly
+records absence, without inventing old backup bytes or publishing freshness.
+Ordinary origins and post-migration captures still require the existing marker.
+The marker is published only after real restoration and authenticated replication.
+
 Disposable logical-restore cleanup removes the exact newly created target and
 its image-declared anonymous volumes. Required backup archives and operational
 volumes are outside that scope. Native CI verifies volume absence through a

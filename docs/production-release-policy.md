@@ -1,5 +1,14 @@
 # Madar production release acceptance policy
 
+Protected backup publication requires the explicit MADAR_BACKUP_DIR and
+MADAR_BACKUP_FRESHNESS_MARKER configuration in pre-approval read-only validation.
+No legacy key alias or scoped capture override can satisfy this publication
+contract. A truthfully enrolled historical origin may record that its first
+source backup had no LATEST marker; that distinct absence receipt is not a
+completed backup or freshness evidence. Ordinary and target backups retain the
+prior-marker requirement. Actual restore, replication and protected authority
+remain mandatory before publication or SQL execution.
+
 New fenced maintenance backups use version2 fingerprint semantics for PostgreSQL
 ACL defaults. The independently pinned maintenance manifest selects the same
 comparison on source and restore; callers cannot choose a permissive mode.

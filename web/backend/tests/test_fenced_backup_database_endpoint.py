@@ -19,13 +19,15 @@ class FencedBackupEndpointTests(unittest.TestCase):
     def exercise(self,schema):
         temporary=tempfile.TemporaryDirectory();self.addCleanup(temporary.cleanup)
         root=Path(temporary.name);backups=root/'backups';backups.mkdir()
+        (backups/'LATEST').write_bytes(b'existing-original-marker\n')
         package=root/'package';package.mkdir()
         plan=SimpleNamespace(digest='a'*64,source_sha='b'*40)
         identity=SimpleNamespace(pw_uid=os.getuid(),pw_gid=os.getgid())
         descriptor=os.memfd_create('test-sealed-backup-endpoint',os.MFD_ALLOW_SEALING)
         os.write(descriptor,json.dumps({'address':'172.19.0.2'}).encode())
         fcntl.fcntl(descriptor,fcntl.F_ADD_SEALS,backup_support.DATABASE_SEALS)
-        context=SimpleNamespace(validate=Mock(),guard=Mock(),schema=schema,contract={},provider_adapter=object())
+        context=SimpleNamespace(validate=Mock(),guard=Mock(),schema=schema,contract={},provider_adapter=object(),
+            stage='pre-migration' if schema==146 else 'post-migration')
         context.artifacts=Mock(return_value={'node1_replica':{'configuration_sha256':'c'*64}})
         observed=[]
         def capture(env,fd,user):
@@ -41,6 +43,7 @@ class FencedBackupEndpointTests(unittest.TestCase):
         def configuration(path,*,environ,**kwargs):
             if Path(path)==operation.INPUTS['backup_configuration']:
                 environ.update(PGHOST='supabase-db',PGHOSTADDR='203.0.113.9',PGUSER='postgres')
+                environ.update(MADAR_BACKUP_DIR=str(backups),MADAR_BACKUP_FRESHNESS_MARKER=str(backups/'LATEST'))
         def path(value):
             return backups if str(value)=='/var/lib/madar/backups' else Path(value)
         with patch.object(operation,'Path',side_effect=path),\

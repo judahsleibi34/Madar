@@ -34,6 +34,41 @@ def latest_preimage_name(completed_context=None):
         raise RuntimeError('normal_backup_preimage_stage_invalid')
     return completed_context.stage+'-ordinary-latest-preimage'
 
+def verify_publication_configuration(cfg, canonical):
+    """Check the real publication inputs before capture or approval consumption."""
+    if (cfg.get('MADAR_BACKUP_DIR') != str(canonical)
+            or cfg.get('MADAR_BACKUP_FRESHNESS_MARKER') != str(canonical/'LATEST')):
+        raise RuntimeError('normal_backup_configured_root_changed')
+
+
+def latest_preimage(canonical, *, contract=None, stage=None):
+    """Absence is truthful only for the enrolled origin's first source backup.
+
+    Ordinary origins and target backups still require their preceding marker.
+    This observes input only; it neither creates freshness nor grants authority.
+    """
+    latest=canonical/'LATEST'
+    if not latest.exists() and not latest.is_symlink() and stage=='pre-migration' and historical_database_options(contract):
+        from deployment.lib.completed_normal_admission import validate_provider_preparation
+        from deployment.lib.completed_normal_profile import RECONCILED
+        if validate_provider_preparation(contract) is RECONCILED:
+            return None
+    return readonly_configuration(latest,private=False).read_bytes()
+
+
+def preserve_latest_preimage(root,canonical,completed_context=None,*,expected):
+    contract=None if completed_context is None else completed_context.contract
+    stage=None if completed_context is None else completed_context.stage
+    body=latest_preimage(canonical,contract=contract,stage=stage)
+    if body!=expected:raise RuntimeError('normal_backup_latest_changed_during_capture')
+    name=latest_preimage_name(completed_context)
+    if body is None:
+        exclusive(root/(name+'-absent.json'),encoded({'version':1,
+            'kind':'absent-before-first-historical-source-backup',
+            'context_sha256':completed_context.context,'stage':stage,'path':str(canonical/'LATEST')}))
+    else:
+        exclusive(root/name,body)
+
 def checked(args, *, env=None, user=None, timeout=1800, stdin=None, pass_fds=()):
     if user is not None:args=['/usr/bin/setpriv','--no-new-privs',*args]
     result=subprocess.run(args,env=env or ENVIRONMENT,user=user,group=user,extra_groups=[] if user is not None else None,
@@ -86,6 +121,10 @@ def verify_backup_execution_context(package, *, expected_schema=115, completed_c
     if contract is not None and file_digest(configuration)!=contract['database']['backup_configuration_sha256']:
         raise RuntimeError('normal_backup_preflight_configuration_changed')
     load_environment_file(configuration, environ=cfg)
+    canonical=Path('/var/lib/madar/backups')
+    verify_publication_configuration(cfg,canonical)
+    latest_preimage(canonical,contract=contract,
+        stage='pre-migration' if contract is not None and expected_schema==146 else None)
     if any(key.startswith(('LD_', 'PYTHON', 'DOCKER_', 'GIT_')) or key in {
             'PATH', 'HOME', 'BASH_ENV', 'ENV', 'SHELL', 'CREDENTIALS_DIRECTORY',
             backup_support.LOCAL_DATABASE_FD} for key in cfg):
@@ -251,8 +290,11 @@ def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_con
     scope=canonical/(('normal-local-' if recovery_context is None else 'recovery-before-normal-')+scope_digest)
     if scope.exists() or scope.is_symlink():raise FileExistsError('normal_backup_scope_exists')
     if not scope.parent.is_dir() or scope.parent.is_symlink():raise RuntimeError('normal_backup_parent_missing')
-    scope.mkdir(mode=0o700);os.chown(scope,identity.pw_uid,identity.pw_gid)
     cfg={};load_environment_file(readonly_configuration(INPUTS['backup_configuration'],private=True),environ=cfg)
+    verify_publication_configuration(cfg,canonical)
+    previous_latest=latest_preimage(canonical,contract=None if completed_context is None else completed_context.contract,
+        stage=None if completed_context is None else completed_context.stage)
+    scope.mkdir(mode=0o700);os.chown(scope,identity.pw_uid,identity.pw_gid)
     paths={};load_environment_file(protected(Path('/opt/madar/control-plane/deployment/production-paths.conf')),environ=paths,require_private=False)
     # Configuration data cannot select a shell/interpreter/loader or credentials.
     if any(key.startswith(('LD_','PYTHON','DOCKER_','GIT_')) or key in {'PATH','HOME','BASH_ENV','ENV','SHELL','CREDENTIALS_DIRECTORY',backup_support.LOCAL_DATABASE_FD} for key in cfg):
@@ -372,10 +414,8 @@ def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_con
     # Publish this same already-verified backup (no second dump/checkpoint) to
     # the configured ordinary root before restoring its backup timers. Existing
     # LATEST bytes are archived; directory publication refuses all collisions.
-    if cfg.get('MADAR_BACKUP_DIR')!=str(canonical) or cfg.get('MADAR_BACKUP_FRESHNESS_MARKER')!=str(canonical/'LATEST'):
-        raise RuntimeError('normal_backup_configured_root_changed')
-    latest=canonical/'LATEST'
-    exclusive(root/latest_preimage_name(completed_context),readonly_configuration(latest,private=False).read_bytes())
+    verify_publication_configuration(cfg,canonical)
+    preserve_latest_preimage(root,canonical,completed_context,expected=previous_latest)
     final=canonical/backup.name
     if maintenance_digest is not None:
         from deployment.lib.maintenance_backup import release_ownership
