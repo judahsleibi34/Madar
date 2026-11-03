@@ -2902,3 +2902,26 @@ the actual named volume's driver, empty options, realm/operator labels and every
 container reference, then binds that observation into the existing authenticated
 operator scope. Shared, foreign or bind-driver volumes refuse. No volume-name
 allowlist by itself authenticates an exclusion or authorizes a release.
+
+
+### Historical boot prerequisite ordering (2026-11-03)
+
+The existing isolated recovery installer now recognizes a genuine unsigned
+schema146 bootstrap and installs its existing fence/recovery units before origin
+inventory signing. An independent v1 recovery policy is required first. The
+installer records a protected scope and attempt intent in the existing automatic
+recovery journal, enables the unchanged units, starts and verifies the exact
+network barrier, and accepts a ready receipt only after rechecking source, live
+database, filesystem, controller and policy. It starts no application or worker
+and issues no deployment/migration authority.
+
+Historical request creation and enrollment both require that ready journal and
+actual unchanged units. Missing, failed or interrupted construction refuses
+before signing/consumption. Signed requests or enrolled origins cannot be
+retroactively modified by reinstalling prerequisites. A retry before signing
+must retain the same scope and preserves earlier attempt/failure records; an
+unknown unit or tampered firewall is never silently repaired. Historical v2
+known-good sealing follows enrollment without changing its signed boot preimage
+or extending the original policy lifetime. Ordinary completed-release recovery
+installation retains its existing pathway. Real reboot remains a separate
+operational acceptance requirement.

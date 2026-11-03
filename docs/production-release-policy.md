@@ -4945,3 +4945,12 @@ the independently enrolled runtime. Their root-private input digest remains part
 of historical enrollment. Existing strict endpoint files and consumed enrollment
 are not reinterpreted or rewritten. Fresh native repeated-boot/readmission
 acceptance is required; actual recovery alone does not prove successor admission.
+
+
+Historical-origin acceptance requires boot isolation and recovery prerequisites
+to be installed and independently reverified before the first signed inventory.
+The original signed boot preimage may not be retroactively updated to compensate
+for missing controls. The existing isolated installer retains durable failed and
+interrupted attempt history, and historical request/enrollment gates refuse
+until the exact construction is ready. This infrastructure preparation grants no
+release or SQL authority and does not enable production automation.

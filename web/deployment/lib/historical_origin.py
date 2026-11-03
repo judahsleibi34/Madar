@@ -555,6 +555,8 @@ def prepare(system):
 
 
 def _prepare(system,guard):
+    from .automatic_release_recovery import require_historical_boot_prerequisites
+    require_historical_boot_prerequisites(system)
     p,key,environment=policy(system);value=observe(system,p,environment)
     if digest(value)!=p['observation_sha256']:raise RuntimeError('historical_origin_observation_not_independently_pinned')
     request_id=str(uuid.uuid4());now=int(time.time())
@@ -573,6 +575,8 @@ def enroll(system,request_id,token,confirmation):
 
 
 def _enroll(system,request_id,token,confirmation,guard):
+    from .automatic_release_recovery import require_historical_boot_prerequisites
+    require_historical_boot_prerequisites(system)
     p,key,environment=policy(system)
     with journal_lock(identifier(request_id),namespace='historical-origins') as path:
         request=verified(path/'bootstrap-origin-request.json',key)

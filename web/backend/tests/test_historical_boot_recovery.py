@@ -59,6 +59,7 @@ class HistoricalBootRecoveryTests(unittest.TestCase):
         self.enterContext(patch.object(recovery,'inspect_all',side_effect=lambda:copy.deepcopy(self.rows)))
         self.enterContext(patch.object(recovery,'historical_context',return_value=self.context))
         self.enterContext(patch.object(recovery,'require_historical_boot_controls')) # MODEL systemd; separate exact-unit tests.
+        self.enterContext(patch.object(recovery,'require_historical_boot_prerequisites')) # Construction journal is exercised separately.
         self.enterContext(patch.object(origin,'restored_context',side_effect=lambda *a,**kw:self.original))
         self.enterContext(patch.object(origin,'bootstrap_record',return_value=self.bootstrap))
         self.enterContext(patch.object(origin,'attest',return_value=self.binding))

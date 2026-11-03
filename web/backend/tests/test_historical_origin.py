@@ -36,6 +36,7 @@ class HistoricalOriginTests(unittest.TestCase):
             ('journal_lock',locked),('readonly_configuration',lambda p,**k:Path(p)),('protected',lambda p,**k:Path(p))]:
             stack.enter_context(patch.object(origin,target,value))
         stack.enter_context(patch.object(approval,'protected',lambda p,**k:Path(p)))
+        stack.enter_context(patch('deployment.lib.automatic_release_recovery.require_historical_boot_prerequisites'))
         from deployment.lib import automatic_release_admission
         stack.enter_context(patch.object(automatic_release_admission,'ROOT',self.root))
 

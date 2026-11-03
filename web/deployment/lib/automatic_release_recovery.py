@@ -8,7 +8,7 @@ import hashlib,json,os,re,subprocess,time,uuid
 from pathlib import Path
 from .migration_inventory import canonical,digest,strict_json
 from .provider_recovery_runtime import protected,readonly_configuration
-from .migration_executor import atomic_json
+from .migration_executor import atomic_json,_sync_directory
 from . import automatic_release_admission as admission
 from .isolated_release_environment import observe_host,observe_effect_fence,required_rules,TABLE,run,verify_runtime_scope
 
@@ -361,6 +361,7 @@ def seal_historical_known_good(system):
     from .control_plane_upgrade import require_root_directory
     p,host=policy(system)
     if p.get('version')!=2:raise RuntimeError('automatic_recovery_historical_policy_required')
+    require_historical_boot_prerequisites(system)
     with operation_locks(system) as guard:
         state=read(STATE/'state.json',private=False);binding=attest(system,state)
         if binding!=p['historical_origin']:raise RuntimeError('automatic_recovery_historical_enrollment_changed')
@@ -823,9 +824,8 @@ WantedBy=multi-user.target
         'docker.service.d/madar-isolated-fence.conf':dependency,'docker.socket.d/madar-isolated-fence.conf':dependency}
 
 
-def install(system):
-    """Explicit install ONLY inside the enrolled KVM; no host or staging path."""
-    p,host=policy(system)
+def _install_units(system,p,host):
+    """Existing unit installer; callers already verified the independent policy."""
     verify_fence(p['control_interface'])
     # No changes before positive host, filesystem, fixed controller and fence.
     root=Path('/etc/systemd/system');files=unit_definitions()
@@ -843,5 +843,140 @@ def install(system):
     run(['/usr/bin/systemctl','enable','madar-isolated-fence.service','madar-known-good-recovery.service'])
     result={'operation':'install-isolated-known-good-recovery','guest_uuid':host['guest_uuid'],
         'unit_sha256':{k:hashlib.sha256(v.encode()).hexdigest() for k,v in files.items()},'production_activation':False}
+    return result
+
+
+BOOT_PREREQUISITES=ROOT/'historical-boot-prerequisites'
+
+
+def _historical_boot_scope(system,p,host,*,unsigned=False):
+    from .historical_origin import bootstrap_record
+    state=strict_json(readonly_configuration(system.state_root/'state.json',private=True).read_bytes())
+    known=state.get('known_good_release') or {}
+    if (known.get('schema')!=146 or type(known.get('schema')) is not int
+            or known.get('slot') not in {'blue','green'} or state.get('active_slot')!=known['slot']
+            or state.get('in_progress_release') or state.get('rollback_failure')
+            or 'completed_normal_upgrade' in known):
+        raise RuntimeError('historical_boot_original146_required')
+    bootstrap=bootstrap_record(system.state_root/'origin-bootstrap-adopted.json')
+    if (bootstrap not in state.get('history',[]) or bootstrap.get('phase')!='bootstrap_adopted'
+            or bootstrap.get('status')!='known_good' or bootstrap.get('release_sha')!=known.get('sha')
+            or bootstrap.get('candidate_slot')!=known['slot'] or bootstrap.get('traffic_target')!=known['slot']
+            or bootstrap.get('schema')!={'observed':146} or bootstrap.get('images')!=known.get('images')):
+        raise RuntimeError('historical_boot_truthful_bootstrap_required')
+    if unsigned:
+        requests=admission.ROOT/'historical-origins'
+        if (p['version']!=1 or known.get('historical_origin')
+                or any(requests.glob('*/bootstrap-origin-request.json'))):
+            raise RuntimeError('historical_boot_installation_must_precede_signed_inventory')
+    observed=strict_json(run(['/usr/bin/docker','exec',host['database_container_id'],'psql','-XqAt',
+        '-v','ON_ERROR_STOP=1','-U','supabase_admin','-d','postgres','-c',
+        "BEGIN READ ONLY; SET LOCAL statement_timeout='5s'; SELECT json_build_array("
+        "(SELECT system_identifier::text FROM pg_control_system()),schema_version) "
+        "FROM public.application_schema_state WHERE contract_key='core'; COMMIT;"]))
+    if observed!=[host['database_system_identifier'],146]:
+        raise RuntimeError('historical_boot_database_changed')
+    return {'environment_id':p['environment_id'],**{k:p[k] for k in
+        ('guest_uuid','machine_id','root_filesystem_uuid','controller_sha','controller_tree_sha256',
+         'control_interface','control_mac','control_address','control_gateway')},
+        'database_system_identifier':host['database_system_identifier'],'source_sha':known['sha'],
+        'slot':known['slot'],'bootstrap_sha256':digest(bootstrap)}
+
+
+def require_historical_boot_prerequisites(system):
+    """A ready root journal and real units precede signed origin inventories."""
+    p,host=policy(system);scope=_historical_boot_scope(system,p,host)
+    try:original=read(BOOT_PREREQUISITES/'scope.json');ready=read(BOOT_PREREQUISITES/'ready.json')
+    except (OSError,RuntimeError):
+        raise RuntimeError('historical_boot_prerequisites_not_ready') from None
+    if (set(original)!={'version','kind','scope','bootstrap_policy'} or original['version']!=1
+            or original['kind']!='isolated-historical-boot-prerequisites' or original['scope']!=scope
+            or original['bootstrap_policy'].get('version')!=1
+            or any(original['bootstrap_policy'].get(k)!=p[k] for k in scope if k in p)
+            or p['expires_at']>original['bootstrap_policy']['expires_at']):
+        raise RuntimeError('historical_boot_prerequisite_scope_changed')
+    fields={'operation','scope_sha256','attempt_id','unit_sha256','network_barrier',
+        'deployment_authority_issued','migration_sql_executed','historical_inventory_signed'}
+    try:
+        if str(uuid.UUID(ready.get('attempt_id','')))!=ready['attempt_id']:raise ValueError()
+    except (ValueError,TypeError,AttributeError):
+        raise RuntimeError('historical_boot_prerequisite_receipt_changed') from None
+    if (set(ready)!=fields or ready['operation']!='prepare-historical-boot-prerequisites'
+            or ready['scope_sha256']!=digest(original)
+            or any(ready[k] is not False for k in ('deployment_authority_issued','migration_sql_executed','historical_inventory_signed'))
+            or ready['unit_sha256']!={k:hashlib.sha256(v.encode()).hexdigest() for k,v in unit_definitions().items()}):
+        raise RuntimeError('historical_boot_prerequisite_receipt_changed')
+    from .historical_origin import network_barrier_control
+    verify_fence(p['control_interface'])
+    if network_barrier_control(system)!=ready['network_barrier']:
+        raise RuntimeError('historical_boot_prerequisite_barrier_changed')
+    for name,body in unit_definitions().items():
+        if protected(Path('/etc/systemd/system')/name).read_text()!=body:
+            raise RuntimeError('historical_boot_prerequisite_unit_changed')
+    state=system.systemctl_state('madar-known-good-recovery.service')
+    if state!={'enabled':'enabled','active':'inactive'}:
+        raise RuntimeError('historical_boot_prerequisite_recovery_unit_changed')
+    completion=read(BOOT_PREREQUISITES/'attempts'/ready['attempt_id']/'completed.json')
+    if completion!=ready:raise RuntimeError('historical_boot_prerequisite_attempt_changed')
+    return ready
+
+
+def prepare_historical_boot_prerequisites(system):
+    """Install the existing boot controls before one historical enrollment.
+
+    This is recovery infrastructure preparation, never migration/release authority.
+    Interrupted intents and failed attempts remain in the existing recovery tree;
+    a retry must have the same independent policy, source, database and controller.
+    """
+    from .historical_origin import operation_locks,network_barrier_control
+    from .control_plane_upgrade import require_root_directory
+    p,host=policy(system)
+    with operation_locks(system):
+        scope=_historical_boot_scope(system,p,host,unsigned=True)
+        require_root_directory(BOOT_PREREQUISITES,create=True)
+        _sync_directory(BOOT_PREREQUISITES.parent)
+        initial={'version':1,'kind':'isolated-historical-boot-prerequisites','scope':scope,'bootstrap_policy':p}
+        location=BOOT_PREREQUISITES/'scope.json'
+        if location.exists():
+            if read(location)!=initial:raise RuntimeError('historical_boot_prerequisite_scope_changed')
+        else:atomic_json(location,initial,exclusive=True)
+        if (BOOT_PREREQUISITES/'ready.json').exists():return require_historical_boot_prerequisites(system)
+        attempts=BOOT_PREREQUISITES/'attempts';require_root_directory(attempts,create=True)
+        _sync_directory(BOOT_PREREQUISITES)
+        if len(list(attempts.iterdir()))>=8:raise RuntimeError('historical_boot_prerequisite_attempt_budget')
+        attempt_id=str(uuid.uuid4());attempt=attempts/attempt_id;attempt.mkdir(mode=0o700)
+        _sync_directory(attempts)
+        atomic_json(attempt/'intent.json',{'operation':'prepare-historical-boot-prerequisites',
+            'scope_sha256':digest(initial),'attempt_id':attempt_id,'deployment_authority_issued':False,
+            'migration_sql_executed':False},exclusive=True)
+        try:
+            installed=_install_units(system,p,host)
+            run(['/usr/bin/systemctl','start','madar-isolated-fence.service'])
+            ready={'operation':'prepare-historical-boot-prerequisites','scope_sha256':digest(initial),
+                'attempt_id':attempt_id,'unit_sha256':installed['unit_sha256'],
+                'network_barrier':network_barrier_control(system),'deployment_authority_issued':False,
+                'migration_sql_executed':False,'historical_inventory_signed':False}
+            # Confirm source/policy again before accepting an interrupted retry.
+            current,current_host=policy(system)
+            if current!=p or _historical_boot_scope(system,current,current_host,unsigned=True)!=scope:
+                raise RuntimeError('historical_boot_prerequisite_scope_changed')
+            atomic_json(attempt/'completed.json',ready,exclusive=True)
+            atomic_json(BOOT_PREREQUISITES/'ready.json',ready,exclusive=True)
+            return require_historical_boot_prerequisites(system)
+        except Exception as error:
+            atomic_json(attempt/'failed.json',{'attempt_id':attempt_id,'exception_type':type(error).__name__,
+                'scope_sha256':digest(initial),'deployment_authority_issued':False,'migration_sql_executed':False},exclusive=True)
+            raise
+
+
+def install(system):
+    """Explicit install ONLY inside the enrolled KVM; no host or staging path."""
+    p,host=policy(system)
+    state_file=getattr(system,'state_root',STATE)/'state.json'
+    if p['version']==1 and state_file.exists():
+        state=strict_json(readonly_configuration(state_file,private=True).read_bytes())
+        if (state.get('known_good_release') or {}).get('schema')==146:
+            return prepare_historical_boot_prerequisites(system)
+    result=_install_units(system,p,host)
     if p['version']==2:result['historical_recovery']=seal_historical_known_good(system)
     return result
