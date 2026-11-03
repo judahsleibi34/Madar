@@ -83,6 +83,7 @@ class BackupPublicationTests(unittest.TestCase):
                 configuration.write_text(''.join(k+'='+v+'\n' for k,v in cfg.items()))
                 configuration.chmod(0o600)
                 with patch.dict(operation.INPUTS,backup_configuration=configuration),\
+                     patch.object(operation.pwd,'getpwnam',return_value=SimpleNamespace(pw_uid=1000)),\
                      patch.object(operation,'file_digest',return_value=self.contract['database']['backup_configuration_sha256']),\
                      patch.object(backup_support,'sealed_local_database_binding') as lease,\
                      patch.object(operation,'checked') as child:
