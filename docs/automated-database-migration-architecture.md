@@ -2918,3 +2918,14 @@ public business data, and rechecks schema/roles/ACL structure. This is confined
 to live historical preparation. SQL-boundary snapshots after writer fencing
 retain every original column; the preservation verifier explicitly refuses a
 preparation-normalized snapshot as migration completion evidence.
+
+Physical full-application restoration has a separately enrolled acceptance-age
+budget in isolated execution policy v2. It is bounded to one hour and the backup
+age limit; the exact receiver's expiry can shorten it further. Ephemeral CI,
+staging and source-observation freshness keep their existing600-second cap.
+Version1 retains its existing behavior. This prevents a valid independently
+restored application from borrowing an unrelated ephemeral-observation lifetime
+during the administrator review sequence. Every existing cryptographic binding,
+full application check, locked revalidation and one-time authority still applies.
+Expired acceptance and receiver evidence still refuse before privileged effects;
+a policy/source revision requires fresh operation, evidence and approval.

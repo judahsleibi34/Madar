@@ -60,6 +60,18 @@ class HistoricalPhysicalRecoveryTests(unittest.TestCase):
         self.assertNotIn('completion_sha256',self.context)
         self.assertNotIn('completion_sha256',self.fixture.trust)
 
+    def test_physical_acceptance_age_requires_explicit_policy_without_rewriting_origin(self):
+        f=self.fixture;now=int(time.time())
+        original=copy.deepcopy(self.context)
+        f.receipt.update(accepted_at=now-900,received_at=now-1000)
+        f.trust['backup_earliest_at']=now-1200;f.seal_receiver()
+        with self.assertRaisesRegex(RuntimeError,'physical_recovery_stale'):self.check()
+        f.policy.update(version=2,physical_recovery_max_age_seconds=1800)
+        self.assertTrue(self.check())
+        self.assertEqual(self.context,original)
+        self.assertNotIn('completion_sha256',self.context)
+        self.assertEqual(f.policy['evidence_max_age_seconds'],300)
+
     def test_ordinary_caller_cannot_implicitly_accept_historical_receipt(self):
         with self.assertRaisesRegex(RuntimeError,'root_binding_invalid'):self.check(binding=False)
 

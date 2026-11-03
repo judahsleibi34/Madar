@@ -4997,3 +4997,14 @@ exercises two real concurrent PostgreSQL instances with the former145 port
 occupied, normal teardown and exact-owned supervisor teardown after SIGKILL.
 Required Backend Check and downstream fresh staging dependencies stay intact;
 this test infrastructure correction supplies no deployment authority.
+
+An independently installed isolated automatic-execution policy may use version2
+with an explicit `physical_recovery_max_age_seconds` (positive integer, at most
+3600 and no greater than `recovery_max_age_seconds`). This governs only the
+signed physical restoration's acceptance age during review/execution. Version1
+keeps its original short evidence-age rule. CI, staging and ordinary independent
+observation freshness remain capped at600 seconds. Source/receiver/database,
+signature, source history, full functional acceptance, backup age and the
+receiver enrollment/receipt expiry remain mandatory. Changing policy invalidates
+existing bound approval/evidence; it cannot extend an issued receipt. No live
+policy or existing signed inventory is changed by this source capability.

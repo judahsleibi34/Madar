@@ -2970,3 +2970,12 @@ completed oneshots may retain a historical ExecMainPID. Timers expose no PID
 properties and retain strict pending-job and inactive/dead fencing checks. Every
 signed timer stays in the original universe; no missing service PID defaults to
 zero and no unit is omitted to satisfy preparation.
+
+The isolated policy v2 physical-restoration acceptance budget is independent of
+the short-lived release-observation budget (see production-release-policy.md).
+The actual9e rehearsal obtained genuine AAL2 exact approval but execution refused
+`automatic_physical_recovery_stale` before consumption/effects: review plus repeat
+technical checks outlasted the600-second observation budget. The old signed
+receipt/approval are retained unchanged. No existing policy is widened in place;
+a new independently enrolled policy/source, fresh restoration and new approval
+must establish the longer explicitly bounded physical-acceptance contract.

@@ -148,7 +148,9 @@ def execution_policy_configuration(operations):
     p=strict_json(body)
     fields={'version','enabled','environment','environment_id','controller_sha','controller_tree_sha256',
         'test_public_key_sha256','test_runner_sha256','test_commands_sha256','evidence_max_age_seconds','operation_max_seconds','recovery_max_age_seconds','denied_database_identifiers'}
-    if (not isinstance(p,dict) or set(p)!=fields or type(p['version']) is not int or p['version']!=1
+    version=p.get('version') if isinstance(p,dict) else None
+    if version==2:fields.add('physical_recovery_max_age_seconds')
+    if (not isinstance(p,dict) or set(p)!=fields or type(version) is not int or version not in (1,2)
             or p['enabled'] is not True or p['environment']!='isolated-test'
             or p['controller_sha']!=operations.installed_sha()
             or not re.fullmatch('[a-f0-9]{40}',str(p['controller_sha']))
@@ -156,6 +158,8 @@ def execution_policy_configuration(operations):
             or any(not re.fullmatch('[a-f0-9]{64}',str(p[k])) for k in ('test_public_key_sha256','test_runner_sha256','test_commands_sha256'))
             or any(type(p[k]) is not int or not 0<p[k]<=limit for k,limit in
                 (('evidence_max_age_seconds',600),('operation_max_seconds',900),('recovery_max_age_seconds',86400)))
+            or version==2 and (type(p['physical_recovery_max_age_seconds']) is not int
+                or not 0<p['physical_recovery_max_age_seconds']<=min(3600,p['recovery_max_age_seconds']))
             or not isinstance(p['denied_database_identifiers'],list) or not 1<=len(p['denied_database_identifiers'])<=64
             or any(not isinstance(v,str) or not re.fullmatch('[1-9][0-9]{0,31}',v) for v in p['denied_database_identifiers'])):
         raise RuntimeError('automatic_policy_not_enabled_for_accepted_environment')
@@ -268,9 +272,14 @@ def physical_recovery_evidence(recovery,policy,origin_source,protocols,*,now,his
                 or not re.fullmatch('[a-f0-9]{64}',str(row['id'])) or not re.fullmatch('sha256:[a-f0-9]{64}',str(row['image']))
                 or not re.fullmatch('[a-f0-9]{64}',str(row['spec_sha256'])) for name,row in actors.items())):
         raise RuntimeError('automatic_physical_recovery_runtime_invalid')
+    # A full physical restoration and human review have a distinct, explicitly
+    # enrolled lifetime. Version1 keeps its original short observation limit;
+    # no policy default, signed timestamp or receiver expiry is extended.
+    physical_age=(policy['physical_recovery_max_age_seconds'] if policy.get('version')==2
+                  else policy['evidence_max_age_seconds'])
     times=[trust['backup_earliest_at'],value.get('received_at'),value.get('accepted_at')]
     if (any(type(v) is not int for v in times) or not times[0]<=times[1]<=times[2]<=now
-            or now-times[0]>policy['recovery_max_age_seconds'] or now-times[2]>policy['evidence_max_age_seconds']):
+            or now-times[0]>policy['recovery_max_age_seconds'] or now-times[2]>physical_age):
         raise RuntimeError('automatic_physical_recovery_stale')
     if historical:
         verify_historical_restored_functional(functional,origin,origin_source,
