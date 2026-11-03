@@ -3003,3 +3003,18 @@ consumed/RECOVERY_REQUIRED and cannot authorize the corrected source.
 Installed operational helper verification uses the shared filesystem-installation contract, cross-checked against the existing installer array. The protected package producer and continuation scripts remain in PROTECTED_PATHS and immutable package verification; they are not backup-helper aliases and are not installed into /usr/local/lib/madar. Both real copies of every declared operational helper still require root ownership, mode0755, regular non-symlink files and identical bytes. Native95f363a7 passed boot supersession then exposed this contract mismatch before migration; its consumed authority remains recovery-required and is never reused for this correction.
 
 The provider adapter treats only the fixed root-owned upgrade interlock as the issuer's public, non-writable SHA/digest document (mode0644). The separate bearer credential remains private and is verified first, including exact operation/schema/context, rehearsal and canonical lease; both live coordinator locks remain required. Provider inventory, journals and receipts keep their private0600 contract. Unknown readable files, altered ownership, writable paths, symlinks, oversized input and missing/forged credentials refuse. Native64e66a4d passed boot/controller installation and inventory publication, then exposed this public-versus-private role mismatch before original account acceptance or SQL. Its consumed approval is retained and cannot authorize the corrected source.
+
+### Provider maintenance boot overlay (2026-11-03)
+
+The installed boot verifier recognizes only the current protected provider
+maintenance journal's exact context-scoped barrier drop-ins. The existing
+Root-private inventory, journal hash chain, lifecycle sequence and barrier's
+binding/preimage digest remain mandatory. Both pending post-effect and completed
+arm intents are observable: the provider must run its source guard after effects
+before it can publish completion. A missing partial installation, changed file,
+unknown physical/effective drop-in, foreign binding or lost barrier refuses.
+Authorized clear intent/completion retains the exact drop-ins without requiring
+the deleted barrier. No signed original inventory or boot receipt is rewritten,
+no effect is performed by verification, and an interrupted intent still requires
+the existing lifecycle reconciliation rather than replay. Component acceptance
+does not establish a protected schema160 completion.

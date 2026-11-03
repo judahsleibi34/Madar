@@ -212,12 +212,14 @@ class CompletedNormalBootInstallation:
             expected_original=dict(baseline,sha256=superseded[str(path)]) if str(path) in superseded else baseline
             if {'sha256':file_digest(path),'uid':st.st_uid,'mode':st.st_mode&0o7777}!=expected_original:
                 raise RuntimeError('completed_boot_preserved_resource_changed')
+        overlays=self.provider_barrier_dropins()
         for name,paths in self.baseline['old_unit_dropins'].items():
             actual={str(UNITS/(name+'.d')/p.name) for p in (self.units/(name+'.d')).glob('*.conf')}
             own=str(UNITS/(name+'.d')/('99-superseded-'+digest(self.contract)[:12]+'.conf'))
-            if actual!=set(paths)|{own}:raise RuntimeError('completed_boot_legacy_dropin_inventory_changed')
+            if actual!=set(paths)|{own}|overlays.get(name,set()):raise RuntimeError('completed_boot_legacy_dropin_inventory_changed')
         actual={str(p) for p in (self.units/(PROXY+'.d')).glob('*.conf')}
-        expected_inventory={str(self.units/Path(raw).relative_to(UNITS)) for raw in self.baseline['proxy_dropins']}|{str(self.proxy)}
+        expected_inventory={str(self.units/Path(raw).relative_to(UNITS)) for raw in self.baseline['proxy_dropins']}|{str(self.proxy)}|{
+            str(self.units/Path(raw).relative_to(UNITS)) for raw in overlays.get(PROXY,set())}
         if actual!=expected_inventory:
             raise RuntimeError('completed_boot_proxy_inventory_changed')
         if any(self.ops.systemctl_state(n)['enabled']!='disabled' for n in self.baseline['old_units']):
@@ -231,6 +233,7 @@ class CompletedNormalBootInstallation:
             loaded=dict(line.split('=',1) for line in raw.splitlines() if '=' in line)
             expected_dropins=set() if name==self.name else set(self.baseline['old_unit_dropins'][name])|{
                 str(UNITS/(name+'.d')/('99-superseded-'+digest(self.contract)[:12]+'.conf'))}
+            expected_dropins|=overlays.get(name,set())
             if (loaded.get('FragmentPath')!=str(UNITS/name)
                     or set(loaded.get('DropInPaths','').split())!=expected_dropins):
                 raise RuntimeError('completed_boot_effective_actor_controls_changed')
@@ -239,9 +242,50 @@ class CompletedNormalBootInstallation:
         requires=set(values.get('Requires','').split())
         if (self.name not in requires or set(self.baseline['old_units'])&requires
                 or self.command('proxy-gate') not in values.get('ExecStartPre','')
-                or set(values.get('DropInPaths','').split())!=set(self.baseline['proxy_dropins'])|{str(self.proxy)}):
+                or set(values.get('DropInPaths','').split())!=set(self.baseline['proxy_dropins'])|{str(self.proxy)}|overlays.get(PROXY,set())):
             raise RuntimeError('completed_boot_effective_proxy_controls_changed')
         return record
+    def provider_barrier_dropins(self):
+        """Observe the existing maintenance overlay, never amend boot evidence.
+
+        The provider publishes intent before its effect and calls the source
+        guard again before recording completion. Requiring a completed effect
+        here would make that guard impossible. An interrupted intent still
+        cannot execute again: ProviderMaintenance150 owns reconciliation.
+        """
+        from deployment.lib.completed_normal_profile import DELETION,RECONCILED
+        if self.profile not in (DELETION,RECONCILED):return {}
+        journal_path=self.root/'provider-journal'
+        if not journal_path.exists() and not journal_path.is_symlink():return {}
+        from deployment.lib.schema150_provider_lifecycle import ProtectedProviderJournal,ProviderMaintenance150,validate_binding,digest as provider_digest
+        from deployment.lib.schema150_actor_inventory import validate_inventory
+        binding=validate_binding({'operation':self.contract['operation'],'context_sha256':digest(self.contract),
+            'source_sha':self.contract['candidate']['source_sha'],'controller_sha':self.contract['candidate']['controller_sha'],
+            'inventory_sha256':self.contract['writer_inventory_sha256'],'system_identifier':self.contract['database']['system_identifier'],
+            'source_schema':self.profile.source,'target_schema':self.profile.target})
+        journal=ProtectedProviderJournal(journal_path)
+        records,completed,pending,_=ProviderMaintenance150(binding,journal,None)._state()
+        barrier=self.root/'provider-barrier.json'
+        exists=barrier.exists() or barrier.is_symlink()
+        armed='arm_boot_interlock' in completed
+        if not armed and not (pending=='arm_boot_interlock' and exists):
+            if exists:raise RuntimeError('completed_boot_provider_barrier_without_intent')
+            return {}
+        inventory=validate_inventory(json.loads(protected(self.root/'provider-inventory.json',private=True).read_bytes()),binding)
+        cleared='clear_boot_interlock' in completed or pending=='clear_boot_interlock'
+        if exists:
+            expected={'binding':binding,'preimage_sha256':provider_digest(records[0]['payload']['preimage'])}
+            if cleared and pending!='clear_boot_interlock' or json.loads(protected(barrier,private=True).read_bytes())!=expected:
+                raise RuntimeError('completed_boot_provider_barrier_changed')
+        elif not cleared:raise RuntimeError('completed_boot_provider_barrier_missing')
+        body=('[Unit]\nConditionPathExists=!'+str(barrier)+'\n').encode()
+        name='99zzzzzz-schema'+str(self.profile.target)+'-'+binding['context_sha256'][:12]+'.conf'
+        result={}
+        for unit in inventory['supervisors']:
+            path=self.units/(unit+'.d')/name
+            if protected(path).read_bytes()!=body:raise RuntimeError('completed_boot_provider_dropin_changed')
+            result[unit]={str(UNITS/(unit+'.d')/name)}
+        return result
     def install(self):
         # The complete coordinator owns deployment/upgrade locks throughout.
         # No unit is started and no application/traffic/write state is changed.
