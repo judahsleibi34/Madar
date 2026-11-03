@@ -60,6 +60,19 @@ def private_json(path):
     return json.loads(source.read_bytes())
 
 
+def supervisor_bus_path(name):
+    """Encode the already authenticated fixed unit name, not a caller object path.
+
+    systemd's unit-property lookup loads the configuration on demand. GetUnit
+    instead requires it already resident, which is false for idle supervisors.
+    No start job, enablement change or persistent reference is requested.
+    """
+    if not isinstance(name,str) or not re.fullmatch(r'madar-[A-Za-z0-9-]+\.(service|timer)',name):
+        raise RuntimeError('schema150_provider_effective_boot_unit_invalid')
+    label=''.join(char if char.isascii() and char.isalnum() else '_'+format(ord(char),'02x') for char in name)
+    return '/org/freedesktop/systemd1/unit/'+label
+
+
 def require_owned_lock(descriptor, path):
     """Observe an already owned flock; never acquire a missing coordinator lock."""
     if type(descriptor) is not int or descriptor < 0:
@@ -402,16 +415,8 @@ class Schema150ProviderAdapter:
             path = UNITS/(name+'.d')/self.dropin_name
             if protected(path).read_bytes() != expected or str(path) not in self._unit(name)['DropInPaths'].split():
                 raise RuntimeError('schema150_provider_effective_boot_barrier_missing')
-            unit = json.loads(self.runtime.command(['busctl','--json=short','call',
-                'org.freedesktop.systemd1','/org/freedesktop/systemd1',
-                'org.freedesktop.systemd1.Manager','GetUnit','s',name]))
-            if (not isinstance(unit,dict) or unit.get('type') != 'o'
-                    or not isinstance(unit.get('data'),list) or len(unit['data']) != 1
-                    or not isinstance(unit['data'][0],str)
-                    or not re.fullmatch(r'/org/freedesktop/systemd1/unit/[A-Za-z0-9_]+',unit['data'][0])):
-                raise RuntimeError('schema150_provider_effective_boot_unit_invalid')
             conditions = json.loads(self.runtime.command(['busctl','--json=short','get-property',
-                'org.freedesktop.systemd1',unit['data'][0],'org.freedesktop.systemd1.Unit','Conditions']))
+                'org.freedesktop.systemd1',supervisor_bus_path(name),'org.freedesktop.systemd1.Unit','Conditions']))
             # D-Bus a(sbbsi): type, trigger, negate, parameter, last result.
             # A substring, positive condition, or trigger cannot fence startup.
             if (not isinstance(conditions,dict) or conditions.get('type') != 'a(sbbsi)'

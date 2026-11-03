@@ -3018,3 +3018,23 @@ the deleted barrier. No signed original inventory or boot receipt is rewritten,
 no effect is performed by verification, and an interrupted intent still requires
 the existing lifecycle reconciliation rather than replay. Component acceptance
 does not establish a protected schema160 completion.
+
+### Inactive provider supervisor condition observation (2026-11-03)
+
+Native128fc854 passed the boot-overlay guard but the following provider barrier
+verification refused `command_failed:busctl`: Manager.GetUnit returns no object
+for unloaded idle services/timers. The verifier now derives the exact systemd
+D-Bus object path only from a validated authenticated Madar supervisor name and
+reads its typed Conditions property directly. systemd resolves that unit's
+configuration within the property request, avoiding an unloaded-unit lookup and
+the two-call collection race. This starts no unit, creates no job/reference and
+changes no enablement. Exact original fragment/drop-in hashes and effective
+DropInPaths are still required before the strict negative, non-trigger barrier
+condition tuple. Unknown names/paths, wrong types, positive/trigger conditions,
+wrong barriers and missing physical/effective controls still refuse. No consumed
+authority is reused; complete corrected-source native acceptance remains required.
+
+Primary API/implementation references:
+https://www.freedesktop.org/software/systemd/man/255/org.freedesktop.systemd1.html
+https://github.com/systemd/systemd/blob/v255/src/core/dbus.c
+https://github.com/systemd/systemd/blob/v255/src/basic/bus-label.c

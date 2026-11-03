@@ -697,7 +697,8 @@ class ConcreteAdapterTests(unittest.TestCase):
         actor._unit=Mock(return_value={'DropInPaths':str(dropin)})
         condition={'type':'a(sbbsi)','data':[['ConditionPathExists',False,True,str(actor.barrier),0]]}
         def response(command,**kwargs):
-            if 'GetUnit' in command:return json.dumps({'type':'o','data':['/org/freedesktop/systemd1/unit/synthetic_2eservice']})
+            self.assertEqual(command,['busctl','--json=short','get-property','org.freedesktop.systemd1',
+                '/org/freedesktop/systemd1/unit/madar_2dauto_2ddeploy_2eservice','org.freedesktop.systemd1.Unit','Conditions'])
             return json.dumps(condition)
         actor.runtime.command.side_effect=response
         with patch.object(adapter,'UNITS',units),patch.object(adapter,'protected',lambda path,**kwargs:Path(path)):
@@ -1039,7 +1040,7 @@ class ConcreteAdapterTests(unittest.TestCase):
         actor._unit=Mock(return_value={'DropInPaths':str(dropin)})
         condition={'type':'a(sbbsi)','data':[]}
         def response(command,**kwargs):
-            if 'GetUnit' in command:return json.dumps({'type':'o','data':['/org/freedesktop/systemd1/unit/synthetic_2eservice']})
+            self.assertEqual(command[2],'get-property')
             return json.dumps(condition)
         actor.runtime.command.side_effect=response
         with patch.object(adapter,'UNITS',units),patch.object(adapter,'protected',lambda path,**kwargs:Path(path)):
@@ -1144,7 +1145,7 @@ class ConcreteAdapterTests(unittest.TestCase):
             with self.subTest(kind=kind),self.assertRaisesRegex(RuntimeError,'database_(uri_scope_invalid|binding_missing)'):
                 adapter.require_provider_database_bindings(bad,identifier)
 
-    def test_effective_bus_unit_and_conditions_malformed_types_fail_closed(self):
+    def test_effective_bus_path_namespace_and_conditions_malformed_types_fail_closed(self):
         actor,scope,preimage,_=self.component(stage='fenced');del actor._verify_barrier
         actor.inventory['supervisors']={'madar-auto-deploy.service':next(iter(actor.inventory['supervisors'].values()))}
         name='madar-auto-deploy.service';units=actor.root/'synthetic-systemd';units.mkdir()
@@ -1152,24 +1153,30 @@ class ConcreteAdapterTests(unittest.TestCase):
         dropin.write_text('[Unit]\nConditionPathExists=!'+str(actor.barrier)+'\n')
         actor.barrier.write_text(json.dumps({'binding':scope,'preimage_sha256':lifecycle.digest(preimage)}))
         actor._unit=Mock(return_value={'DropInPaths':str(dropin)})
-        valid_unit={'type':'o','data':['/org/freedesktop/systemd1/unit/synthetic_2eservice']}
         valid_conditions={'type':'a(sbbsi)','data':[['ConditionPathExists',False,True,str(actor.barrier),0]]}
-        state={'unit':valid_unit,'conditions':valid_conditions}
-        actor.runtime.command.side_effect=lambda command,**kwargs:json.dumps(state['unit'] if 'GetUnit' in command else state['conditions'])
+        state={'conditions':valid_conditions}
+        actor.runtime.command.side_effect=lambda command,**kwargs:json.dumps(state['conditions'])
         with patch.object(adapter,'UNITS',units),patch.object(adapter,'protected',lambda path,**kwargs:Path(path)):
             actor._verify_barrier()
-            for bad in (None,[],{'type':'s','data':valid_unit['data']},{'type':'o','data':[]},
-                        {'type':'o','data':[valid_unit['data'][0],valid_unit['data'][0]]},
-                        {'type':'o','data':['/org/freedesktop/systemd1/unit/../manager']},
-                        {'type':'o','data':[True]}):
-                state['unit']=bad
-                with self.subTest(unit=bad),self.assertRaisesRegex(RuntimeError,'effective_boot_unit_invalid'):actor._verify_barrier()
-            state['unit']=valid_unit
+            # No manager-returned object path can substitute a different unit.
+            # Only a validated, code-encoded authenticated inventory name enters
+            # the one typed property query, even if systemd unloaded it.
+            for bad in (None,[],{},True,'/org/freedesktop/systemd1/unit/../manager',
+                        'madar-test.service/../other','other.service','madar-test.socket',
+                        'madar-test.service\n','madar-test_2eservice','madar-ä.service'):
+                with self.subTest(unit=bad),self.assertRaisesRegex(RuntimeError,'effective_boot_unit_invalid'):
+                    adapter.supervisor_bus_path(bad)
             for bad in (None,[],{'type':'a(sbbsi)','data':True},{'type':'invalid','data':valid_conditions['data']},
                         {'type':'a(sbbsi)','data':[['ConditionPathExists',False,True,str(actor.barrier),True]]},
                         {'type':'a(sbbsi)','data':[['ConditionPathExists',False,True,str(actor.barrier)]]}):
                 state['conditions']=bad
                 with self.subTest(conditions=bad),self.assertRaisesRegex(RuntimeError,'effective_boot_condition_missing'):actor._verify_barrier()
+
+    def test_unit_bus_path_encoding_preserves_exact_service_timer_identity(self):
+        for name,encoded in [('madar-auto-deploy.service','madar_2dauto_2ddeploy_2eservice'),
+                ('madar-backup.timer','madar_2dbackup_2etimer'),
+                ('madar-compatible-normal-boot-a01b2c3d4e5f.service','madar_2dcompatible_2dnormal_2dboot_2da01b2c3d4e5f_2eservice')]:
+            self.assertEqual(adapter.supervisor_bus_path(name),'/org/freedesktop/systemd1/unit/'+encoded)
 
 
     def object_component(self):
