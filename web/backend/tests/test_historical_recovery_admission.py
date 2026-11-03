@@ -107,6 +107,56 @@ class HistoricalPhysicalRecoveryTests(unittest.TestCase):
             self.fixture.receipt['functional_acceptance'][key]=True
 
 
+    def native_historical_acceptance(self):
+        f=self.fixture
+        subjects=[{'auth_id':str(uuid.uuid4()),'factor_id':str(uuid.uuid4()),'object_sha256':str(i)*64,
+            'tenant_id':i,'user_id':i} for i in (1,2)]
+        self.observed['original_account_observations']=subjects
+        self.context['request_record']=approval.sign(self.request,self.key)
+        self.enrollment['request_sha256']=digest(self.request)
+        self.binding['enrollment_sha256']=digest(self.enrollment)
+        self.context['source_binding']=copy.deepcopy(self.binding)
+        self.context['enrollment_record']=approval.sign(self.enrollment,self.key)
+        (self.directory/'bootstrap-origin-request.json').write_bytes(canonical(self.context['request_record']))
+        (self.directory/'bootstrap-origin-consumed.json').write_bytes(canonical(self.context['enrollment_record']))
+        f.receipt['release_context']=copy.deepcopy(self.context)
+        f.trust.update(historical_origin=copy.deepcopy(self.binding),source_origin_sha256=digest(self.context))
+        positive=('original_password_login','original_auth_identity','original_mfa_totp_AAL2','refresh_rotation',
+            'anonymous_storage_denied','tenant_isolation','historical_backend_login_secure_cookie_csrf_session',
+            'private_frontend_backend_routing','network_external_access_refused','external_dns_refused','ready',
+            'preserved_business_functional_acceptance')
+        f.receipt['functional_acceptance']={**dict.fromkeys(positive,True),
+            'acceptance_scope':'historical146-full-preserved-business-application','original_subjects':copy.deepcopy(subjects),
+            'source_sha':'b'*40,'database_system_identifier':'123456789','schema':146,'external_notifications_sent':False,
+            'limitations':['No production acceptance, browser/TLS, migration or worker-handoff certification.']}
+        f.seal_receiver()
+
+    def test_actual_historical_format_binds_original_mfa_private_bytes_and_full_business(self):
+        self.native_historical_acceptance();self.assertTrue(self.check())
+        self.assertNotIn('notification_delivery',self.fixture.receipt['functional_acceptance'])
+        self.assertNotIn('admin_AAL2',self.fixture.receipt['functional_acceptance'])
+
+    def test_historical_subject_or_object_substitution_refuses_valid_receiver_signature(self):
+        self.native_historical_acceptance();f=self.fixture;original=copy.deepcopy(f.receipt['functional_acceptance'])
+        for key,value in [('object_sha256','f'*64),('tenant_id',3),('factor_id',str(uuid.uuid4())),('auth_id',str(uuid.uuid4())),('user_id',1.0)]:
+            f.receipt['functional_acceptance']=copy.deepcopy(original)
+            f.receipt['functional_acceptance']['original_subjects'][0][key]=value;f.seal_receiver()
+            with self.subTest(key=key),self.assertRaisesRegex(RuntimeError,'application_unaccepted'):self.check()
+
+    def test_partial_historical_acceptance_cannot_gain_canonical_admission(self):
+        self.native_historical_acceptance();f=self.fixture;original=copy.deepcopy(f.receipt['functional_acceptance'])
+        for key,value in [('preserved_business_functional_acceptance',False),('original_mfa_totp_AAL2',False),
+                ('tenant_isolation',False),('schema',146.0),('acceptance_scope','historical146-original-identities-private-objects-and-serving-runtime'),
+                ('limitations',['No preserved populated forms/reservations/calendar fixtures were present in this origin; those required Milestone C scenarios remain incomplete.'])]:
+            f.receipt['functional_acceptance']=copy.deepcopy(original);f.receipt['functional_acceptance'][key]=value;f.seal_receiver()
+            with self.subTest(key=key),self.assertRaisesRegex(RuntimeError,'application_unaccepted'):self.check()
+
+    def test_historical_format_does_not_waive_common_signature_runtime_or_freshness(self):
+        self.native_historical_acceptance();f=self.fixture
+        f.receipt['runtime']={};f.seal_receiver()
+        with self.assertRaisesRegex(RuntimeError,'runtime_invalid'):self.check()
+
+
 class CanonicalRecoveryPlanTests(unittest.TestCase):
     def test_only_exact_receipt_in_immutable_plan_reaches_existing_verifier(self):
         contract=origin_fixtures.HistoricalPreparationBindingTests().contract()

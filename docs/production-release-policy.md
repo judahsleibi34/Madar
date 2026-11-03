@@ -4954,3 +4954,12 @@ for missing controls. The existing isolated installer retains durable failed and
 interrupted attempt history, and historical request/enrollment gates refuse
 until the exact construction is ready. This infrastructure preparation grants no
 release or SQL authority and does not enable production automation.
+
+Historical full-application recovery receipts use their exact schema146 acceptance
+contract after the common root-enrollment, signature, source/DB/history, runtime
+and freshness gates. Their original MFA-factor/tenant/user/private-object
+observations must equal the authenticated original enrollment. Full preserved
+business acceptance and secure historical login are mandatory. They claim no
+protocol2 delivery or infrastructure-administrator behavior at schema146.
+Partial historical acceptance, altered subjects or modern field aliases refuse;
+ordinary completed-release functional acceptance remains unchanged.

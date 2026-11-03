@@ -2929,3 +2929,12 @@ operational acceptance requirement.
 First installation creates and syncs the existing automatic-recovery parent
 before its historical prerequisite journal. A missing parent must be handled
 by that ordered protected creation, never by an unchecked recursive mkdir.
+
+The canonical independent-recovery adapter distinguishes the native historical
+full-business receipt from modern schema160 acceptance. It authenticates the
+existing receiver packet unchanged and matches every original subject/factor and
+private-object hash to the signed source enrollment. It does not synthesize new
+receipt fields or claim protocol2 notification delivery on146. An independent
+restore is not release approval or a protected upgrade completion. After an
+intentional restoration hold, restart through the existing recovery systemd
+service so successful recovery also restores its recorded inactive unit state.

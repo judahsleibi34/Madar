@@ -272,6 +272,12 @@ def physical_recovery_evidence(recovery,policy,origin_source,protocols,*,now,his
     if (any(type(v) is not int for v in times) or not times[0]<=times[1]<=times[2]<=now
             or now-times[0]>policy['recovery_max_age_seconds'] or now-times[2]>policy['evidence_max_age_seconds']):
         raise RuntimeError('automatic_physical_recovery_stale')
+    historical_functional=(historical and functional.get('acceptance_scope')==
+        'historical146-full-preserved-business-application')
+    if historical_functional:
+        verify_historical_restored_functional(functional,origin,origin_source,
+            trust['database_system_identifier'])
+        return True
     required=('ready','original_password_login','original_auth_identity','original_mfa_totp','admin_AAL2',
         'refresh_rotation','anonymous_storage_denied','original_forms_and_reservations_read',
         'reservation_transaction_api','tenant_isolation','notification_delivery','private_frontend_backend_routing',
@@ -284,6 +290,51 @@ def physical_recovery_evidence(recovery,policy,origin_source,protocols,*,now,his
             or functional.get('external_notifications_sent') is not False):
         raise RuntimeError('automatic_physical_recovery_application_unaccepted')
     return True
+
+
+def verify_historical_restored_functional(functional,original,source,system_identifier):
+    """Exact signed schema146 acceptance, without invented modern capabilities.
+
+    Called only AFTER root receiver enrollment, its signature, physical/DB/source
+    binding, original journal authentication, runtime and freshness checks. The
+    historical observer exercised real MFA, private objects, preserved business
+    APIs and owner/member tenant separation. Its per-subject observations must
+    equal the independently authenticated ORIGINAL enrollment, not caller hashes.
+    """
+    fields={'acceptance_scope','original_password_login','original_auth_identity',
+        'original_mfa_totp_AAL2','refresh_rotation','anonymous_storage_denied',
+        'original_subjects','tenant_isolation','historical_backend_login_secure_cookie_csrf_session',
+        'private_frontend_backend_routing','network_external_access_refused','external_dns_refused',
+        'ready','source_sha','database_system_identifier','schema','external_notifications_sent',
+        'limitations','preserved_business_functional_acceptance'}
+    positive=fields-{'acceptance_scope','original_subjects','source_sha','database_system_identifier',
+        'schema','external_notifications_sent','limitations'}
+    expected=original.get('original_account_observations')
+    if (set(functional)!=fields
+            or functional['acceptance_scope']!='historical146-full-preserved-business-application'
+            or any(functional[k] is not True for k in positive)
+            or functional['source_sha']!=source or functional['database_system_identifier']!=system_identifier
+            or type(functional['schema']) is not int or functional['schema']!=146
+            or functional['external_notifications_sent'] is not False
+            or not isinstance(expected,list) or not 2<=len(expected)<=8
+            or digest(functional['original_subjects'])!=digest(expected)
+            or functional['limitations']!=[
+                'No production acceptance, browser/TLS, migration or worker-handoff certification.']):
+        raise RuntimeError('automatic_physical_recovery_application_unaccepted')
+    tenants=set();users=set();factors=set()
+    for subject in expected:
+        if (not isinstance(subject,dict) or set(subject)!={'auth_id','factor_id','object_sha256','tenant_id','user_id'}
+                or type(subject['tenant_id']) is not int or subject['tenant_id']<=0
+                or type(subject['user_id']) is not int or subject['user_id']<=0
+                or not re.fullmatch('[a-f0-9]{64}',str(subject['object_sha256']))):
+            raise RuntimeError('automatic_physical_recovery_application_unaccepted')
+        try:
+            if any(str(uuid.UUID(subject[k]))!=subject[k] for k in ('auth_id','factor_id')):raise ValueError()
+        except (ValueError,TypeError,AttributeError):
+            raise RuntimeError('automatic_physical_recovery_application_unaccepted') from None
+        tenants.add(subject['tenant_id']);users.add(subject['auth_id']);factors.add(subject['factor_id'])
+    if min(len(tenants),len(users),len(factors))!=len(expected):
+        raise RuntimeError('automatic_physical_recovery_application_unaccepted')
 
 
 def independent_evidence(source,policy,*,now=None):
