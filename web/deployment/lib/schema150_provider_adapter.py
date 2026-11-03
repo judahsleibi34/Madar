@@ -50,7 +50,11 @@ class NoRedirect(HTTPRedirectHandler):
 
 
 def private_json(path):
-    source = protected(path, private=True)
+    # The issuer deliberately publishes this one root-owned interlock as0644:
+    # non-root services read its SHA/digests, never the private bearer token.
+    # require_authority verifies that separate credential before reading it.
+    # All provider inputs, journals and receipts retain private-file checks.
+    source = protected(path, private=Path(path) != UPGRADE_INTERLOCK)
     if source.stat().st_size > 2 * 1024 * 1024:
         raise RuntimeError('schema150_provider_private_input_limit')
     return json.loads(source.read_bytes())
