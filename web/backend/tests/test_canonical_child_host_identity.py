@@ -16,7 +16,13 @@ import test_historical_origin as fixtures
 
 class CanonicalChildHostIdentityTests(unittest.TestCase):
     def setUp(self):
-        self.machine=Path('/etc/machine-id').read_text().strip()
+        # The unit image intentionally has no host machine-id. Model that one
+        # file here; native guest acceptance reobserves the actual kernel/host.
+        self.machine='1'*32
+        read=Path.read_text
+        def machine_file(path,*a,**kw):
+            return self.machine if str(path)=='/etc/machine-id' else read(path,*a,**kw)
+        self.enterContext(patch.object(Path,'read_text',machine_file))
         self.boot=Path('/proc/sys/kernel/random/boot_id').read_text().strip()
         self.registration={'context_sha256':'a'*64,'guest_uuid':'00000000-0000-4000-8000-000000000001',
             'machine_id':self.machine,'root_filesystem_uuid':'00000000-0000-4000-8000-000000000002'}
