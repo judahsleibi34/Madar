@@ -4987,3 +4987,13 @@ ControlPID, or PID-less timers with no pending job. Fenced units must remain
 inactive/dead. Historical ExecMainPID alone is neither a current writer nor proof
 of quiescence. Signed unit inventory, source hashes and enablement checks remain
 mandatory.
+
+Synthetic PostgreSQL CI rehearsals use Docker-assigned loopback-only ports, not
+fixed host ports or a probe-then-bind reservation. The actual single binding is
+verified before its port enters a test DSN. A per-container UUID, purpose, image
+and immutable Docker ID govern cleanup, including create/start failures and
+termination. Cleanup observation/ownership failures remain errors. Backend CI
+exercises two real concurrent PostgreSQL instances with the former145 port
+occupied, normal teardown and exact-owned supervisor teardown after SIGKILL.
+Required Backend Check and downstream fresh staging dependencies stay intact;
+this test infrastructure correction supplies no deployment authority.

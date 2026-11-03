@@ -37,6 +37,9 @@ jobs:
       - name: Build locked backend test image
         run: docker build --target test -t madar-backend-test web/backend
 
+      - name: Verify concurrent synthetic PostgreSQL allocation and cleanup
+        run: timeout 3m python3 web/scripts/test_synthetic_postgres_native.py
+
       - name: Validate loopback notification alert inspection
         run: python3 web/staging/integration/test_notification_observer.py
 

@@ -3,22 +3,10 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 WEB_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
-CONTAINER_NAME="madar-146-synthetic-$RANDOM-$$"
 POSTGRES_IMAGE="postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73"
 BACKEND_TEST_IMAGE="${BACKEND_TEST_IMAGE:-madar-backend-test}"
-created=false
-
-cleanup() {
-  if "$created"; then
-    docker rm -f "$CONTAINER_NAME" >/dev/null
-  fi
-}
-trap cleanup EXIT
-
-docker run -d --memory=768m --cpus=0.75 --pids-limit=128 --name "$CONTAINER_NAME" --label madar.rehearsal=synthetic-price-book-146 \
-  --publish 127.0.0.1:55447:5432 --tmpfs /var/lib/postgresql/data:rw,noexec,nosuid,size=1g \
-  -e POSTGRES_HOST_AUTH_METHOD=trust "$POSTGRES_IMAGE" >/dev/null
-created=true
+source "$SCRIPT_DIR/synthetic_postgres.sh"
+synthetic_postgres_start "synthetic-price-book-146"
 for attempt in $(seq 1 60); do
   if docker exec "$CONTAINER_NAME" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1; then
     break
@@ -106,7 +94,7 @@ for suite in test_commercial_continuity_database.py test_launch_price_book_datab
     --env SUPABASE_ANON_KEY=madar-ci-placeholder-anon-not-a-secret \
     --env SUPABASE_SERVICE_KEY=madar-ci-placeholder-service-not-a-secret \
     --env PYTHONDONTWRITEBYTECODE=1 \
-    --env COMMERCIAL_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=55447 dbname=postgres user=postgres connect_timeout=10' \
+    --env COMMERCIAL_SYNTHETIC_DATABASE_DSN="host=127.0.0.1 port=$SYNTHETIC_POSTGRES_PORT dbname=postgres user=postgres connect_timeout=10" \
     --volume "$WEB_ROOT/backend/tests/$suite:/commercial-database-tests.py:ro" \
     "$BACKEND_TEST_IMAGE" python /commercial-database-tests.py
 done

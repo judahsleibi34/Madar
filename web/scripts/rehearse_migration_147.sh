@@ -3,23 +3,10 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 WEB_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
-CONTAINER_NAME="madar-147-synthetic-$RANDOM-$$"
 POSTGRES_IMAGE="postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73"
 BACKEND_TEST_IMAGE="${BACKEND_TEST_IMAGE:-madar-backend-test}"
-created=false
-
-cleanup() {
-  if "$created"; then
-    docker rm -f "$CONTAINER_NAME" >/dev/null
-  fi
-}
-trap cleanup EXIT
-
-docker create --memory=768m --cpus=0.75 --pids-limit=128 --name "$CONTAINER_NAME" --label madar.rehearsal=synthetic-notification-147 \
-  --publish 127.0.0.1:55448:5432 --tmpfs /var/lib/postgresql/data:rw,noexec,nosuid,size=1g \
-  -e POSTGRES_HOST_AUTH_METHOD=trust "$POSTGRES_IMAGE" >/dev/null
-created=true
-docker start "$CONTAINER_NAME" >/dev/null
+source "$SCRIPT_DIR/synthetic_postgres.sh"
+synthetic_postgres_start "synthetic-notification-147"
 for attempt in $(seq 1 60); do
   if docker exec "$CONTAINER_NAME" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1; then
     break
@@ -76,7 +63,7 @@ docker exec -e PGOPTIONS='-c client_min_messages=warning' -i "$CONTAINER_NAME" \
 if [[ "${RUN_SCHEMA148_ADMISSION:-false}" == true ]]; then
   docker run --rm --memory=1g --cpus=1 --pids-limit=256 --network host --read-only \
     --tmpfs /tmp:rw,noexec,nosuid,size=128m --env PYTHONPATH=/app:/release/web --env PYTHONDONTWRITEBYTECODE=1 \
-    --env SCHEMA148_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=55448 dbname=postgres user=postgres connect_timeout=5' \
+    --env SCHEMA148_SYNTHETIC_DATABASE_DSN="host=127.0.0.1 port=$SYNTHETIC_POSTGRES_PORT dbname=postgres user=postgres connect_timeout=5" \
     --env SCHEMA148_SOURCE_ROOT=/release \
     --env MADAR_TEST_REPOSITORY_ROOT=/release/web \
     --volume "$WEB_ROOT/backend:/app:ro" --volume "$WEB_ROOT/..:/release:ro" \
@@ -84,7 +71,7 @@ if [[ "${RUN_SCHEMA148_ADMISSION:-false}" == true ]]; then
   if [[ "${RUN_SCHEMA149_ADMISSION:-false}" == true ]]; then
     docker run --rm --memory=1g --cpus=1 --pids-limit=256 --network host --read-only \
       --tmpfs /tmp:rw,noexec,nosuid,size=128m --env PYTHONPATH=/app:/release/web --env PYTHONDONTWRITEBYTECODE=1 \
-      --env SCHEMA148_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=55448 dbname=postgres user=postgres connect_timeout=5' \
+      --env SCHEMA148_SYNTHETIC_DATABASE_DSN="host=127.0.0.1 port=$SYNTHETIC_POSTGRES_PORT dbname=postgres user=postgres connect_timeout=5" \
       --env SCHEMA148_SOURCE_ROOT=/release \
       --env MADAR_TEST_REPOSITORY_ROOT=/release/web \
       --volume "$WEB_ROOT/backend:/app:ro" --volume "$WEB_ROOT/..:/release:ro" \
@@ -93,7 +80,7 @@ if [[ "${RUN_SCHEMA148_ADMISSION:-false}" == true ]]; then
   if [[ "${RUN_DELETION_INTEGRITY:-false}" == true ]]; then
     docker run --rm --memory=768m --cpus=1 --pids-limit=256 --network host --read-only \
       --tmpfs /tmp:rw,noexec,nosuid,size=128m --env PYTHONPATH=/app:/release/web --env PYTHONDONTWRITEBYTECODE=1 \
-      --env SCHEMA148_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=55448 dbname=postgres user=postgres connect_timeout=5' \
+      --env SCHEMA148_SYNTHETIC_DATABASE_DSN="host=127.0.0.1 port=$SYNTHETIC_POSTGRES_PORT dbname=postgres user=postgres connect_timeout=5" \
       --env SCHEMA148_SOURCE_ROOT=/release \
       --env MADAR_TEST_REPOSITORY_ROOT=/release/web \
       --volume "$WEB_ROOT/backend:/app:ro" --volume "$WEB_ROOT/..:/release:ro" \
@@ -108,7 +95,7 @@ docker run --rm --memory=1g --cpus=1 --pids-limit=256 --network host --read-only
   --env SUPABASE_ANON_KEY=madar-ci-placeholder-anon-not-a-secret \
   --env SUPABASE_SERVICE_KEY=madar-ci-placeholder-service-not-a-secret \
   --env PYGWALKER_TELEMETRY_ENABLED=false \
-  --env NOTIFICATION_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=55448 dbname=postgres user=postgres connect_timeout=5' \
+  --env NOTIFICATION_SYNTHETIC_DATABASE_DSN="host=127.0.0.1 port=$SYNTHETIC_POSTGRES_PORT dbname=postgres user=postgres connect_timeout=5" \
   --env NOTIFICATION_MIGRATION_SQL=/migration147.sql \
   --volume "$WEB_ROOT/backend:/app:ro" \
   --volume "$WEB_ROOT/database/historical-architecture-146-150/147_fence_notification_delivery_claims.sql:/migration147.sql:ro" \
@@ -134,7 +121,7 @@ if [[ "${RUN_BUSINESS_INTEGRITY:-false}" == true ]]; then
 
   docker run --rm --memory=768m --cpus=1 --pids-limit=256 --network host --read-only \
     --tmpfs /tmp:rw,noexec,nosuid,size=64m --env PYTHONPATH=/app --env PYTHONDONTWRITEBYTECODE=1 \
-    --env BUSINESS_INTEGRITY_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=55448 dbname=postgres user=postgres connect_timeout=5' \
+    --env BUSINESS_INTEGRITY_SYNTHETIC_DATABASE_DSN="host=127.0.0.1 port=$SYNTHETIC_POSTGRES_PORT dbname=postgres user=postgres connect_timeout=5" \
     --volume "$WEB_ROOT/backend:/app:ro" --entrypoint python "$BACKEND_TEST_IMAGE" \
     -m unittest tests.test_native_business_integrity_database -v
   docker run --rm --memory=768m --cpus=1 --pids-limit=256 --network host --read-only \
@@ -142,7 +129,7 @@ if [[ "${RUN_BUSINESS_INTEGRITY:-false}" == true ]]; then
     --env APP_ENV=test --env SUPABASE_URL=http://127.0.0.1:54321 \
     --env SUPABASE_ANON_KEY=madar-ci-placeholder-anon-not-a-secret \
     --env SUPABASE_SERVICE_KEY=madar-ci-placeholder-service-not-a-secret \
-    --env BUSINESS_INTEGRITY_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=55448 dbname=postgres user=postgres connect_timeout=5' \
+    --env BUSINESS_INTEGRITY_SYNTHETIC_DATABASE_DSN="host=127.0.0.1 port=$SYNTHETIC_POSTGRES_PORT dbname=postgres user=postgres connect_timeout=5" \
     --volume "$WEB_ROOT/backend:/app:ro" --entrypoint python "$BACKEND_TEST_IMAGE" \
     -m unittest tests.test_calendar_event_concurrency_database -v
   if replay_output="$(docker exec -i "$CONTAINER_NAME" psql -X -U postgres -v ON_ERROR_STOP=1 -q \
@@ -163,7 +150,7 @@ if [[ "${RUN_OUTBOX_INTEGRITY:-false}" == true ]]; then
     --env SUPABASE_URL=http://127.0.0.1:54321 \
     --env SUPABASE_ANON_KEY=madar-ci-placeholder-anon-not-a-secret \
     --env SUPABASE_SERVICE_KEY=madar-ci-placeholder-service-not-a-secret \
-    --env OUTBOX_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=55448 dbname=postgres user=postgres connect_timeout=5' \
+    --env OUTBOX_SYNTHETIC_DATABASE_DSN="host=127.0.0.1 port=$SYNTHETIC_POSTGRES_PORT dbname=postgres user=postgres connect_timeout=5" \
     --env OUTBOX_MIGRATION_SQL=/migration149.sql \
     --volume "$WEB_ROOT/backend:/app:ro" \
     --volume "$WEB_ROOT/database/historical-architecture-146-150/149_fence_notification_outbox_claims.sql:/migration149.sql:ro" \
@@ -173,7 +160,7 @@ if [[ "${RUN_OUTBOX_INTEGRITY:-false}" == true ]]; then
   # Repeat the same22 business invariants on149, after all fencing cases.
   docker run --rm --memory=768m --cpus=1 --pids-limit=256 --network host --read-only \
     --tmpfs /tmp:rw,noexec,nosuid,size=64m --env PYTHONPATH=/app --env PYTHONDONTWRITEBYTECODE=1 \
-    --env BUSINESS_INTEGRITY_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=55448 dbname=postgres user=postgres connect_timeout=5' \
+    --env BUSINESS_INTEGRITY_SYNTHETIC_DATABASE_DSN="host=127.0.0.1 port=$SYNTHETIC_POSTGRES_PORT dbname=postgres user=postgres connect_timeout=5" \
     --volume "$WEB_ROOT/backend:/app:ro" --entrypoint python "$BACKEND_TEST_IMAGE" \
     -m unittest tests.test_native_business_integrity_database -v
   echo "Schema149 reservation, inventory/order and simulated payment invariants passed"
@@ -186,8 +173,8 @@ if [[ "${RUN_DELETION_INTEGRITY:-false}" == true ]]; then
     --env APP_ENV=test --env SUPABASE_URL=http://127.0.0.1:54321 \
     --env SUPABASE_ANON_KEY=madar-ci-placeholder-anon-not-a-secret \
     --env SUPABASE_SERVICE_KEY=madar-ci-placeholder-service-not-a-secret \
-    --env DELETION_FENCING_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=55448 dbname=postgres user=postgres connect_timeout=5' \
-    --env SCHEMA150_LEGACY_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=55448 dbname=postgres user=postgres connect_timeout=5' \
+    --env DELETION_FENCING_SYNTHETIC_DATABASE_DSN="host=127.0.0.1 port=$SYNTHETIC_POSTGRES_PORT dbname=postgres user=postgres connect_timeout=5" \
+    --env SCHEMA150_LEGACY_SYNTHETIC_DATABASE_DSN="host=127.0.0.1 port=$SYNTHETIC_POSTGRES_PORT dbname=postgres user=postgres connect_timeout=5" \
     --env MADAR_TEST_REPOSITORY_ROOT=/test-repository \
     --env DELETION_MIGRATION_SQL=/migration150.sql \
     --volume "$WEB_ROOT/backend:/app:ro" \
@@ -202,7 +189,7 @@ if [[ "${RUN_DELETION_INTEGRITY:-false}" == true ]]; then
     --env APP_ENV=test --env SUPABASE_URL=http://127.0.0.1:54321 \
     --env SUPABASE_ANON_KEY=madar-ci-placeholder-anon-not-a-secret \
     --env SUPABASE_SERVICE_KEY=madar-ci-placeholder-service-not-a-secret \
-    --env BUSINESS_INTEGRITY_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=55448 dbname=postgres user=postgres connect_timeout=5' \
+    --env BUSINESS_INTEGRITY_SYNTHETIC_DATABASE_DSN="host=127.0.0.1 port=$SYNTHETIC_POSTGRES_PORT dbname=postgres user=postgres connect_timeout=5" \
     --volume "$WEB_ROOT/backend:/app:ro" --entrypoint python "$BACKEND_TEST_IMAGE" \
     -m unittest tests.test_native_business_integrity_database tests.test_calendar_event_concurrency_database -v
   echo "Schema150 reservation, stock, order/payment and calendar invariants passed"
@@ -216,7 +203,7 @@ if [[ "${RUN_DELETION_INTEGRITY:-false}" == true ]]; then
     --env PUBLIC_UPLOADS_DIR=/tmp/madar-test/public --env DATA_UPLOAD_DIR=/tmp/madar-test/data \
     --env PRIVATE_CHARTS_DIR=/tmp/madar-test/charts --env MADAR_UPLOAD_WORKSPACE_DIR=/tmp/madar-test/parser \
     --env MPLCONFIGDIR=/tmp/matplotlib --env XDG_CACHE_HOME=/tmp/cache --env PYGWALKER_TELEMETRY_ENABLED=false \
-    --env LEARNING_PRIVATE_UPLOAD_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=55448 dbname=postgres user=postgres connect_timeout=5' \
+    --env LEARNING_PRIVATE_UPLOAD_SYNTHETIC_DATABASE_DSN="host=127.0.0.1 port=$SYNTHETIC_POSTGRES_PORT dbname=postgres user=postgres connect_timeout=5" \
     --volume "$WEB_ROOT/backend:/app:ro" --entrypoint python "$BACKEND_TEST_IMAGE" \
     -m unittest tests.test_learning_private_upload_ack_database -v
   echo "Schema150 committed private-upload metadata retains referenced bytes after acknowledgement loss"
