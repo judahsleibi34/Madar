@@ -43,7 +43,9 @@ class InstalledHelperTests(unittest.TestCase):
         self.verify()
 
     def test_exact_installer_and_filesystem_contract_agree(self):
-        web=Path(__file__).resolve().parents[2]
+        # Backend CI copies tests to /app/tests and mounts the authenticated
+        # deployment source separately. Follow the imported module's layout.
+        web=Path(upgrade.__file__).resolve().parents[2]
         installer=(web/'deployment/bin/madar-install-control-plane').read_text()
         body=re.search(r'declare -a operational_scripts=\((.*?)\)',installer,re.S).group(1)
         self.assertEqual(tuple(shlex.split(body)),upgrade.OPERATIONAL_SCRIPTS)
