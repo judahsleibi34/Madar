@@ -297,6 +297,12 @@ class DockerGitOperations:
                 # The accepted manual build has this immutable local tag.
                 # Never retag/rebuild it to fit the historical build suffix.
                 frontend_tag=f'madar-frontend:{sha}'
+        if admission is not None:
+            from deployment.lib.completed_normal_profile import RECONCILED
+            if profile(admission) is RECONCILED:
+                from deployment.lib.schema148_artifacts import candidate_image_tags
+                tags=candidate_image_tags(sha)
+                backend_tag,frontend_tag=tags['backend'],tags['frontend']
         existing_backend = self._existing_artifact(backend_tag, sha)
         existing_frontend = self._existing_artifact(
             frontend_tag, sha,

@@ -3151,3 +3151,19 @@ Modern origins retain the exact completion-context check. Worker states, origina
 fencing, generation transfer and candidate authority checks remain unchanged.
 This correction addresses a deterministic post-SQL handoff failure found before
 approval issuance in the cd1ac417 rehearsal; it is not operational acceptance.
+
+### Isolated canonical candidate image preparation
+
+An authenticated CI archive is not proof of Docker image availability. The existing
+package entrypoint's `prepare-isolated-images` action imports hash-verified archive
+members into an independently enrolled disposable guest before approval. It takes
+the existing deployment lock, verifies the measured package, controller, exact
+GitHub artifact and isolated registration, and refuses an already started admission
+or conflicting image tag. It creates no container, approval or SQL authority.
+The canonical preflight reobserves the actual CI image names, immutable IDs, source
+labels, build timestamp and frontend API origin before single-use consumption.
+The child uses the producer's `madar-schema148-{role}:{sha}` names and independently
+checks the accepted IDs; it never rebuilds or retags missing accepted artifacts.
+Interrupted imports require reobservation under a still-valid preparation scope;
+a consumed failed operation cannot use this action to retry execution. Production
+image preparation remains outside this isolated-only action.

@@ -25,6 +25,7 @@ REQUIRED_FILES={'web/scripts/continue_completed_normal_upgrade.py',*(
         'completed_normal_model','completed_normal_evidence','completed_normal_forward','completed_normal_profile','completed_normal_private_acceptance','schema148_release','schema148_artifacts','schema148_consumers','schema149_release','schema149_consumers','schema149_provider_lifecycle','schema149_controller','schema150_release','schema150_provider_lifecycle','schema150_actor_inventory','schema150_object_inventory','schema150_provider_adapter','schema150_status','schema160_release'))}
 REQUIRED_FILES.update({
     'web/deployment/lib/isolated_github_observation.py',
+    'web/deployment/lib/isolated_candidate_images.py',
     'web/deployment/lib/maintenance_backup_roles.py',
     'web/deployment/lib/maintenance_backup.py',
     *{'web/deployment/lib/'+name+'.py' for name in ('migration_inventory','migration_plan','migration_policy','migration_risk','migration_drift')},
@@ -106,7 +107,7 @@ def main():
         raise RuntimeError('completed_upgrade_boot_isolated_root_required')
     parser=argparse.ArgumentParser()
     parser.add_argument('mode',choices=('capture-inventory','verify-candidate','preflight','execute','forward-preflight','forward-resume','boot','proxy-gate',
-        'approval-prepare','approval-inspect','approval-approve','approval-reject','approval-revoke','approved-execute'))
+        'prepare-isolated-images','approval-prepare','approval-inspect','approval-approve','approval-reject','approval-revoke','approved-execute'))
     for name in ('source-package','approved-source','approved-plan'):parser.add_argument('--'+name,required=True)
     parser.add_argument('--resumption-plan');parser.add_argument('--approved-resumption')
     parser.add_argument('--request-id');parser.add_argument('--confirm-request-digest')
@@ -130,7 +131,7 @@ def main():
         try:isolated_registration(dict(document['admission_contract'],plan_sha256=digest(document)))
         except (OSError,RuntimeError,ValueError,KeyError):
             raise RuntimeError('completed_upgrade_fixture_cannot_authorize_production') from None
-    if args.mode in {'capture-inventory','verify-candidate'}:
+    if args.mode in {'capture-inventory','verify-candidate','prepare-isolated-images'}:
         from deployment.lib.completed_normal_admission import digest,ADMISSIONS
         contract = dict(document['admission_contract'], plan_sha256=digest(document))
         def source_guard():
@@ -145,12 +146,16 @@ def main():
             from types import SimpleNamespace
             from deployment.lib.completed_normal_evidence import verify_reconciled_application_evidence
             from deployment.lib.control_plane_upgrade import SystemOperations
-            # Read-only package/API/archive verification. No boot/execution actor,
-            # admission, credential, image import or service mutation is created.
+            # Package/API/archive verification creates no boot/execution actor,
+            # admission or credential. Image import is a separate explicit
+            # isolated-only preparation action below; verify-candidate stays read-only.
             source_guard()
             actor=SimpleNamespace(contract=contract,document=document,package=package,
                 root=ADMISSIONS/digest(contract),ops=SystemOperations())
             result=verify_reconciled_application_evidence(actor)
+            if args.mode=='prepare-isolated-images':
+                from deployment.lib.isolated_candidate_images import prepare
+                result=prepare(actor,source_guard)
             source_guard()
         print(json.dumps({'operation':args.mode,'result':result},sort_keys=True))
         return

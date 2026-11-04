@@ -313,3 +313,40 @@ def verify_provenance(actor,binding):
     archive=readonly_configuration(Path(binding['archive']),private=True)
     return verify_archive(archive,artifact,run,source_sha=actor.contract['candidate']['source_sha'],
         images=actor.contract['candidate']['images'],expected_inputs=inputs)
+
+
+def candidate_image_tags(source_sha):
+    """Names emitted by the authenticated CI producer, never legacy aliases."""
+    if not re.fullmatch('[0-9a-f]{40}', str(source_sha)):
+        raise RuntimeError('schema148_candidate_source_invalid')
+    return {role: 'madar-schema148-'+role+':'+source_sha for role in ('backend','frontend')}
+
+
+def verify_prepared_candidate_images(contract, build_timestamp, command):
+    """Read-only Docker availability check before single-use approval.
+
+    Archive acceptance alone does not prove that the child can use the images.
+    Recheck the CI names, immutable IDs and labels; never pull, build or retag.
+    The child repeats its own image check at the actual prepare boundary.
+    """
+    candidate=contract['candidate'];tags=candidate_image_tags(candidate['source_sha'])
+    for role,tag in tags.items():
+        try:
+            rows=json.loads(command(['docker','image','inspect',tag]))
+        except Exception as error:
+            raise RuntimeError('schema148_candidate_image_unavailable') from error
+        if not isinstance(rows,list) or len(rows)!=1 or not isinstance(rows[0],dict):
+            raise RuntimeError('schema148_candidate_image_invalid')
+        row=rows[0];config=row.get('Config')
+        if not isinstance(config,dict):raise RuntimeError('schema148_candidate_image_invalid')
+        labels=config.get('Labels',{})
+        if (row.get('Id')!=candidate['images'][role] or not isinstance(labels,dict)
+                or labels.get('com.madar.release.sha')!=candidate['source_sha']
+                or labels.get('org.opencontainers.image.revision')!=candidate['source_sha']
+                or labels.get('com.madar.release.built_at')!=build_timestamp
+                or labels.get('com.madar.build.mode')!='fresh-locked-ci'
+                or labels.get('com.madar.staging.build_mode')
+                or role=='frontend' and labels.get('com.madar.frontend.api_origin')!='/api'):
+            raise RuntimeError('schema148_candidate_image_changed')
+    return {'images':dict(candidate['images']), 'source_sha':candidate['source_sha'],
+            'authority_issued':False}
