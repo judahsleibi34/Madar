@@ -16,6 +16,31 @@ function safeEnvironment(overrides = {}) {
 }
 
 describe("isolated E2E safety contract", () => {
+  for (const baseUrl of [
+    "https://madarportal.com",
+    "https://app.madarportal.com",
+    "https://deep.app.madarportal.com",
+    "https://MADARPORTAL.COM.:443",
+    "http://madarportal.com:5173",
+  ]) {
+    it(`rejects production without an optional blocklist: ${baseUrl}`, () => {
+      assert.throws(
+        () => assertIsolatedE2EEnvironment(safeEnvironment({ MADAR_E2E_BASE_URL: baseUrl })),
+        /forbidden production host/
+      );
+    });
+  }
+
+  it("normalizes trailing dots in an additional production host", () => {
+    assert.throws(
+      () => assertIsolatedE2EEnvironment(safeEnvironment({
+        MADAR_E2E_BASE_URL: "https://app.production.example.test",
+        MADAR_E2E_PRODUCTION_HOSTS: " PRODUCTION.EXAMPLE.TEST. ",
+      })),
+      /forbidden production host/
+    );
+  });
+
   it("accepts an explicitly isolated local target", () => {
     assert.deepEqual(assertIsolatedE2EEnvironment(safeEnvironment()), {
       baseUrl: "http://127.0.0.1:5173",

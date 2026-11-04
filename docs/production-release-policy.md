@@ -1,5 +1,11 @@
 # Madar production release acceptance policy
 
+Browser acceptance refuses both madar.com and madarportal.com, including their
+subdomains, without relying on an optional environment blocklist. This URL
+guard is not independent environment attestation. Preserved-upgrade browser
+acceptance must not assert the fresh-install clean-migration flag; authenticated
+fixture provenance and target admission remain separate acceptance requirements.
+
 Historical-origin observation requires the existing release driver directory,
 state, worker-ownership record and deployment lock to remain privately writable
 by the actual `madar` operator. Root-readable state alone is insufficient for
