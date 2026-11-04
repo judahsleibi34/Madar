@@ -3117,3 +3117,13 @@ groups, no-new-privileges, read-only database options, inherited sealed FD and
 post-capture database/address reobservation remain required. This does not alter
 backup format, credentials, grants, retention, replication or SQL authority.
 Corrected-source full protected acceptance is still required.
+
+
+The disposable historical constructor now lives in the existing integration
+tooling at `web/staging/integration/running146_origin_lifecycle.py`. It observes
+the guest identity and effect fence, reads construction inputs, then permanently
+drops to the real madar UID before calling the existing release lifecycle. It
+refuses preexisting or partially constructed state rather than reowning it.
+`historical_operator_state_native.py` exercises real UID and filesystem boundaries
+in an exact-owned synthetic directory, including interruption and process restart;
+it does not claim systemd-credential, VM-reboot or protected-upgrade acceptance.
