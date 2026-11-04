@@ -310,6 +310,8 @@ class CompletedNormalUpgrade:
     def preflight(self, *, locked=False):
         """No authorization consumption, service effects, or live SQL writes."""
         self.preparation_source();self.verify_candidate_remote();self.artifact_guard();self.rehearsal_guard()
+        from deployment.lib.completed_normal_profile import verify_installed_metadata
+        verify_installed_metadata(self.profile)
         before=self.ops.current_preflight(lock_deployment=locked)
         if self.profile is APPLICATION:
             from deployment.lib.control_plane_upgrade import validate_immutable_release_selection

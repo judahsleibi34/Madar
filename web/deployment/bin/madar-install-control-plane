@@ -157,6 +157,7 @@ declare -a tracked_files=(
   releases/migrations-147-148-coordinated.json
   releases/schema-146-149-coordinated.json
   releases/schema-146-150-coordinated.json
+  releases/schema-146-160-coordinated.json
   releases/migrations-147-149-coordinated.json
   releases/schema-144-146-commercial-bridge.json
   releases/learning-136-144-path.json

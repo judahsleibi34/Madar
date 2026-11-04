@@ -128,3 +128,25 @@ def expected_origin_grant(contract, mode):
     elif selected in (FENCED, OUTBOX, DELETION, RECONCILED):
         value.update(compatible_min=144, compatible_max=146)
     return value
+
+
+def verify_installed_metadata(selected, *, releases=None):
+    """Read-only child-input check; existing source/tree attestation pins bytes.
+
+    Nonsecret metadata must be readable by the madar child, not merely root.
+    This validates installation, never registers a profile or grants authority.
+    """
+    import stat
+    from pathlib import Path
+    from deployment.lib.release_deployer import Compatibility
+    root = Path(__file__).resolve().parents[1] / 'releases' if releases is None else Path(releases)
+    try:
+        path = root / selected.metadata
+        info = path.lstat()
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != 0
+                or stat.S_IMODE(info.st_mode) != 0o644 or info.st_nlink != 1):
+            raise ValueError('untrusted metadata')
+        Compatibility.load(path)
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        raise RuntimeError('completed_upgrade_installed_metadata_invalid') from exc
+    return path

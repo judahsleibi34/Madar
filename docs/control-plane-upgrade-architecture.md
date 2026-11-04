@@ -1,5 +1,14 @@
 # Privileged control-plane upgrade architecture
 
+The installed controller includes the selected schema146–160 release descriptor.
+Read-only coordinator preflight now requires its selected metadata to be a
+root-owned, singly linked, nonsecret0644 regular file parsed by the same
+Compatibility loader used by the madar child. Missing/private/malformed metadata
+refuses before authority consumption and is rechecked by locked preflight.
+Existing source and installed-tree attestation still bind the actual bytes;
+this installation check neither registers a release nor grants execution.
+A consumed failed attempt is never repaired in place or replayed by this fix.
+
 Historical origin measurement checks operator access to the existing private
 release state, worker-owner record and deployment lock before collecting account
 or database evidence. The genuine bootstrap lifecycle must create those mutable
