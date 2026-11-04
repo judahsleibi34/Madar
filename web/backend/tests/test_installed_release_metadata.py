@@ -82,6 +82,21 @@ class InstalledMetadataTests(unittest.TestCase):
                         with self.subTest(consumer=name, dependency=module):
                             self.assertIn('lib/'+module.split('.')[2]+'.py', entries)
 
+    def test_default_targets_installed_tree_even_from_sealed_package(self):
+        expected = Path('/opt/madar/control-plane/deployment/releases') / profiles.RECONCILED.metadata
+        observed = []
+        real_lstat = Path.lstat
+        def inspect_path(path, *args, **kwargs):
+            observed.append(path)
+            if path == expected: return real_lstat(self.path, *args, **kwargs)
+            return real_lstat(path, *args, **kwargs)
+        with patch.object(profiles, '__file__', str(self.root/'private-package/web/deployment/lib/completed_normal_profile.py')), \
+                patch.object(Path, 'lstat', inspect_path), \
+                patch('deployment.lib.release_deployer.Compatibility.load') as loader:
+            self.assertEqual(profiles.verify_installed_metadata(profiles.RECONCILED), expected)
+            loader.assert_called_once_with(expected)
+        self.assertEqual(observed, [expected])
+
     def test_preflight_checks_before_origin_and_effects(self):
         source = inspect.getsource(CompletedNormalUpgrade.preflight)
         self.assertLess(source.index('verify_installed_metadata(self.profile)'), source.index('current_preflight('))

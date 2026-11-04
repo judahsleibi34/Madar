@@ -5,6 +5,9 @@ Read-only coordinator preflight now requires its selected metadata to be a
 root-owned, singly linked, nonsecret0644 regular file parsed by the same
 Compatibility loader used by the madar child. Missing/private/malformed metadata
 refuses before authority consumption and is rechecked by locked preflight.
+The descriptor path is the fixed installed controller path even when approval
+executes from a sealed private source package. Package-relative resolution would
+incorrectly inspect the private archive rather than the child input.
 Existing source and installed-tree attestation still bind the actual bytes;
 this installation check neither registers a release nor grants execution.
 A consumed failed attempt is never repaired in place or replayed by this fix.

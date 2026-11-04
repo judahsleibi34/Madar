@@ -139,7 +139,9 @@ def verify_installed_metadata(selected, *, releases=None):
     import stat
     from pathlib import Path
     from deployment.lib.release_deployer import Compatibility
-    root = Path(__file__).resolve().parents[1] / 'releases' if releases is None else Path(releases)
+    # Approval runs from the sealed source package, whereas the madar child
+    # runs the installed controller. Never resolve this input beside __file__.
+    root = Path('/opt/madar/control-plane/deployment/releases') if releases is None else Path(releases)
     try:
         path = root / selected.metadata
         info = path.lstat()
