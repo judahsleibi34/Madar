@@ -90,6 +90,27 @@ def _duration(value):
         raise RuntimeError('completed_runtime_health_declaration_invalid')
     return round(sum(float(n)*units[u] for n,u in parts))
 
+
+def verify_historical_native_network(contract, runtime, *, observed=None):
+    """Require the enrolled historical provider bridge, with no native egress.
+
+    Enrollment authenticates the existing network ID. Docker's Internal flag
+    is a creation property; a new bridge cannot inherit that enrolled identity.
+    This observer never creates or reconfigures a network.
+    """
+    from deployment.lib.historical_origin import KIND, enrolled_database_networks
+    from deployment.lib.schema150_actor_inventory import DEFAULT_NETWORK
+    if contract.get('source_roles', {}).get('origin_kind') != KIND:
+        return False
+    expected = enrolled_database_networks(contract)[DEFAULT_NETWORK]
+    rows = (json.loads(runtime.command(['docker', 'network', 'inspect', DEFAULT_NETWORK]))
+            if observed is None else [observed])
+    if (len(rows) != 1 or rows[0].get('Name') != DEFAULT_NETWORK
+            or rows[0].get('Id') != expected or rows[0].get('Driver') != 'bridge'
+            or rows[0].get('Internal') is not True or rows[0].get('EnableIPv6')):
+        raise RuntimeError('completed_runtime_historical_native_network_changed')
+    return True
+
 def validate_model(contract,model,runtime, *, phase='running'):
     if phase not in {'staged','running','fenced','provisional'}:
         raise RuntimeError('completed_runtime_lifecycle_invalid')
@@ -123,7 +144,8 @@ def validate_model(contract,model,runtime, *, phase='running'):
         if len(observed)!=1 or observed[0]['Name']!=name or observed[0]['Driver']!='bridge':
             raise RuntimeError('completed_runtime_network_object_changed')
         net=observed[0]
-        if bool(net.get('Internal'))!= (False if native else bool(declaration.get('internal',declaration.get('external',False)))):
+        historical_native = native and verify_historical_native_network(contract,runtime,observed=net)
+        if bool(net.get('Internal'))!= (bool(historical_native) if native else bool(declaration.get('internal',declaration.get('external',False)))):
             raise RuntimeError('completed_runtime_network_isolation_changed')
         if not declaration.get('external') and (net.get('IPAM',{}).get('Config') or [])!=declaration.get('ipam',{}).get('config',[]):
             # Docker adds the gateway to IPAM serialization. Compare subnets
@@ -236,7 +258,10 @@ def validate_model(contract,model,runtime, *, phase='running'):
                 raise RuntimeError('completed_runtime_exact_maintenance_authority_changed')
             authority=declared.get('/run/madar/business-write-authority')
             if (authority is None or authority['source']!=str(ADMISSIONS/digest(contract)/'write-authority')
-                    or not authority.get('read_only') or authority.get('bind',{}).get('create_host_path') is not False
+                    # Compose config omits the false zero value from the
+                    # authenticated long-syntax bind declaration. True (also
+                    # emitted for short-syntax binds) must still refuse.
+                    or not authority.get('read_only') or authority.get('bind',{}).get('create_host_path',False) is not False
                     or expected_env.get('MADAR_BUSINESS_WRITE_CONTRACT')!=digest(contract)
                     or expected_env.get('MADAR_BUSINESS_WRITE_AUTHORITY')!='/run/madar/business-write-authority/authority.json'
                     or expected_env.get('SCHEMA_COMPATIBLE_MIN')!=str(release.minimum)

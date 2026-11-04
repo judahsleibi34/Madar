@@ -18,6 +18,38 @@ from test_completed_normal_admission import fixture_contract
 from test_completed_normal_manual_profile import manual_contract
 
 class RuntimeModelTests(unittest.TestCase):
+    def test_historical_native_network_requires_enrolled_id_and_internal_bridge(self):
+        from deployment.lib.historical_origin import KIND
+        from deployment.lib.schema150_actor_inventory import DEFAULT_NETWORK
+        contract={'source_roles':{'origin_kind':KIND}}
+        row={'Id':'a'*64,'Name':DEFAULT_NETWORK,'Driver':'bridge','Internal':True,'EnableIPv6':False}
+        runtime=Mock();runtime.command.return_value=json.dumps([row])
+        with patch('deployment.lib.historical_origin.enrolled_database_networks',return_value={DEFAULT_NETWORK:'a'*64}) as enrolled:
+            self.assertTrue(m.verify_historical_native_network(contract,runtime))
+            enrolled.assert_called_once_with(contract)
+            runtime.command.assert_called_once_with(['docker','network','inspect',DEFAULT_NETWORK])
+            for key,value in (('Id','b'*64),('Internal',False),('Internal',None),('Name','foreign'),('Driver','overlay'),('EnableIPv6',True)):
+                with self.subTest(key=key,value=value),self.assertRaisesRegex(RuntimeError,'historical_native_network_changed'):
+                    m.verify_historical_native_network(contract,runtime,observed=dict(row,**{key:value}))
+        with patch('deployment.lib.historical_origin.enrolled_database_networks',side_effect=RuntimeError('historical_enrollment_invalid')):
+            with self.assertRaisesRegex(RuntimeError,'historical_enrollment_invalid'):
+                m.verify_historical_native_network(contract,runtime,observed=row)
+        runtime.reset_mock()
+        self.assertFalse(m.verify_historical_native_network({'source_roles':{}},runtime))
+        runtime.command.assert_not_called()
+
+    def test_compose_omitted_false_bind_creation_is_not_permission_to_create(self):
+        for service in self.model['services'].values():
+            for mount in service.get('volumes',[]):
+                if mount['target']=='/run/madar/business-write-authority':
+                    mount['bind'].pop('create_host_path')
+        self.validate()
+        mount=self.model['services']['backend']['volumes'][0]
+        for value in (True, None, 'false', 0):
+            with self.subTest(value=value):
+                mount['bind']['create_host_path']=value
+                with self.assertRaisesRegex(RuntimeError,'authority_mount_changed'):self.validate()
+
     def setUp(self):
         self.contract=fixture_contract();self.selected=allocation(self.contract,'green')
         self.model={'services':{},'networks':{'default':{'name':self.selected['networks']['default'],

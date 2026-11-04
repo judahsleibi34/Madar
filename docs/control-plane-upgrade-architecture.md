@@ -20,6 +20,20 @@ or substituted overlays refuse with `completed_upgrade_installed_compose_invalid
 The installer includes these inputs; source rendering alone does not demonstrate
 that an installed child can read them. Consumed attempts remain immutable.
 
+An enrolled historical canonical origin uses its authenticated existing native
+provider bridge as an internal network. Preapproval and candidate sealing both
+reobserve the exact enrolled network ID, name, bridge driver, Internal=true and
+disabled IPv6. No network is modified to satisfy validation. Ordinary modern
+origins retain their existing topology contract. This fixes the former blanket
+non-internal native-bridge assumption without permitting new networks, native
+egress or unauthenticated historical flags.
+
+Compose's rendered long-syntax bind may omit `create_host_path: false`; the
+runtime verifier treats that omitted false value equivalently while rejecting
+true, null and nonboolean values. Exact authenticated overlay bytes, existing
+root-issued authority directory, read-only mount and actual source/destination
+checks remain required. Short-syntax auto-creation is not accepted.
+
 Historical origin measurement checks operator access to the existing private
 release state, worker-owner record and deployment lock before collecting account
 or database evidence. The genuine bootstrap lifecycle must create those mutable

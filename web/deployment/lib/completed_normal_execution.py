@@ -315,6 +315,8 @@ class CompletedNormalUpgrade:
             from deployment.lib.schema148_artifacts import verify_prepared_candidate_images
             verify_prepared_candidate_images(self.contract,
                 self.document['application_artifacts']['build_timestamp'],self.actor.runtime.command)
+            from deployment.lib.completed_normal_runtime import verify_historical_native_network
+            verify_historical_native_network(self.contract,self.actor.runtime)
 
         from deployment.lib.completed_normal_profile import verify_installed_metadata
         verify_installed_metadata(self.profile)
