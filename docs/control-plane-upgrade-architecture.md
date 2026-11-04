@@ -3167,3 +3167,9 @@ checks the accepted IDs; it never rebuilds or retags missing accepted artifacts.
 Interrupted imports require reobservation under a still-valid preparation scope;
 a consumed failed operation cannot use this action to retry execution. Production
 image preparation remains outside this isolated-only action.
+
+The prepared record retains the verified CI tag/ID association. Compose receives
+the exact admitted local OCI image IDs for canonical candidates: a loaded local
+manifest ID is not a registry RepoDigest, so `tag@ID` must not be sent to Docker
+as if it were a registry-qualified reference. No tag mutation or digest relabeling
+is permitted. The existing tag/ID reobservation still runs before creation.

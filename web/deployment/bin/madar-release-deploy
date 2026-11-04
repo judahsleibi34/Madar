@@ -680,6 +680,11 @@ class DockerGitOperations:
                 "MADAR_ALLOCATION_REMOTE_EGRESS_NETWORK":selected['networks']['remote_egress'],
             })
             if selected_profile is RECONCILED:
+                # CI archives contain local OCI manifest IDs, not registry
+                # RepoDigests. Retain tag@ID provenance in the prepared record,
+                # but pass the exact admitted local IDs to Docker/Compose.
+                env['MADAR_BACKEND_IMAGE']=admission['candidate']['images']['backend']
+                env['MADAR_FRONTEND_IMAGE']=admission['candidate']['images']['frontend']
                 # Candidate-only URL; the original gateway/configuration is
                 # retained. Credentials and TLS choice remain protected inputs.
                 from deployment.lib.completed_normal_private_provider import require_calendar_environment,historical_calendar_environment

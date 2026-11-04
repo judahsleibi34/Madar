@@ -83,6 +83,8 @@ class PrivateProviderTests(unittest.TestCase):
             self.assertEqual(result['MADAR_CALENDAR_DATABASE_DSN'],
                 configured['MADAR_CALENDAR_DATABASE_DSN'].replace('@supabase-db:', '@'+gateway+':'))
             self.assertNotIn('authority.json',result['MADAR_CALENDAR_DATABASE_DSN'])
+            self.assertEqual(result['MADAR_BACKEND_IMAGE'],contract['candidate']['images']['backend'])
+            self.assertEqual(result['MADAR_FRONTEND_IMAGE'],contract['candidate']['images']['frontend'])
 
     def test_gateway_is_a_canonical_only_candidate_not_an_admitted_profile(self):
         value=reconciled_contract()
@@ -157,7 +159,7 @@ class PrivateProviderTests(unittest.TestCase):
             with patch.dict(os.environ,env),patch('deployment.lib.completed_normal_admission.require_candidate_authority',side_effect=AssertionError('preauthorization must issue/read no grant')):
                 ops._compose(contract['candidate']['source_sha'],'green',images,'config','--format','json',workers_active=True)
             services=models[0]['services'];self.assertEqual(set(services),set(candidate_roles(contract)))
-            gateway=services['provider-gateway'];self.assertEqual(gateway['image'],images['frontend'])
+            gateway=services['provider-gateway'];self.assertEqual(gateway['image'],contract['candidate']['images']['frontend'])
             self.assertFalse(gateway.get('ports'));self.assertFalse(gateway.get('volumes'));self.assertFalse(gateway.get('environment'))
             self.assertEqual(set(gateway['networks']),{'supabase_client','provider_native'})
             self.assertEqual(services['backend']['environment']['SUPABASE_URL'],'http://'+name+':8000')
