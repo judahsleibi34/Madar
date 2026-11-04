@@ -3127,3 +3127,15 @@ refuses preexisting or partially constructed state rather than reowning it.
 `historical_operator_state_native.py` exercises real UID and filesystem boundaries
 in an exact-owned synthetic directory, including interruption and process restart;
 it does not claim systemd-credential, VM-reboot or protected-upgrade acceptance.
+
+### Historical worker lookup (2026-11-04)
+
+The release child's existing worker ownership observer uses the exact original
+runtime IDs from the independently enrolled historical projection. Both current
+root-issued witnesses must agree, and the historical witness still verifies the
+successor/source/database binding and fresh child authority. Historical actors
+have no completed-release context; no completion marker or old grant is created.
+Modern origins retain the exact completion-context check. Worker states, original
+fencing, generation transfer and candidate authority checks remain unchanged.
+This correction addresses a deterministic post-SQL handoff failure found before
+approval issuance in the cd1ac417 rehearsal; it is not operational acceptance.

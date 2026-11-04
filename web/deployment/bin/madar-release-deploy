@@ -979,9 +979,18 @@ class DockerGitOperations:
             if profile(admission) is not LEGACY:
                 from deployment.lib.completed_normal_admission import credential_witness
                 witness=credential_witness('origin_runtime','origin_runtime_sha256')
+                from deployment.lib.historical_origin import KIND
+                if admission['source_roles'].get('origin_kind') == KIND:
+                    # Historical actors have enrollment evidence, never a
+                    # completion context. Reuse the authenticated historical
+                    # projection, including its exact successor binding.
+                    from deployment.lib.completed_normal_admission import origin_runtime
+                    binding_valid = witness == origin_runtime(admission)
+                else:
+                    binding_valid = witness.get('context_sha256') == Path(admission['source_roles']['completion_root']).name
                 if (witness.get('source_sha')!=admission['source_roles']['application_sha']
                         or witness.get('worker_generation')!=admission['origin']['worker_generation']
-                        or witness.get('context_sha256')!=Path(admission['source_roles']['completion_root']).name
+                        or not binding_valid
                         or witness.get('images')!=admission['origin']['images']):
                     raise RuntimeError('completed_normal_origin_worker_runtime_changed')
                 identities=[witness.get('runtimes',{}).get(role,{}).get('id') for role in
