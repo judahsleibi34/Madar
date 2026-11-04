@@ -37,6 +37,7 @@ declare -a tracked_files=(
   production-paths.conf
   docker-compose.release.yml
   docker-compose.write-authority.yml
+  docker-compose.schema160-private-provider.yml
   bin/madar-auto-deploy
   bin/madar-control-plane-guard
   bin/madar-control-plane-upgrade

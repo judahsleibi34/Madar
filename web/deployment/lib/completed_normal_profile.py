@@ -152,3 +152,27 @@ def verify_installed_metadata(selected, *, releases=None):
     except (OSError, ValueError, KeyError, TypeError) as exc:
         raise RuntimeError('completed_upgrade_installed_metadata_invalid') from exc
     return path
+
+
+def verify_installed_compose_inputs(source, *, installed=None):
+    """Reobserve public child overlays against the already authenticated package.
+
+    This is read-only and grants no authority. The sealed package source guard
+    must have run before this check; caller-provided bytes are not a trust root.
+    """
+    import stat
+    from pathlib import Path
+    root = Path('/opt/madar/control-plane/deployment') if installed is None else Path(installed)
+    names = ('docker-compose.release.yml', 'docker-compose.write-authority.yml',
+             'docker-compose.schema160-private-provider.yml')
+    try:
+        for name in names:
+            path = root / name
+            info = path.lstat()
+            if (not stat.S_ISREG(info.st_mode) or info.st_uid != 0
+                    or stat.S_IMODE(info.st_mode) != 0o644 or info.st_nlink != 1
+                    or path.read_bytes() != (Path(source) / name).read_bytes()):
+                raise ValueError('untrusted installed compose input')
+    except (OSError, ValueError) as exc:
+        raise RuntimeError('completed_upgrade_installed_compose_invalid') from exc
+    return tuple(root / name for name in names)

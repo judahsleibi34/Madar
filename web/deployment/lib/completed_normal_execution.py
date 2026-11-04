@@ -318,6 +318,8 @@ class CompletedNormalUpgrade:
 
         from deployment.lib.completed_normal_profile import verify_installed_metadata
         verify_installed_metadata(self.profile)
+        from deployment.lib.completed_normal_profile import verify_installed_compose_inputs
+        verify_installed_compose_inputs(self.package/'source/web/deployment')
         before=self.ops.current_preflight(lock_deployment=locked)
         if self.profile is APPLICATION:
             from deployment.lib.control_plane_upgrade import validate_immutable_release_selection

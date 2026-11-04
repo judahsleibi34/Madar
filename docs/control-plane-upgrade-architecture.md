@@ -12,6 +12,14 @@ Existing source and installed-tree attestation still bind the actual bytes;
 this installation check neither registers a release nor grants execution.
 A consumed failed attempt is never repaired in place or replayed by this fix.
 
+The installed child also requires all three public Compose overlays, including
+the canonical160 private-provider overlay. Read-only preflight compares their
+actual bytes with the authenticated sealed package and requires root ownership,
+0644 mode, regular files and single links before approval consumption. Missing
+or substituted overlays refuse with `completed_upgrade_installed_compose_invalid`.
+The installer includes these inputs; source rendering alone does not demonstrate
+that an installed child can read them. Consumed attempts remain immutable.
+
 Historical origin measurement checks operator access to the existing private
 release state, worker-owner record and deployment lock before collecting account
 or database evidence. The genuine bootstrap lifecycle must create those mutable
