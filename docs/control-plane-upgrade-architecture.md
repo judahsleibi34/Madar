@@ -1,5 +1,13 @@
 # Privileged control-plane upgrade architecture
 
+Historical origin measurement checks operator access to the existing private
+release state, worker-owner record and deployment lock before collecting account
+or database evidence. The genuine bootstrap lifecycle must create those mutable
+operator files under User madar, as the governed child will use them. This is a
+read-only prerequisite, not permission to chmod/chown a signed origin or expose
+root-private state through a projection. Independent issuer records remain root
+owned; ordinary completed-release admission is unchanged.
+
 Canonical historical child credentials additionally carry a nonsecret host
 identity witness. The root issuer reobserves actual DMI, machine/root filesystem
 and effect isolation before each issuance; its public interlock binds the witness

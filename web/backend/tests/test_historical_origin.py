@@ -1,5 +1,6 @@
 """Issuer contract tests; not a claim of privileged preserved-upgrade acceptance."""
 import copy,json,tempfile,time,unittest
+import os
 from contextlib import contextmanager,ExitStack
 from pathlib import Path
 from types import SimpleNamespace
@@ -7,6 +8,70 @@ from unittest.mock import Mock,patch
 from deployment.lib import historical_origin as origin
 from deployment.lib import exceptional_release_approval as approval
 from deployment.lib.migration_inventory import digest,canonical
+
+
+class HistoricalOperatorStateTests(unittest.TestCase):
+    """Real private-file modes/inodes; no identity, approval or runtime effects."""
+    def setUp(self):
+        self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
+        self.root=Path(self.tmp.name)/'state';self.root.mkdir(mode=0o700)
+        self.paths=[self.root/name for name in ('state.json','worker-ownership.json','deploy.lock')]
+        for path in self.paths:path.write_bytes(b'{}\n');path.chmod(0o600)
+        self.enterContext(patch('pwd.getpwnam',return_value=SimpleNamespace(pw_uid=os.getuid())))
+        # Installation ancestry is modeled; these temporary private files and
+        # the new driver's ownership/mode/link checks use the real filesystem.
+        self.enterContext(patch.object(origin,'readonly_configuration',side_effect=lambda p,**kw:Path(p)))
+
+    def test_operator_owned_private_state_passes_without_permission_or_content_changes(self):
+        before=[(p.stat().st_ino,p.stat().st_uid,p.stat().st_mode,p.read_bytes()) for p in self.paths]
+        self.assertIsNone(origin.require_operator_state(self.root))
+        self.assertEqual(before,[(p.stat().st_ino,p.stat().st_uid,p.stat().st_mode,p.read_bytes()) for p in self.paths])
+
+    def test_root_or_foreign_owned_private_state_worker_or_lock_refuses(self):
+        real=Path.lstat
+        for selected in [self.root,*self.paths]:
+            def metadata(path):
+                value=real(path)
+                if path!=selected:return value
+                values=list(value);values[4]=0 if os.getuid()!=0 else 10001
+                return os.stat_result(values)
+            with self.subTest(path=selected.name),patch.object(Path,'lstat',metadata):
+                with self.assertRaisesRegex(RuntimeError,'operator_state_inaccessible'):
+                    origin.require_operator_state(self.root)
+
+    def test_shared_readonly_or_nonprivate_files_refuse_without_repair(self):
+        for path in self.paths:
+            for mode in (0o400,0o640,0o644,0o660,0o666):
+                with self.subTest(path=path.name,mode=mode):
+                    path.chmod(mode)
+                    with self.assertRaisesRegex(RuntimeError,'operator_state_inaccessible'):
+                        origin.require_operator_state(self.root)
+                    self.assertEqual(path.stat().st_mode&0o777,mode)
+                    path.chmod(0o600)
+
+    def test_unwritable_unsearchable_or_shared_state_directory_refuses(self):
+        for mode in (0o500,0o600,0o770,0o777):
+            self.root.chmod(mode)
+            with self.subTest(mode=mode),self.assertRaisesRegex(RuntimeError,'operator_state_inaccessible'):
+                origin.require_operator_state(self.root)
+            self.assertEqual(self.root.stat().st_mode&0o777,mode)
+            self.root.chmod(0o700)
+
+    def test_missing_symlink_and_hardlinked_state_refuse(self):
+        path=self.paths[0];path.unlink()
+        with self.assertRaisesRegex(RuntimeError,'operator_state_inaccessible'):origin.require_operator_state(self.root)
+        path.symlink_to(self.paths[1])
+        with self.assertRaisesRegex(RuntimeError,'operator_state_inaccessible'):origin.require_operator_state(self.root)
+        path.unlink();os.link(self.paths[1],path)
+        with self.assertRaisesRegex(RuntimeError,'operator_state_inaccessible'):origin.require_operator_state(self.root)
+
+    def test_invalid_origin_refuses_before_account_or_database_observation(self):
+        self.paths[0].chmod(0o644)
+        with patch('deployment.lib.automatic_release_admission.connect_database') as database,\
+             patch('deployment.lib.completed_normal_private_acceptance.observe_subjects') as accounts:
+            with self.assertRaisesRegex(RuntimeError,'operator_state_inaccessible'):
+                origin.observe(SimpleNamespace(state_root=self.root),{}, {})
+            database.assert_not_called();accounts.assert_not_called()
 
 
 class HistoricalOriginTests(unittest.TestCase):

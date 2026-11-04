@@ -23,6 +23,30 @@ PROVIDERS=('supabase-db','supabase-auth','supabase-rest','supabase-storage','sup
 BOOT_UNIT_ROOT=Path('/etc/systemd/system')
 
 
+def require_operator_state(state_root):
+    """Observe legacy release-driver access before enrolling or consuming approval.
+
+    These mutable operator files are not issuer credentials or root receipts.
+    Root may read a root-owned0600 file which the fixed madar child cannot.
+    Refuse that origin; never chmod/chown it or substitute a state projection.
+    """
+    import pwd,stat
+    from .runtime_authority import worker_authority_path
+    root=Path(state_root);operator=pwd.getpwnam('madar').pw_uid
+    try:
+        directory=readonly_configuration(root/'state.json',private=True).parent.lstat()
+        if (not stat.S_ISDIR(directory.st_mode) or directory.st_uid!=operator
+                or directory.st_mode&0o700!=0o700 or directory.st_mode&0o022):
+            raise RuntimeError('historical_origin_operator_state_inaccessible')
+        for path in (root/'state.json',worker_authority_path(root),root/'deploy.lock'):
+            metadata=readonly_configuration(path,private=True).lstat()
+            if (not stat.S_ISREG(metadata.st_mode) or metadata.st_uid!=operator
+                    or metadata.st_mode&0o777!=0o600 or metadata.st_nlink!=1):
+                raise RuntimeError('historical_origin_operator_state_inaccessible')
+    except OSError:
+        raise RuntimeError('historical_origin_operator_state_inaccessible') from None
+
+
 def bootstrap_record(path):
     """Read original operator lifecycle DATA, never a trusted issuer receipt.
 
@@ -441,6 +465,7 @@ def observe(system,p,environment):
     account probes create Auth sessions while verifying real password/MFA and
     private objects; their credentials cannot select foreign provider endpoints.
     """
+    require_operator_state(system.state_root)
     from .automatic_release_recovery import inspect_all
     from .completed_normal_resources import measured_spec
     from .completed_normal_package import snapshot

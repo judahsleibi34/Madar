@@ -1,5 +1,14 @@
 # Madar production release acceptance policy
 
+Historical-origin observation requires the existing release driver directory,
+state, worker-ownership record and deployment lock to remain privately writable
+by the actual `madar` operator. Root-readable state alone is insufficient for
+the governed madar child. Inaccessible, foreign-owned, shared or linked files
+refuse before enrollment/account probes; observation never repairs permissions.
+Disposable origin construction must execute its genuine application lifecycle
+as that operator before signing any inventory. Root issuer receipts, grants and
+credentials retain their independent protection and are not reowned.
+
 The historical child receives actual root-observed DMI identity only through
 the existing digest-bound systemd credential. Root rechecks the complete host
 and isolation at issuance; the child also reobserves current boot, machine,
