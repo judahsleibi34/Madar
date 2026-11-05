@@ -244,3 +244,56 @@ class RecoveryPolicyBoundaryTests(unittest.TestCase):
         from deployment.lib.completed_normal_execution import CompletedNormalUpgrade
         driver=CompletedNormalUpgrade.__new__(CompletedNormalUpgrade);driver.profile=None
         with self.assertRaisesRegex(RuntimeError,'profile_invalid'):driver.observe_maintenance_environment()
+
+
+class RecoveryEnvironmentTests(unittest.TestCase):
+    """Real observer control flow with synthetic daemon responses; no authority."""
+    def test_realm_stage_network_and_volume_substitution_refuse(self):
+        import tempfile
+        from types import SimpleNamespace
+        from deployment.lib import completed_normal_execution as execution
+        from deployment.lib import isolated_release_environment as environment
+        from deployment.lib import schema150_actor_inventory as inventory
+        from deployment.lib.completed_normal_profile import RECONCILED
+        from deployment.lib.completed_normal_admission import digest as context_digest
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);driver=execution.CompletedNormalUpgrade.__new__(execution.CompletedNormalUpgrade)
+            driver.profile=RECONCILED;driver.root=root
+            driver.contract={'database':{'container_id':'db','system_identifier':'123'},
+                'candidate':{'source_sha':'a'*40,'images':{'backend':'image'}}}
+            stage={'context_sha256':context_digest(driver.contract),'source_sha':'a'*40,'images':{'backend':'image'}}
+            (root/'candidate-staged-runtime.json').write_text(json.dumps(stage))
+            driver.ops=SimpleNamespace(interlock_file=root/'interlock.json')
+            driver.ops.interlock_file.write_text(json.dumps({'candidate_stage_sha256':context_digest(stage)}))
+            driver.actor=Mock();provider=Mock();driver.maintenance_recovery_components=Mock(return_value=(provider,None))
+            provider._database_identity.return_value=160;provider._sql.return_value=json.dumps('madar-isolated-realm')
+            provider._rows.return_value=[{'NetworkSettings':{'Networks':{'active':{'NetworkID':'net'},'stopped':{'NetworkID':''}}},
+                'Mounts':[{'Type':'volume','Name':'data'}]}]
+            networks=[{'Id':'net','Driver':'bridge','EnableIPv6':False}]
+            volumes=[{'Name':'data','Driver':'local','Options':{},'Labels':{'com.madar.test.realm':'realm'}}]
+            def command(args):
+                if args[:3]==['docker','network','inspect']:
+                    self.assertEqual(args[3:],['net']);return json.dumps(networks)
+                if args[:3]==['docker','volume','inspect']:return json.dumps(volumes)
+                raise AssertionError('unexpected effect')
+            driver.actor.runtime.command.side_effect=command
+            host={'version':2,'realm_id':'realm','database_container_id':'db','database_system_identifier':'123'}
+            with patch.object(environment,'observe_host',return_value=host), \
+                    patch.object(environment,'observe_effect_fence',return_value='eth0'), \
+                    patch.object(environment,'verify_host_interfaces') as interfaces, \
+                    patch.object(execution,'protected',lambda p,**kw:Path(p)), \
+                    patch.object(inventory,'bind_staged_candidates'),patch.object(inventory,'attest_containers'):
+                self.assertEqual(driver.observe_maintenance_environment()['database_system_identifier'],'123')
+                interfaces.assert_called_once_with('eth0',networks)
+                provider._sql.return_value=json.dumps('foreign-realm')
+                with self.assertRaisesRegex(RuntimeError,'database_scope_changed'):driver.observe_maintenance_environment()
+                provider._sql.return_value=json.dumps('madar-isolated-realm')
+                volumes[0]['Options']={'type':'nfs'}
+                with self.assertRaisesRegex(RuntimeError,'volume_scope_changed'):driver.observe_maintenance_environment()
+                volumes[0]['Options']={};volumes[0]['Labels']={}
+                with self.assertRaisesRegex(RuntimeError,'volume_scope_changed'):driver.observe_maintenance_environment()
+                volumes[0]['Labels']={'com.madar.test.realm':'realm'};networks[0]['Driver']='overlay'
+                with self.assertRaisesRegex(RuntimeError,'network_changed'):driver.observe_maintenance_environment()
+                networks[0]['Driver']='bridge';stage['source_sha']='b'*40
+                (root/'candidate-staged-runtime.json').write_text(json.dumps(stage))
+                with self.assertRaisesRegex(RuntimeError,'candidate_changed'):driver.observe_maintenance_environment()

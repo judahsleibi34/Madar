@@ -759,6 +759,9 @@ class CompletedNormalUpgrade:
         provider,_=self.maintenance_recovery_components()
         if provider._database_identity()!=self.profile.target:
             raise RuntimeError('maintenance_recovery_committed_target_required')
+        realm=json.loads(provider._sql("BEGIN READ ONLY; SELECT to_json(shobj_description(oid,'pg_database')) FROM pg_database WHERE datname='postgres'; COMMIT;"))
+        if realm!='madar-isolated-'+environment['realm_id']:
+            raise RuntimeError('maintenance_recovery_database_scope_changed')
         stage=json.loads(protected(self.root/'candidate-staged-runtime.json',private=True).read_bytes())
         interlock=json.loads(protected(self.ops.interlock_file,private=False).read_bytes())
         # The original root issuer bound this stage before handing off writers.
@@ -780,6 +783,12 @@ class CompletedNormalUpgrade:
                 n.get('Driver')=='host' and n.get('Name')!='host' for n in networks)):
             raise RuntimeError('maintenance_recovery_network_changed')
         verify_host_interfaces(interface,[n for n in networks if n['Driver']=='bridge'])
+        volumes={m['Name'] for row in rows for m in row.get('Mounts',[]) if m.get('Type')=='volume'}
+        if volumes:
+            actual=json.loads(self.actor.runtime.command(['docker','volume','inspect',*sorted(volumes)]))
+            if ({v['Name'] for v in actual}!=volumes or any(v.get('Driver')!='local' or v.get('Options')
+                    or (v.get('Labels') or {}).get('com.madar.test.realm')!=environment['realm_id'] for v in actual)):
+                raise RuntimeError('maintenance_recovery_volume_scope_changed')
         self.actor.guard()
         return {**environment,'control_interface':interface}
 

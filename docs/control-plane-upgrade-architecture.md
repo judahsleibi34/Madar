@@ -3463,8 +3463,8 @@ its installed canonical driver. The original isolated enrollment inventory is
 still mandatory for ordinary deployment admission; it is not rewritten when
 candidate actors are added. Recovery rechecks the enrolled host and effect
 fence, actual database identity, authenticated historical provider inventory,
-root-interlock-bound candidate stage, complete active actor set and network
-identities. Independent issuer configuration and fresh recovery approval remain
+root-interlock-bound candidate stage, complete active actor set, network
+identities, database realm marker and local realm-owned volumes. Independent issuer configuration and fresh recovery approval remain
 mandatory. Approval dispatch authenticates the request before choosing this
 observer, and rechecks policy after technical observation. Historical policy
 expiry is validated against the same post-transition observer for recovery only.
