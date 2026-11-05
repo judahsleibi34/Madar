@@ -17,13 +17,13 @@ class AcceptanceWindowTests(unittest.TestCase):
     def test_complete_execution_business_reboot_and_retirement_budget(self):
         result = window.require_window(self.registration(), now=2000, supervisor_deadline=8000)
         self.assertEqual(result['deadline'], 8000)
-        self.assertEqual(result['required_seconds'], 3880)
+        self.assertEqual(result['required_seconds'], 4140)
         self.assertIs(result['authority_issued'], False)
 
     def test_exact_boundary_and_one_second_short(self):
-        window.require_window(self.registration(), now=2000, supervisor_deadline=5880)
+        window.require_window(self.registration(), now=2000, supervisor_deadline=6140)
         with self.assertRaisesRegex(RuntimeError, 'window_insufficient'):
-            window.require_window(self.registration(), now=2000, supervisor_deadline=5879)
+            window.require_window(self.registration(), now=2000, supervisor_deadline=6139)
 
     def test_expired_future_and_unbounded_registration_refused(self):
         for now, expiry in ((9000,9000),(999,9000),(2000,11801)):
@@ -45,6 +45,27 @@ class AcceptanceWindowTests(unittest.TestCase):
         window.require_window(record, now=2000, supervisor_deadline=8000)
         self.assertEqual(record, original)
 
+    def test_nested_execution_budget_covers_observed1600_second_kill(self):
+        timeout = window.protected_execution_timeout(started=1000, now=1300)
+        self.assertEqual(timeout, 2140)
+        self.assertGreater(timeout, 1600)
+        self.assertLessEqual(300 + timeout + window.REMOTE_COMPLETION_RESERVE,
+                             window.REMOTE_REQUEST_TIMEOUT)
+        # The parent also reserves journal capture and transport teardown.
+        self.assertGreaterEqual(window.PHASES[0][1] - window.REMOTE_REQUEST_TIMEOUT, 200)
+
+    def test_slow_approval_refuses_before_execution_without_resetting_clock(self):
+        self.assertEqual(window.protected_execution_timeout(started=1000, now=1340), 2100)
+        with self.assertRaisesRegex(RuntimeError, 'window_insufficient'):
+            window.protected_execution_timeout(started=1000, now=1341)
+        with self.assertRaisesRegex(RuntimeError, 'window_insufficient'):
+            window.protected_execution_timeout(started=1000, now=3500)
+
+    def test_invalid_execution_clock_refuses(self):
+        for started, now in ((True, 10), (10, 9), (float('nan'), 10), (0, float('inf'))):
+            with self.subTest(started=started, now=now), self.assertRaisesRegex(RuntimeError, 'clock_invalid'):
+                window.protected_execution_timeout(started=started, now=now)
+
     def test_completion_then_business_then_reboot(self):
         calls = []; window.execute_steps(lambda name, timeout: calls.append((name,timeout)))
         self.assertEqual(tuple(calls), window.PHASES)
@@ -58,3 +79,52 @@ class AcceptanceWindowTests(unittest.TestCase):
             with self.subTest(failed=failed), self.assertRaisesRegex(RuntimeError, 'interrupted'):
                 window.execute_steps(run)
             self.assertEqual(calls, [name for name,_ in window.PHASES[:failed+1]])
+
+
+class NativeChildAdapterTests(unittest.TestCase):
+    """Real harmless subprocesses under the runner UID; no approval or SQL."""
+    def test_actual_adapter_success_once_and_private_log(self):
+        import tempfile, sys, json
+        with tempfile.TemporaryDirectory() as directory:
+            log=Path(directory)/'execution.log'
+            argv=[sys.executable,'-c','import os,json; print(json.dumps({"uid":os.getuid(),"gid":os.getgid()}))']
+            result=window.execute_protected_child(argv,started=0,clock=lambda:1,log=log)
+            self.assertEqual(result.returncode,0)
+            self.assertEqual(json.loads(result.stdout),{'uid':os.getuid(),'gid':os.getgid()})
+            self.assertEqual(log.stat().st_mode & 0o777,0o600)
+            with self.assertRaises(FileExistsError):
+                window.execute_protected_child(argv,started=0,clock=lambda:1,log=log)
+
+    def test_actual_adapter_insufficient_budget_has_no_child_effect(self):
+        import tempfile,sys
+        with tempfile.TemporaryDirectory() as directory:
+            effect=Path(directory)/'effect';log=Path(directory)/'log'
+            with self.assertRaisesRegex(RuntimeError,'window_insufficient'):
+                window.execute_protected_child([sys.executable,'-c',f'open({str(effect)!r},"w").close()'],
+                                               started=0,clock=lambda:400,log=log)
+            self.assertFalse(effect.exists());self.assertFalse(log.exists())
+
+    def test_timeout_retains_diagnostics_and_kills_owned_descendants(self):
+        import tempfile,sys,subprocess,time
+        with tempfile.TemporaryDirectory() as directory:
+            log=Path(directory)/'timeout.log'
+            code='import subprocess,sys,time,os; p=subprocess.Popen([sys.executable,"-c","import time; time.sleep(60)"]); print(os.getpid(),p.pid,flush=True); time.sleep(60)'
+            with self.assertRaises(subprocess.TimeoutExpired):
+                window.bounded_child([sys.executable,'-c',code],timeout=1,log=log)
+            parent,descendant=map(int,log.read_text().split())
+            self.assertFalse(Path(f'/proc/{parent}').exists())
+            # Orphan zombies may briefly await init reaping, but no live child
+            # may survive the exact process-group retirement.
+            for _ in range(50):
+                state=Path(f'/proc/{descendant}/stat')
+                if not state.exists() or state.read_text().split()[2]=='Z':break
+                time.sleep(.02)
+            else:self.fail('owned descendant survived timeout')
+
+    def test_real_request_wrapper_uses_shared_adapter_and_no1600_limit(self):
+        source=(path.parent/'request-and-execute-approved-canonical-upgrade.py').read_text()
+        self.assertIn('executed=execute_protected_child(',source)
+        self.assertIn('started=remote_started,log=log',source)
+        self.assertIn('timeout=REMOTE_REQUEST_TIMEOUT',source)
+        self.assertNotIn('timeout=1600',source)
+        self.assertEqual(window.WINDOW_TIMEOUT,3960)

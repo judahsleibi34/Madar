@@ -13,15 +13,76 @@ import sys
 import time
 
 PHASES = (
-    ('request-and-execute-approved-canonical-upgrade.py', 2500),
+    ('request-and-execute-approved-canonical-upgrade.py', 2700),
     ('verify-completed-preserved-business.py', 600),
     ('verify-completed-canonical-reboot.py', 600),
 )
 RETIREMENT_RESERVE = 180
+WINDOW_OVERHEAD = 60
+WINDOW_TIMEOUT = sum(seconds for _, seconds in PHASES) + WINDOW_OVERHEAD
+REMOTE_REQUEST_TIMEOUT = 2500
+MIN_PROTECTED_EXECUTION_SECONDS = 2100
+REMOTE_COMPLETION_RESERVE = 60
+
+
+def protected_execution_timeout(*, started, now):
+    """Reserve the actual remaining remote window before consuming approval.
+
+    Preparation/MFA time is charged once, never reset at execution. This does
+    not extend any approval or policy. The installed controller still owns all
+    authority checks. A slow preparation may leave an unconsumed approval;
+    insufficient time refuses before invoking approved-execute.
+    """
+    import math
+    if (type(started) not in (int, float) or type(now) not in (int, float)
+            or not math.isfinite(started) or not math.isfinite(now) or now < started):
+        raise RuntimeError('canonical_protected_execution_clock_invalid')
+    remaining = math.floor(REMOTE_REQUEST_TIMEOUT - (now - started) - REMOTE_COMPLETION_RESERVE)
+    if remaining < MIN_PROTECTED_EXECUTION_SECONDS:
+        raise RuntimeError('canonical_protected_execution_window_insufficient')
+    return remaining
+
+
+def bounded_child(argv, *, timeout, log, input=None):
+    """Run once in a private process group; preserve diagnostics before refusal.
+
+    The caller must supply its locally calculated remaining timeout. No remote
+    monotonic timestamp is accepted. This wrapper issues no execution authority.
+    """
+    import signal
+    import math
+    if type(timeout) not in (int, float) or not math.isfinite(timeout) or timeout <= 0:
+        raise RuntimeError('canonical_child_budget_invalid')
+    log = Path(log)
+    fd = os.open(log, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, 'wb') as output:
+        child = subprocess.Popen(argv, stdin=subprocess.PIPE if input is not None else subprocess.DEVNULL,
+                                 stdout=output, stderr=subprocess.STDOUT, start_new_session=True)
+        try:
+            child.communicate(input=input, timeout=timeout)
+        except BaseException:
+            # Kill the whole owned group, including descendants retaining pipes.
+            # No retry, and no signalling of a controller's independently owned
+            # systemd services. Their durable recovery contract remains in force.
+            try:
+                os.killpg(child.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            child.wait(timeout=10)
+            output.flush(); os.fsync(output.fileno())
+            raise
+        output.flush(); os.fsync(output.fileno())
+    return subprocess.CompletedProcess(argv, child.returncode, log.read_bytes(), b'')
+
+
+def execute_protected_child(argv, *, started, log, input=None, clock=time.monotonic):
+    """Shared actual remote adapter: check the remaining local clock, then run once."""
+    return bounded_child(argv, timeout=protected_execution_timeout(started=started, now=clock()),
+                         log=log, input=input)
 
 
 def require_window(registration, *, now, supervisor_deadline):
-    required = sum(seconds for _, seconds in PHASES) + RETIREMENT_RESERVE
+    required = WINDOW_TIMEOUT + RETIREMENT_RESERVE
     if (not isinstance(registration, dict)
             or registration.get('kind') != 'isolated-canonical-controller-acceptance'
             or any(type(v) is not int for v in
@@ -78,10 +139,8 @@ def main():
                 or script.stat().st_mode & 0o022):
             raise RuntimeError('canonical_acceptance_runner_changed')
         log = evidence/('private-window-'+name+'.log')
-        with log.open('xb') as output:
-            os.fchmod(output.fileno(), 0o600)
-            subprocess.run([sys.executable, '-B', str(script)], stdout=output,
-                           stderr=subprocess.STDOUT, timeout=timeout, check=True)
+        result = bounded_child([sys.executable, '-B', str(script)], timeout=timeout, log=log)
+        result.check_returncode()
         print(json.dumps({'completed_step': name}), flush=True)
     execute_steps(run)
 

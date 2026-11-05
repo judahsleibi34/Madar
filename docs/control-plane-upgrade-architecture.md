@@ -3288,3 +3288,28 @@ native bridge are required; no caller URL, credential, redirect or ambient proxy
 is accepted. Temporary transport failures retry only within the existing boot
 deadline. A running container alone never establishes readiness. These probes
 do not replace final authenticated application and worker acceptance.
+
+The parent acceptance window also bounds the nested request/execution transport.
+The request has2500 seconds inside its2700-second parent phase; before invoking
+`approved-execute`, preparation and MFA elapsed time is subtracted,60 seconds
+remain reserved for completion observation, and at least2100 execution seconds
+must remain. Slow preparation refuses before consumption instead of resetting
+the clock. The parent retains200 seconds for journal capture/transport teardown.
+This replaces the inconsistent1600-second inner timeout that killed a real
+operation after NORMAL acceptance but before final completion. Such a killed
+operation is not completed and its authority cannot be reused. Its committed
+SQL, receipts and reboot fencing remain distinct evidence. No lifetime in a
+signed registration, approval, recovery receipt or supervisor is extended.
+
+The actual rehearsal request wrapper is source-controlled alongside this window
+and is copied from the frozen controller source into each fresh owned scope.
+Its remote installed-package adapter uses its own monotonic clock, not a clock
+value transmitted from Node2. The inner approved execution uses the remaining
+budget; the outer SSH request is2500 seconds, phase2700, business600, reboot600,
+window overhead60, and retirement180 (4140 seconds minimum remaining lifetime).
+A missing native prerequisite refuses immediately; waiting for it is not hidden
+inside the approval window. Independent signed expiry checks remain at every
+controller boundary. The adapter runs once with exclusive private diagnostics
+and kills/reaps its owned process group on timeout, without replay or signalling
+independently managed application/systemd actors. Native harmless subprocess
+coverage establishes wrapper behavior, not migration or recovery acceptance.
