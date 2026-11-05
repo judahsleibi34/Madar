@@ -330,6 +330,91 @@ class CompletedNormalBootActor:
                     if row['State']['Running']:self.runtime.command(['docker','stop',expected['id']])
         self.event('maintenance',mode='READ_ONLY')
         if failures:raise RuntimeError('completed_upgrade_boot_compensation_worker_stop_failed') from None
+    def completed_provider_rows(self):
+        """Cold-start identities from the admitted original inventory, not names.
+
+        This is limited to the independently enrolled canonical origin. It
+        never changes that inventory or treats it as a modern completion.
+        """
+        from deployment.lib.schema150_actor_inventory import validate_inventory
+        from deployment.lib.completed_normal_resources import measured_spec_matches,verify_runtime_binding
+        binding={'operation':self.contract['operation'],'context_sha256':digest(self.contract),
+            'source_sha':self.contract['candidate']['source_sha'],'controller_sha':self.contract['candidate']['controller_sha'],
+            'inventory_sha256':self.contract['writer_inventory_sha256'],'system_identifier':self.contract['database']['system_identifier'],
+            'source_schema':self.profile.source,'target_schema':self.profile.target}
+        inventory=validate_inventory(json.loads(protected(self.root/'provider-inventory.json',private=True).read_bytes()),binding)
+        publication=json.loads(protected(self.root/'normal-publication.json',private=True).read_bytes())
+        verify_runtime_binding(self.contract,publication,self.runtime,Path('/var/lib/madar/releases'))
+        ids=self.runtime.command(['docker','ps','-aq','--no-trunc']).split()
+        expected={v['id'] for v in inventory['containers'].values()}|set(inventory['exclusions'])|{
+            v['id'] for v in publication['runtimes'].values()}
+        if len(ids)!=len(set(ids)) or set(ids)!=expected:
+            raise RuntimeError('completed_boot_provider_inventory_changed')
+        rows=self.runtime.inspect(ids)
+        rows={v['Id']:v for v in rows.values()}
+        if set(rows)!=expected:raise RuntimeError('completed_boot_provider_inventory_changed')
+        native_ids={record['id'] for role,record in inventory['containers'].items() if role.startswith('native:')}
+        proxy=rows[inventory['containers']['proxy']['id']]
+        if any(not rows[identity]['State']['Running'] for identity in native_ids) and proxy['State']['Running']:
+            raise RuntimeError('completed_boot_provider_ingress_not_fenced')
+        if not rows[inventory['containers']['native:db']['id']]['State']['Running'] and any(
+                rows[record['id']]['State']['Running'] for record in publication['runtimes'].values()):
+            raise RuntimeError('completed_boot_provider_writers_not_fenced')
+        selected={}
+        for role,record in inventory['containers'].items():
+            row=rows[record['id']]
+            if (row.get('Name')!='/'+record['name'] or row.get('Image')!=record['image']
+                    or not measured_spec_matches(row,record['spec_sha256'],started_worker=True)
+                    or row['HostConfig']['RestartPolicy']['Name']!='no' or row['State'].get('Restarting')
+                    or role.startswith('origin:') and row['State']['Running']):
+                raise RuntimeError('completed_boot_provider_actor_changed')
+            attached=row['NetworkSettings']['Networks']
+            if set(attached)!=set(record['networks']):
+                raise RuntimeError('completed_boot_provider_network_changed')
+            for name,identity in record['networks'].items():
+                endpoint=attached[name]
+                if endpoint.get('NetworkID')!=identity and (row['State']['Running']
+                        or endpoint.get('NetworkID')!='' or endpoint.get('EndpointID') or endpoint.get('IPAddress')
+                        or row['State'].get('Status') not in {'created','exited'}):
+                    raise RuntimeError('completed_boot_provider_network_changed')
+                objects=json.loads(self.runtime.command(['docker','network','inspect',name]))
+                if len(objects)!=1 or objects[0]['Id']!=identity:
+                    raise RuntimeError('completed_boot_provider_network_changed')
+            if role.startswith('native:'):selected[role]=row
+        for identity,record in inventory['exclusions'].items():
+            row=rows[identity]
+            if row['Image']!=record['image'] or not measured_spec_matches(row,record['spec_sha256']):
+                raise RuntimeError('completed_boot_excluded_actor_changed')
+        if set(selected)!={'native:db','native:auth','native:rest','native:storage','native:gateway'}:
+            raise RuntimeError('completed_boot_provider_roles_invalid')
+        return selected
+
+    def resume_completed_providers(self):
+        from deployment.lib.completed_normal_profile import RECONCILED
+        if self.profile is not RECONCILED or self.contract['source_roles'].get('origin_kind')!='independently-enrolled-historical-bootstrap-origin':
+            return
+        from deployment.lib.completed_normal_database import require_manual_normal_completion
+        # An incomplete operation is fenced; this method cannot continue SQL,
+        # restore roles, clear maintenance or issue a fresh deployment grant.
+        self.guard();require_manual_normal_completion(self.contract,self.root)
+        require_candidate_authority(self.contract,mode='NORMAL')
+        with verification_window(self.runtime,60):
+            with runtime_mutation_lock(Path('/var/lib/madar/releases')):
+                for role in ('native:db','native:auth','native:rest','native:storage','native:gateway'):
+                    self.guard();rows=self.completed_provider_rows();row=rows[role]
+                    if not row['State']['Running']:
+                        self.runtime.command(['docker','start',row['Id']])
+                    while True:
+                        self.runtime.budget(1)
+                        current=self.completed_provider_rows()[role]
+                        if current['State']['Running'] and current['State'].get('Health',{}).get('Status')=='healthy':break
+                        __import__('time').sleep(self.runtime.budget(1))
+                    if role=='native:db':
+                        schema=self.native()
+                        require_normal_migration_boundary(self.contract,schema,self.root,Path('/var/lib/madar/releases'))
+                        if schema!=self.profile.target:raise RuntimeError('completed_boot_provider_schema_changed')
+        self.event('completed_native_providers_ready',schema=self.profile.target)
+
     def resume(self):
         self.guard();self.proxy_identity();self.event('begin')
         if self.profile is not LEGACY and not (self.root/'candidate-runtime.json').exists():
@@ -360,6 +445,7 @@ class CompletedNormalBootActor:
             actor,kernel=self.origin()
             actor.candidate.require_write_authority(actor.candidate.contract,'NORMAL')
             return kernel.execute()
+        self.resume_completed_providers()
         kernel=self.candidate();grant=require_candidate_authority(self.contract)
         if grant['mode']=='NORMAL':
             # Native PostgreSQL may still be warming up after Docker/host

@@ -158,7 +158,8 @@ class CompatibleNormalBoot:
             self._converge(normal=normal)
 
     def _start(self, rows):
-        for kind in ('redis','parser-worker','remote-ingestion-worker','backend','frontend',*WORKERS):
+        gateway = ('provider-gateway',) if 'provider-gateway' in rows else ()
+        for kind in ('redis','parser-worker',*gateway,'remote-ingestion-worker','backend','frontend',*WORKERS):
             self.source_guard()
             actual=next(iter(self.runtime.inspect([rows[kind]['Id']]).values()))
             if not actual['State']['Running']:

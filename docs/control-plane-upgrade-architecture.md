@@ -3260,3 +3260,16 @@ policy and effect-boundary checks remain mandatory. An expired isolated policy
 still refuses boot. Preserve the completed operation separately from that failed
 availability test, retire its owned resources, and obtain fresh evidence in a new
 scope; never extend expired registration or replay consumed approval.
+
+For an independently enrolled historical origin whose canonical upgrade has a
+verified NORMAL completion, the existing boot actor must explicitly restore the
+pinned native providers: database first, then Auth, REST, storage and the native
+gateway. It verifies the complete admitted container inventory, the candidate
+publication and exclusive worker owner before starting anything. Missing
+completion, changed actors/networks, active original writers, or early ingress
+refuse. After database health, it observes the actual system/schema and verifies
+the committed migration boundary before starting any other provider. It does
+not replay role restoration or migration effects. The existing compatible boot
+kernel starts the sealed private candidate gateway before backend and workers.
+These changes require fresh real guest reboot acceptance; component tests alone
+do not establish unattended availability.
