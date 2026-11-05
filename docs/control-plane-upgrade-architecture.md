@@ -3448,3 +3448,12 @@ The source-controlled historical backup producer checks this before fencing or
 backup effects. Existing packets are never extended or rebound. Routine
 ninety-minute evidence retains its existing upper bound. A short remaining
 lifetime requires retirement and genuinely new scoped evidence.
+
+Fresh F04 environment and historical-origin enrollment now use that same
+original supervisor deadline. Their previous two-hour producer constants could
+not cover the required preparation and recovery window. Both existing producers
+are source-controlled, pass bounded epoch deadlines to the actual guest, and
+revalidate time there. Existing consumed origins cannot be repinned. Routine
+enrollment retains its two-hour cap. This applies only before new disposable
+enrollment; signed prior policies, enrollment receipts and consumed approvals
+are never extended. The installed verifier's four-hour maximum is unchanged.

@@ -36,6 +36,28 @@ def phases(fault_boundary=None):
 RECOVERY_PREPARATION_RESERVE = 1800
 
 
+def fresh_historical_enrollment_expiry(manifest, *, now):
+    """Plan new disposable enrollment only, capped by its original owner lifetime."""
+    from datetime import datetime
+    lifetime=manifest.get('max_lifetime_seconds')
+    if type(now) is not int or type(lifetime) is not int or not 0<lifetime<=10800:
+        raise RuntimeError('canonical_fresh_enrollment_lifetime_invalid')
+    try:
+        created=datetime.fromisoformat(manifest['created_at'])
+        if created.tzinfo is None:raise ValueError('timezone required')
+        start=int(created.timestamp())
+    except (KeyError,TypeError,ValueError,OverflowError):
+        raise RuntimeError('canonical_fresh_enrollment_lifetime_invalid') from None
+    if start>now:raise RuntimeError('canonical_fresh_enrollment_lifetime_invalid')
+    boundary=manifest.get('fault_boundary');phases(boundary)
+    deadline=min(start+lifetime,now+(10800 if boundary else 7200))
+    if boundary:
+        fresh_recovery_expiry(now=now,origin_deadline=deadline,
+                              supervisor_deadline=deadline,fault_boundary=boundary)
+    elif deadline<=now:raise RuntimeError('canonical_fresh_enrollment_expired')
+    return deadline
+
+
 def fresh_recovery_expiry(*, now, origin_deadline, supervisor_deadline, fault_boundary=None):
     """Budget NEW evidence before backup effects, never extend an existing receipt.
 

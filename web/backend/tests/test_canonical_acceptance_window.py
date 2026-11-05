@@ -57,6 +57,50 @@ class AcceptanceWindowTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'fault_scope_unsupported'):
             window.phases('arbitrary-resumption')
 
+    def test_fresh_enrollment_chain_fits_original_supervisor_without_renewal(self):
+        from datetime import datetime,timezone
+        manifest={'created_at':datetime.fromtimestamp(1000,timezone.utc).isoformat(),
+                  'max_lifetime_seconds':10800,'fault_boundary':'ingress_finalization'}
+        before=dict(manifest)
+        expiry=window.fresh_historical_enrollment_expiry(manifest,now=1300)
+        self.assertEqual(expiry,11800)
+        backup=window.fresh_recovery_expiry(now=1900,origin_deadline=expiry,
+            supervisor_deadline=11800,fault_boundary='ingress_finalization')
+        window.require_window(self.registration(backup),now=3700,
+            supervisor_deadline=11800,fault_boundary='ingress_finalization')
+        self.assertEqual(manifest,before)
+        with self.assertRaisesRegex(RuntimeError,'preparation_window_insufficient'):
+            window.fresh_historical_enrollment_expiry(manifest,now=4061)
+        for change in ({'max_lifetime_seconds':10801},{'max_lifetime_seconds':True},
+                       {'created_at':'2026-11-05T00:00:00'},{'created_at':'invalid'}):
+            with self.subTest(change=change),self.assertRaisesRegex(RuntimeError,'lifetime_invalid'):
+                window.fresh_historical_enrollment_expiry(dict(manifest,**change),now=1300)
+        routine=dict(manifest);routine.pop('fault_boundary')
+        self.assertEqual(window.fresh_historical_enrollment_expiry(routine,now=1300),8500)
+
+    def test_real_environment_producer_passes_bounded_epoch_to_remote_guard(self):
+        import json,runpy,tempfile,time,types,sys
+        from unittest.mock import patch,Mock
+        from datetime import datetime,timezone
+        now=int(time.time())
+        class Captured(Exception):pass
+        with tempfile.TemporaryDirectory() as tmp:
+            rpc=types.ModuleType('automatic_rpc');rpc.EVIDENCE=Path(tmp)
+            rpc.MANIFEST={'created_at':datetime.fromtimestamp(now,timezone.utc).isoformat(),
+                          'max_lifetime_seconds':10800,'fault_boundary':'ingress_finalization'}
+            def capture(code,**kwargs):
+                compile(code,'real-environment-producer','exec')
+                self.assertIn('ENROLLMENT_DEADLINE='+str(now+10800),code)
+                self.assertIn("assert not Path('/etc/madar/release-approval.key').exists()",code)
+                self.assertIn('datetime.fromtimestamp(ENROLLMENT_DEADLINE,timezone.utc)',code)
+                raise Captured()
+            rpc.call=Mock(side_effect=capture)
+            with patch.dict(sys.modules,{'automatic_rpc':rpc,'canonical_acceptance_window':window}),patch('time.time',return_value=now):
+                with self.assertRaises(Captured):
+                    runpy.run_path(str(path.parent/'enroll-historical-test-environment.py'))
+            self.assertEqual(rpc.call.call_count,1)
+            self.assertEqual(list(Path(tmp).iterdir()),[])
+
     def test_fresh_fault_evidence_covers_preparation_and_full_window(self):
         expiry=window.fresh_recovery_expiry(now=1000,origin_deadline=11000,
             supervisor_deadline=10000,fault_boundary='ingress_finalization')
