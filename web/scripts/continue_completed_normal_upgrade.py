@@ -107,13 +107,13 @@ def main():
         raise RuntimeError('completed_upgrade_boot_isolated_root_required')
     parser=argparse.ArgumentParser()
     parser.add_argument('mode',choices=('capture-inventory','verify-candidate','preflight','execute','forward-preflight','forward-resume','boot','proxy-gate',
-        'prepare-isolated-images','approval-prepare','approval-inspect','approval-approve','approval-reject','approval-revoke','approved-execute'))
+        'prepare-isolated-images','approval-prepare','approval-inspect','approval-approve','approval-reject','approval-revoke','approved-execute','recovery-prepare','recovery-execute'))
     for name in ('source-package','approved-source','approved-plan'):parser.add_argument('--'+name,required=True)
     parser.add_argument('--resumption-plan');parser.add_argument('--approved-resumption')
     parser.add_argument('--request-id');parser.add_argument('--confirm-request-digest')
     args=parser.parse_args();package=Path(args.source_package)
-    review=args.mode.startswith('approval-');approved_execution=args.mode=='approved-execute';controlled=review or approved_execution
-    mutation=args.mode in {'approval-approve','approval-reject','approval-revoke','approved-execute'}
+    review=args.mode.startswith(('approval-','recovery-'));recovery_execution=args.mode=='recovery-execute';approved_execution=args.mode in {'approved-execute','recovery-execute'};controlled=review or approved_execution
+    mutation=args.mode in {'approval-approve','approval-reject','approval-revoke','approved-execute','recovery-execute'}
     if not controlled and (args.request_id or args.confirm_request_digest):parser.error('approval arguments require an approval action')
     if controlled and (args.resumption_plan or args.approved_resumption):parser.error('approval cannot mix with forward recovery')
     if controlled and ((args.mode=='approval-prepare')==bool(args.request_id)):parser.error('approval preparation creates a request; other approval actions require its exact UUID')
@@ -199,12 +199,17 @@ def main():
             if controlled:
                 from deployment.lib import exceptional_release_approval as approval
                 actor.ops.canonical_exceptional_driver=driver
-                if args.mode=='approval-prepare':result=approval.create_canonical(actor.ops)
+                if args.mode=='recovery-prepare':
+                    from deployment.lib.completed_normal_maintenance_recovery import create
+                    result=create(actor.ops,args.request_id)
+                elif args.mode=='approval-prepare':result=approval.create_canonical(actor.ops)
                 elif args.mode=='approval-inspect':result=approval.inspect(actor.ops,args.request_id)
                 else:
                     if approved_execution:
                         status=approval.inspect(actor.ops,args.request_id)
-                        if (status['request'] is None or status['request']['admission'].get('kind')!=approval.CANONICAL_KIND
+                        from deployment.lib.completed_normal_maintenance_recovery import KIND as RECOVERY_KIND
+                        required_kind=RECOVERY_KIND if recovery_execution else approval.CANONICAL_KIND
+                        if (status['request'] is None or status['request']['admission'].get('kind')!=required_kind
                                 or status['request']['admission'].get('contract')!=driver.contract
                                 or status['request_sha256']!=args.confirm_request_digest
                                 or status['state']!='APPROVED' or status['consumed']):
@@ -215,10 +220,13 @@ def main():
                     else:token=sys.stdin.read(16385).strip()
                     if not token or len(token)>16384:raise RuntimeError('release_operator_credential_invalid')
                     if approved_execution:
-                        actor.ops.canonical_exceptional_admission=status['request']['admission']
-                        actor.ops.exceptional_operator_token=token
-                        try:result=driver.execute()
-                        finally:actor.ops.exceptional_operator_token=None
+                        if recovery_execution:
+                            result=driver.recover_maintenance_finalization(status['request']['admission'],token)
+                        else:
+                            actor.ops.canonical_exceptional_admission=status['request']['admission']
+                            actor.ops.exceptional_operator_token=token
+                            try:result=driver.execute()
+                            finally:actor.ops.exceptional_operator_token=None
                     else:result=approval.decide(actor.ops,args.request_id,args.mode.removeprefix('approval-'),token,args.confirm_request_digest)
             else:result=driver.preflight() if args.mode=='preflight' else driver.execute()
         finally:actor.ops.close_locks()

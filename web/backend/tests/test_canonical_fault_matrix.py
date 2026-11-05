@@ -5,7 +5,8 @@ import subprocess
 import sys
 import unittest
 
-spec=importlib.util.spec_from_file_location('canonical_fault_matrix',Path(__file__).resolve().parents[2]/'staging/integration/canonical_fault_matrix.py')
+root=Path(os.getenv('MADAR_TEST_REPOSITORY_ROOT') or Path(__file__).resolve().parents[2])
+spec=importlib.util.spec_from_file_location('canonical_fault_matrix',root/'staging/integration/canonical_fault_matrix.py')
 f=importlib.util.module_from_spec(spec);spec.loader.exec_module(f)
 
 def observation(boundary):

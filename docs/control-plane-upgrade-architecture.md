@@ -3383,3 +3383,39 @@ The root-controlled fault plan also pins the adapter and helper file digests.
 Under isolated Python, the adapter explicitly loads that root-protected helper;
 ambient module lookup cannot substitute it. This plan is test targeting policy,
 not an approval or a continuation grant.
+
+## Independently approved maintenance finalization recovery
+
+The existing exceptional issuer supports an opt-in version3 canonical policy
+with exactly `recovery_actions: ["finalize-target160-v1"]`. Version1/2 policies
+retain their previous authority and cannot authorize this action. A fresh
+recovery request uses the same signed journals, deliberate AAL2 approval,
+revocation, expiry and consumption machinery. It binds the immutable parent
+request/approval/consumption/audit, exact source/context/database, provider
+journal, actual schema160, protected canonical migration history, worker owner,
+route, runtime inventory and current data fingerprint. Parent authority remains
+consumed and unchanged. Actual upgrade/deployment locks and fresh observations
+precede recovery consumption. A live parent, changed observation, ambiguous
+provider intent, partial SQL, wrong ownership or absent recovery policy refuses.
+
+The sealed continuation entrypoint exposes `recovery-prepare --request-id
+<PARENT>` and `recovery-execute --request-id <NEW-RECOVERY-REQUEST>`; ordinary
+approval inspect/approve/reject/revoke actions operate on the new request. The
+same explicit digest confirmation and protected token input apply. Recovery
+execution uses the existing root credential issuer and maintenance finalization
+routine. It cannot dispatch child prepare/activate/adopt, migration resumption,
+SQL or new worker/route transfer. Existing target services, private/public
+acceptance, current NORMAL grant and provider effects must actually verify
+before boot release, backup-timer restoration, genuine completion and known-good
+publication. It never manufactures historical completion or renews deployment
+approval. The fresh request has a separate execution deadline bounded by the
+independent environment, origin and recovery evidence; old expiry is not edited.
+
+This first adapter supports only the finite matrix's post-adoption/pre-final
+completion boundary. Pre-SQL return, committed-SQL forward activation and
+worker-handoff recovery remain unsupported engineering work. Safe fencing is
+not recovered availability. Source/component tests do not establish installed
+fault, recovered application, reboot or production acceptance. Extracting the
+shared finalization body affects the ordinary success tail, so its operational
+success/reboot acceptance must be repeated at the corrected source;938e2ace
+receipts remain specific to938e2ace.

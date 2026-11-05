@@ -725,6 +725,135 @@ class CompletedNormalUpgrade:
                         if self.lock is not None:os.close(self.lock)
                     finally:self.lock=None
 
+    def maintenance_recovery_components(self):
+        from .schema150_provider_adapter import Schema150ProviderAdapter
+        from .schema150_provider_lifecycle import ProviderMaintenance150,ProtectedProviderJournal
+        binding={'operation':self.profile.operation,'context_sha256':digest(self.contract),
+            'source_sha':self.contract['candidate']['source_sha'],'controller_sha':self.controller,
+            'inventory_sha256':self.contract['writer_inventory_sha256'],
+            'system_identifier':self.contract['database']['system_identifier'],
+            'source_schema':self.profile.source,'target_schema':self.profile.target}
+        provider=Schema150ProviderAdapter(self.contract,binding,self.actor.runtime,
+            source_guard=self.actor.guard,lock_descriptors=(self.lock,self.ops.deploy_lock_descriptor),
+            acceptance_guard=self.maintenance_acceptance_guard,activation_guard=self.maintenance_activation_guard)
+        self.provider_adapter=provider
+        return provider,ProviderMaintenance150(binding,ProtectedProviderJournal(self.root/'provider-journal'),provider)
+
+    def observe_maintenance_finalization(self):
+        """Read-only exact F04 state; earlier or ambiguous effects are not resumed."""
+        from .completed_normal_profile import RECONCILED
+        from .completed_normal_database import require_normal_migration_boundary
+        from .schema150_provider_lifecycle import STEPS
+        if self.profile is not RECONCILED:
+            raise RuntimeError('maintenance_recovery_profile_invalid')
+        self.actor.guard();self.artifact_guard();self.rehearsal_guard()
+        if any((self.root/name).exists() for name in ('normal-completion.json','normal-acceptance.json','failure.json')):
+            raise RuntimeError('maintenance_recovery_finalization_state_unsupported')
+        events=protected(self.root/'boot-events.jsonl',private=True).read_text().splitlines()
+        if not events or json.loads(events[-1]).get('phase')!='service_adopt_completed':
+            raise RuntimeError('maintenance_recovery_finalization_boundary_required')
+        schema=self.actor.native()
+        if schema!=160:raise RuntimeError('maintenance_recovery_committed_target_required')
+        require_normal_migration_boundary(self.contract,schema,self.root,self.ops.state_root)
+        grant=require_candidate_authority(self.contract,mode='NORMAL')
+        provider,lifecycle=self.maintenance_recovery_components()
+        records,completed,pending,ready=lifecycle._state()
+        if pending or not ready or completed!=list(STEPS[:-1]):
+            raise RuntimeError('maintenance_recovery_provider_effect_ambiguous')
+        stage=json.loads(protected(self.root/'candidate-runtime.json',private=True).read_bytes())
+        owner_path=readonly_configuration(self.ops.state_root/'worker-ownership.json',private=True)
+        owner=json.loads(owner_path.read_bytes())
+        if (owner.get('owner')!='CANDIDATE' or owner.get('generation')!=stage.get('worker_generation')
+                or owner.get('candidate')!={'sha':self.contract['candidate']['source_sha'],'slot':self.contract['candidate']['slot']}
+                or owner.get('old')!={'sha':self.contract['source_roles']['application_sha'],'slot':self.contract['origin']['slot']}):
+            raise RuntimeError('maintenance_recovery_worker_ownership_changed')
+        from .emergency_routing_repair import UPSTREAM
+        route=readonly_configuration(UPSTREAM,private=False).read_bytes()
+        if route!=provider.target_route():raise RuntimeError('maintenance_recovery_route_changed')
+        ids=self.actor.runtime.command(['docker','ps','-aq','--no-trunc']).split()
+        rows=self.actor.runtime.inspect(ids)
+        actors={r['Id']:{'image':r['Image'],'configuration_sha256':digest(r['Config']),
+            'host_sha256':digest(r['HostConfig']),'running':r['State']['Running'],
+            'restarting':r['State']['Restarting'],'status':r['State']['Status']}
+            for r in rows.values()}
+        names=('migration-intent.json','migration-completion.json','migration-execution.json',
+            'migration-manifest.json','migration-customer-preservation.json','candidate-runtime.json',
+            'post-migration-backup.json','target-route-publication.json','provider-barrier.json')
+        original=json.loads(protected(self.root/'pre-migration-customer-snapshot.json',private=True).read_bytes())
+        current=migration_customer_snapshot(self.contract,self.actor.runtime,columns=original['columns'])
+        self.actor.guard()
+        return {'schema':schema,'database_system_identifier':self.contract['database']['system_identifier'],
+            'boot_id':Path('/proc/sys/kernel/random/boot_id').read_text().strip(),
+            'phase':'service_adopt_completed','files':{n:file_digest(protected(self.root/n,private=True)) for n in names},
+            'provider_journal_sha256':digest(records),'grant_sha256':digest(grant),
+            'worker_owner_sha256':file_digest(owner_path),'route_sha256':hashlib.sha256(route).hexdigest(),
+            'actors_sha256':digest(actors),'current_data_sha256':digest(current)}
+
+    def recover_maintenance_finalization(self,value,token):
+        """Freshly approved F04 only; no SQL, prepare, activate, adopt or grant replay."""
+        from . import completed_normal_maintenance_recovery as recovery
+        from .exceptional_release_approval import execution_event
+        if os.geteuid()!=0 or self.lock is not None:
+            raise RuntimeError('maintenance_recovery_root_idle_required')
+        self.lock=acquire_lock(self.ops.upgrade_root/'upgrade.lock',create=False)
+        consumed=False
+        try:
+            self.ops.automatic_upgrade_lock=self.lock
+            self.ops.deploy_lock_descriptor=acquire_lock(self.ops.state_root/'deploy.lock',create=False)
+            recovery.verify(self.ops,value,consume=True,token=token);consumed=True
+            self.ops.canonical_maintenance_recovery=value
+            self.phase='maintenance_recovery_finalization'
+            execution_event(self.ops,value,'EXECUTING',{'parent_request_id':value['parent_request_id']})
+            with self.root_credential():
+                provider,lifecycle=self.maintenance_recovery_components()
+                provider.verify_target_route()
+                self.acceptance_guard(schema=160,normal=True)
+                final=json.loads(protected(self.root/'post-migration-backup.json',private=True).read_bytes())
+                result=self.finish_maintenance(self.actor.candidate(),lifecycle,final,historical=True,value=value)
+            self.ops.clear_interlock()
+            return {'action':recovery.ACTION,'recovery_request_id':value['request_id'],
+                'parent_request_id':value['parent_request_id'],'completion':result,'migration_sql_executed':False}
+        except Exception as error:
+            if consumed:
+                try:
+                    from .exceptional_release_approval import inspect
+                    if inspect(self.ops,value['request_id'])['state'] in {'AUTHORIZED_FOR_EXECUTION','EXECUTING','VERIFYING'}:
+                        execution_event(self.ops,value,'RECOVERY_REQUIRED',{'error_type':type(error).__name__})
+                finally:
+                    self.fenced=True;self.failure(error)
+            raise
+        finally:
+            try:self.ops.clear_authorization()
+            finally:
+                self.ops.canonical_maintenance_recovery=None
+                self.ops.close_locks()
+                if self.lock is not None:os.close(self.lock)
+                self.lock=None
+
+    def finish_maintenance(self,kernel,lifecycle,final,*,historical,value):
+        """Common accepted finalization; callers must hold fresh authority and both locks."""
+        from deployment.lib.exceptional_release_approval import execution_event
+        kernel.round(normal=True)
+        result={'operation':self.profile.operation,'context_sha256':digest(self.contract),'schema':self.profile.target,'mode':'NORMAL',
+            'application_sha':self.contract['candidate']['source_sha'],'controller_sha':self.controller,
+            'images':self.contract['candidate']['images'],'backup':final,'customer_database_restored':False}
+        exclusive(self.root/'normal-acceptance.json',encoded(result))
+        if historical:
+            execution_event(self.ops,value,'VERIFYING',{'acceptance_sha256':file_digest(self.root/'normal-acceptance.json')})
+        # Public acceptance precedes boot release; final completion is
+        # published only after that independently observed effect.
+        lifecycle.activate_after_grant()
+        self.ops.restore_backup_timers()
+        exclusive(self.root/'normal-completion.json',encoded(result))
+        from deployment.lib.completed_normal_baseline import seal_compatible_release
+        seal_compatible_release(self.contract,self.root,self.ops.state_root)
+        self.event('normal_completed',schema=self.profile.target,mode='NORMAL')
+        if historical:
+            execution_event(self.ops,value,'COMPLETED',{'context_sha256':digest(self.contract),
+                'completion_path':str(self.root/'normal-completion.json'),
+                'completion_sha256':file_digest(protected(self.root/'normal-completion.json',private=True))})
+        return result
+
     def _execute_maintenance(self):
         """Maintenance first; never publish a schema146 candidate bridge.
 
@@ -876,25 +1005,7 @@ class CompletedNormalUpgrade:
                     self.event('post_migration_backup_pending')
                     final=CompletedNormalBackupContext(self.contract,self.document,self.package,kernel,
                         stage='post-migration',source_guard=self.actor.guard,artifact_guard=self.artifact_guard).capture()
-                kernel.round(normal=True)
-                result={'operation':self.profile.operation,'context_sha256':digest(self.contract),'schema':self.profile.target,'mode':'NORMAL',
-                    'application_sha':self.contract['candidate']['source_sha'],'controller_sha':self.controller,
-                    'images':self.contract['candidate']['images'],'backup':final,'customer_database_restored':False}
-                exclusive(self.root/'normal-acceptance.json',encoded(result))
-                if historical:
-                    execution_event(self.ops,value,'VERIFYING',{'acceptance_sha256':file_digest(self.root/'normal-acceptance.json')})
-                # Public acceptance precedes boot release; final completion is
-                # published only after that independently observed effect.
-                lifecycle.activate_after_grant()
-                self.ops.restore_backup_timers()
-                exclusive(self.root/'normal-completion.json',encoded(result))
-                from deployment.lib.completed_normal_baseline import seal_compatible_release
-                seal_compatible_release(self.contract,self.root,self.ops.state_root)
-                self.event('normal_completed',schema=self.profile.target,mode='NORMAL')
-                if historical:
-                    execution_event(self.ops,value,'COMPLETED',{'context_sha256':digest(self.contract),
-                        'completion_path':str(self.root/'normal-completion.json'),
-                        'completion_sha256':file_digest(protected(self.root/'normal-completion.json',private=True))})
+                result=self.finish_maintenance(kernel,lifecycle,final,historical=historical,value=value if historical else None)
             self.ops.clear_interlock()
             return result
         except Exception as error:

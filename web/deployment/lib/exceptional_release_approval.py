@@ -74,10 +74,11 @@ def _policy_material(execution,database_system_identifier):
     fields={'version','policy_id','environment_id','database_system_identifier','controller_sha',
         'enabled','contracts','approval_key_sha256','max_approval_seconds','max_request_seconds',
         'max_table_bytes','max_table_rows','relation_owner','require_physical_restore','physical_recovery_receipt_sha256'}
-    canonical_policy=isinstance(p,dict) and type(p.get('version')) is int and p['version']==2
+    canonical_policy=isinstance(p,dict) and type(p.get('version')) is int and p['version'] in (2,3)
+    if isinstance(p,dict) and p.get('version')==3:fields.add('recovery_actions')
     if canonical_policy:
         fields=(fields-{'max_table_bytes','max_table_rows','relation_owner'})|{'canonical_scope','execution_max_seconds'}
-    if (not isinstance(p,dict) or set(p)!=fields or type(p['version']) is not int or p['version'] not in {1,2}
+    if (not isinstance(p,dict) or set(p)!=fields or type(p['version']) is not int or p['version'] not in {1,2,3}
             or p['enabled'] is not True or not re.fullmatch('[a-zA-Z0-9_-]{1,128}',str(p['policy_id']))
             or p['environment_id']!=execution['environment_id']
             or p['database_system_identifier']!=database_system_identifier
@@ -91,6 +92,8 @@ def _policy_material(execution,database_system_identifier):
             or any(type(p[k]) is not int or not 0<p[k]<=limit for k,limit in
                 (('max_approval_seconds',300),('max_request_seconds',600)))):
         raise RuntimeError('exceptional_policy_not_enrolled')
+    if p['version']==3 and p['recovery_actions']!=['finalize-target160-v1']:
+        raise RuntimeError('exceptional_recovery_policy_invalid')
     if canonical_policy:
         validate_canonical_scope(p['canonical_scope'])
         if type(p['execution_max_seconds']) is not int or not 0<p['execution_max_seconds']<=10800:
@@ -158,7 +161,7 @@ def observe_canonical(system,request_id,*,created_at=None,expires_at=None):
     from .automatic_release_admission import PHYSICAL_RECOVERY
     from .completed_normal_admission import digest as context_digest
     p,_=policy(system);driver=canonical_driver(system);scope=canonical_scope(driver)
-    if (p['version']!=2 or p['contracts']!=[CANONICAL] or p['canonical_scope']!=scope
+    if (p['version'] not in (2,3) or p['contracts']!=[CANONICAL] or p['canonical_scope']!=scope
             or driver.document.get('independent_recovery')!={'receipt_sha256':p['physical_recovery_receipt_sha256']}
             or driver.contract['database']['system_identifier']!=p['database_system_identifier']
             or driver.controller!=p['controller_sha']):
@@ -181,6 +184,9 @@ def observe_canonical(system,request_id,*,created_at=None,expires_at=None):
 
 
 def reobserve_review(system,value):
+    from .completed_normal_maintenance_recovery import KIND,observe
+    if value.get('kind')==KIND:
+        return observe(system,value['parent_request_id'],value['request_id'],created_at=value['created_at'],expires_at=value['expires_at'])
     if value.get('kind')==CANONICAL_KIND:
         return observe_canonical(system,value['request_id'],created_at=value['created_at'],expires_at=value['expires_at'])
     return system.reobserve_automatic_admission(value)
@@ -192,7 +198,7 @@ def create_canonical(system):
     from .schema160_release import captured_source
     from .migration_risk import analyze
     p,key=policy(system);driver=canonical_driver(system)
-    if p['version']!=2:raise RuntimeError('exceptional_canonical_policy_required')
+    if p['version'] not in (2,3):raise RuntimeError('exceptional_canonical_policy_required')
     require_no_pending_operation();request_id=str(uuid.uuid4())
     with journal_lock(request_id) as path:
         event(path,key,'DISCOVERED',{'source_sha':driver.controller,'requested_by':'controller:'+system.installed_sha()})
@@ -531,7 +537,8 @@ def verify_execution(value,system,*,consume=False,token=None):
 
 def execution_event(system,value,state,detail):
     p,key=audit_policy(system)
-    x=canonical_admission_scope(value) if value.get('kind')==CANONICAL_KIND else validate_extension(value)
+    from .completed_normal_maintenance_recovery import KIND,validate
+    x=validate(value) if value.get('kind')==KIND else (canonical_admission_scope(value) if value.get('kind')==CANONICAL_KIND else validate_extension(value))
     if digest(p)!=x['policy_sha256']:
         raise RuntimeError('exceptional_policy_changed')
     with journal_lock(x['request_id']) as path:
@@ -583,7 +590,7 @@ def verify_canonical_execution(value,system,*,consume=False,token=None):
     require_owned_lock(getattr(system,'automatic_upgrade_lock',None),system.upgrade_root/'upgrade.lock')
     require_owned_lock(system.deploy_lock_descriptor,system.state_root/'deploy.lock')
     p,key=policy(system) if consume else audit_policy(system)
-    if (p['version']!=2 or p['contracts']!=[CANONICAL] or x['policy_sha256']!=digest(p)
+    if (p['version'] not in (2,3) or p['contracts']!=[CANONICAL] or x['policy_sha256']!=digest(p)
             or p['canonical_scope']!={k:x[k] for k in p['canonical_scope']}
             or value['controller_sha']!=p['controller_sha']
             or value['contract']['database']['system_identifier']!=p['database_system_identifier']
@@ -636,6 +643,10 @@ def verify_canonical_execution(value,system,*,consume=False,token=None):
 
 
 def require_canonical_execution(system,contract):
+    recovery=getattr(system,'canonical_maintenance_recovery',None)
+    if recovery is not None:
+        from .completed_normal_maintenance_recovery import require_lease
+        return require_lease(system,contract,recovery)
     value=getattr(system,'canonical_exceptional_admission',None)
     if not isinstance(value,dict) or value.get('kind')!=CANONICAL_KIND or value.get('contract')!=contract:
         raise RuntimeError('schema160_exceptional_execution_approval_required')

@@ -2879,6 +2879,10 @@ print(hashlib.sha256(keys[0].encode()).hexdigest())
         completed_normal_mode: str | None = None,
         automatic_release_admission: dict | None = None,
     ) -> None:
+        if getattr(self,'canonical_maintenance_recovery',None) is not None and (
+                completed_normal_contract is None or completed_normal_mode is not None
+                or migration_resumption is not None or recovery or automatic_release_admission is not None):
+            raise UpgradeError('maintenance_recovery_finalization_only')
         if completed_normal_mode is not None and completed_normal_contract is None:
             raise UpgradeError('completed_normal_deploy_contract_required')
         require_root_directory(self.runtime_root, mode=0o711)
