@@ -25,8 +25,8 @@ import {
   Users,
 } from "lucide-react";
 import { STORAGE_KEY } from "../PageBuilder/core/PageBuilder.constants";
-import { getProductionTenantUrl } from "../PageBuilder/core/PageBuilder.routing";
 import { getBuilderWorkspacePath } from "../PageBuilder/core/PageBuilder.workspaceRouting";
+import { buildCanonicalTenantUrl } from "../../utils/hostedAddress";
 import WeeklyScreenTimePanel from "./WeeklyScreenTimePanel";
 import { fetchSiteVisitMetrics } from "../../services/siteVisitApi";
 import { fetchEcommerceDashboardSummary } from "../../services/ecommerceApi";
@@ -39,6 +39,7 @@ import {
 import {
   fetchBuilderSiteMembers,
   fetchBuilderStorageUsage,
+  fetchWebsiteSettings,
   listBuilderProjects,
   listBuilderReservations,
 } from "../PageBuilder/services/PageBuilder.api";
@@ -302,18 +303,19 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
 
       const projectRequest = listBuilderProjects({ limit: 100 }).catch(() => null);
       const ecommerceRequest = fetchEcommerceDashboardSummary({ scope: cacheScope }).catch(() => null);
+      const websiteSettingsRequest = fetchWebsiteSettings(cacheScope).catch(() => null);
       const membersRequest = projectRequest.then(result => Promise.all((result?.projects || []).map(record => {
         const id = record?.id || record?.project_id;
         return id ? fetchBuilderSiteMembers(id).catch(() => null) : Promise.resolve([]);
       })));
-      const [projectResult, storage, reservations, visitMetrics, ecommerceSummary] = await Promise.all([
+      const [projectResult, storage, reservations, visitMetrics, ecommerceSummary, websiteSettings] = await Promise.all([
         projectRequest,
         fetchBuilderStorageUsage().catch(() => null),
         loadAllReservations().catch(() => null),
         fetchSiteVisitMetrics().catch(() => null),
         ecommerceRequest,
+        websiteSettingsRequest,
       ]);
-      if (!projectResult && cachedMetrics) throw new Error("Dashboard refresh unavailable");
       const records = projectResult?.projects || [];
 
       const remoteProjects = records.map(parseProjectSchema).filter(Boolean);
@@ -325,6 +327,7 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
             ? [localProject]
             : [];
       const primaryProject = projects[0] || null;
+      const hasProjectSnapshot = Boolean(projectResult || localProject);
       const primaryRecord = records[0] || null;
       const projectId = String(
         primaryRecord?.id || primaryRecord?.project_id || primaryProject?.id || ""
@@ -334,17 +337,26 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
         storage ? Number(storage.used_bytes || 0) + Number(storage.reserved_bytes || 0) : Number(cachedMetrics?.usedBytes || 0);
       const commerceCatalog = ecommerceSummary?.catalog || {};
       const commerceSales = ecommerceSummary?.sales || {};
+      const tenantSubdomain = String(
+        websiteSettings?.subdomain || websiteSettings?.standard_path_slug || ""
+      ).trim();
+      const canonicalWebsiteUrl = tenantSubdomain
+        ? buildCanonicalTenantUrl(tenantSubdomain)
+        : "";
+      const canonicalStoreUrl = tenantSubdomain
+        ? buildCanonicalTenantUrl(tenantSubdomain, "/shop")
+        : "";
 
       const nextMetrics = {
-        projects: projects.length,
-        forms: projects.reduce(
+        projects: hasProjectSnapshot ? projects.length : Number(cachedMetrics?.projects || 0),
+        forms: hasProjectSnapshot ? projects.reduce(
           (total, project) => total + (Array.isArray(project?.forms) ? project.forms.length : 0),
           0
-        ),
-        reservationForms: projects.reduce(
+        ) : Number(cachedMetrics?.forms || 0),
+        reservationForms: hasProjectSnapshot ? projects.reduce(
           (total, project) => total + countReservationForms(project),
           0
-        ),
+        ) : Number(cachedMetrics?.reservationForms || 0),
         newReservations: reservations ? reservations.filter(
           (reservation) => String(reservation?.status || "new").toLowerCase() === "new"
         ).length : Number(cachedMetrics?.newReservations || 0),
@@ -354,10 +366,18 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
         usedBytes,
         quotaBytes: Number(storage?.quota_bytes ?? cachedMetrics?.quotaBytes ?? 0),
         permittedUsers: Number(cachedMetrics?.permittedUsers || 0),
-        permissionTypes: getPermissionTypes(projects),
-        projectId,
-        storeUrl: primaryProject ? getProductionTenantUrl(primaryProject, "/shop") : "",
-        websiteUrl: primaryProject ? getProductionTenantUrl(primaryProject) : "",
+        permissionTypes: hasProjectSnapshot
+          ? getPermissionTypes(projects)
+          : (cachedMetrics?.permissionTypes || []),
+        projectId: hasProjectSnapshot ? projectId : String(cachedMetrics?.projectId || ""),
+        storeUrl: ecommerceSummary
+          ? canonicalStoreUrl
+          : String(cachedMetrics?.storeUrl || ""),
+        websiteUrl: websiteSettings?.published_project_id
+          ? canonicalWebsiteUrl
+          : websiteSettings
+            ? ""
+            : String(cachedMetrics?.websiteUrl || ""),
         ecommerceProducts: Number(commerceCatalog.products ?? cachedMetrics?.ecommerceProducts ?? 0),
         ecommerceActiveProducts: Number(commerceCatalog.active_products ?? cachedMetrics?.ecommerceActiveProducts ?? 0),
         ecommerceTags: Number(commerceCatalog.tags ?? cachedMetrics?.ecommerceTags ?? 0),

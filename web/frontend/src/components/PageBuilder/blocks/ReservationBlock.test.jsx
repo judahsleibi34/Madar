@@ -8,6 +8,63 @@ import ReservationBlock from "./ReservationBlock";
 afterEach(cleanup);
 
 describe("ReservationBlock fixed slots", () => {
+  it("translates fixed booking fields, calendar controls and seat labels into Arabic", () => {
+    const props = { bookingMode: "restricted", availableDates: ["2026-08-07"], timeSlots: ["09:00"], sessionType: "group", seatCapacity: 3 };
+    const { rerender } = render(<ReservationBlock {...props} lang="ar" />);
+    expect(screen.getByLabelText("الاسم الكامل *")).toBeTruthy();
+    expect(screen.getByLabelText("البريد الإلكتروني *")).toBeTruthy();
+    expect(screen.getByLabelText("رقم الهاتف *")).toBeTruthy();
+    expect(screen.getByLabelText("عدد المقاعد المطلوبة")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "الشهر التالي" })).toBeTruthy();
+    expect(screen.getByText("الأوقات المتاحة")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /الساعة/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "إرسال طلب الحجز" })).toBeTruthy();
+    rerender(<ReservationBlock {...props} lang="en" />);
+    expect(screen.getByLabelText("Full name *")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Next month" })).toBeTruthy();
+  });
+  it("translates the empty fixed-slot state", () => {
+    render(<ReservationBlock lang="ar" bookingMode="restricted" availableDates={[]} />);
+    expect(screen.getByText("لا توجد مواعيد متاحة حاليًا.")).toBeTruthy();
+  });
+  it("submits a group seat quantity and validates the seat limit", async () => {
+    const submit = vi.fn().mockResolvedValue(false);
+    const { container } = render(<ReservationBlock bookingMode="restricted"
+      availableDates={["2026-08-07"]} timeSlotsByDate={{ "2026-08-07": ["09:00", "11:00"] }}
+      sessionSettingsByDate={{ "2026-08-07": { "09:00": { sessionType: "group", seatCapacity: 3 } } }}
+      formItems={[{ id: "availability", type: "availability", label: "Pick a session" }, { id: "send", type: "button", label: "Reserve seats" }]}
+      onSubmit={submit} submitLabel="Reserve seats" />);
+    fireEvent.click(screen.getByRole("button", { name: /August 7, 2026 at 9:00 AM/ }));
+    fireEvent.change(screen.getByLabelText("Seats to book"), { target: { value: "4" } });
+    fireEvent.submit(container.querySelector("form"));
+    expect(submit).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert").textContent).toBe("Choose between 1 and 3 seats.");
+    fireEvent.change(screen.getByLabelText("Seats to book"), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Reserve seats" }));
+    await waitFor(() => expect(submit).toHaveBeenCalled());
+    expect(submit.mock.calls[0][0].guests).toBe(2);
+    fireEvent.click(screen.getByRole("button", { name: /August 7, 2026 at 11:00 AM/ }));
+    expect(screen.queryByLabelText("Seats to book")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Reserve seats" }));
+    await waitFor(() => expect(submit).toHaveBeenCalledTimes(2));
+    expect(submit.mock.calls[1][0].guests).toBe(1);
+  });
+
+  it("offers weekly dates in later months and removes them when repetition is disabled", () => {
+    const props = {
+      bookingMode: "restricted", availableDates: ["2026-08-07"],
+      timeSlotsByDate: { "2026-08-07": ["09:00"] }, weeklyRepeatDates: ["2026-08-07"],
+    };
+    const { rerender } = render(<ReservationBlock {...props} />);
+    fireEvent.click(screen.getByRole("button", { name: "Next month" }));
+    const date = screen.getByRole("button", { name: "Friday, September 4, 2026, available" });
+    expect(date.disabled).toBe(false);
+    fireEvent.click(date);
+    expect(screen.getByRole("button", { name: /September 4, 2026 at 9:00 AM/i })).toBeTruthy();
+    rerender(<ReservationBlock {...props} weeklyRepeatDates={[]} />);
+    expect(screen.getByRole("button", { name: "Friday, September 4, 2026, unavailable" }).disabled).toBe(true);
+  });
+
   it("submits a selected configured date and time", async () => {
     const onSubmit = vi.fn().mockResolvedValue(false);
     const { container } = render(
@@ -184,6 +241,73 @@ describe("ReservationBlock fixed slots", () => {
 });
 
 describe("ReservationBlock custom form", () => {
+  it("translates the starter text inside an existing saved form in Arabic", () => {
+    const formItems = [
+      { id: "intro", type: "heading", text: "Reserve now", translations: { ar: { text: "احجز الآن" } } },
+      { id: "help", type: "paragraph", text: "Choose the service, date, and time that works for you." },
+      { id: "email", type: "email", label: "Email address", placeholder: "you@example.com" },
+      { id: "new", type: "heading", text: "New section heading" },
+      { id: "question", type: "text", label: "Your question", placeholder: "Type your answer" },
+      { id: "send", type: "button", label: "Send request" },
+    ];
+    const { rerender } = render(<ReservationBlock lang="ar" formItems={JSON.parse(JSON.stringify(formItems))} />);
+    expect(screen.getByRole("heading", { name: "احجز الآن" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "عنوان جديد" })).toBeTruthy();
+    expect(screen.getByText("اختر الخدمة والتاريخ والوقت المناسب لك.")).toBeTruthy();
+    expect(screen.getByLabelText("البريد الإلكتروني")).toBeTruthy();
+    expect(screen.getByPlaceholderText("اكتب إجابتك")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "إرسال الطلب" })).toBeTruthy();
+    rerender(<ReservationBlock lang="en" formItems={formItems} />);
+    expect(screen.getByLabelText("Your question")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Send request" })).toBeTruthy();
+  });
+  it("preserves the default service value in Arabic submissions", async () => {
+    const submit = vi.fn().mockResolvedValue(false);
+    render(<ReservationBlock lang="ar" fields={["service"]} onSubmit={submit} />);
+    fireEvent.click(screen.getByRole("button", { name: "إرسال طلب الحجز" }));
+    await waitFor(() => expect(submit).toHaveBeenCalled());
+    expect(submit.mock.calls[0][0].service).toBe("Consultation");
+  });
+  it("sets Arabic form flow and mirrors untranslated question controls", () => {
+    const { container, rerender } = render(<ReservationBlock lang="ar" formItems={[
+      { id: "name", type: "text", label: "Name", direction: "ltr" },
+      { id: "choice", type: "radio", label: "Choice", options: ["One"] },
+    ]} />);
+    expect(container.querySelector('form').dir).toBe("rtl");
+    expect(container.querySelector('.reservation-custom-form').dir).toBe("rtl");
+    expect(screen.getByLabelText("Name").dir).toBe("rtl");
+    expect(screen.getByRole("group", { name: "Choice" }).dir).toBe("rtl");
+    rerender(<ReservationBlock lang="en" formItems={[{ id: "name", type: "text", label: "Name", direction: "ltr" }]} />);
+    expect(container.querySelector('.reservation-custom-form').dir).toBe("ltr");
+  });
+  it("renders a saved divider between authored components", () => {
+    const { container } = render(<ReservationBlock formItems={[
+      { id: "intro", type: "heading", text: "Book a visit" },
+      { id: "line", type: "divider", layout: { desktop: { columns: 6, position: "center" } } },
+      { id: "send", type: "button", label: "Send request" },
+    ]} />);
+    const divider = screen.getByRole("separator");
+    expect(divider.getAttribute("aria-orientation")).toBe("horizontal");
+    expect(divider.style.getPropertyValue("--booking-desktop-span")).toBe("6");
+    expect(container.querySelector('.reservation-custom-form').children[1]).toBe(divider);
+  });
+  it("shows translated content but submits original choice values", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(false);
+    render(<ReservationBlock lang="ar" bookingMode="flexible" fields={[]} onSubmit={onSubmit}
+      formItems={[
+        { id: "intro", type: "heading", text: "Book", translations: { ar: { text: "احجز موعدك" } } },
+        { id: "note", type: "text", label: "Note", translations: { ar: { label: "ملاحظة", placeholder: "اكتب هنا" } } },
+        { id: "time", type: "radio", label: "Time", required: true, options: ["Morning", "Evening"],
+          translations: { ar: { label: "الوقت", options: { Morning: "صباحًا", Evening: "مساءً" } } } },
+        { id: "send", type: "button", label: "Send", translations: { ar: { label: "إرسال" } } },
+      ]} />);
+    expect(screen.getByRole("heading", { name: "احجز موعدك" })).toBeTruthy();
+    expect(screen.getByPlaceholderText("اكتب هنا")).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("صباحًا"));
+    fireEvent.click(screen.getByRole("button", { name: "إرسال" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0].customAnswers.time).toBe("Morning");
+  });
   it("validates and submits custom text, checkbox, and radio answers", async () => {
     const onSubmit = vi.fn().mockResolvedValue(false);
     render(

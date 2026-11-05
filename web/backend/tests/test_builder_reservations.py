@@ -722,6 +722,31 @@ class ReservationConfiguredSlotValidationTests(unittest.TestCase):
         self.assertEqual(raised.exception.status_code, 400)
         self.assertEqual(raised.exception.detail["code"], "reservation_slot_invalid")
 
+    def test_weekly_repeat_accepts_matching_weekday_without_expiry(self):
+        self.block["reservation"]["weeklyRepeatDates"] = ["2026-08-20"]
+        public_site_routes.validate_configured_reservation_slot(
+            self.block, {"date": "2028-08-17", "time": "09:00"},
+        )
+
+    def test_weekly_repeat_rejects_other_weekday_before_source_and_wrong_time(self):
+        self.block["reservation"]["weeklyRepeatDates"] = ["2026-08-20"]
+        for date, time in [("2026-08-28", "09:00"), ("2026-08-13", "09:00"), ("2026-08-27", "16:00")]:
+            with self.subTest(date=date, time=time), self.assertRaises(HTTPException):
+                public_site_routes.validate_configured_reservation_slot(self.block, {"date": date, "time": time})
+
+    def test_weekly_repeat_preserves_explicit_override_and_closed_date(self):
+        self.block["reservation"]["weeklyRepeatDates"] = ["2026-08-20"]
+        self.block["reservation"]["timeSlotsByDate"].update({"2026-08-27": ["11:00"], "2026-09-03": []})
+        public_site_routes.validate_configured_reservation_slot(self.block, {"date": "2026-08-27", "time": "11:00"})
+        for date in ["2026-08-27", "2026-09-03"]:
+            with self.subTest(date=date), self.assertRaises(HTTPException):
+                public_site_routes.validate_configured_reservation_slot(self.block, {"date": date, "time": "09:00"})
+
+    def test_disabling_weekly_repeat_rejects_future_dates(self):
+        self.block["reservation"]["weeklyRepeatDates"] = []
+        with self.assertRaises(HTTPException):
+            public_site_routes.validate_configured_reservation_slot(self.block, {"date": "2026-08-27", "time": "09:00"})
+
     def test_keeps_legacy_global_time_lists_compatible(self):
         public_site_routes.validate_configured_reservation_slot(
             {"reservation": {"bookingMode": "restricted", "timeSlots": ["09:00"]}},

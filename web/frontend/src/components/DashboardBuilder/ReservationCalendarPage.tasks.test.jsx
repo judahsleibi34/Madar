@@ -5,6 +5,7 @@ import ReservationCalendarPage from "./ReservationCalendarPage";
 import {
   archiveCalendarTask,
   createCalendarTask,
+  createCalendarEvent,
   deleteCalendarTask,
   fetchCalendarWorkspace,
   listBuilderReservations,
@@ -121,15 +122,222 @@ beforeEach(() => {
 });
 
 describe("calendar task UI", () => {
-  it("opens the structured Reservations view beside Agenda", async () => {
+  it("renders standalone Agenda without calendar tools and allows drafting while services are disabled", async () => {
+    fetchCalendarWorkspace.mockResolvedValueOnce({ ...workspace, calendar_features_available: false });
+    render(<ReservationCalendarPage user={operator} standaloneAgenda />);
+
+    expect(await screen.findByRole("heading", { name: "My tasks", exact: true })).toBeTruthy();
+    const title = await screen.findByLabelText("Task title");
+    await screen.findByText(/Saving is unavailable/);
+    expect(title.disabled).toBe(false);
+    expect(screen.getByLabelText("Task schedule").closest("details")).toBeNull();
+    fireEvent.change(title, { target: { value: "Draft my task" } });
+    expect(title.value).toBe("Draft my task");
+    expect(screen.getByRole("button", { name: "Add task" }).disabled).toBe(true);
+    expect(screen.queryByRole("heading", { name: "Calendar", exact: true })).toBeNull();
+    expect(screen.queryByRole("button", { name: "New event" })).toBeNull();
+    expect(document.getElementById("calendar-workspace-tools")).toBeNull();
+    expect(document.querySelector(".reservation-calendar-view-switch")).toBeNull();
+    expect(screen.queryByTitle("Allow system notifications for calendar reminders")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Today", exact: true })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Refresh/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Reset" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Task history" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Open Archive" })).toBeNull();
+    fireEvent.submit(title.closest("form"));
+    expect(createCalendarTask).not.toHaveBeenCalled();
+  });
+
+  it("applies date filters inclusively and rejects invalid ranges before restoring upcoming dates", async () => {
+    render(<ReservationCalendarPage user={operator} standaloneAgenda />);
+    await screen.findByRole("heading", { name: "My tasks", exact: true });
+    await waitFor(() => expect(fetchCalendarWorkspace).toHaveBeenCalledTimes(1));
+    const initialRange = fetchCalendarWorkspace.mock.calls[0][0];
+    fireEvent.change(screen.getByLabelText("Date range"), { target: { value: "custom" } });
+    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-11-03" } });
+    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-11-05" } });
+    expect(fetchCalendarWorkspace).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Apply filters" }));
+    await waitFor(() => expect(fetchCalendarWorkspace).toHaveBeenCalledTimes(2));
+    expect(fetchCalendarWorkspace.mock.calls[1][0]).toMatchObject({
+      start: new Date("2026-11-03T00:00:00").toISOString(),
+      end: new Date("2026-11-06T00:00:00").toISOString(),
+    });
+    expect(screen.getByText("Unscheduled tasks")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-11-07" } });
+    fireEvent.click(screen.getByRole("button", { name: "Apply filters" }));
+    expect(screen.getByRole("alert").textContent).toMatch(/end date on or after/);
+    expect(fetchCalendarWorkspace).toHaveBeenCalledTimes(2);
+    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-01-01" } });
+    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2028-01-01" } });
+    fireEvent.click(screen.getByRole("button", { name: "Apply filters" }));
+    expect(screen.getByRole("alert").textContent).toMatch(/370 days/);
+    expect(fetchCalendarWorkspace).toHaveBeenCalledTimes(2);
+    fireEvent.change(screen.getByLabelText("Date range"), { target: { value: "month" } });
+    fireEvent.change(screen.getByLabelText("Task status"), { target: { value: "open" } });
+    fireEvent.click(screen.getByRole("button", { name: "Apply filters" }));
+    await waitFor(() => expect(fetchCalendarWorkspace).toHaveBeenCalledTimes(3));
+    expect(fetchCalendarWorkspace.mock.calls[2][0]).toMatchObject({ start: initialRange.start, end: initialRange.end });
+    expect(screen.getByLabelText("Date range").value).toBe("month");
+    expect(screen.queryByLabelText("From")).toBeNull();
+  });
+
+  it("shows past completed tasks through the date and status filters", async () => {
+    const pastStart = new Date(); pastStart.setDate(pastStart.getDate() - 10); pastStart.setHours(10, 0, 0, 0);
+    const pastEnd = new Date(pastStart); pastEnd.setHours(11);
+    fetchCalendarWorkspace.mockResolvedValue({ ...workspace, tasks: [...workspace.tasks, {
+      id: "past-completed", calendar_id: "calendar-fixture", title: "Past completed task", status: "done",
+      scheduled_start: pastStart.toISOString(), scheduled_end: pastEnd.toISOString(), version: 1,
+    }, {
+      id: "archived-task", calendar_id: "calendar-fixture", title: "Archived fixture task", status: "done",
+      scheduled_start: pastStart.toISOString(), archived_at: pastEnd.toISOString(),
+    }] });
+    render(<ReservationCalendarPage user={operator} standaloneAgenda />);
+    await screen.findByRole("heading", { name: "My tasks", exact: true });
+    expect(screen.queryByText("Past completed task")).toBeNull();
+    fireEvent.change(screen.getByLabelText("Date range"), { target: { value: "last-month" } });
+    fireEvent.change(screen.getByLabelText("Task status"), { target: { value: "all" } });
+    fireEvent.click(screen.getByRole("button", { name: "Apply filters" }));
+    expect(await screen.findByText("Past completed task")).toBeTruthy();
+    expect(screen.getByLabelText("Date range").value).toBe("last-month");
+    expect(screen.getByLabelText("Task status").value).toBe("all");
+    expect(screen.queryByText("Archived fixture task")).toBeNull();
+    expect(screen.queryByRole("link", { name: "Open Archive" })).toBeNull();
+    fireEvent.change(screen.getByLabelText("Task status"), { target: { value: "done" } });
+    fireEvent.click(screen.getByRole("button", { name: "Apply filters" }));
+    expect(screen.getByText("Past completed task")).toBeTruthy();
+    expect(screen.queryByText("Unscheduled fixture task")).toBeNull();
+    fireEvent.change(screen.getByLabelText("Date range"), { target: { value: "month" } });
+    fireEvent.change(screen.getByLabelText("Task status"), { target: { value: "open" } });
+    fireEvent.click(screen.getByRole("button", { name: "Apply filters" }));
+    expect(screen.getByLabelText("Task status").value).toBe("open");
+    expect(screen.queryByText("Past completed task")).toBeNull();
+    expect(createCalendarTask).not.toHaveBeenCalled();
+    expect(deleteCalendarTask).not.toHaveBeenCalled();
+  });
+
+  it("opens Reservations under My calendars and returns to the selected calendar view", async () => {
     render(<ReservationCalendarPage user={operator} />);
     await screen.findByText("Open tasks");
 
-    fireEvent.click(screen.getByRole("button", { name: "reservations" }));
+    const reservations = screen.getByRole("button", { name: "Reservations" });
+    expect(reservations.closest(".calendar-calendars-panel")).toBeTruthy();
+    expect(document.querySelector(".reservation-calendar-toolbar-actions")).toBeNull();
+    expect(screen.getByRole("button", { name: "New event" }).closest(".calendar-calendars-panel")).toBeTruthy();
+    fireEvent.click(reservations);
 
     expect(await screen.findByRole("heading", { name: "Reservations" })).toBeTruthy();
     expect(screen.getByLabelText("Search reservations")).toBeTruthy();
     expect(listBuilderReservations).toHaveBeenCalledWith({ limit: 100, offset: 0 });
+    const views = screen.getByRole("group", { name: "Calendar view" });
+    expect(within(views).getAllByRole("button").map((button) => button.textContent)).toEqual(["day", "week", "month"]);
+    expect(views.contains(screen.queryByRole("button", { name: "Reservations" }))).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Back to calendar" }));
+    expect(screen.getByRole("button", { name: "week" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("opens an event draft from My calendars when Calendar services are disabled", async () => {
+    fetchCalendarWorkspace.mockResolvedValue({ ...workspace, calendar_features_available: false });
+    render(<ReservationCalendarPage user={operator} />);
+    const button = await screen.findByRole("button", { name: "New event" });
+    expect(button.disabled).toBe(false);
+    expect(button.closest(".calendar-calendars-panel")).toBeTruthy();
+    fireEvent.click(button);
+    expect(screen.getByRole("heading", { name: "Add to calendar" })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Event draft" } });
+    expect(screen.getByLabelText("Title").value).toBe("Event draft");
+    expect(screen.getByText(/Saving is unavailable while Calendar services are disabled/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Save event" }).disabled).toBe(true);
+    fireEvent.submit(screen.getByRole("button", { name: "Save event" }).closest("form"));
+    expect(createCalendarEvent).not.toHaveBeenCalled();
+  });
+
+  it("allows drafting without inventing a calendar and prevents saving", async () => {
+    fetchCalendarWorkspace.mockResolvedValue({ ...workspace, calendars: [] });
+    render(<ReservationCalendarPage user={operator} />);
+    fireEvent.click(await screen.findByRole("button", { name: "New event" }));
+    expect(screen.getByText("Your Madar calendar is not ready yet. You can draft an event here, but saving is unavailable.")).toBeTruthy();
+    expect(screen.getByText("My Madar calendar")).toBeTruthy();
+    expect(screen.queryByText("No calendars available")).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Calendar" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Save event" }).disabled).toBe(true);
+    fireEvent.submit(screen.getByRole("button", { name: "Save event" }).closest("form"));
+    expect(createCalendarEvent).not.toHaveBeenCalled();
+  });
+
+  it("saves a new event through the existing API when Calendar services are available", async () => {
+    createCalendarEvent.mockResolvedValue({});
+    render(<ReservationCalendarPage user={operator} />);
+    fireEvent.click(await screen.findByRole("button", { name: "New event" }));
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Team session" } });
+    expect(screen.getByRole("button", { name: "Save event" }).disabled).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Save event" }));
+    await waitFor(() => expect(createCalendarEvent).toHaveBeenCalledWith(expect.objectContaining({ title: "Team session", calendar_id: "calendar-fixture" })));
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "Add to calendar" })).toBeNull());
+  });
+
+  it("shows scheduled and undated My tasks in Calendar with a visibility toggle", async () => {
+    render(<ReservationCalendarPage user={operator} />);
+    await screen.findByText("Open tasks");
+    const taskToggle = screen.getByRole("checkbox", { name: /My tasks/ });
+    expect(taskToggle.checked).toBe(true);
+    expect(screen.getByRole("heading", { name: "Tasks to schedule" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Unscheduled fixture task" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Scheduled fixture task/ })).toBeTruthy();
+    fireEvent.click(taskToggle);
+    expect(screen.queryByRole("heading", { name: "Tasks to schedule" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Scheduled fixture task/ })).toBeNull();
+    fireEvent.click(taskToggle);
+    fireEvent.click(screen.getByRole("button", { name: "Unscheduled fixture task" }));
+    expect(screen.getByLabelText("Title").value).toBe("Unscheduled fixture task");
+    expect(screen.getByLabelText("Start date")).toBeTruthy();
+  });
+
+  it("keeps advanced event options collapsed while allowing edits and Escape", async () => {
+    render(<ReservationCalendarPage user={operator} />);
+    fireEvent.click(await screen.findByRole("button", { name: "New event" }));
+    const dialog = screen.getByRole("dialog", { name: "Add to calendar" });
+    expect(within(dialog).getByLabelText("Title")).toBeTruthy();
+    expect(within(dialog).getByLabelText("Start date")).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: "Save event" })).toBeTruthy();
+    const options = within(dialog).getByText("More options").closest("details");
+    expect(options.open).toBe(false);
+    fireEvent.click(within(dialog).getByText("More options"));
+    expect(options.open).toBe(true);
+    fireEvent.change(within(dialog).getByLabelText("Location"), { target: { value: "Studio" } });
+    expect(within(dialog).getByLabelText("Location").value).toBe("Studio");
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Add to calendar" })).toBeNull();
+  });
+
+  it("lets users choose event times and a time zone with clear sharing and busy settings", async () => {
+    createCalendarEvent.mockResolvedValue({});
+    render(<ReservationCalendarPage user={operator} />);
+    fireEvent.click(await screen.findByRole("button", { name: "New event" }));
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Zoned session" } });
+    fireEvent.change(screen.getByLabelText("Start date"), { target: { value: "2026-01-15" } });
+    fireEvent.change(screen.getByLabelText("Start time"), { target: { value: "09:30" } });
+    fireEvent.change(screen.getByLabelText("End date"), { target: { value: "2026-01-15" } });
+    fireEvent.change(screen.getByLabelText("End time"), { target: { value: "10:30" } });
+    fireEvent.change(screen.getByLabelText(/^Time zone/), { target: { value: "America/New_York" } });
+    fireEvent.click(screen.getByText("More options"));
+    expect(screen.getByLabelText(/Who can see this event/).value).toBe("calendar_default");
+    expect(screen.getByLabelText(/Does this block your time/).value).toBe("busy");
+    fireEvent.click(screen.getByRole("button", { name: "Save event" }));
+    await waitFor(() => expect(createCalendarEvent).toHaveBeenCalledWith(expect.objectContaining({ starts_at: "2026-01-15T14:30:00.000Z", ends_at: "2026-01-15T15:30:00.000Z", timezone: "America/New_York", visibility: "calendar_default", transparency: "busy" })));
+  });
+
+  it("defaults to the built-in Madar calendar when other calendars exist", async () => {
+    fetchCalendarWorkspace.mockResolvedValue({ ...workspace, calendars: [
+      { id: "another-calendar", name: "Team calendar" },
+      { id: "calendar-fixture", name: "Personal", is_default: true },
+    ] });
+    render(<ReservationCalendarPage user={operator} />);
+    fireEvent.click(await screen.findByRole("button", { name: "New event" }));
+    expect(screen.getByLabelText("Calendar").value).toBe("calendar-fixture");
+    expect(screen.getByRole("option", { name: "My Madar calendar (Personal)" })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Calendar"), { target: { value: "another-calendar" } });
+    expect(screen.getByLabelText("Calendar").value).toBe("another-calendar");
   });
 
   it("renders a fresh cache without a redundant network request", async () => {
@@ -163,7 +371,7 @@ describe("calendar task UI", () => {
     await waitFor(() => expect(fetchCalendarWorkspace).toHaveBeenCalledTimes(1));
   });
 
-  it("offers both Calendar and Agenda views on phones", async () => {
+  it("keeps only day, week and month views on phones", async () => {
     vi.stubGlobal("matchMedia", vi.fn(() => ({
       matches: true,
       addEventListener: vi.fn(),
@@ -175,34 +383,31 @@ describe("calendar task UI", () => {
     render(<ReservationCalendarPage user={operator} />);
     await screen.findByText("Open tasks");
 
-    expect(screen.getByRole("button", { name: "calendar" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "agenda" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "week" })).toBeNull();
-
-    fireEvent.click(screen.getByRole("button", { name: "calendar" }));
+    expect(screen.getByRole("button", { name: "day" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "week" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "agenda" })).toBeNull();
+    expect(screen.getByRole("button", { name: "month" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "Reservations" })).toBeTruthy();
     expect(document.querySelector(".calendar-month-grid")).toBeTruthy();
+    expect(document.querySelector(".calendar-month-weekdays").textContent)
+      .toBe("SunMonTueWedThuFriSat");
+    expect(screen.getByText(new Date().toLocaleDateString(undefined, { month: "long", year: "numeric" })))
+      .toBeTruthy();
+    const toolsToggle = screen.getByRole("button", { name: "Calendar tools" });
+    expect(toolsToggle.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(toolsToggle);
+    expect(toolsToggle.getAttribute("aria-expanded")).toBe("true");
+    expect(document.getElementById("calendar-workspace-tools").classList.contains("is-mobile-open"))
+      .toBe(true);
   });
 
-  it("prewarms and stores the Agenda range before switching views", async () => {
+  it("does not prefetch a removed Agenda tab", async () => {
     render(<ReservationCalendarPage user={operator} />);
     await screen.findByText("Open tasks");
     await waitFor(() => expect(writeCalendarWorkspaceCache).toHaveBeenCalledTimes(1));
-
-    fireEvent.pointerEnter(screen.getByRole("button", { name: "agenda" }));
-
-    await waitFor(() => expect(fetchCalendarWorkspace).toHaveBeenCalledTimes(2));
-    const agendaRequest = fetchCalendarWorkspace.mock.calls[1][0];
-    const agendaStart = new Date(agendaRequest.start);
-    const agendaEnd = new Date(agendaRequest.end);
-    const localDateAsUtc = (value) => Date.UTC(
-      value.getFullYear(),
-      value.getMonth(),
-      value.getDate(),
-    );
-    expect(
-      (localDateAsUtc(agendaEnd) - localDateAsUtc(agendaStart)) / 86_400_000
-    ).toBe(31);
-    await waitFor(() => expect(writeCalendarWorkspaceCache).toHaveBeenCalledTimes(2));
+    expect(screen.queryByRole("button", { name: "agenda" })).toBeNull();
+    fireEvent.pointerEnter(screen.getByRole("button", { name: "day" }));
+    expect(fetchCalendarWorkspace).toHaveBeenCalledTimes(1);
   });
 
   it("paints stale cached workspace immediately and refreshes it in the background", async () => {
@@ -255,7 +460,7 @@ describe("calendar task UI", () => {
   });
 
   it("renders scheduled tasks in week, day, month, and agenda while keeping unscheduled work separate", async () => {
-    render(<ReservationCalendarPage user={operator} />);
+    const page = render(<ReservationCalendarPage user={operator} />);
 
     expect(await screen.findByRole("button", { name: /Scheduled fixture task/ })).toBeTruthy();
     const openTasksSummary = screen.getByText("Open tasks").closest("article");
@@ -267,7 +472,9 @@ describe("calendar task UI", () => {
     fireEvent.click(screen.getByRole("button", { name: "month" }));
     expect(screen.getByRole("button", { name: /Scheduled fixture task/ })).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "agenda" }));
+    page.unmount();
+    render(<ReservationCalendarPage user={operator} standaloneAgenda />);
+    await screen.findByLabelText("Task title");
     expect(screen.getAllByRole("button", { name: /Scheduled fixture task/ }).some(
       (button) => button.classList.contains("calendar-agenda-task")
     )).toBe(true);
@@ -310,11 +517,12 @@ describe("calendar task UI", () => {
   });
 
   it("sends an explicit schedule or explicit nulls from quick add and counts both as open", async () => {
-    render(<ReservationCalendarPage user={operator} />);
+    render(<ReservationCalendarPage user={operator} initialView="agenda" />);
     await screen.findByText("Open tasks");
 
-    fireEvent.click(screen.getByRole("button", { name: /TasksScheduled and unscheduled work/ }));
-    expect(screen.getByText("Unscheduled", { selector: "small" })).toBeTruthy();
+    expect(within(document.getElementById("calendar-workspace-tools")).queryByLabelText("Task title"))
+      .toBeNull();
+    expect(screen.getByText("Unscheduled tasks")).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText("Task title"), {
       target: { value: "New scheduled task" },
@@ -346,10 +554,9 @@ describe("calendar task UI", () => {
   });
 
   it("archives an Agenda task and removes it from the active Calendar workspace", async () => {
-    render(<ReservationCalendarPage user={operator} />);
+    render(<ReservationCalendarPage user={operator} initialView="agenda" />);
     await screen.findByText("Open tasks");
 
-    fireEvent.click(screen.getByRole("button", { name: "agenda" }));
     fireEvent.click(screen.getByRole("button", { name: "Archive Scheduled fixture task" }));
     expect(screen.getByRole("dialog", { name: "Archive this task?" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Archive task" }));
@@ -360,10 +567,9 @@ describe("calendar task UI", () => {
 
   it("deletes an Agenda task directly beside its archive action", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
-    render(<ReservationCalendarPage user={operator} />);
+    render(<ReservationCalendarPage user={operator} initialView="agenda" />);
     await screen.findByText("Open tasks");
 
-    fireEvent.click(screen.getByRole("button", { name: "agenda" }));
     const archiveButton = screen.getByRole("button", { name: "Archive Scheduled fixture task" });
     const deleteButton = screen.getByRole("button", { name: "Delete Scheduled fixture task" });
 
@@ -392,11 +598,10 @@ describe("calendar task UI", () => {
       priority: "normal",
     });
 
-    const { container } = render(<ReservationCalendarPage user={operator} />);
+    const { container } = render(<ReservationCalendarPage user={operator} initialView="agenda" />);
     await screen.findByText("Open tasks");
     expect(container.querySelector(".reservation-calendar-loading")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: /TasksScheduled and unscheduled work/ }));
     fireEvent.change(screen.getByLabelText("Task title"), {
       target: { value: "Quiet refresh task" },
     });
@@ -434,9 +639,10 @@ describe("calendar task UI", () => {
 
   it("keeps advanced fields out of the editor and confirms task deletion", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
-    render(<ReservationCalendarPage user={operator} />);
+    render(<ReservationCalendarPage user={operator} initialView="agenda" />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /Scheduled fixture task/ }));
+    fireEvent.click((await screen.findAllByRole("button", { name: /Scheduled fixture task/ }))
+      .find((button) => button.classList.contains("calendar-agenda-task")));
     expect(screen.getByRole("button", { name: "Delete" })).toBeTruthy();
     expect(screen.queryByText("More options")).toBeNull();
     expect(screen.queryByLabelText("Time needed (minutes)")).toBeNull();
@@ -445,8 +651,8 @@ describe("calendar task UI", () => {
     expect(screen.queryByLabelText(/Notes/)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
-    fireEvent.click(screen.getByRole("button", { name: /TasksScheduled and unscheduled work/ }));
-    fireEvent.click(await screen.findByRole("button", { name: /Unscheduled fixture task/ }));
+    fireEvent.click(screen.getAllByRole("button", { name: /Unscheduled fixture task/ })
+      .find((button) => button.classList.contains("calendar-agenda-task")));
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     fireEvent.click(screen.getByRole("button", { name: "Delete task" }));
     await waitFor(() =>

@@ -29,6 +29,19 @@ describe("PageBuilderTopbar", () => {
     expect(view.container.querySelector("h1")).toBeNull();
     expect(view.container.querySelector(".builder-brand-name")?.tagName).toBe("SPAN");
   });
+
+  it("places project commands in the header when supplied", () => {
+    render(
+      <PageBuilderTopbar
+        project={{ name: "Site" }}
+        activeHelper="Build pages"
+        actions={<button type="button">Save</button>}
+      />
+    );
+
+    expect(screen.getByRole("button", { name: "Save" }).closest(".builder-topbar")).toBeTruthy();
+  });
+
   it("places the exit preview action in the header", () => {
     const onPreviewClick = vi.fn();
 

@@ -63,3 +63,157 @@ that cannot be tested locally.
 
 Never bypass a failed release gate or directly modify production to compensate
 for a source-code rejection.
+
+## Mandatory Madar Continuous QA Contract
+
+These rules apply automatically to every Codex coding task
+within Madar. QA is part of development, not an optional
+step after development.
+
+### 1. Mandatory development lifecycle
+
+Every code-changing task must follow:
+
+UNDERSTAND -> PLAN -> BUILD -> TEST -> VALIDATE
+-> FIX -> RETEST -> REPORT
+
+Implementation alone does not mean a feature is complete.
+
+### 2. Before development
+
+- Inspect relevant code, architecture and existing tests.
+- Preserve uncommitted and untracked work.
+- Define acceptance criteria and expected behavior.
+- Identify affected modules, APIs and user workflows.
+- Identify functional and non-functional risks.
+- Determine the relevant testing scope.
+
+### 3. During development
+
+- Implement changes in small, testable increments.
+- Add or update tests for changed behavior.
+- Run relevant tests after implementation.
+- Check edge cases and invalid inputs.
+- Verify error handling, loading and empty states.
+- Preserve existing behavior unless changes are intended.
+
+### 4. Mandatory functional QA
+
+Assess and test applicable areas:
+
+- Business logic and feature correctness
+- Input validation and boundary conditions
+- Forms, navigation and user journeys
+- API request and response behavior
+- Database integrity and consistency
+- Authentication and authorization
+- Tenant isolation and permission boundaries
+- Integration between affected components
+- Existing feature regression
+
+### 5. Mandatory non-functional QA
+
+Assess and test applicable areas:
+
+- API latency and performance
+- Frontend loading and rendering performance
+- UI/UX consistency
+- Desktop, tablet and mobile responsiveness
+- Arabic, English and RTL layout behavior
+- Accessibility and keyboard navigation
+- Browser compatibility
+- Security and sensitive data exposure
+- Reliability, concurrency and error recovery
+
+Use measurable performance baselines and thresholds
+where available. Never claim unmeasured performance
+has passed.
+
+### 6. Automatic failure repair loop
+
+When an applicable test fails:
+
+1. Record the failure and reproduction steps.
+2. Analyze the root cause.
+3. Fix the underlying problem.
+4. Rerun the failed test.
+5. Run affected regression tests.
+6. Repeat until verified or blocked.
+
+Do not bypass, delete or weaken meaningful tests
+merely to obtain a passing result.
+
+After three unsuccessful repair attempts on the same
+issue, stop and report the blocker.
+
+### 7. Quality gates
+
+GATE A - FAST
+Run relevant lint, syntax, type and unit checks.
+
+GATE B - FEATURE
+Run relevant integration, API, browser, UI/UX,
+accessibility and workflow tests.
+
+GATE C - RELEASE
+Run applicable regression, security, performance
+and release-policy checks.
+
+Select checks based on the scope and risk of the change.
+Do not run expensive full suites unnecessarily.
+
+### 8. Existing Madar testing infrastructure
+
+Prefer reusing existing testing tools and configurations,
+including applicable components in:
+
+- QA testing/
+- web/frontend/
+- web/backend/
+- mobile/
+
+Inspect actual test commands and dependencies before
+executing them. Do not assume tests are configured.
+
+### 9. Mandatory QA completion report
+
+Every completed coding task must report:
+
+QA STATUS: PASS / FAIL / BLOCKED / NOT RUN
+CHANGED FILES:
+ACCEPTANCE CRITERIA:
+TEST COMMANDS EXECUTED:
+FUNCTIONAL VALIDATION:
+NON-FUNCTIONAL VALIDATION:
+REGRESSION RESULTS:
+UNRESOLVED ISSUES:
+NEXT ACTION:
+
+Never report a test as passed unless it actually ran.
+If a required test cannot execute, report the limitation.
+
+### 10. Safety and approval
+
+- Preserve all existing owner work.
+- Reuse existing QA infrastructure when possible.
+- Never test destructively against production.
+- Never expose credentials or sensitive test data.
+- Do not bypass existing Madar release protections.
+- Do not commit, push, merge or deploy without approval.
+- Do not automatically start another feature.
+
+Existing release-safety instructions remain mandatory
+and take precedence over conflicting QA actions.
+
+### 11. Read-only tasks
+
+For analysis, explanations and documentation-only tasks,
+avoid unnecessary test execution.
+
+Still identify relevant QA risks when appropriate.
+
+### Core development principle
+
+No code-changing task is complete without
+proportionate QA verification and an evidence-based
+completion report.

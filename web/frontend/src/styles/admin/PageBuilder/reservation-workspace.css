@@ -1,0 +1,751 @@
+/* Booking administration uses application tokens, independently of the authored site. */
+:root .page-builder .reservations-workspace {
+  --reservation-accent: var(--theme-primary);
+  --reservation-accent-soft: var(--theme-primary-soft);
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 20px 24px 32px !important;
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font-family: var(--font-family-base) !important;
+  font-size: var(--type-small-size);
+  font-weight: var(--weight-regular);
+  line-height: var(--type-small-line);
+  --form-theme-accent: var(--theme-primary);
+  --form-theme-button-text: var(--theme-text-inverse);
+  --form-theme-input: var(--surface-1);
+  --form-theme-text: var(--text-primary);
+  --form-theme-muted: var(--text-secondary);
+  --form-theme-border: var(--border-strong);
+  --theme-input-bg: var(--surface-1);
+}
+
+/* Override the older route-level forced control surfaces in both themes. */
+:root .page-builder .reservations-workspace .reservation-block-list {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+:root .page-builder .reservations-workspace :is(
+  .reservation-library-actions button, .reservation-list-item,
+  .reservation-editor-actions button, .reservation-calendar-trigger,
+  .reservation-bullet-row, .reservation-step-actions button:not(.primary-action),
+  .booking-component-toolbox-list button, .booking-text-toolbar select,
+  .booking-component-inspector input, .booking-component-inspector textarea,
+  .booking-component-inspector select, .reservation-build-name input
+) {
+  background: var(--surface-1) !important;
+  color: var(--text-primary) !important;
+  -webkit-text-fill-color: var(--text-primary) !important;
+  border-color: var(--border-control) !important;
+  box-shadow: none !important;
+}
+
+:root .page-builder .reservations-workspace .reservation-list-item.is-active {
+  border-color: var(--theme-primary) !important;
+}
+
+:root .page-builder .reservations-workspace .reservation-setup-steps button {
+  background: transparent !important;
+  border: 0 !important;
+  border-bottom: 2px solid transparent !important;
+  border-radius: 0 !important;
+  color: var(--text-primary) !important;
+  box-shadow: none !important;
+}
+:root .page-builder .reservations-workspace nav.reservation-setup-steps button.is-active {
+  border-bottom-color: var(--theme-primary) !important;
+  box-shadow: none !important;
+}
+:root .page-builder .reservations-workspace .reservation-editor-actions button.reservation-delete-block {
+  color: var(--color-status-danger-text) !important;
+  -webkit-text-fill-color: var(--color-status-danger-text) !important;
+}
+
+:root .page-builder .reservations-workspace .reservations-header {
+  width: 100%;
+  max-width: none;
+  margin: 0 0 20px;
+  padding: 0;
+  border: 0;
+  min-height: 0;
+}
+
+/* Match the shared application hierarchy; authored component previews keep their own text styles. */
+:root .page-builder .reservations-workspace :is(h1, h2, h3, p, span, small, strong, label, button, input, select, textarea, legend):not(.booking-canvas-component-preview, .booking-canvas-component-preview *) {
+  font-family: var(--font-family-base) !important;
+  letter-spacing: normal !important;
+  text-transform: none;
+}
+:root .page-builder .reservations-workspace .reservations-header h1 {
+  font-size: var(--type-h1-size) !important;
+  font-weight: var(--weight-bold) !important;
+  line-height: var(--type-h1-line) !important;
+  color: var(--theme-text) !important;
+}
+:root .page-builder .reservations-workspace :is(h2, h3):not(.booking-canvas-component-preview *) {
+  font-size: var(--type-body-size) !important;
+  font-weight: var(--weight-semibold) !important;
+  line-height: var(--type-body-line) !important;
+  color: var(--theme-text) !important;
+}
+:root .page-builder .reservations-workspace :is(p, small, .reservation-list-item > span):not(.booking-canvas-component-preview *) {
+  font-size: var(--type-caption-size) !important;
+  font-weight: var(--weight-regular) !important;
+  line-height: var(--type-small-line) !important;
+  color: var(--theme-text-muted) !important;
+}
+:root .page-builder .reservations-workspace :is(button, label, strong, input, select, textarea):not(.booking-canvas-component-preview *) {
+  font-size: var(--type-small-size) !important;
+  font-weight: var(--weight-medium) !important;
+  line-height: var(--type-small-line) !important;
+}
+:root .page-builder .reservations-workspace span:not(.booking-canvas-component-preview *) { font-weight: inherit !important; }
+:root .page-builder .reservations-workspace :is(strong, button strong, .reservation-calendar-toolbar strong):not(.booking-canvas-component-preview *) {
+  font-weight: var(--weight-semibold) !important;
+}
+:root .page-builder .reservations-workspace :is(input, textarea, select):not(.booking-canvas-component-preview *) {
+  font-weight: var(--weight-regular) !important;
+}
+:root .page-builder .reservations-workspace button:not(.booking-canvas-component-preview *) {
+  border-radius: var(--radius-default);
+  box-shadow: none !important;
+}
+:root .page-builder .reservations-workspace .reservation-calendar-weekdays span {
+  font-size: var(--type-caption-size) !important;
+  font-weight: var(--weight-medium) !important;
+  color: var(--theme-text-muted) !important;
+}
+:root .page-builder .reservations-workspace .reservation-calendar-trigger :is(small, strong) {
+  font-size: var(--type-small-size) !important;
+  letter-spacing: normal;
+}
+:root .page-builder .reservations-workspace .reservation-step-actions .primary-action {
+  background: var(--theme-primary) !important;
+  color: var(--theme-text-inverse) !important;
+  -webkit-text-fill-color: var(--theme-text-inverse) !important;
+  border-color: var(--theme-primary) !important;
+}
+:root .page-builder .reservations-workspace .reservation-step-actions .primary-action:not(:disabled):hover {
+  background: var(--theme-primary-hover) !important;
+}
+
+
+:root .page-builder .reservations-workspace .reservation-editor-layout {
+  width: 100%;
+  margin: 0;
+  max-width: none;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+:root .page-builder .reservations-workspace .reservation-block-list {
+  position: static;
+  max-height: none;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent !important;
+  overflow: visible;
+  gap: 12px;
+}
+
+:root .page-builder .reservations-workspace .reservation-library-actions { grid-template-columns: 1fr; }
+:root .page-builder .reservations-workspace .reservation-block-list .reservation-library-actions button { justify-content: flex-start; }
+:root .page-builder .reservations-workspace .reservation-panel-heading { margin-bottom: 4px; }
+:root .page-builder .reservations-workspace .reservation-count { color: var(--text-secondary); }
+:root .page-builder .reservations-workspace .reservation-block-list .reservation-list-item strong { white-space: normal; overflow-wrap: anywhere; }
+:root .page-builder .reservations-workspace .reservation-block-list .reservation-list-item.is-active {
+  border-color: var(--theme-primary);
+  background: var(--surface-1);
+}
+
+:root .page-builder .reservations-workspace .reservation-editor-card {
+  padding: 24px;
+  gap: 24px;
+  background: var(--surface-1);
+  border-color: var(--border-strong);
+  box-shadow: none;
+}
+
+:root .page-builder .reservations-workspace .reservation-editor-card > .editor-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 0;
+  border: 0;
+}
+
+:root .page-builder .reservations-workspace .reservation-editor-card > .editor-card-header > div:first-child {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+:root .page-builder .reservations-workspace .reservation-build-name { width: min(100%, 420px); margin-top: 16px; }
+:root .page-builder .reservations-workspace .reservation-booking-meta { margin: 10px 0 0; }
+:root .page-builder .reservations-workspace .reservation-editor-actions { gap: 8px; }
+:root .page-builder .reservations-workspace .reservation-editor-actions button { font-size: 12px; padding-inline: 12px; }
+
+:root .page-builder .reservations-workspace .reservation-setup-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  border-bottom: 1px solid var(--border-strong);
+}
+
+:root .page-builder .reservations-workspace .reservation-setup-steps button {
+  flex: 0 1 auto;
+  border: 0 !important;
+  border-bottom: 2px solid transparent !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 4px 14px;
+  gap: 10px;
+}
+
+:root .page-builder .reservations-workspace nav.reservation-setup-steps button.is-active {
+  border-bottom-color: var(--theme-primary) !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+:root .page-builder .reservations-workspace .reservation-setup-steps button > span {
+  background: transparent !important;
+  color: var(--theme-text-muted) !important;
+}
+:root .page-builder .reservations-workspace .reservation-setup-steps button.is-active > span {
+  background: var(--theme-primary) !important;
+  color: var(--theme-text-inverse) !important;
+}
+:root .page-builder .reservations-workspace .reservation-setup-steps button :is(div, strong, small) {
+  background: transparent !important;
+}
+:root .page-builder .reservations-workspace :is(.reservation-setup-steps, .reservation-editor-actions) button,
+:root .page-builder .reservations-workspace :is(.reservation-setup-steps, .reservation-editor-actions) button::before,
+:root .page-builder .reservations-workspace :is(.reservation-setup-steps, .reservation-editor-actions) button::after {
+  background-image: none !important;
+  box-shadow: none !important;
+}
+:root .page-builder .reservations-workspace .reservation-editor-actions button {
+  background: var(--theme-surface) !important;
+  border: 1px solid var(--color-border-control) !important;
+  color: var(--theme-text) !important;
+  -webkit-text-fill-color: var(--theme-text) !important;
+}
+:root .page-builder .reservations-workspace .reservation-editor-actions button:hover {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-primary) !important;
+}
+:root .page-builder .reservations-workspace .reservation-editor-actions button.reservation-delete-block {
+  color: var(--color-status-danger-text) !important;
+  -webkit-text-fill-color: var(--color-status-danger-text) !important;
+}
+:root .page-builder .reservations-workspace .reservation-editor-actions button.reservation-delete-block:hover {
+  border-color: var(--color-status-danger-text) !important;
+}
+:root .page-builder .reservations-workspace .reservation-setup-steps :is(strong, small) { white-space: normal; }
+
+:root .page-builder .reservations-workspace .reservation-availability-layout {
+  display: grid;
+  grid-template-columns: minmax(250px, 300px) minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+
+:root .page-builder .reservations-workspace .reservation-availability-layout > .reservation-schedule-section {
+  grid-column: auto;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  gap: 16px;
+  min-width: 0;
+  box-shadow: none !important;
+}
+
+:root .page-builder .reservations-workspace .reservation-date-heading-icon { display: none; }
+:root .page-builder .reservations-workspace .reservation-date-heading p { margin: 4px 0 0; }
+:root .page-builder .reservations-workspace .reservation-calendar-picker { width: 100%; max-width: none; }
+:root .page-builder .reservations-workspace .reservation-calendar-trigger {
+  width: 100%;
+  min-width: 0;
+  border-color: var(--border-strong);
+  background: var(--surface-1);
+}
+:root .page-builder .reservations-workspace .reservation-calendar-popover {
+  box-sizing: border-box;
+  width: min(344px, calc(100vw - 48px));
+  max-width: none;
+  padding: 16px;
+  background: var(--surface-1);
+  border-color: var(--border-strong);
+}
+:root .page-builder .reservations-workspace :is(.reservation-calendar-days, .reservation-calendar-weekdays) {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+:root .page-builder .reservations-workspace .reservation-calendar-weekdays { margin-bottom: 10px; }
+:root .page-builder .reservations-workspace .reservation-calendar-days > button {
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 38px !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 1px solid transparent !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  font-size: 13px;
+  line-height: 1 !important;
+}
+:root .page-builder .reservations-workspace .reservation-calendar-days > button:is(.is-today, .is-selected, :hover:not(:disabled)) {
+  border-color: var(--theme-primary) !important;
+}
+:root .page-builder .reservations-workspace .reservation-calendar-toolbar > div { gap: 8px; }
+:root .page-builder .reservations-workspace .reservation-calendar-toolbar button {
+  width: 36px !important;
+  min-width: 36px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 0 !important;
+}
+:root .page-builder .reservations-workspace .reservation-date-picker-grid { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+:root .page-builder .reservations-workspace .reservation-date-card {
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  padding: 8px;
+  gap: 6px;
+  border-radius: 10px;
+  border-color: var(--border-strong);
+  background: transparent;
+  box-shadow: none;
+}
+:root .page-builder .reservations-workspace .reservation-date-card.is-selected {
+  border-color: var(--theme-primary) !important;
+  background: var(--surface-2) !important;
+  box-shadow: none;
+}
+:root .page-builder .reservations-workspace .reservation-date-card .reservation-date-select {
+  border: 0 !important;
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  grid-template-columns: minmax(0, 1fr);
+  padding: 4px 8px;
+  box-shadow: none !important;
+  background: transparent !important;
+  text-align: start !important;
+  justify-items: start;
+  color: var(--text-primary);
+}
+:root .page-builder .reservations-workspace .reservation-date-card-icon { display: none; }
+:root .page-builder .reservations-workspace .reservation-date-select > span:last-child { display: flex; flex-direction: column-reverse; gap: 4px; }
+:root .page-builder .reservations-workspace .reservation-date-card strong { white-space: normal; line-height: 1.5; }
+:root .page-builder .reservations-workspace .reservation-date-card small { text-transform: none; letter-spacing: 0; }
+:root .page-builder .reservations-workspace .reservation-date-card > button:last-child { border: 0; background: transparent; }
+:root .page-builder .reservations-workspace .reservation-times-section { container: reservation-times / inline-size; }
+:root .page-builder .reservations-workspace .reservation-time-editor {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+:root .page-builder .reservations-workspace .reservation-time-editor .reservation-bullet-row {
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  gap: 6px;
+  padding: 8px;
+}
+:root .page-builder .reservations-workspace .reservation-time-editor .reservation-bullet-row > svg { display: none; }
+:root .page-builder .reservations-workspace .reservation-time-editor .reservation-bullet-row > button {
+  width: 34px;
+  min-width: 0;
+  padding: 0;
+}
+@container reservation-times (max-width: 850px) {
+  :root .page-builder .reservations-workspace .reservation-time-editor { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container reservation-times (max-width: 440px) {
+  :root .page-builder .reservations-workspace .reservation-time-editor { grid-template-columns: minmax(0, 1fr); }
+}
+
+:root .page-builder .reservations-workspace .reservation-repeat { min-width: 0; padding: 8px 0; }
+:root .page-builder .reservations-workspace .reservation-repeat-toggle {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--text-primary);
+  font-weight: 600;
+  cursor: pointer;
+}
+:root .page-builder .reservations-workspace .reservation-repeat-toggle input {
+  width: 18px !important;
+  height: 18px !important;
+  min-height: 0 !important;
+  margin: 0;
+  accent-color: var(--theme-primary);
+}
+:root .page-builder .reservations-workspace .reservation-bullet-row { background: var(--surface-1); border-color: var(--border-strong); box-shadow: none; }
+:root .page-builder .reservations-workspace .reservation-time-editor input[type="time"] { font-variant-numeric: tabular-nums; }
+:root .page-builder .reservations-workspace .reservation-step-actions { border-top: 1px solid var(--border-strong); padding-top: 20px; }
+:root .page-builder .reservations-workspace :is(button, input):focus-visible { outline: 2px solid var(--theme-primary); outline-offset: 3px; }
+
+@container reservation-editor (max-width: 680px) {
+  :root .page-builder .reservations-workspace .reservation-availability-layout { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  :root .page-builder .reservations-workspace .reservation-date-picker-grid { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+}
+
+@media (max-width: 1100px) {
+  :root .page-builder .reservations-workspace .reservation-editor-layout { grid-template-columns: 200px minmax(0, 1fr); gap: 16px; }
+  :root .page-builder .reservations-workspace .reservation-editor-card { padding: 20px; }
+}
+
+@media (max-width: 760px) {
+  :root .page-builder .reservations-workspace { padding: 16px !important; }
+  :root .page-builder .reservations-workspace .reservation-editor-layout { grid-template-columns: minmax(0, 1fr); }
+  :root .page-builder .reservations-workspace .reservation-library-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  :root .page-builder .reservations-workspace .reservation-editor-card { padding: 16px; }
+  :root .page-builder .reservations-workspace .reservation-editor-actions { width: auto; }
+  :root .page-builder .reservations-workspace .reservation-editor-actions button { width: auto; }
+  :root .page-builder .reservations-workspace .reservation-step-actions { display: flex; flex-wrap: wrap; justify-content: space-between; }
+  :root .page-builder .reservations-workspace .reservation-step-actions > span { order: 0; }
+}
+
+/* Each appointment owns its people limit; settings open inside its own card. */
+:root .page-builder .reservations-workspace .reservation-session-card { align-self: start; align-content: start; }
+:root .page-builder .reservations-workspace .reservation-time-editor .reservation-session-card.is-editing { border-color: var(--theme-primary) !important; }
+:root .page-builder .reservations-workspace .reservation-session-card > input { grid-column: 1; grid-row: 1; }
+:root .page-builder .reservations-workspace .reservation-session-card > button:not(.reservation-session-summary) { grid-column: 2; grid-row: 1; }
+:root .page-builder .reservations-workspace .reservation-time-editor .reservation-session-card > button.reservation-session-summary {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 4px 2px;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--theme-text-muted) !important;
+  -webkit-text-fill-color: var(--theme-text-muted) !important;
+  box-shadow: none !important;
+  text-align: start;
+  font-size: var(--type-caption-size) !important;
+}
+:root .page-builder .reservations-workspace .reservation-session-summary span { min-width: 0; white-space: normal; }
+:root .page-builder .reservations-workspace .reservation-session-summary svg { flex: 0 0 auto; }
+:root .page-builder .reservations-workspace .reservation-session-fields {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  display: grid;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--theme-border);
+}
+:root .page-builder .reservations-workspace .reservation-session-fields label { display: grid; gap: 6px; min-width: 0; }
+:root .page-builder .reservations-workspace .reservation-session-fields :is(input, select) { width: 100%; min-width: 0; }
+:root .page-builder .reservations-workspace .reservation-session-fields small { margin: 0; }
+
+/* Compact appointment typography; retain the shared control hit areas. */
+:root .page-builder .reservations-workspace .reservation-time-editor .reservation-bullet-row.reservation-session-card :is(input, select) {
+  font-size: 13px !important;
+  line-height: var(--type-small-line) !important;
+}
+:root .page-builder .reservations-workspace .reservation-session-card .reservation-session-fields label {
+  font-size: var(--type-caption-size) !important;
+  font-weight: var(--weight-medium) !important;
+  line-height: var(--type-caption-line) !important;
+}
+:root .page-builder .reservations-workspace .reservation-session-card .reservation-session-fields small {
+  font-size: var(--type-caption-size) !important;
+  line-height: var(--type-caption-line) !important;
+}
+
+/* Use the editor's available width for form tools, preview and settings. */
+:root .page-builder .reservations-workspace .reservation-block-builder-section {
+  min-width: 0;
+  padding: 0;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+:root .page-builder .reservations-workspace .booking-element-builder {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr) 280px;
+  align-items: start;
+  gap: 20px;
+}
+:root .page-builder .reservations-workspace .booking-component-toolbox {
+  grid-column: 1;
+  grid-row: 1;
+  padding: 16px;
+}
+:root .page-builder .reservations-workspace .booking-component-toolbox-heading { display: grid; gap: 6px; }
+:root .page-builder .reservations-workspace .booking-component-toolbox-heading h4 { margin: 0; font-size: var(--type-small-size); font-weight: var(--weight-semibold); }
+:root .page-builder .reservations-workspace .booking-component-toolbox-heading p { margin: 0; }
+:root .page-builder .reservations-workspace .booking-component-toolbox-list.section-component-palette {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+:root .page-builder .reservations-workspace .booking-element-stage { grid-column: 2; grid-row: 1; }
+:root .page-builder .reservations-workspace .booking-component-inspector {
+  grid-column: 3;
+  grid-row: 1;
+  position: static;
+  max-height: none;
+  overflow: visible;
+  padding: 0;
+}
+:root .page-builder .reservations-workspace :is(.booking-component-toolbox, .booking-element-stage) {
+  background: var(--theme-surface);
+  border: 1px solid var(--theme-border);
+  box-shadow: none;
+}
+:root .page-builder .reservations-workspace .booking-element-canvas { min-height: 360px; }
+@container reservation-editor (max-width: 1050px) {
+  :root .page-builder .reservations-workspace .booking-element-builder { grid-template-columns: minmax(0, 1fr) 260px; gap: 20px; }
+  :root .page-builder .reservations-workspace .booking-component-toolbox { grid-column: 1 / -1; grid-row: 1; }
+  :root .page-builder .reservations-workspace .booking-component-toolbox-list.section-component-palette { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  :root .page-builder .reservations-workspace .booking-element-stage { grid-column: 1; grid-row: 2; }
+  :root .page-builder .reservations-workspace .booking-component-inspector { grid-column: 2; grid-row: 2; }
+}
+@container reservation-editor (max-width: 700px) {
+  :root .page-builder .reservations-workspace .booking-element-builder { grid-template-columns: minmax(0, 1fr); }
+  :root .page-builder .reservations-workspace .booking-component-toolbox-list.section-component-palette { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  :root .page-builder .reservations-workspace .booking-element-stage { grid-column: 1; grid-row: 2; }
+  :root .page-builder .reservations-workspace .booking-component-inspector { grid-column: 1; grid-row: 3; }
+}
+:root .page-builder .reservations-workspace .booking-text-toolbar > label:not(.booking-toolbar-color) {
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 0;
+}
+:root .page-builder .reservations-workspace .booking-text-toolbar > label:not(.booking-toolbar-color) input[type="number"] {
+  width: 100% !important;
+  min-width: 0;
+  padding-inline: 8px !important;
+}
+:root .page-builder .reservations-workspace .booking-text-toolbar {
+  --booking-toolbar-control-size: max(var(--control-height-sm), 2.5em);
+  gap: 6px;
+  font-size: var(--type-small-size);
+}
+:root .page-builder .reservations-workspace .booking-text-toolbar :is(button, select, input) {
+  font-size: var(--type-small-size) !important;
+  font-weight: var(--weight-regular) !important;
+  line-height: var(--type-small-line);
+}
+:root .page-builder .reservations-workspace .booking-text-toolbar > :is(button, select, .booking-toolbar-color) {
+  height: var(--booking-toolbar-control-size) !important;
+  min-height: var(--booking-toolbar-control-size) !important;
+  padding: 0 6px !important;
+  margin: 0;
+}
+:root .page-builder .reservations-workspace .booking-text-toolbar > label:not(.booking-toolbar-color) {
+  min-height: 0;
+  gap: 2px;
+  padding: 4px 6px;
+}
+:root .page-builder .reservations-workspace .booking-text-toolbar > label:not(.booking-toolbar-color) > span {
+  font-size: var(--type-caption-size) !important;
+  font-weight: var(--weight-regular) !important;
+  line-height: var(--type-caption-line);
+}
+:root .page-builder .reservations-workspace .booking-text-toolbar > label:not(.booking-toolbar-color) input[type="number"] {
+  height: calc(var(--booking-toolbar-control-size) - 8px) !important;
+  min-height: calc(var(--booking-toolbar-control-size) - 8px) !important;
+  padding: 2px 6px !important;
+}
+:root .page-builder .reservations-workspace .booking-text-toolbar svg { width: 1em; height: 1em; }
+
+/* Form editing follows the Page Builder: tools, page surface, inspector. */
+:root .page-builder .reservations-workspace.is-form-editing .reservations-header { display: none; }
+:root .page-builder .reservations-workspace.is-form-editing .reservation-editor-layout { grid-template-columns: minmax(0, 1fr); }
+:root .page-builder .reservations-workspace.is-form-editing .reservation-block-list { display: none; }
+:root .page-builder .reservations-workspace.is-form-editing .reservation-editor-card { padding: 0; border: 0; border-radius: 0; background: transparent; }
+:root .page-builder .reservations-workspace.is-form-editing .editor-card-header > div:first-child { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; }
+:root .page-builder .reservations-workspace.is-form-editing .editor-card-header :is(h2, .reservation-booking-meta) { display: none; }
+:root .page-builder .reservations-workspace.is-form-editing .reservation-build-name { width: min(100%, 320px); margin: 0; }
+:root .page-builder .reservations-workspace .reservation-form-chooser { display: grid; gap: 8px; width: min(100%, 260px); min-width: 0; }
+:root .page-builder .reservations-workspace .reservation-form-chooser select { width: 100%; }
+:root .page-builder .reservations-workspace .reservation-back-button { display: inline-flex; align-items: center; gap: 6px; min-height: var(--control-height); white-space: nowrap; }
+:root .page-builder .reservations-workspace.is-form-editing .reservation-setup-steps:has(> button:only-child) { display: none; }
+:root .page-builder .reservations-workspace .reservation-block-builder-section-heading { display: flex; align-items: start; justify-content: space-between; gap: 16px; }
+:root .page-builder .reservations-workspace .reservation-block-builder-section-heading p { margin: 6px 0 0; }
+:root .page-builder .reservations-workspace .reservation-block-builder-section-heading > span { flex: 0 0 auto; color: var(--theme-text-muted); font-size: var(--type-caption-size); }
+:root .page-builder .reservations-workspace .booking-element-stage { background: var(--surface-2); border-radius: var(--radius-card); }
+:root .page-builder .reservations-workspace .booking-element-canvas { margin: 24px; padding: 24px; background: var(--theme-surface); border: 1px solid var(--theme-border); border-radius: 0; }
+:root .page-builder .reservations-workspace .booking-canvas-component { border: 1px solid transparent; border-left: 1px solid transparent; border-radius: 0; background: transparent; box-shadow: none !important; cursor: pointer; }
+:root .page-builder .reservations-workspace .booking-canvas-component:hover { border-color: var(--theme-border); }
+:root .page-builder .reservations-workspace .booking-canvas-component.is-selected,
+:root .page-builder .reservations-workspace .booking-canvas-component:focus-visible { border-color: var(--theme-primary); }
+@container reservation-editor (max-width: 700px) {
+  :root .page-builder .reservations-workspace .booking-element-canvas { margin: 12px; padding: 18px; }
+}
+
+
+/* A readable form page, with independent workspace panels on desktop. */
+:root .page-builder .reservations-workspace .booking-form-page {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  min-height: 0;
+  margin: 0;
+  padding: 24px;
+  border: 1px solid var(--theme-border);
+  background: var(--theme-surface);
+}
+:root .page-builder .reservations-workspace .booking-element-canvas {
+  margin: 0;
+  padding: 24px;
+  border: 0;
+  background: var(--surface-2);
+}
+:root .page-builder .reservations-workspace.is-form-editing .reservation-block-builder-section-heading,
+:root .page-builder .reservations-workspace.is-form-editing .reservation-step-actions { display: none; }
+@media (min-width: 961px) {
+  :root .page-builder .reservations-workspace.is-form-editing {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+    padding: 0 !important;
+    overflow: hidden;
+    scrollbar-gutter: auto;
+  }
+  :root .page-builder .reservations-workspace.is-form-editing .reservation-editor-layout {
+    display: flex;
+    flex: 1 1 0;
+    min-height: 0;
+  }
+  :root .page-builder .reservations-workspace.is-form-editing .reservation-editor-card {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 0;
+    width: 100%;
+    gap: 0;
+    overflow: hidden;
+  }
+  :root .page-builder .reservations-workspace.is-form-editing .reservation-editor-card > .editor-card-header {
+    flex: 0 0 auto;
+    padding: 12px 20px;
+    align-items: end;
+    border-bottom: 1px solid var(--theme-border);
+    background: var(--theme-surface);
+  }
+  :root .page-builder .reservations-workspace.is-form-editing .reservation-setup-steps { flex: 0 0 auto; padding-inline: 20px; }
+  :root .page-builder .reservations-workspace.is-form-editing .reservation-block-builder-section {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 0;
+    gap: 0;
+    overflow: hidden;
+  }
+  :root .page-builder .reservations-workspace.is-form-editing .booking-element-builder {
+    flex: 1 1 0;
+    min-height: 0;
+    grid-template-columns: 240px minmax(0, 1fr) 300px;
+    grid-template-rows: minmax(0, 1fr);
+    gap: 0;
+  }
+  :root .page-builder .reservations-workspace.is-form-editing .booking-component-toolbox {
+    grid-column: 1; grid-row: 1;
+    height: 100%; min-height: 0; overflow: auto;
+    align-content: start;
+    padding: 16px;
+    border: 0;
+    border-inline-end: 1px solid var(--theme-border);
+    border-radius: 0;
+  }
+  :root .page-builder .reservations-workspace.is-form-editing .booking-component-toolbox-list.section-component-palette { grid-template-columns: minmax(0, 1fr); }
+  :root .page-builder .reservations-workspace.is-form-editing .booking-element-stage {
+    grid-column: 2; grid-row: 1;
+    display: flex; flex-direction: column;
+    height: 100%; min-height: 0; overflow: hidden;
+    border: 0; border-radius: 0;
+  }
+  :root .page-builder .reservations-workspace.is-form-editing .booking-element-stage-heading { flex: 0 0 auto; min-height: 44px; background: var(--theme-surface); }
+  :root .page-builder .reservations-workspace.is-form-editing .booking-element-canvas { flex: 1 1 0; min-height: 0; overflow: auto; }
+  :root .page-builder .reservations-workspace.is-form-editing .booking-component-inspector {
+    grid-column: 3; grid-row: 1;
+    height: 100%; min-height: 0; overflow: auto;
+    align-content: start;
+    padding: 16px;
+    border: 0 !important;
+    border-inline-start: 1px solid var(--theme-border) !important;
+    background: var(--theme-surface);
+  }
+}
+@media (max-width: 960px) {
+  :root .page-builder .reservations-workspace .booking-form-page { padding: 18px; }
+  :root .page-builder .reservations-workspace .booking-element-canvas { padding: 16px; }
+}
+@media (min-width: 961px) {
+  :root .page-builder .reservations-workspace.is-form-editing :is(.booking-component-toolbox, .booking-component-inspector) { scrollbar-gutter: stable; overscroll-behavior: contain; }
+
+}
+:root .page-builder .reservations-workspace .booking-component-inspector-heading { position: static; z-index: auto; }
+:root .page-builder .reservations-workspace .booking-field-translations { min-width: 0; border-top: 1px solid var(--theme-border); padding-top: 12px; }
+:root .page-builder .reservations-workspace .booking-device-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+:root .page-builder .reservations-workspace .booking-device-tabs button { padding: 5px 8px; min-height: 32px; background: var(--theme-surface) !important; color: var(--theme-text) !important; box-shadow: none; }
+:root .page-builder .reservations-workspace .booking-device-tabs button[aria-pressed="true"] { border-color: var(--theme-primary); color: var(--theme-primary) !important; }
+:root .page-builder .reservations-workspace .booking-element-stage-heading { flex-wrap: wrap; gap: 8px; }
+/* Use the page builder's shared move icon and corner-resize handle. */
+:root .page-builder .reservations-workspace .booking-component-move-x.direct-move-handle {
+  min-width: 28px; min-height: 24px; margin: 0; touch-action: none;
+  -webkit-text-fill-color: currentColor; opacity: 0; visibility: hidden; pointer-events: none;
+}
+:root .page-builder .reservations-workspace .booking-component-resize.direct-resize-handle {
+  min-width: 16px; min-height: 16px; margin: 0; touch-action: none;
+  opacity: 0; visibility: hidden; pointer-events: none;
+}
+:root .page-builder .reservations-workspace .booking-canvas-component[dir="rtl"] > .direct-move-handle { left: auto; right: -7px; }
+:root .page-builder .reservations-workspace .booking-canvas-component[dir="rtl"] > .direct-resize-handle { right: auto; left: -7px; cursor: nesw-resize; }
+:root .page-builder .reservations-workspace .booking-canvas-component:is(.is-selected, :focus-within) :is(.booking-component-move-x, .booking-component-resize) { opacity: 1; visibility: visible; pointer-events: auto; }
+:root .page-builder .reservations-workspace .booking-canvas-component:is(.is-selected, :focus-within) .booking-component-move-x:disabled { opacity: .35; cursor: default; }
+:root .page-builder .reservations-workspace .booking-form-page.reservation-layout-grid { gap: 16px; }
+:root .page-builder .reservations-workspace .booking-canvas-component-slot { position: relative; }
+:root .page-builder .reservations-workspace .booking-canvas-component-preview { padding: 0; }
+:root .page-builder .reservations-workspace .booking-canvas-component-preview { min-height: var(--booking-content-height, auto); }
+:root .page-builder .reservations-workspace .booking-canvas-component.is-button .booking-canvas-component-preview > button { width: 100%; min-width: 0; height: var(--booking-content-height, auto); min-height: 32px; box-sizing: border-box; padding-block: 4px; }
+:root .page-builder .reservations-workspace .booking-canvas-component-preview > label > input:not([type="checkbox"]):not([type="radio"]) { height: var(--booking-content-height, auto); min-height: 32px; box-sizing: border-box; padding-block: 4px; }
+:root .page-builder .reservations-workspace .booking-canvas-component-preview :is(h1, h2, h3, h4, p, ul, ol) { margin-block: 0; }
+:root .page-builder .reservations-workspace .booking-component-dropzone { display: none; position: absolute; inset-inline: 0; top: -12px; height: 24px; margin: 0; pointer-events: none; }
+:root .page-builder .reservations-workspace .booking-component-dropzone.is-visible { display: block; pointer-events: auto; z-index: 22; }
+:root .page-builder .reservations-workspace .booking-component-dropzone.is-active { height: 24px; }
+:root .page-builder .reservations-workspace .booking-component-dropzone.is-last { top: auto; bottom: -12px; }
+:root .page-builder .reservations-workspace .booking-canvas-component.is-pointer-moving { z-index: 20; opacity: .85; will-change: transform; }
+:root .page-builder .reservations-workspace .booking-canvas-component-slot:is(.is-pointer-drop-before, .is-pointer-drop-after)::after { content: ""; position: absolute; inset-inline: 0; top: 8px; height: 3px; border-radius: 2px; background: var(--theme-primary); pointer-events: none; z-index: 21; }
+:root .page-builder .reservations-workspace .booking-canvas-component-slot.is-pointer-drop-after::after { top: auto; bottom: -8px; }
+:root .page-builder .reservations-workspace .booking-canvas-component-slot .booking-canvas-component { min-height: inherit; }
+:root .page-builder .reservations-workspace .booking-canvas-component-preview [contenteditable] { pointer-events: auto; cursor: text; white-space: pre-wrap; min-height: 1em; outline: none; }
+:root .page-builder .reservations-workspace .booking-canvas-component-preview [contenteditable]:focus { box-shadow: 0 1px 0 var(--theme-primary); }
+:root .page-builder .reservations-workspace details.booking-field-translations { display: block; min-height: 0; padding: 6px 10px; border: 1px solid var(--theme-border); border-radius: var(--radius-default); background: transparent; box-shadow: none; }
+:root .page-builder .reservations-workspace .booking-field-translations > summary { min-height: 20px; margin: 0; padding: 0; line-height: 20px; cursor: pointer; color: var(--theme-text); font-size: var(--type-small-size); font-weight: var(--weight-semibold); }
+:root .page-builder .reservations-workspace .booking-field-translations > p { margin: 4px 0 12px; }
+:root .page-builder .reservations-workspace .booking-field-translations label { display: grid; gap: 6px; min-width: 0; margin-top: 12px; }
+:root .page-builder .reservations-workspace .booking-field-translations :is(input, textarea) { width: 100%; min-width: 0; }
+:root .page-builder .reservations-workspace .booking-field-translations textarea { min-height: 72px; resize: vertical; }
+:root .page-builder .reservations-workspace .booking-translation-tabs { display: flex; gap: 8px; }
+:root .page-builder .reservations-workspace .booking-translation-tabs button { flex: 1; min-height: 36px; background: var(--theme-surface) !important; color: var(--theme-text) !important; border: 1px solid var(--color-border-control); box-shadow: none; }
+:root .page-builder .reservations-workspace .booking-translation-tabs button[aria-pressed="true"] { border-color: var(--theme-primary); color: var(--theme-primary) !important; }
+:root .page-builder .reservations-workspace .booking-preview-language { display: flex; align-items: center; gap: 8px; font-size: var(--type-caption-size) !important; }
+:root .page-builder .reservations-workspace .booking-element-stage .booking-element-stage-heading .booking-preview-language select { min-height: 32px !important; width: 120px; padding: 4px 8px !important; font-size: var(--type-caption-size) !important; }

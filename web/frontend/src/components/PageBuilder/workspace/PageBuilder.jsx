@@ -68,6 +68,8 @@ import {
   getFormSections,
   getFormFields,
   createElement,
+  createColumn,
+  createRow,
   createSection,
   createPage,
   createRole,
@@ -109,6 +111,7 @@ import {
 } from "../core/PageBuilder.artboard";
 import ButtonColorControls from "./ButtonColorControls";
 import PageBuilderPageInspector from "./PageBuilderPageInspector";
+import PageBuilderComponentLibrary, { PageBuilderComponentDetails } from "./PageBuilderComponentLibrary";
 import {
   FormsTab,
   ReservationsTab,
@@ -659,16 +662,16 @@ export function BuilderSidebarActions({
   };
 
   return (
-    <div className="builder-sidebar-save-control">
-      <p className="builder-note" role="status" aria-live="polite">
-        {getBuilderSaveStateLabel(saveState)}
+    <div className="builder-sidebar-save-control builder-command-bar">
+      <p className="builder-command-status" role="status" aria-live="polite">
+        <span>{getBuilderSaveStateLabel(saveState)}</span>
         {saveState === BUILDER_SAVE_STATES.savedCloud && lastCloudSavedAt
-          ? ` at ${lastCloudSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-          : ""}
+          ? <small>{` at ${lastCloudSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}</small>
+          : null}
       </p>
       <button
         type="button"
-        className="page-primary-action builder-sidebar-save-button"
+        className="builder-command-button"
         disabled={isSavingProject || saveDisabled || !onSave}
         onClick={() => onSave?.()}
       >
@@ -681,14 +684,14 @@ export function BuilderSidebarActions({
               : "Save"}
         </span>
       </button>
-      <p className="builder-note" data-testid="builder-publication-state">
+      <span className="builder-publication-state" data-testid="builder-publication-state">
         {saveState === BUILDER_SAVE_STATES.conflict
           ? "Publish blocked by conflict"
           : getBuilderPublicationLabel(publicationState)}
-      </p>
+      </span>
       <button
         type="button"
-        className="page-primary-action builder-sidebar-save-button"
+        className="builder-command-button"
         disabled={!onPreview}
         onClick={() => onPreview?.()}
       >
@@ -697,7 +700,7 @@ export function BuilderSidebarActions({
       </button>
       <button
         type="button"
-        className="page-primary-action builder-sidebar-save-button"
+        className="builder-command-button builder-command-publish"
         disabled={isPublishing || !onGoLive}
         onClick={handleGoLive}
       >
@@ -781,6 +784,12 @@ export default function PageBuilder({
   const activeTab = hideWorkspaceTabs ? internalActiveTab : (routeTab || "design");
   const [designPanel, setDesignPanelState] = useState(routeDesignPanel || "Pages");
   const visibleDesignPanel = designPanel;
+  const [componentDetails, setComponentDetails] = useState(null);
+  const componentTriggerRef = useRef(null);
+  const closeComponentDetails = useCallback(() => {
+    setComponentDetails(null);
+    componentTriggerRef.current?.focus();
+  }, []);
   const [viewport, setViewport] = useState("desktop");
   const [preview, setPreview] = useState(() => new URLSearchParams(location.search).get("preview") === "1");
   const [editorViewportWidth, setEditorViewportWidth] = useState(0);
@@ -963,6 +972,7 @@ export default function PageBuilder({
 
   const setDesignPanel = useCallback(
     (nextPanel) => {
+      setComponentDetails(null);
       setDesignPanelState(nextPanel);
       if (hideWorkspaceTabs) return;
 
@@ -1771,6 +1781,15 @@ export default function PageBuilder({
       }));
   }, [reservationDefinitions, elementTypes]);
 
+  const componentLibraryItems = useMemo(() => elementTypes
+    .filter((item) => item.group !== "Bookings")
+    .map((item) => ({ ...item, key: item.id, type: item.id }))
+    .concat(reservationPaletteItems.map((item) => ({
+      ...item,
+      group: "Bookings",
+      key: `reservation_${item.id}`,
+    }))), [elementTypes, reservationPaletteItems]);
+
   const reservationFormOptions = useMemo(
     () =>
       reservationDefinitions.map((block, index) => {
@@ -2179,7 +2198,7 @@ export default function PageBuilder({
     );
   };
 
-  const addComponentToSection = (type, requestedSectionId = "", dropPoint = null, overrides = {}) => {
+  const addComponentToSection = (type, requestedSectionId = "", dropPoint = null, overrides = {}, placement = {}) => {
     const reservationPlacementMode = type === "reservationRequest"
       ? "flexible"
       : type === "reservationFixedSlots"
@@ -2265,6 +2284,28 @@ export default function PageBuilder({
       activePage?.sections.find((section) => section.id === requestedSectionId) ||
       selectedSection ||
       activePage?.sections[activePage.sections.length - 1];
+    if (placement.preserveLayout && existingTarget && !["direct", "free"].includes(existingTarget.mode)) {
+      const nextElement = { ...element, ...resolvedOverrides, mode: "auto" };
+      const columns = (existingTarget.rows || []).flatMap((row) => row.columns || []);
+      const targetColumn = columns.find((column) => column.id === placement.columnId) || columns[0];
+      updateActivePage((page) => ({
+        ...page,
+        sections: page.sections.map((section) => section.id !== existingTarget.id ? section : {
+          ...section,
+          rows: targetColumn ? section.rows.map((row) => ({
+            ...row,
+            columns: row.columns.map((column) => column.id !== targetColumn.id ? column : {
+              ...column,
+              elements: [...(column.elements || []), nextElement],
+            }),
+          })) : [...(section.rows || []), createRow([createColumn([nextElement])])],
+        }),
+      }));
+      setSelected({ type: "element", id: nextElement.id });
+      setPaletteDropSectionId("");
+      showToast(`${nextElement.name || "Component"} added to ${existingTarget.name || "section"}.`);
+      return nextElement;
+    }
     const targetSection = existingTarget ? (["direct", "free"].includes(existingTarget.mode) ? existingTarget : convertSectionToDirectLayout(existingTarget)) : convertSectionToDirectLayout(
       createSection({
         name: "Section 1",
@@ -2369,6 +2410,26 @@ export default function PageBuilder({
     }
   };
 
+  const handleComponentLibraryDrag = (event, item) => {
+    handlePaletteDragStart(event, item.type, item.group === "Bookings" && !item.isStarter ? item.id : "");
+    // A drag from the details panel keeps its source mounted until dragend.
+    if (!event.currentTarget.closest(".component-details")) setComponentDetails(null);
+  };
+
+  const addLibraryComponent = (item) => {
+    const targetSectionId = selectedSection?.id || "";
+    const placement = item.group === "Bookings" ? getReservationPalettePlacement(item.id) : null;
+    if (item.group === "Bookings" && !placement && !item.isStarter) return;
+    const added = addComponentToSection(
+      placement?.type || item.type,
+      targetSectionId,
+      getVisibleCanvasInsertPoint(targetSectionId),
+      placement?.overrides || {},
+      { preserveLayout: true }
+    );
+    if (added) closeComponentDetails();
+  };
+
   const getVisibleCanvasInsertPoint = (sectionId = "") => {
     const shell = canvasShellRef.current;
     if (!shell) return null;
@@ -2418,7 +2479,8 @@ export default function PageBuilder({
       reservationPlacement?.type || type,
       section.id,
       localPoint,
-      reservationPlacement?.overrides || {}
+      reservationPlacement?.overrides || {},
+      { preserveLayout: true, columnId: getClosestColumnIdFromEvent(event) }
     );
   };
 
@@ -6192,10 +6254,6 @@ export default function PageBuilder({
         <aside className="builder-sidebar">
             <div className="builder-side-panel">
               <div className="panel-mode-select">
-                <div className="panel-navigator-heading">
-                  <span>Editing tools</span>
-                  <small>Choose what you want to manage</small>
-                </div>
                 <div className="panel-navigator" role="tablist" aria-label="Editing tools">
                   {designPanelOptions.map((panel) => {
                     const PanelIcon = panel.icon;
@@ -6205,35 +6263,18 @@ export default function PageBuilder({
                         type="button"
                         role="tab"
                         aria-selected={visibleDesignPanel === panel.id}
+                        aria-label={panel.id === "Sections" ? "Sections — Add" : panel.id}
                         className={visibleDesignPanel === panel.id ? "active" : ""}
                         key={panel.id}
                         onClick={() => setDesignPanel(panel.id)}
                       >
                         {PanelIcon && <PanelIcon size={18} aria-hidden="true" />}
-                        <span>
-                          <strong>{panel.id}</strong>
-                          <small>{panel.hint}</small>
-                        </span>
+                        <strong>{panel.id === "Sections" ? "Add" : panel.id}</strong>
                       </button>
                     );
                   })}
                 </div>
               </div>
-
-              <BuilderSidebarActions
-                isSavingProject={isSavingProject}
-                lastCloudSavedAt={lastCloudSavedAt}
-                onSave={() => saveProject({ successMessage: "Changes saved." })}
-                onPreview={handlePreviewClick}
-                onGoLive={publishProject}
-                publicationState={publicationState}
-                saveDisabled={
-                  builderProjectLoading ||
-                  hasProtectedUnreadableDraft ||
-                  saveState === BUILDER_SAVE_STATES.conflict
-                }
-                saveState={saveState}
-              />
 
             {visibleDesignPanel === "Pages" && (
               <section className="builder-panel pages-manager-panel">
@@ -6297,70 +6338,16 @@ export default function PageBuilder({
             )}
 
           {visibleDesignPanel === "Sections" && (
-            <section className="builder-panel">
-              <h2>Components</h2>
-              <p className="panel-help">Drag a component anywhere onto the continuous page canvas.</p>
-              <div className="section-component-palette">
-                <span>Page components</span>
-                {elementGroups.filter(group => elementTypes.some(item => item.group === group)).map((group) => (
-                  <div className="add-group" key={group}>
-                    <span>{group}</span>
-                    {group === "Bookings" ? (
-                      reservationPaletteItems.length > 0 ? reservationPaletteItems.map((item) => (
-                        <button
-                          type="button"
-                          draggable
-                          className="saved-reservation-palette-item"
-                          key={`reservation_${item.id}`}
-                          onDragStart={(event) => handlePaletteDragStart(
-                            event,
-                            item.type,
-                            item.isStarter ? '' : item.id
-                          )}
-                          onClick={() => {
-                            const targetSectionId = selectedSection?.id || "";
-                            const placement = getReservationPalettePlacement(item.id);
-                            if (!placement && !item.isStarter) return;
-                            addComponentToSection(
-                              placement?.type || item.type,
-                              targetSectionId,
-                              getVisibleCanvasInsertPoint(targetSectionId),
-                              placement?.overrides || {}
-                            );
-                          }}
-                        >
-                          <strong>{item.label}</strong>
-                          <small>{item.helper} · Drag into a section</small>
-                        </button>
-                      )) : (
-                        <p className="builder-palette-empty">Create a reservation in the Reservations workspace first.</p>
-                      )
-                    ) : elementTypes
-                      .filter((item) => item.group === group)
-                      .map((item) => (
-                        <button
-                          type="button"
-                          draggable
-                          key={item.id}
-                          onDragStart={(event) => handlePaletteDragStart(event, item.id)}
-                          onClick={() => {
-                            const targetSectionId = selectedSection?.id || "";
-                            addComponentToSection(
-                              item.id,
-                              targetSectionId,
-                              getVisibleCanvasInsertPoint(targetSectionId)
-                            );
-                          }}
-                        >
-                          <strong>{item.label}</strong>
-                          <small>Drag into a section</small>
-                        </button>
-                      ))}
-                  </div>
-                ))}
-              </div>
-
-            </section>
+            <PageBuilderComponentLibrary
+              groups={elementGroups}
+              items={componentLibraryItems}
+              selectedKey={componentDetails?.key}
+              onInspect={(item, trigger) => {
+                componentTriggerRef.current = trigger;
+                setComponentDetails(item);
+              }}
+              onDragStart={handleComponentLibraryDrag}
+            />
           )}
 
           {visibleDesignPanel === "Themes" && (
@@ -6371,6 +6358,16 @@ export default function PageBuilder({
 
           </div>
         </aside>
+      )}
+
+      {!preview && visibleDesignPanel === "Sections" && componentDetails && (
+        <PageBuilderComponentDetails
+          key={componentDetails.key}
+          item={componentDetails}
+          onClose={closeComponentDetails}
+          onAdd={addLibraryComponent}
+          onDragStart={handleComponentLibraryDrag}
+        />
       )}
 
       <main
@@ -6419,8 +6416,20 @@ export default function PageBuilder({
             return {
               className: [
                 isSelected ? "is-selected" : "",
-                isDirect && (dragState?.dropSectionId === section.id || paletteDropSectionId === section.id) ? "is-drop-target" : "",
+                (isDirect && dragState?.dropSectionId === section.id) || paletteDropSectionId === section.id ? "is-drop-target" : "",
               ].filter(Boolean).join(" "),
+              onDragOver: (event) => {
+                if (preview || !Array.from(event.dataTransfer.types || []).includes("application/x-madar-component")) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "copy";
+                if (paletteDropSectionId !== section.id) setPaletteDropSectionId(section.id);
+              },
+              onDragLeave: (event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) setPaletteDropSectionId("");
+              },
+              onDrop: (event) => {
+                if (!preview && Array.from(event.dataTransfer.types || []).includes("application/x-madar-component")) handlePaletteDrop(event, section);
+              },
               onClick: (event) => {
                 if (suppressCanvasClickRef.current) {
                   suppressCanvasClickRef.current = false;
@@ -7742,6 +7751,9 @@ export default function PageBuilder({
       onSelectReservationBlock={selectReservationBlock}
       onUpdateReservationBlock={updateReservationBlock}
       onDeleteReservationBlock={deleteReservationBlock}
+      onSave={() => saveProject({ successMessage: lang === "ar" ? "تم حفظ إعدادات الحجز." : "Booking settings saved." })}
+      isSaving={isSavingProject}
+      saveDisabled={builderProjectLoading || hasProtectedUnreadableDraft || saveState === BUILDER_SAVE_STATES.conflict}
     />
   );
 
@@ -7864,6 +7876,7 @@ export default function PageBuilder({
             ? visibleTabIds.includes(tab.id)
             : !mainBuilderHiddenTabs.includes(tab.id)
         )
+        .filter((tab) => ["design", "chrome", "publish"].includes(tab.id))
         .map((tab) => {
           const tabPath = routeProjectId
             ? getBuilderWorkspacePath(routeProjectId, tab.id, routeWorkspace)
@@ -8001,21 +8014,21 @@ export default function PageBuilder({
                 type="button"
                 onClick={undoProjectChange}
                 disabled={historyDepth.undo === 0}
-                aria-label="Undo last builder change"
-                title="Undo (Ctrl+Z)"
+                aria-label={lang === "ar" ? "تراجع عن آخر تغيير" : "Undo last builder change"}
+                title={lang === "ar" ? "تراجع (Ctrl+Z)" : "Undo (Ctrl+Z)"}
               >
                 <Undo2 size={16} aria-hidden="true" />
-                <span>Undo</span>
+                <span>{lang === "ar" ? "تراجع" : "Undo"}</span>
               </button>
               <button
                 type="button"
                 onClick={redoProjectChange}
                 disabled={historyDepth.redo === 0}
-                aria-label="Redo builder change"
-                title="Redo (Ctrl+Shift+Z)"
+                aria-label={lang === "ar" ? "إعادة التغيير" : "Redo builder change"}
+                title={lang === "ar" ? "إعادة (Ctrl+Shift+Z)" : "Redo (Ctrl+Shift+Z)"}
               >
                 <Redo2 size={16} aria-hidden="true" />
-                <span>Redo</span>
+                <span>{lang === "ar" ? "إعادة" : "Redo"}</span>
               </button>
             </div>
           )}
@@ -8032,6 +8045,18 @@ export default function PageBuilder({
           setViewport={setViewport}
           viewport={viewport}
           viewports={viewports}
+          workspaceActions={activeTab === "design" ? (
+            <BuilderSidebarActions
+              isSavingProject={isSavingProject}
+              lastCloudSavedAt={lastCloudSavedAt}
+              onSave={() => saveProject({ successMessage: "Changes saved." })}
+              onPreview={handlePreviewClick}
+              onGoLive={publishProject}
+              publicationState={publicationState}
+              saveDisabled={builderProjectLoading || hasProtectedUnreadableDraft || saveState === BUILDER_SAVE_STATES.conflict}
+              saveState={saveState}
+            />
+          ) : null}
         />
 
 

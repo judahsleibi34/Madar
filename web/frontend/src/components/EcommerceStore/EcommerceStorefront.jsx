@@ -21,7 +21,7 @@ import {
 } from "../../services/ecommerceApi";
 import StorefrontSeo, { safePublicUrl } from "./StorefrontSeo";
 import { getResponsiveMediaProps, isVideoMediaUrl, resolveMediaUrl } from "../../utils/media";
-import { normalizeStoreTheme } from "../../utils/ecommerceTheme";
+import { normalizeStoreTheme, readableForeground } from "../../utils/ecommerceTheme";
 import { createDemoLandingSlides } from "../../config/ecommerceLandingDefaults";
 import { formatCommerceMoney, normalizeCommerceLocale } from "../../utils/commerceI18n";
 import { estimateCartDiscount } from "../../utils/ecommerceDiscounts";
@@ -57,7 +57,7 @@ const productSalePercentage = (product) => {
 function ProductSaleBadge({ product }) {
   const percentage = productSalePercentage(product);
   if (!percentage) return null;
-  return <span className="live-store-product-sale-badge">{c("product.sale")}</span>;
+  return <span className="live-store-product-sale-badge">{c("product.salePercentage", { percentage })}</span>;
 }
 
 const STORE_SOCIAL_NETWORKS = [
@@ -821,6 +821,7 @@ function CategoryList({ categories, activeSlug, onSelect }) {
         <button
           type="button"
           className={activeSlug === item.slug ? "is-active" : ""}
+          aria-pressed={activeSlug === item.slug}
           style={{ "--category-depth": depth }}
           onClick={() => onSelect(item.slug)}
           title={item.name}
@@ -840,6 +841,7 @@ function CategoryList({ categories, activeSlug, onSelect }) {
         <button
           type="button"
           className={!activeSlug ? "is-active" : ""}
+          aria-pressed={!activeSlug}
           onClick={() => onSelect("")}
         >
           <span>{c("common.viewAll")}</span>
@@ -1258,7 +1260,7 @@ function CategoryCarousel({ categories, shopPath, categoriesPath, kind = "catego
             {rtl ? <ChevronRight size={24} aria-hidden="true" /> : <ChevronLeft size={24} aria-hidden="true" />}
           </button>
         )}
-        <ul className="live-store-category-carousel" ref={trackRef} onScroll={syncActiveIndex} style={{ "--store-carousel-columns": Math.min(5, Math.max(1, categories.length)), "--store-carousel-tablet-columns": Math.min(3, Math.max(1, categories.length)) }}>
+        <ul className="live-store-category-carousel" ref={trackRef} onScroll={syncActiveIndex}>
           {loopedCategories.map(({ category, index, group }) => (
             <li
               key={`${group}-${category.id}`}
@@ -1301,6 +1303,18 @@ function StoreSaleBar({ percentage, shopPath, onDismiss }) {
   );
 }
 
+function StoreBlackFridayBar({ percentage, shopPath, onDismiss }) {
+  return (
+    <div className="live-store-sale-bar live-store-black-friday-bar" role="status">
+      <Gift size={18} aria-hidden="true" />
+      <Link to={shopPath}>{percentage ? c("blackFriday.barDiscount", { percentage }) : c("blackFriday.bar")}</Link>
+      <button type="button" onClick={onDismiss} aria-label={c("blackFriday.dismissBar")}>
+        <X size={18} />
+      </button>
+    </div>
+  );
+}
+
 function StoreSalePopup({ percentage, shopPath, onDismiss }) {
   const closeRef = useRef(null);
 
@@ -1334,6 +1348,45 @@ function StoreSalePopup({ percentage, shopPath, onDismiss }) {
           <h2>{c("salePromotion.title", { percentage })}</h2>
           <p>{c("salePromotion.popupBody", { percentage })}</p>
           <Link to={shopPath} onClick={onDismiss}><ShoppingBag size={18} aria-hidden="true" />{c("salePromotion.shopSale")}<ArrowRight size={18} aria-hidden="true" /></Link>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function StoreBlackFridayPopup({ percentage, shopPath, onDismiss }) {
+  const closeRef = useRef(null);
+
+  useEffect(() => {
+    const previouslyFocused = document.activeElement;
+    closeRef.current?.focus();
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") onDismiss();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("keydown", closeOnEscape);
+      previouslyFocused?.focus?.();
+    };
+  }, [onDismiss]);
+
+  return (
+    <div className="live-store-sale-popup-backdrop live-store-black-friday-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onDismiss()}>
+      <section className="live-store-sale-popup live-store-black-friday-popup" role="dialog" aria-modal="true" aria-label={c("blackFriday.dialogLabel")}>
+        <button ref={closeRef} className="live-store-sale-popup-close" type="button" onClick={onDismiss} aria-label={c("blackFriday.dismiss")}>
+          <X size={20} />
+        </button>
+        <div className="live-store-sale-popup-offer live-store-black-friday-offer" aria-hidden="true">
+          <span className="live-store-sale-popup-icon"><Gift size={24} /></span>
+          <small>{c("blackFriday.kicker")}</small>
+          <strong>{percentage ? <><bdi>{percentage}%</bdi><br />OFF</> : <>BLACK<br />FRIDAY</>}</strong>
+          <span>{percentage ? c("blackFriday.discount") : c("blackFriday.event")}</span>
+        </div>
+        <div className="live-store-sale-popup-copy">
+          <span>{c("blackFriday.kicker")}</span>
+          <h2>{c(percentage ? "blackFriday.discountTitle" : "blackFriday.title", { percentage })}</h2>
+          <p>{c(percentage ? "blackFriday.discountBody" : "blackFriday.body", { percentage })}</p>
+          <Link to={shopPath} onClick={onDismiss}><ShoppingBag size={18} aria-hidden="true" />{c("blackFriday.shop")}<ArrowRight size={18} aria-hidden="true" /></Link>
         </div>
       </section>
     </div>
@@ -1425,7 +1478,32 @@ function LandingHeroCarousel({ site, brand, locale }) {
 }
 
 
-function StoreLanding({ brand, site, catalog, categoryById, locale, shopPath, productBasePath, onAdd }) {
+function BlackFridayCampaignHero({ percentage, shopPath }) {
+  return (
+    <section className="live-store-black-friday-hero" aria-labelledby="black-friday-hero-title">
+      <div className="live-store-black-friday-hero-copy">
+        <span className="live-store-black-friday-hero-kicker"><Gift size={17} aria-hidden="true" />{c("blackFriday.heroEyebrow")}</span>
+        <h1 id="black-friday-hero-title">{c("blackFriday.heroTitle")}</h1>
+        <strong>{percentage ? c("blackFriday.heroDiscount", { percentage }) : c("blackFriday.heroEvent")}</strong>
+        <p>{c(percentage ? "blackFriday.heroBody" : "blackFriday.heroBodyNoDiscount", { percentage })}</p>
+        <Link to={shopPath}>{c("blackFriday.shopDeals")}<ArrowRight size={19} aria-hidden="true" /></Link>
+      </div>
+      <div className="live-store-black-friday-hero-art" aria-hidden="true">
+        <span className="live-store-black-friday-ticket is-primary">
+          <small>{c("blackFriday.kicker")}</small>
+          <b>{percentage ? `${percentage}%` : "SALE"}</b>
+          <em>{percentage ? "OFF" : "NOW"}</em>
+        </span>
+        <span className="live-store-black-friday-ticket is-secondary">BLACK<br />FRIDAY</span>
+        <span className="live-store-black-friday-spark is-one">✦</span>
+        <span className="live-store-black-friday-spark is-two">✦</span>
+      </div>
+    </section>
+  );
+}
+
+
+function StoreLanding({ brand, site, catalog, categoryById, locale, shopPath, productBasePath, onAdd, blackFridayEnabled, salePercentage }) {
   const selectedProductIds = site?.growth?.featured_product_ids || [];
   const selectedCategoryIds = site?.growth?.featured_category_ids || [];
   const featuredProducts = (selectedProductIds.length ? catalog.featured_products : catalog.products).slice(0, 12);
@@ -1433,7 +1511,9 @@ function StoreLanding({ brand, site, catalog, categoryById, locale, shopPath, pr
   const featuredCategories = (selectedCategoryIds.length ? catalog.featured_categories : catalog.categories.filter((item) => !item.parent_id)).slice(0, 6);
   return (
     <div className="live-store-landing">
-      <LandingHeroCarousel site={site} brand={brand} locale={locale} />
+      {blackFridayEnabled
+        ? <BlackFridayCampaignHero percentage={salePercentage} shopPath={shopPath} />
+        : <LandingHeroCarousel site={site} brand={brand} locale={locale} />}
 
       {featuredBrands.length > 0 && (
         <CategoryCarousel
@@ -1514,6 +1594,7 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
   const [notification, setNotification] = useState(null);
   const [dismissedSaleBarKey, setDismissedSaleBarKey] = useState("");
   const [dismissedSalePopupKey, setDismissedSalePopupKey] = useState("");
+  const [dismissedCampaignKey, setDismissedCampaignKey] = useState("");
   const notify = useCallback((value) => setNotification({ ...value }), []);
   const dismissNotification = useCallback(() => setNotification(null), []);
   const orderAttemptRef = useRef({ fingerprint: "", key: "" });
@@ -1542,22 +1623,39 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
     return Math.max(reportedMaximum, ...visibleProducts.map(productSalePercentage));
   }, [catalog.featured_products, catalog.products, catalog.sale_summary?.max_percentage, productDetail?.product]);
 
+  const savedTheme = normalizeStoreTheme(draftTheme || site?.store_theme || site?.theme);
+  const blackFridayEnabled = savedTheme.seasonal_campaign?.enabled === true
+    && savedTheme.seasonal_campaign?.type === "black_friday";
+  const campaignStorageKey = `${subdomain || "store"}:black-friday`;
+  const blackFridayPopupVisible = blackFridayEnabled
+    && dismissedCampaignKey !== campaignStorageKey
+    && (() => {
+      try { return sessionStorage.getItem(`madar-seasonal-campaign:${campaignStorageKey}`) !== "dismissed"; }
+      catch { return true; }
+    })();
+
   const saleStorageKey = `${subdomain || "store"}:${salePercentage}`;
   const wasSaleDismissed = (kind) => {
     try { return sessionStorage.getItem(`madar-sale-${kind}:${saleStorageKey}`) === "dismissed"; }
     catch { return false; }
   };
-  const saleBarVisible = Boolean(salePercentage) && dismissedSaleBarKey !== saleStorageKey;
-  const salePopupVisible = Boolean(salePercentage) && dismissedSalePopupKey !== saleStorageKey && !wasSaleDismissed("popup");
+  const activeSaleBarKey = blackFridayEnabled ? campaignStorageKey : saleStorageKey;
+  const saleBarVisible = (blackFridayEnabled || Boolean(salePercentage)) && dismissedSaleBarKey !== activeSaleBarKey;
+  const salePopupVisible = !blackFridayEnabled && Boolean(salePercentage) && dismissedSalePopupKey !== saleStorageKey && !wasSaleDismissed("popup");
 
   const dismissSaleBar = useCallback(() => {
-    setDismissedSaleBarKey(saleStorageKey);
-  }, [saleStorageKey]);
+    setDismissedSaleBarKey(activeSaleBarKey);
+  }, [activeSaleBarKey]);
 
   const dismissSalePopup = useCallback(() => {
     setDismissedSalePopupKey(saleStorageKey);
     try { sessionStorage.setItem(`madar-sale-popup:${saleStorageKey}`, "dismissed"); } catch { /* Storage may be unavailable. */ }
   }, [saleStorageKey]);
+
+  const dismissBlackFridayPopup = useCallback(() => {
+    setDismissedCampaignKey(campaignStorageKey);
+    try { sessionStorage.setItem(`madar-seasonal-campaign:${campaignStorageKey}`, "dismissed"); } catch { /* Storage may be unavailable. */ }
+  }, [campaignStorageKey]);
 
   const handleAccountChange = async (user) => {
     setAccount(user);
@@ -1974,7 +2072,6 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
     .map(([key, label]) => ({ key, label, href: String(site?.social_links?.[key] || "").trim() }));
   const activeCategory = catalog.categories.find((item) => item.slug === filters.category) || null;
   const seoView = error || (filters.category && !activeCategory) ? "missing" : draftPreviewMode ? "preview" : confirmationRoute ? "confirmation" : checkoutRoute ? "checkout" : productSlug ? (productDetail?.product ? "product" : "missing") : categoriesRoute ? "categories" : isCatalogView ? "catalog" : contactRoute ? "contact" : "home";
-  const savedTheme = normalizeStoreTheme(draftTheme || site?.store_theme || site?.theme);
   const storeStyle = {
     "--store-accent": savedTheme.accent,
     "--store-paper": savedTheme.background,
@@ -1982,6 +2079,11 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
     "--store-ink": savedTheme.text,
     "--store-muted": savedTheme.muted,
     "--store-night": savedTheme.accentDark || savedTheme.text,
+    "--store-accent-contrast": readableForeground(savedTheme.accent),
+    "--store-campaign-accent": savedTheme.accent,
+    "--store-campaign-on-accent": readableForeground(savedTheme.accent),
+    "--store-campaign-night": "#080808",
+    "--store-deal": "#ef2b2d",
   };
   const catalogRefreshing = loading && isCatalogView && Boolean(requestStatus.key);
 
@@ -2000,22 +2102,25 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
   }, [locale]);
 
   return (
-    <div ref={storefrontRef} className="live-store" style={storeStyle} dir={locale === "ar" ? "rtl" : "ltr"} lang={locale}>
+    <div ref={storefrontRef} className={`live-store${blackFridayEnabled ? " is-black-friday" : ""}`} style={storeStyle} dir={locale === "ar" ? "rtl" : "ltr"} lang={locale}>
       <StorefrontSeo origin={window.location.origin} storePath={canonicalStorePath} locale={locale} site={site} productDetail={productDetail} category={activeCategory} view={seoView} />
       <StoreHeader brand={brand} logoUrl={site?.logo_url} cartCount={cartCount} shopPath={shopPath} homePath={homePath} categoriesPath={categoriesPath} contactPath={contactPath} onCartOpen={openCart} subdomain={subdomain} account={account} loyalty={loyalty} onAccountChange={handleAccountChange} />
-      {saleBarVisible && <StoreSaleBar percentage={salePercentage} shopPath={shopPath} onDismiss={dismissSaleBar} />}
+      {saleBarVisible && (blackFridayEnabled
+        ? <StoreBlackFridayBar percentage={salePercentage} shopPath={shopPath} onDismiss={dismissSaleBar} />
+        : <StoreSaleBar percentage={salePercentage} shopPath={shopPath} onDismiss={dismissSaleBar} />)}
       {salePopupVisible && <StoreSalePopup percentage={salePercentage} shopPath={shopPath} onDismiss={dismissSalePopup} />}
+      {blackFridayPopupVisible && <StoreBlackFridayPopup percentage={salePercentage} shopPath={shopPath} onDismiss={dismissBlackFridayPopup} />}
       {site?.growth?.announcement_enabled && announcementText && <div className="live-store-announcement" role="status">{announcementLink ? <a href={announcementLink} onClick={() => trackCommerceEvent("promotion_click", { store: subdomain, locale, placement: "announcement" })}>{announcementText}</a> : <span>{announcementText}</span>}</div>}
       <StoreActionToast notification={notification} onDismiss={dismissNotification} locale={locale} />
       <StoreWhatsAppLink phone={site?.phone} brand={brand} />
       <StoreCart open={cartOpen} items={cartItems} homePath={homePath} checkoutPath={checkoutPath} delivery={delivery} selectedAreaId={selectedAreaId} onSelectedAreaChange={setSelectedAreaId} loyalty={loyalty} normalDiscounts={normalDiscounts} onClose={() => setCartOpen(false)} onQuantityChange={changeCartQuantity} onRemove={removeCartItem} />
-      <main>
+      <main className={blackFridayEnabled && (isLanding || isCatalogView) ? "live-store-campaign-decorated" : undefined}>
 
         {loading && !catalogRefreshing && <StoreSkeleton view={productSlug ? "product" : categoriesRoute ? "categories" : contactRoute ? "contact" : checkoutRoute ? "catalog" : isLanding ? "landing" : "catalog"} />}
         {!loading && error && <div className="live-store-state is-error"><h2>{c("errors.storeUnavailable")}</h2><p>{error}</p></div>}
 
         {!loading && !error && isLanding && (
-          <StoreLanding brand={brand} site={localizedSite} catalog={catalog} categoryById={categoryById} locale={locale} shopPath={shopPath} productBasePath={homePath} onAdd={addToCart} />
+          <StoreLanding brand={brand} site={localizedSite} catalog={catalog} categoryById={categoryById} locale={locale} shopPath={shopPath} productBasePath={homePath} onAdd={addToCart} blackFridayEnabled={blackFridayEnabled} salePercentage={salePercentage} />
         )}
 
         {!loading && !error && categoriesRoute && (
@@ -2048,9 +2153,9 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
                 <button type="submit" aria-label={c("common.search")}><Search size={18} /></button>
               </form>
               <div className="live-store-filter-card"><h2>{c("common.categories")}</h2><CategoryList categories={catalog.categories} activeSlug={filters.category} onSelect={(value) => setFilter("category", filters.category === value ? "" : value)} /></div>
-              {catalog.brands?.length > 0 && <div className="live-store-filter-card"><h2>{c("catalog.brands")}</h2><div className="live-store-tags"><button type="button" className={!filters.brand ? "is-active" : ""} onClick={() => setFilter("brand", "")}>{c("catalog.allBrands")}</button>{catalog.brands.map((item) => <button type="button" key={item.id} className={filters.brand === item.slug ? "is-active" : ""} onClick={() => setFilter("brand", filters.brand === item.slug ? "" : item.slug)}>{item.name}</button>)}</div></div>}
+              {catalog.brands?.length > 0 && <div className="live-store-filter-card"><h2>{c("catalog.brands")}</h2><div className="live-store-tags"><button type="button" className={!filters.brand ? "is-active" : ""} aria-pressed={!filters.brand} onClick={() => setFilter("brand", "")}>{c("catalog.allBrands")}</button>{catalog.brands.map((item) => <button type="button" key={item.id} className={filters.brand === item.slug ? "is-active" : ""} aria-pressed={filters.brand === item.slug} onClick={() => setFilter("brand", filters.brand === item.slug ? "" : item.slug)}>{item.name}</button>)}</div></div>}
               <PriceRangeFilter key={`${priceBounds.min}:${priceBounds.max}:${filters.minPrice}:${filters.maxPrice}`} bounds={priceBounds} minimum={filters.minPrice} maximum={filters.maxPrice} locale={locale} onChange={setPriceFilters} />
-              {catalog.tags.length > 0 && <div className="live-store-filter-card"><h2>{c("common.tags")}</h2><div className="live-store-tags">{catalog.tags.map((item) => <button type="button" key={item.id} className={filters.tag === item.slug ? "is-active" : ""} onClick={() => setFilter("tag", filters.tag === item.slug ? "" : item.slug)}>{item.name}</button>)}</div></div>}
+              {catalog.tags.length > 0 && <div className="live-store-filter-card"><h2>{c("common.tags")}</h2><div className="live-store-tags">{catalog.tags.map((item) => <button type="button" key={item.id} className={filters.tag === item.slug ? "is-active" : ""} aria-pressed={filters.tag === item.slug} onClick={() => setFilter("tag", filters.tag === item.slug ? "" : item.slug)}>{item.name}</button>)}</div></div>}
             </aside>
             <div className="live-store-results">
               <div className="live-store-toolbar"><select value={filters.sort} onChange={(event) => setFilter("sort", event.target.value)} aria-label={c("catalog.title")}><option value="latest">{c("catalog.latest")}</option><option value="price_low">{c("catalog.priceLow")}</option><option value="price_high">{c("catalog.priceHigh")}</option><option value="name">{c("catalog.name")}</option></select></div>

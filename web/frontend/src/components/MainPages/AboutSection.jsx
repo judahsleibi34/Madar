@@ -1,4 +1,4 @@
-import { ArrowRight, Globe2, GraduationCap, ShieldCheck, ShoppingBag } from "lucide-react";
+import { ArrowRight, Globe2, GraduationCap, Layers, ShoppingBag } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import FadeIn from "../Animations/FadeIn";
@@ -8,7 +8,7 @@ const aboutIcons = [Globe2, ShoppingBag, GraduationCap];
 
 export default function AboutSection({ lang }) {
   const { t } = useTranslation("public");
-  const content = t("about", { returnObjects: true });
+  const content = t("about", { returnObjects: true, lng: lang === "ar" ? "ar" : "en" });
   const isRTL = lang === "ar";
 
   return (
@@ -17,7 +17,7 @@ export default function AboutSection({ lang }) {
         <div className="about-page-hero">
           <div className="about-page-hero-copy">
             <h1>
-              {content.hero.titlePrefix} <span className="heading-accent">{content.hero.titleHighlight}</span>
+              {content.hero.titlePrefix} <span>{content.hero.titleHighlight}</span>
             </h1>
             <p className="about-page-lead">
               <strong>{content.hero.name}</strong> {content.hero.description}
@@ -32,33 +32,18 @@ export default function AboutSection({ lang }) {
 
           <div className="about-system-card" aria-label={content.panel.ariaLabel}>
             <div className="about-system-card-heading">
-              <span className="about-panel-icon"><ShieldCheck size={23} /></span>
+              <span className="about-panel-icon"><Layers size={22} aria-hidden="true" /></span>
               <div><strong>{content.panel.title}</strong><p>{content.panel.description}</p></div>
             </div>
-            <div className="about-system-map" aria-label={content.visual.ariaLabel}>
-              <div className="about-system-node is-forms"><Globe2 size={19} /><span>{content.visual.forms}</span></div>
-              <div className="about-system-core"><span>M</span><small>{content.hero.name}</small></div>
-              <div className="about-system-node is-records"><GraduationCap size={19} /><span>{content.visual.records}</span></div>
-              <div className="about-system-node is-workflows"><ShoppingBag size={19} /><span>{content.visual.workflows}</span></div>
-            </div>
+            <ul className="about-product-list" aria-label={content.visual.ariaLabel}>
+              {content.metrics.map((product, index) => {
+                const Icon = aboutIcons[index] || Globe2;
+                return <li key={product.value}><Icon size={20} aria-hidden="true" /><div><strong>{product.value}</strong><p>{product.label}</p></div></li>;
+              })}
+            </ul>
           </div>
         </div>
       </FadeIn>
-
-      <div className="about-page-metrics" aria-label={content.metricsAriaLabel}>
-        {content.metrics.map((metric, index) => {
-          const Icon = aboutIcons[index] || Globe2;
-
-          return (
-            <FadeIn delay={0.08 + index * 0.06} key={metric.value}>
-              <article className="about-page-metric">
-                <span><Icon size={20} /></span>
-                <div><strong>{metric.value}</strong><p>{metric.label}</p></div>
-              </article>
-            </FadeIn>
-          );
-        })}
-      </div>
 
       <FadeIn delay={0.2}>
         <header className="about-page-story-heading">
@@ -74,10 +59,9 @@ export default function AboutSection({ lang }) {
             <FadeIn delay={0.28 + index * 0.07} key={section.title}>
               <article className="about-page-card">
                 <div className="about-page-card-top">
-                  <span>{String(index + 1).padStart(2, "0")}</span>
                   <Icon size={21} aria-hidden="true" />
                 </div>
-                <h2>{section.title}</h2>
+                <h3>{section.title}</h3>
                 <p>{section.body}</p>
               </article>
             </FadeIn>

@@ -22,6 +22,7 @@ export default function PageBuilderWorkspaceHeader({
   setViewport,
   viewport,
   viewports,
+  workspaceActions,
 }) {
   return (
     <>
@@ -36,6 +37,9 @@ export default function PageBuilderWorkspaceHeader({
         demoMode={demoMode}
         copy={builderCopy.topbar}
         onPreviewClick={handlePreviewClick}
+        actions={activeTab === "reservations"
+          ? historyControls && <div className="builder-subbar-actions">{historyControls}</div>
+          : workspaceActions}
         activeTopbarAction={activeTopbarAction}
         setActiveTopbarAction={setActiveTopbarAction}
         setModal={setModal}
@@ -45,13 +49,13 @@ export default function PageBuilderWorkspaceHeader({
 
       <PageBuilderSubbar
         preview={preview}
-        hideWorkspaceTabs={hideWorkspaceTabs}
+        hideWorkspaceTabs={hideWorkspaceTabs || activeTab === "reservations"}
         historyControls={activeTab === "publish" ? null : historyControls}
         viewports={viewports}
         viewport={viewport}
         setViewport={setViewport}
         renderWorkspaceNavigator={renderWorkspaceNavigator}
-        artboardCameraControls={activeTab === "publish" ? null : artboardCameraControls}
+        artboardCameraControls={["publish", "reservations"].includes(activeTab) ? null : artboardCameraControls}
       />
     </>
   );

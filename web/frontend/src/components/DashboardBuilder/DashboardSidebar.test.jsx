@@ -40,6 +40,9 @@ const labels = {
   "sidebar.home": "Home",
   "sidebar.dashboard": "Dashboard",
   "sidebar.workspace": "Workspace",
+  "sidebar.siteManagement": "Site & forms",
+  "sidebar.planning": "Planning",
+  "sidebar.dataInsights": "Data & insights",
   "sidebar.ecommerce": "Online Store",
   "sidebar.tags": "Tags",
   "sidebar.categories": "Categories",
@@ -58,6 +61,9 @@ const labels = {
   "elearning.certificates.myCertificates": "My Certificates",
   "sidebar.store": "Store",
   "sidebar.pageBuilder": "Page Builder",
+  "sidebar.users": "Users",
+  "sidebar.forms": "Forms",
+  "sidebar.reservations": "Reservations",
   "sidebar.submissions": "Submissions",
   "sidebar.dataProjects": "Projects",
   "sidebar.dataSources": "Data Sources",
@@ -116,7 +122,7 @@ function renderSidebar(pathname = "/dashboard") {
 }
 
 describe("DashboardSidebar navigation hierarchy", () => {
-  it("renders notifications first and expands only workspace children", () => {
+  it("renders focused workspace dropdowns and expands their own children", () => {
     renderSidebar();
 
     const navigation = screen.getByRole("navigation", {
@@ -128,32 +134,45 @@ describe("DashboardSidebar navigation hierarchy", () => {
       "Notifications",
       "Home",
       "Dashboard",
-      "Workspace",
+      "Site & forms",
+      "Planning",
+      "Data & insights",
       "Online Store",
       "E-Learning",
       "My Plan",
+      "Archive",
     ]);
 
-    const workspace = screen.getByRole("button", { name: "Workspace" });
-    expect(workspace.getAttribute("aria-expanded")).toBe("false");
-    fireEvent.click(workspace);
-    expect(workspace.getAttribute("aria-expanded")).toBe("true");
+    const site = screen.getByRole("button", { name: "Site & forms" });
+    const planning = screen.getByRole("button", { name: "Planning" });
+    const data = screen.getByRole("button", { name: "Data & insights" });
+    expect(site.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(site);
+    expect(site.getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByRole("button", { name: "Page Builder" })).toBeTruthy();
+    fireEvent.click(planning);
+    expect(site.getAttribute("aria-expanded")).toBe("false");
+    expect(planning.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByRole("button", { name: "Calendar" })).toBeTruthy();
+    fireEvent.click(data);
+    expect(planning.getAttribute("aria-expanded")).toBe("false");
+    expect(data.getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByRole("button", { name: "Projects" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Data Sources" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Business Intelligence" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Calendar" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Archive" })).toBeTruthy();
+    expect(within(document.getElementById("dashboard-sidebar-workspace-data"))
+      .queryByRole("button", { name: "Archive" })).toBeNull();
   });
 
-  it("renders Ecommerce below Workspace as an expandable section without navigating", () => {
+  it("renders Ecommerce below the workspace dropdowns without navigating", () => {
     const props = renderSidebar();
 
-    const workspace = screen.getByRole("button", { name: "Workspace" });
+    const data = screen.getByRole("button", { name: "Data & insights" });
     const ecommerce = screen.getByRole("button", { name: "Online Store" });
 
     expect(
-      workspace.compareDocumentPosition(ecommerce) &
+      data.compareDocumentPosition(ecommerce) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(ecommerce.getAttribute("aria-expanded")).toBe("false");
@@ -170,6 +189,31 @@ describe("DashboardSidebar navigation hierarchy", () => {
     expect(screen.getByRole("link", { name: "Store theme" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Social links" }).getAttribute("href")).toBe("/ecommerce/social-links");
     expect(screen.getByRole("link", { name: "Store" })).toBeTruthy();
+  });
+
+  it("puts project management destinations in the Site & forms dropdown", () => {
+    renderSidebar("/page-builder/projects/project-42/pages");
+
+    expect(screen.getByRole("button", { name: "Forms" }).dataset.routePath)
+      .toBe("/page-builder/projects/project-42/forms");
+    expect(screen.getByRole("button", { name: "Reservations" }).dataset.routePath)
+      .toBe("/page-builder/projects/project-42/reservations");
+    expect(screen.queryByRole("button", { name: "Header & Footer" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Users" }).dataset.routePath)
+      .toBe("/page-builder/projects/project-42/users");
+    const site = document.getElementById("dashboard-sidebar-workspace-site");
+    expect(within(site).getAllByRole("button").map((button) => button.textContent))
+      .toEqual([
+        "Page Builder", "Users", "Forms", "Submissions", "Reservations",
+      ]);
+    expect(screen.getByRole("button", { name: "Reservations" }).dataset.workspaceGroup)
+      .toBe("site");
+    fireEvent.click(screen.getByRole("button", { name: "Planning" }));
+    expect(screen.getByRole("button", { name: "My tasks" }).dataset.workspaceGroup)
+      .toBe("planning");
+    fireEvent.click(screen.getByRole("button", { name: "Data & insights" }));
+    expect(screen.getByRole("button", { name: "Business Intelligence" }).dataset.workspaceGroup)
+      .toBe("data");
   });
 
   it("keeps Ecommerce expanded on a child route and highlights the child", () => {
@@ -199,52 +243,54 @@ describe("DashboardSidebar navigation hierarchy", () => {
   it("keeps only one expandable sidebar section open at a time", () => {
     const props = renderSidebar();
 
-    const workspace = screen.getByRole("button", { name: "Workspace" });
+    const site = screen.getByRole("button", { name: "Site & forms" });
+    const planning = screen.getByRole("button", { name: "Planning" });
     const ecommerce = screen.getByRole("button", { name: "Online Store" });
     const settings = screen.getByRole("button", { name: "Settings" });
 
-    fireEvent.click(workspace);
-    expect(workspace.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(site);
+    expect(site.getAttribute("aria-expanded")).toBe("true");
     expect(settings.getAttribute("aria-expanded")).toBe("false");
 
+    fireEvent.click(planning);
+    expect(site.getAttribute("aria-expanded")).toBe("false");
+    expect(planning.getAttribute("aria-expanded")).toBe("true");
+
     fireEvent.click(ecommerce);
-    expect(workspace.getAttribute("aria-expanded")).toBe("false");
+    expect(planning.getAttribute("aria-expanded")).toBe("false");
     expect(ecommerce.getAttribute("aria-expanded")).toBe("true");
     expect(props.onNavigate).not.toHaveBeenCalled();
 
-    fireEvent.click(workspace);
-    expect(workspace.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(site);
+    expect(site.getAttribute("aria-expanded")).toBe("true");
     expect(ecommerce.getAttribute("aria-expanded")).toBe("false");
 
     fireEvent.click(settings);
-    expect(workspace.getAttribute("aria-expanded")).toBe("false");
+    expect(site.getAttribute("aria-expanded")).toBe("false");
     expect(settings.getAttribute("aria-expanded")).toBe("true");
 
-    fireEvent.click(workspace);
-    expect(workspace.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(site);
+    expect(site.getAttribute("aria-expanded")).toBe("true");
     expect(settings.getAttribute("aria-expanded")).toBe("false");
   });
-  it("opens workspace for its active route and highlights only the child", () => {
+  it("opens the matching workspace dropdown for its active route", () => {
     renderSidebar("/builder-data");
 
     const sidebar = screen.getByLabelText("Dashboard sidebar");
-    const workspace = screen.getByRole("button", { name: "Workspace" });
+    const data = screen.getByRole("button", { name: "Data & insights" });
     const activeChild = screen.getByRole("button", { name: "Data Logs" });
     const expandSidebar = screen.getByRole("button", {
       name: "Expand sidebar",
     });
 
     expect(sidebar.classList.contains("is-workspace-collapsed")).toBe(true);
-    expect(workspace.getAttribute("aria-expanded")).toBe("true");
-    expect(workspace.classList.contains("active-parent")).toBe(false);
-    expect(workspace.classList.contains("active")).toBe(false);
-    expect(workspace.hasAttribute("aria-current")).toBe(false);
+    expect(data.getAttribute("aria-expanded")).toBe("true");
+    expect(data.classList.contains("active-parent")).toBe(false);
+    expect(data.classList.contains("active")).toBe(false);
+    expect(data.hasAttribute("aria-current")).toBe(false);
     expect(activeChild.getAttribute("aria-current")).toBe("page");
-    expect(
-      screen
-        .getByRole("button", { name: "Page Builder" })
-        .hasAttribute("aria-current"),
-    ).toBe(false);
+    expect(screen.getByRole("button", { name: "Site & forms" }).getAttribute("aria-expanded"))
+      .toBe("false");
 
     fireEvent.click(expandSidebar);
     expect(sidebar.classList.contains("is-workspace-collapsed")).toBe(false);
@@ -258,10 +304,24 @@ describe("DashboardSidebar navigation hierarchy", () => {
 
     const projects = screen.getByRole("button", { name: "Projects" });
     expect(projects.getAttribute("aria-current")).toBe("page");
-    expect(screen.getByRole("button", { name: "Workspace" }).getAttribute("aria-expanded"))
+    expect(screen.getByRole("button", { name: "Data & insights" }).getAttribute("aria-expanded"))
       .toBe("true");
     expect(screen.getByRole("button", { name: "Data Logs" }).hasAttribute("aria-current"))
       .toBe(false);
+  });
+
+  it("keeps the shared Archive outside every workspace dropdown", () => {
+    renderSidebar("/archive");
+
+    const archive = screen.getByRole("button", { name: "Archive" });
+    expect(archive.getAttribute("aria-current")).toBe("page");
+    expect(archive.dataset.routePath).toBe("/archive");
+    expect(screen.getByRole("button", { name: "Site & forms" }).getAttribute("aria-expanded"))
+      .toBe("false");
+    expect(screen.getByRole("button", { name: "Planning" }).getAttribute("aria-expanded"))
+      .toBe("false");
+    expect(screen.getByRole("button", { name: "Data & insights" }).getAttribute("aria-expanded"))
+      .toBe("false");
   });
 
   it("highlights Data Sources as a separate workspace feature", () => {
@@ -278,7 +338,7 @@ describe("DashboardSidebar navigation hierarchy", () => {
   it("highlights Business Intelligence independently from Data Sources and Data Logs", () => {
     renderSidebar("/business-intelligence/projects/project-7/data");
 
-    expect(screen.getByRole("button", { name: "Workspace" }).getAttribute("aria-expanded"))
+    expect(screen.getByRole("button", { name: "Data & insights" }).getAttribute("aria-expanded"))
       .toBe("true");
     expect(screen.getByRole("button", { name: "Business Intelligence" }).getAttribute("aria-current"))
       .toBe("page");
@@ -288,11 +348,11 @@ describe("DashboardSidebar navigation hierarchy", () => {
       .toBe(false);
   });
 
-  it("keeps Agenda compact and marks Calendar as active", () => {
+  it("keeps Agenda compact and marks its own navigation item as active", () => {
     renderSidebar("/agenda");
 
     const sidebar = screen.getByLabelText("Dashboard sidebar");
-    const calendar = screen.getByRole("button", { name: "Calendar" });
+    const calendar = screen.getByRole("button", { name: "My tasks" });
 
     expect(sidebar.classList.contains("is-workspace-collapsed")).toBe(true);
     expect(calendar.getAttribute("aria-current")).toBe("page");
@@ -366,7 +426,7 @@ describe("DashboardSidebar navigation hierarchy", () => {
 it("shows only supported Platform Administration destinations", () => {
   render(<MemoryRouter><DashboardSidebar user={{ account_kind: "platform", user_type: "admin" }} showNotifications /></MemoryRouter>);
   for (const label of ["Dashboard", "Users / Tenants", "Account Access", "Security", "Settings"]) expect(screen.getByRole("button", { name: label, exact: true })).toBeTruthy();
-  for (const label of ["Workspace", "Online Store", "My Plan", "Home", "Notifications"]) expect(screen.queryByRole("button", { name: label, exact: true })).toBeNull();
+  for (const label of ["Site & forms", "Planning", "Data & insights", "Archive", "Online Store", "My Plan", "Home", "Notifications"]) expect(screen.queryByRole("button", { name: label, exact: true })).toBeNull();
 });
 
 it("expands E-Learning and highlights only its active Settings child", () => {

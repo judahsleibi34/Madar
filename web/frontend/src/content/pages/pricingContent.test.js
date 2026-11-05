@@ -8,7 +8,7 @@ describe("canonical pricing copy", () => {
     expect(english).toContain("continuous");
     expect(english).toContain("no grace period");
     expect(english).toContain("does not delete");
-    expect(pricingContent.ar.title).toContain("أسعار");
+    expect(pricingContent.ar.title).toContain("خطط");
   });
 
   it("does not contain WhatsApp pricing", () => {

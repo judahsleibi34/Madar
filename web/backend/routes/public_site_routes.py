@@ -966,6 +966,15 @@ def _public_store_social_links(saved_theme: dict[str, Any]) -> dict[str, str]:
     return result
 
 
+def _public_store_seasonal_campaign(saved_theme: dict[str, Any]) -> dict[str, Any]:
+    value = saved_theme.get("seasonal_campaign") if isinstance(saved_theme, dict) else None
+    value = value if isinstance(value, dict) else {}
+    return {
+        "enabled": value.get("enabled") is True,
+        "type": "black_friday",
+    }
+
+
 def build_public_store_profile(settings: dict, subdomain: str) -> dict:
     """Build storefront identity without reading any page-builder project."""
     saved_theme = settings.get("ecommerce_theme") if isinstance(settings.get("ecommerce_theme"), dict) else {}
@@ -984,7 +993,11 @@ def build_public_store_profile(settings: dict, subdomain: str) -> dict:
         "contact_email": settings.get("contact_email"),
         "phone": settings.get("phone"),
         "description": settings.get("description"),
-        "store_theme": {**DEFAULT_PUBLIC_STORE_THEME, **{key: value for key, value in saved_theme.items() if key not in {"growth", "landing_page", "social_links", "store_identity_ar"}}},
+        "store_theme": {
+            **DEFAULT_PUBLIC_STORE_THEME,
+            **{key: saved_theme[key] for key in DEFAULT_PUBLIC_STORE_THEME if key in saved_theme},
+            "seasonal_campaign": _public_store_seasonal_campaign(saved_theme),
+        },
         "growth": _public_store_growth(saved_theme),
         "landing_page": _public_store_landing_page(saved_theme),
         "social_links": _public_store_social_links(saved_theme),
@@ -1388,6 +1401,64 @@ def normalize_reservation_timing(payload: dict[str, Any]) -> dict[str, str | Non
     return normalized
 
 
+def reservation_session_settings(block: dict[str, Any], payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    reservation = block.get("reservation") or {}
+    settings = reservation
+    if payload and isinstance(reservation.get("sessionSettingsByDate"), dict):
+        requested_date = str(payload.get("date") or "")
+        requested_time = str(payload.get("time") or "")
+        source_date = requested_date
+        by_date = reservation.get("timeSlotsByDate") or {}
+        if requested_date not in by_date:
+            candidates = []
+            try:
+                target = datetime.strptime(requested_date, "%Y-%m-%d").date()
+                for source in reservation.get("weeklyRepeatDates") or []:
+                    if not isinstance(source, str) or source not in by_date:
+                        continue
+                    try:
+                        parsed = datetime.strptime(source, "%Y-%m-%d").date()
+                    except ValueError:
+                        continue
+                    if parsed.isoformat() == source and source <= requested_date and parsed.weekday() == target.weekday():
+                        candidates.append(source)
+            except ValueError:
+                pass
+            if candidates:
+                source_date = max(candidates)
+        day_settings = reservation["sessionSettingsByDate"].get(source_date)
+        if isinstance(day_settings, dict) and requested_time in day_settings:
+            settings = day_settings[requested_time]
+            if not isinstance(settings, dict):
+                raise api_error(400, "reservation_capacity_invalid", "This appointment needs valid booking settings.")
+    return settings
+
+
+def reservation_seat_capacity(block: dict[str, Any], payload: dict[str, Any] | None = None) -> int:
+    reservation = block.get("reservation") or {}
+    settings = reservation_session_settings(block, payload)
+    if reservation.get("bookingMode") == "flexible" or settings.get("sessionType") != "group":
+        return 1
+    capacity = settings.get("seatCapacity")
+    if isinstance(capacity, bool) or not isinstance(capacity, int) or not 2 <= capacity <= 1000:
+        raise api_error(400, "reservation_capacity_invalid", "The group session needs a seat limit between 2 and 1000.")
+    return capacity
+
+
+def validate_reservation_seats(block: dict[str, Any], payload: dict[str, Any]) -> None:
+    reservation = block.get("reservation") or {}
+    if reservation.get("bookingMode") == "flexible":
+        return
+    capacity = reservation_seat_capacity(block, payload)
+    seats = payload.get("guests", 1)
+    if isinstance(seats, str) and re.fullmatch(r"[1-9][0-9]{0,3}", seats):
+        seats = int(seats)
+    if isinstance(seats, bool) or not isinstance(seats, int) or not 1 <= seats <= capacity:
+        raise api_error(400, "reservation_seats_invalid", f"Choose between 1 and {capacity} seats.")
+    if "guests" in payload:
+        payload["guests"] = seats
+
+
 def reservation_block_is_exclusive(block: dict[str, Any]) -> bool:
     reservation = block.get("reservation")
     if not isinstance(reservation, dict):
@@ -1409,6 +1480,27 @@ def validate_configured_reservation_slot(block: dict[str, Any], payload: dict[st
     requested_date = str(payload.get("date") or "").strip()
     requested_time = str(payload.get("time") or "").strip()
     configured_times = slots_by_date.get(requested_date)
+    if requested_date not in slots_by_date:
+        repeat_dates = reservation.get("weeklyRepeatDates")
+        sources = []
+        try:
+            target = datetime.strptime(requested_date, "%Y-%m-%d").date()
+            if target.isoformat() != requested_date:
+                raise ValueError("Invalid date")
+            for value in repeat_dates if isinstance(repeat_dates, list) else []:
+                if not isinstance(value, str) or value not in slots_by_date:
+                    continue
+                try:
+                    source = datetime.strptime(value, "%Y-%m-%d").date()
+                except ValueError:
+                    continue
+                if source.isoformat() == value and source <= target and source.weekday() == target.weekday():
+                    sources.append(value)
+        except ValueError:
+            pass
+        if sources:
+            configured_times = slots_by_date[max(sources)]
+
     valid_times = {
         str(value).strip()
         for value in configured_times
@@ -1518,7 +1610,7 @@ def validate_reservation_custom_answers(block: dict[str, Any], payload: dict[str
 
     payload["customAnswers"] = cleaned_answers
 
-def build_reservation_field_snapshot(block: dict, block_id: str | None, block_type: str) -> list[dict[str, Any]]:
+def build_reservation_field_snapshot(block: dict, block_id: str | None, block_type: str, payload: dict | None = None) -> list[dict[str, Any]]:
     snapshot = {
         "block_id": block_id or block.get("id"),
         "block_type": block_type,
@@ -1527,6 +1619,12 @@ def build_reservation_field_snapshot(block: dict, block_id: str | None, block_ty
     reservation = block.get("reservation")
     if isinstance(reservation, dict):
         snapshot["reservation"] = reservation
+        if isinstance(reservation.get("sessionSettingsByDate"), dict) and payload and reservation.get("bookingMode") != "flexible":
+            settings = reservation_session_settings(block, payload)
+            snapshot["session"] = {
+                "sessionType": "group" if settings.get("sessionType") == "group" else "private",
+                "seatCapacity": reservation_seat_capacity(block, payload),
+            }
 
     return [snapshot]
 
@@ -1560,7 +1658,7 @@ def build_builder_reservation_payload(
         "timezone": clean_timing.get("timezone"),
         "status": "new",
         "payload": payload,
-        "field_snapshot": build_reservation_field_snapshot(block, block_id, block_type),
+        "field_snapshot": build_reservation_field_snapshot(block, block_id, block_type, payload),
         "submitter_ip": get_client_ip(request),
         "user_agent": request.headers.get("user-agent", "")[:1000],
     }
@@ -1574,6 +1672,10 @@ def _reservation_storage_error(error: Exception) -> HTTPException:
             "idempotency_conflict",
             "This idempotency key was already used for a different request.",
         )
+    if "reservation_capacity_unavailable" in text or ("create_builder_reservation_seated_safe" in text and ("pgrst202" in text or "could not find" in text or "does not exist" in text)):
+        return api_error(503, "reservation_capacity_unavailable", "Group session booking is not available on this installation yet.")
+    if "reservation_seats_invalid" in text or "reservation_capacity_invalid" in text:
+        return api_error(400, "reservation_seats_invalid", "Choose a valid number of seats for this session.")
     if "reservation_slot_unavailable" in text:
         return api_error(
             409,
@@ -1599,13 +1701,14 @@ def insert_builder_reservation(
     idempotency_key_hash: str | None,
     request_hash: str,
     exclusive_slot: bool,
+    seat_capacity: int = 1,
     notification: dict[str, Any],
 ) -> tuple[dict[str, Any], bool]:
     try:
         rpc = getattr(service_supabase, "rpc", None)
         if callable(rpc):
             insert_response = rpc(
-                "create_builder_reservation_notified_safe",
+                "create_builder_reservation_seated_safe" if seat_capacity > 1 else "create_builder_reservation_notified_safe",
                 {
                     "p_reservation": payload,
                     "p_idempotency_key_hash": idempotency_key_hash,
@@ -1622,6 +1725,9 @@ def insert_builder_reservation(
             if not isinstance(result, dict) or not isinstance(result.get("reservation"), dict):
                 raise RuntimeError("reservation_rpc_empty_result")
             return result["reservation"], bool(result.get("duplicate"))
+
+        if seat_capacity > 1:
+            raise RuntimeError("reservation_capacity_unavailable")
 
         # Lightweight in-memory clients used by unit tests do not implement RPC.
         # Production uses the Supabase RPC above so the overlap check is atomic.
@@ -5131,6 +5237,7 @@ def submit_public_builder_block_event(
     if block_type == "reservationBlock":
         validate_reservation_custom_answers(block, cleaned_payload)
         validate_configured_reservation_slot(block, cleaned_payload)
+        validate_reservation_seats(block, cleaned_payload)
     timing = normalize_reservation_timing(cleaned_payload)
 
     if block_type == "reservationBlock":
@@ -5193,6 +5300,7 @@ def submit_public_builder_block_event(
         exclusive_slot=(
             block_type == "reservationBlock" and reservation_block_is_exclusive(block)
         ),
+        seat_capacity=reservation_seat_capacity(block, cleaned_payload) if block_type == "reservationBlock" else 1,
         notification={
             "event_type": event_type,
             "source_type": block_type,

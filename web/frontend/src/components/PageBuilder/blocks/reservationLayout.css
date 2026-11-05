@@ -1,0 +1,52 @@
+.reservation-layout-grid,
+.reservation-block.has-custom-composition .reservation-custom-form.reservation-layout-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+  align-content: start;
+  grid-auto-rows: max-content;
+  container: booking-form / inline-size;
+}
+.reservation-layout-item {
+  --booking-span: var(--booking-desktop-span);
+  --booking-start: var(--booking-desktop-start);
+  --booking-content-height: var(--booking-desktop-content-height);
+  grid-column: var(--booking-start) / span var(--booking-span);
+  min-width: 0;
+  min-height: 0;
+  margin-block: 0;
+  overflow-wrap: anywhere;
+}
+.reservation-layout-item > * { min-width: 0; max-width: 100%; }
+.reservation-component-divider { position: relative; width: 100%; height: 12px; min-height: 12px; margin: 0; border: 0; }
+.reservation-component-divider::after { content: ""; position: absolute; inset-inline: 0; top: 50%; border-top: 1px solid var(--theme-border-strong, var(--theme-border)); }
+@container booking-form (max-width: 1024px) {
+  .reservation-layout-item {
+    --booking-span: var(--booking-tablet-span); --booking-start: var(--booking-tablet-start);
+    --booking-content-height: var(--booking-tablet-content-height);
+  }
+}
+@container booking-form (max-width: 600px) {
+  .reservation-layout-item {
+    --booking-span: var(--booking-mobile-span); --booking-start: var(--booking-mobile-start);
+    --booking-content-height: var(--booking-mobile-content-height);
+  }
+}
+/* Explicit editor views override the container's automatic visitor layout. */
+[data-layout-viewport="desktop"] > .reservation-layout-item {
+  --booking-span: var(--booking-desktop-span); --booking-start: var(--booking-desktop-start);
+  --booking-content-height: var(--booking-desktop-content-height);
+}
+[data-layout-viewport="tablet"] > .reservation-layout-item {
+  --booking-span: var(--booking-tablet-span); --booking-start: var(--booking-tablet-start);
+  --booking-content-height: var(--booking-tablet-content-height);
+}
+[data-layout-viewport="mobile"] > .reservation-layout-item {
+  --booking-span: var(--booking-mobile-span); --booking-start: var(--booking-mobile-start);
+  --booking-content-height: var(--booking-mobile-content-height);
+}
+.reservation-block.has-custom-composition .reservation-custom-form .reservation-custom-submit { justify-self: stretch; width: 100%; min-width: 0; height: var(--booking-content-height, auto); min-height: 32px; box-sizing: border-box; padding-block: 4px; }
+.reservation-block.has-custom-composition .reservation-custom-field input:not([type="checkbox"]):not([type="radio"]) { height: var(--booking-content-height, auto); min-height: 32px; box-sizing: border-box; padding-block: 4px; }
+.reservation-custom-text-component.reservation-layout-item { min-height: var(--booking-content-height, auto); }
+.fixed-slot-picker[dir="rtl"] .fixed-slot-calendar > header button svg { transform: scaleX(-1); }

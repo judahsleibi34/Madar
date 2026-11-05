@@ -1,3 +1,4 @@
+import DateTimeInput from "../common/DateTimeInput";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { commercialRequest, moduleNames, money, date } from "../../services/adminCommercialApi";
@@ -49,6 +50,7 @@ function CommercialDialog({ action, snapshot, history, books, tenantId, language
   const [confirmed, setConfirmed] = useState(false);
   const [stale, setStale] = useState(false);
   const [needsMfa, setNeedsMfa] = useState(false);
+  const [intentLocked, setIntentLocked] = useState(false);
   const requiresQuote = action === "modules" || action === "manual-payments";
   const grant = ["manual-payments", "complimentary-access"].includes(action);
   const payment = ["manual-payments", "correct-payment"].includes(action);
@@ -103,6 +105,7 @@ function CommercialDialog({ action, snapshot, history, books, tenantId, language
     if (action === "revoke-access") body.period_id = fields.period_id;
     if (action === "correct-payment") body.payment_id = fields.payment_id;
     if (!intent.current) intent.current = { ...body, idempotency_key: crypto.randomUUID() };
+    setIntentLocked(true);
     inFlight.current = true; setBusy(true); setError("");
     try {
       await commercialRequest(`tenants/${tenantId}/${action}`, intent.current);
@@ -113,7 +116,7 @@ function CommercialDialog({ action, snapshot, history, books, tenantId, language
       if (err.status === 409) { setStale(true); await onConflict(); setError(`${err.message} State refreshed. Close and review again before a new action.`); }
     } finally { inFlight.current = false; setBusy(false); }
   };
-  const input = (key, label, type = "text", required = true) => <label>{label}<input type={type} required={required} value={fields[key]} onChange={e => change(key, e.target.value)} {...(type === "number" ? { min: 1, step: 1 } : {})} /></label>;
+  const input = (key, label, type = "text", required = true) => <label>{label}<DateTimeInput type={type} required={required} value={fields[key]} onChange={e => change(key, e.target.value)} {...(type === "number" ? { min: 1, step: 1 } : {})} /></label>;
   const removed = assigned.filter(id => !fields.module_ids.includes(id));
   return <dialog ref={dialog} open={!HTMLDialogElement.prototype.showModal} className="commercial-dialog" aria-labelledby="commercial-action-title" onCancel={e => { if (busy) e.preventDefault(); else onClose(); }}>
     <form onSubmit={submit}>
@@ -132,7 +135,7 @@ function CommercialDialog({ action, snapshot, history, books, tenantId, language
       {action === "correct-payment" && <label>Original payment<select required value={fields.payment_id} onChange={e => change("payment_id", e.target.value)}><option value="">Select payment</option>{(history.payments || []).map(p => <option key={p.id} value={p.id}>{p.id} · {money(p.actual_minor, p.currency)} · {p.receipt_reference}</option>)}</select></label>}
       <label>Required reason<textarea required minLength={3} maxLength={1000} value={fields.reason} onChange={e => change("reason", e.target.value)} /></label>
       {input("reference", action === "restore-price-basis" ? "Supporting approval reference" : "Safe action reference (optional)", "text", action === "restore-price-basis")}
-      {requiresQuote && <><button type="button" disabled={busy || stale || !!intent.current} onClick={preview}>Preview server quote</button>{quote && <section aria-label="Server quote"><Pricing pricing={quote.pricing} />{action === "manual-payments" && <p>Expected payment: {money(quote.expected_payment_minor, quote.pricing.currency)}</p>}{action === "manual-payments" && !quote.payment_eligible && <p role="alert">This basis is not eligible for payment. Launch pricing is prepared, not activated; use an approved complimentary workflow if appropriate.</p>}<p>Proposed modules: {quote.pricing.module_ids.map(id => moduleNames[id]).join(", ") || "Full cancellation"}</p></section>}</>}
+      {requiresQuote && <><button type="button" disabled={busy || stale || intentLocked} onClick={preview}>Preview server quote</button>{quote && <section aria-label="Server quote"><Pricing pricing={quote.pricing} />{action === "manual-payments" && <p>Expected payment: {money(quote.expected_payment_minor, quote.pricing.currency)}</p>}{action === "manual-payments" && !quote.payment_eligible && <p role="alert">This basis is not eligible for payment. Launch pricing is prepared, not activated; use an approved complimentary workflow if appropriate.</p>}<p>Proposed modules: {quote.pricing.module_ids.map(id => moduleNames[id]).join(", ") || "Full cancellation"}</p></section>}</>}
       <label><input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} required />I have reviewed this tenant, commercial basis and the effect of this action.</label>
       {error && <p role="alert">{error}</p>}
       <div className="commercial-actions"><button type="button" disabled={busy} onClick={onClose}>Cancel</button><button type="submit" disabled={busy || needsMfa || stale || !confirmed || fields.reason.trim().length < 3 || (requiresQuote && !quote) || (action === "manual-payments" && !quote?.payment_eligible)}>{busy ? "Submitting…" : "Confirm action"}</button></div>

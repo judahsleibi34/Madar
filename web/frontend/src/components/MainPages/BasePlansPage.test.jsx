@@ -1,103 +1,120 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { MemoryRouter, useLocation } from "react-router-dom";
 
 import BasePlansPage from "./BasePlansPage";
+import { DASHBOARD_ROUTES } from "../../config/routes";
 import { apiFetch } from "../../utils/apiClient";
 
 vi.mock("../../utils/apiClient", async (original) => ({
   ...(await original()), apiFetch: vi.fn(),
 }));
 
-const catalog = {
-  currency: "USD",
-  products: [
-    { id: "forms", name: "Madar Forms", summary: "Forms", type: "core_module" },
-    { id: "website", name: "Madar Website", summary: "Website", type: "core_module" },
-    { id: "ecommerce", name: "Madar Commerce", summary: "Commerce", type: "core_module" },
-    { id: "ai_website_assistant", name: "AI website assistant", type: "add_on", price_minor: 1000, currency: "USD", coming_soon: true },
-  ],
-  price_book: {
-    id: "launch_2026_v2", version: "2026-10-14", currency: "USD", billing_interval: "month",
-    standalone_minor: { forms: 1500, website: 2000, ecommerce: 2500 },
-    bundle_minor: { 2: 3000, 3: 4000 }, sales_start_at: "2026-10-01T00:00:00Z", new_sales_active: true,
-  },
-};
+const products = [
+  { id: "ai_website_assistant", type: "add_on", price_minor: 1000, currency: "USD", coming_soon: true },
+];
+const response = (catalog) => ({ ok: true, json: async () => ({ catalog }) });
+const Location = () => <output aria-label="Current route">{useLocation().pathname}</output>;
+
+async function renderPage(lang = "en") {
+  let view;
+  await act(async () => {
+    view = render(<MemoryRouter><BasePlansPage lang={lang} /><Location /></MemoryRouter>);
+  });
+  return view;
+}
+
+function expectPublicPlans() {
+  for (const [name, price] of [["Forms", "$15"], ["Website", "$20"], ["Commerce", "$20"], ["Advanced Statistics", "$30"], ["E-learning", "$30"]]) {
+    const card = within(screen.getByRole("heading", { name, exact: true }).closest("article"));
+    expect(card.getByText(price)).toBeTruthy();
+    expect(card.getByText("Starting from")).toBeTruthy();
+  }
+  expect(within(screen.getByRole("heading", { name: "All five modules" }).closest("article")).getByText("$100")).toBeTruthy();
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(screen.queryByText("Any two modules")).toBeNull();
+  expect(screen.queryByText("All three modules")).toBeNull();
+}
 
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
-describe("launch pricing page", () => {
-  it("renders all module and bundle amounts from the backend price book", async () => {
-    apiFetch.mockResolvedValue({ ok: true, json: async () => ({ catalog }) });
-    render(<MemoryRouter><BasePlansPage lang="en" /></MemoryRouter>);
-    expect(await screen.findByText("$15")).toBeTruthy();
-    expect(screen.getByText("$20")).toBeTruthy();
-    expect(screen.getByText("$25")).toBeTruthy();
-    expect(screen.getByText("$30")).toBeTruthy();
-    expect(screen.getByText("$40")).toBeTruthy();
-    expect(screen.getByText(/Reservations, scheduling/)).toBeTruthy();
-  });
-
-  it("shows a prepared but unopened book with its prices and a disabled action", async () => {
-    const prepared = { ...catalog.price_book, sales_start_at: null, new_sales_active: false };
-    apiFetch.mockResolvedValue({ ok: true, json: async () => ({ catalog: { ...catalog, price_book: prepared } }) });
-    render(<MemoryRouter><BasePlansPage lang="en" /></MemoryRouter>);
-    expect(await screen.findByText("Not yet open for new subscriptions")).toBeTruthy();
-    expect(screen.getByText("$15")).toBeTruthy();
-    expect(screen.getByText("$40")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Not available for new subscriptions" }).disabled).toBe(true);
-  });
-
-  it("states exact bundle savings derived from the backend book", async () => {
-    apiFetch.mockResolvedValue({ ok: true, json: async () => ({ catalog }) });
-    render(<MemoryRouter><BasePlansPage lang="en" /></MemoryRouter>);
-    expect(await screen.findByText(/Save \$5–\$15 a month/)).toBeTruthy();
-    expect(screen.getByText("Save $20 a month compared with buying them separately")).toBeTruthy();
-  });
-
+describe("public pricing offers", () => {
   it.each([
-    ["backend failure", { ok: false, json: async () => ({ detail: "private" }) }, "We could not reach"],
-    ["older API without a price book contract", { ok: true, json: async () => ({ catalog: { products: catalog.products } }) }, "has not been updated"],
-    ["unreadable price book", { ok: true, json: async () => ({ catalog: { ...catalog, price_book: null } }) }, "could not be loaded"],
-    ["malformed price book", { ok: true, json: async () => ({ catalog: { ...catalog, price_book: { ...catalog.price_book, bundle_minor: { 2: "30" } } } }) }, "incomplete"],
-  ])("fails closed without prices for %s", async (_label, response, message) => {
-    apiFetch.mockResolvedValue(response);
-    render(<MemoryRouter><BasePlansPage lang="en" /></MemoryRouter>);
-    expect((await screen.findByRole("alert")).textContent).toContain(message);
-    expect(screen.queryByText("$15")).toBeNull();
+    ["a null price book", response({ products, price_book: null })],
+    ["an older catalog", response({ products })],
+    ["an empty catalog", response(null)],
+    ["a malformed product list", response({ products: {}, price_book: {} })],
+    ["a failed billing response", { ok: false, json: async () => ({ detail: "private" }) }],
+    ["unreadable JSON", { ok: true, json: async () => { throw Error("invalid_json"); } }],
+  ])("keeps approved prices visible with %s", async (_label, result) => {
+    apiFetch.mockResolvedValue(result);
+    await renderPage();
+    expectPublicPlans();
     expect(screen.queryByText("private")).toBeNull();
   });
 
-  it("fails closed when the network request rejects", async () => {
+  it("shows plans immediately while the catalog request is pending", async () => {
+    apiFetch.mockReturnValue(new Promise(() => {}));
+    await renderPage();
+    expectPublicPlans();
+    expect(screen.queryByText("Loading the current price book…")).toBeNull();
+  });
+
+  it("keeps plans visible when the network is offline", async () => {
     apiFetch.mockRejectedValue(new TypeError("Failed to fetch"));
-    render(<MemoryRouter><BasePlansPage lang="en" /></MemoryRouter>);
-    expect((await screen.findByRole("alert")).textContent).toContain("We could not reach");
+    await renderPage();
+    expectPublicPlans();
   });
 
-  it("renders Arabic RTL copy and does not offer a closed founding book", async () => {
-    apiFetch.mockResolvedValue({ ok: true, json: async () => ({ catalog: { ...catalog, price_book: { ...catalog.price_book, new_sales_active: false, sales_end_at: "2026-10-05T00:00:00Z" } } }) });
-    const { container } = render(<MemoryRouter><BasePlansPage lang="ar" /></MemoryRouter>);
-    expect(await screen.findByText("انتهى عرض التأسيس للاشتراكات الجديدة")).toBeTruthy();
+  it("does not replace approved USD offers with another billing book or currency", async () => {
+    const book = { new_sales_active: false, currency: "EUR", standalone_minor: { forms: 9900, website: 9900, ecommerce: 9900 } };
+    apiFetch.mockResolvedValue(response({ products, price_book: book }));
+    await renderPage();
+    expectPublicPlans();
+    expect(book.standalone_minor.ecommerce).toBe(9900);
+    expect(screen.queryByText("€99")).toBeNull();
+  });
+
+  it("lists all five modules in the complete plan without the old bundle offers", async () => {
+    apiFetch.mockResolvedValue(response({ products }));
+    await renderPage();
+    const card = within(screen.getByRole("heading", { name: "All five modules" }).closest("article"));
+    for (const name of ["Forms", "Website", "Commerce", "Advanced Statistics", "E-learning"]) expect(card.getByText(name, { exact: true })).toBeTruthy();
+    expect(card.queryByText("Starting from")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Bundle and save" })).toBeNull();
+  });
+
+  it("renders Arabic offers and RTL without a billing price book", async () => {
+    apiFetch.mockResolvedValue(response({ price_book: null }));
+    const { container } = await renderPage("ar");
+    expect(screen.getByRole("heading", { name: "التعلّم الإلكتروني" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "الوحدات الخمس" })).toBeTruthy();
     expect(container.querySelector("main").getAttribute("dir")).toBe("rtl");
-    expect(screen.getByRole("button", { name: "غير متاح للاشتراكات الجديدة" }).disabled).toBe(true);
+    expect(screen.getAllByText("ابتداءً من")).toHaveLength(5);
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("shows the AI assistant as a priced add-on for every module from the catalog", async () => {
-    apiFetch.mockResolvedValue({ ok: true, json: async () => ({ catalog }) });
-    render(<MemoryRouter><BasePlansPage lang="en" /></MemoryRouter>);
-    expect(await screen.findByRole("heading", { name: "AI assistant" })).toBeTruthy();
+  it("adds the optional assistant only when the catalog provides a valid amount", async () => {
+    apiFetch.mockResolvedValue(response({ products, price_book: null }));
+    await renderPage();
+    expect(screen.getByRole("heading", { name: "AI assistant" })).toBeTruthy();
     expect(screen.getByText("+$10")).toBeTruthy();
-    expect(screen.getByText("Coming soon")).toBeTruthy();
-    expect(screen.getByText("Add to any plan")).toBeTruthy();
-    const modules = screen.getByRole("list", { name: "Works with" });
-    expect(modules.textContent).toBe("FormsWebsiteCommerce");
+    expect(screen.getByRole("list", { name: "Works with" }).textContent).toBe("FormsWebsiteCommerce");
   });
 
-  it("omits the assistant extra when the catalog does not price it", async () => {
-    const products = catalog.products.filter((product) => product.id !== "ai_website_assistant");
-    apiFetch.mockResolvedValue({ ok: true, json: async () => ({ catalog: { ...catalog, products } }) });
-    render(<MemoryRouter><BasePlansPage lang="en" /></MemoryRouter>);
-    expect(await screen.findByText("$25")).toBeTruthy();
+  it("does not invent an assistant price when the catalog has none", async () => {
+    apiFetch.mockResolvedValue(response({ products: [{ ...products[0], price_minor: null }] }));
+    await renderPage();
+    expectPublicPlans();
     expect(screen.queryByRole("heading", { name: "AI assistant" })).toBeNull();
+  });
+
+  it("only navigates to subscription management and never submits a purchase", async () => {
+    apiFetch.mockResolvedValue(response({ price_book: null }));
+    await renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Manage subscription" }));
+    expect(screen.getByLabelText("Current route").textContent).toBe(DASHBOARD_ROUTES.myPlan);
+    expect(apiFetch).toHaveBeenCalledTimes(1);
+    expect(apiFetch.mock.calls[0][1].method).toBe("GET");
   });
 });

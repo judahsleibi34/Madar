@@ -58,6 +58,47 @@ function LocationProbe() {
 }
 
 describe("EcommerceStorefront", () => {
+  it("applies the Black Friday palette and shows a dismissible customer message", async () => {
+    const campaignSite = {
+      brand: "Test Store",
+      store_theme: {
+        accent: "#287a55",
+        background: "#fdf8f2",
+        surface: "#fffaf6",
+        text: "#162033",
+        muted: "#667085",
+        seasonal_campaign: { enabled: true, type: "black_friday" },
+      },
+    };
+    fetchPublicEcommerceCatalog.mockResolvedValue({
+      ...catalog,
+      site: campaignSite,
+      catalog: { ...catalog.catalog, sale_summary: { active: true, max_percentage: 39 } },
+    });
+    fetchPublicEcommerceProfile.mockResolvedValue({ site: campaignSite });
+
+    render(<MemoryRouter initialEntries={["/shop"]}><Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes></MemoryRouter>);
+
+    const dialog = await screen.findByRole("dialog", { name: "Black Friday store event" });
+    const storefront = dialog.closest(".live-store");
+    expect(storefront.classList.contains("is-black-friday")).toBe(true);
+    expect(storefront.style.getPropertyValue("--store-accent")).toBe("#287a55");
+    expect(storefront.style.getPropertyValue("--store-paper")).toBe("#fdf8f2");
+    expect(storefront.style.getPropertyValue("--store-soft")).toBe("#fffaf6");
+    expect(storefront.style.getPropertyValue("--store-ink")).toBe("#162033");
+    expect(storefront.style.getPropertyValue("--store-campaign-accent")).toBe("#287a55");
+    expect(storefront.style.getPropertyValue("--store-campaign-on-accent")).toBe("#ffffff");
+    expect(screen.getByText("Black Friday — save up to 39%")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Save up to 39% this Black Friday." })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "BLACK FRIDAY" })).toBeTruthy();
+    expect(screen.getByText("UP TO 39% OFF")).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Shop the deals/i }).getAttribute("href")).toBe("/shop/catalog");
+
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss Black Friday message" }));
+    expect(screen.queryByRole("dialog", { name: "Black Friday store event" })).toBeNull();
+    expect(sessionStorage.getItem("madar-seasonal-campaign:demo:black-friday")).toBe("dismissed");
+  });
+
   it("returns the production storefront to the top after every route navigation", async () => {
     const windowScrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
     fetchPublicEcommerceCatalog.mockResolvedValue(catalog);
@@ -488,6 +529,8 @@ describe("EcommerceStorefront", () => {
       catalog: {
         ...catalog.catalog,
         categories: [{ id: "women", slug: "women", name: "Women", parent_id: null }],
+        brands: [{ id: "adidas", slug: "adidas", name: "Adidas" }],
+        tags: [{ id: "featured", slug: "featured", name: "Featured" }],
       },
     });
     render(
@@ -534,6 +577,42 @@ describe("EcommerceStorefront", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Women" }));
     await waitFor(() => expect(screen.getByLabelText("current query").textContent).not.toContain("category=women"));
+
+    const adidas = screen.getByRole("button", { name: "Adidas" });
+    expect(adidas.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(adidas);
+    await waitFor(() => {
+      expect(screen.getByLabelText("current query").textContent).toContain("brand=adidas");
+      expect(fetchPublicEcommerceCatalog).toHaveBeenLastCalledWith(
+        "demo",
+        expect.objectContaining({ brand: "adidas" })
+      );
+    });
+    expect(screen.getByRole("button", { name: "Adidas" }).getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Featured" }));
+    await waitFor(() => {
+      expect(fetchPublicEcommerceCatalog).toHaveBeenLastCalledWith(
+        "demo",
+        expect.objectContaining({ brand: "adidas", tag: "featured" })
+      );
+    });
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Products" }), { target: { value: "name" } });
+    await waitFor(() => {
+      expect(fetchPublicEcommerceCatalog).toHaveBeenLastCalledWith(
+        "demo",
+        expect.objectContaining({ brand: "adidas", tag: "featured", sort: "name" })
+      );
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Adidas" }));
+    await waitFor(() => {
+      const currentQuery = screen.getByLabelText("current query").textContent;
+      expect(currentQuery).not.toContain("brand=");
+      expect(currentQuery).toContain("tag=featured");
+    });
+
     const storeSearch = screen.getByRole("searchbox", { name: "Search store" });
     fireEvent.change(storeSearch, { target: { value: "chair" } });
     fireEvent.submit(storeSearch.closest("form"));
@@ -753,7 +832,7 @@ describe("EcommerceStorefront", () => {
     expect(screen.getAllByText("02").some((node) => node.closest(".live-store-brand-section"))).toBe(true);
     expect(document.querySelector(".live-store-brand-section + .live-store-category-section")).toBeTruthy();
     expect(screen.queryByText("Objects for everyday living")).toBeNull();
-    expect(document.querySelector(".live-store-category-carousel").style.getPropertyValue("--store-carousel-columns")).toBe("2");
+    expect(document.querySelector(".live-store-category-carousel").style.getPropertyValue("--store-carousel-columns")).toBe("");
     expect(screen.getByRole("button", { name: "Previous categories" }).classList.contains("is-previous")).toBe(true);
     expect(screen.getByRole("button", { name: "Next categories" }).classList.contains("is-next")).toBe(true);
     expect(screen.getByRole("button", { name: "Previous categories" }).disabled).toBe(false);
@@ -782,6 +861,54 @@ describe("EcommerceStorefront", () => {
     expect(document.querySelector(".live-store").style.getPropertyValue("--store-accent")).toBe("#287a55");
     expect(screen.queryByRole("textbox")).toBeNull();
   });
+
+  it("keeps single brand, category, and product media in normal card-sized slots", async () => {
+    fetchPublicEcommerceCatalog.mockResolvedValue({
+      site: { brand: "Single Item Store" },
+      catalog: {
+        brands: [{
+          id: "brand-1",
+          slug: "single-brand",
+          name: "Single Brand",
+          image_url: "/uploads/tenant_1/builder_assets/11111111111111111111111111111111.png",
+        }],
+        categories: [{
+          id: "category-1",
+          slug: "single-category",
+          name: "Single Category",
+          image_url: "/uploads/tenant_1/builder_assets/22222222222222222222222222222222.jpg",
+          parent_id: null,
+        }],
+        tags: [],
+        products: [{
+          id: "product-1",
+          slug: "single-product",
+          name: "Single Product",
+          price: "10",
+          currency: "USD",
+          in_stock: true,
+          images: ["/uploads/tenant_1/builder_assets/33333333333333333333333333333333.webp"],
+        }],
+        pagination: { page: 1, pages: 1, total: 1, limit: 12 },
+      },
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/shop"]}>
+        <Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes>
+      </MemoryRouter>,
+    );
+
+    await screen.findByRole("heading", { level: 1, name: "Single Item Store" });
+    const tracks = [...document.querySelectorAll(".live-store-category-carousel")];
+    expect(tracks).toHaveLength(2);
+    expect(tracks.every((track) => track.children.length === 1)).toBe(true);
+    expect(tracks.every((track) => !track.style.getPropertyValue("--store-carousel-columns"))).toBe(true);
+    expect(document.querySelectorAll(".live-store-category-side-control")).toHaveLength(0);
+    expect(document.querySelectorAll(".live-store-featured-section .live-store-product-card")).toHaveLength(1);
+    expect(screen.getByRole("img", { name: "Single Brand" }).getAttribute("src")).toContain("&w=480");
+  });
+
   it("maps the published builder theme payload into every storefront color token", async () => {
     fetchPublicEcommerceCatalog.mockResolvedValue({
       ...catalog,
@@ -1073,7 +1200,7 @@ describe("EcommerceStorefront", () => {
     expect(screen.getAllByText("Featured Soap").length).toBeGreaterThan(0);
     expect(screen.queryByText("Latest")).toBeNull();
     expect(screen.getAllByText("$12.00").length).toBeGreaterThan(0);
-    expect(document.querySelector(".live-store-product-sale-badge")?.textContent).toBe("Sale");
+    expect(document.querySelector(".live-store-product-sale-badge")?.textContent).toBe("Sale -20%");
     expect(await screen.findByRole("dialog", { name: "Sale: up to 20% off" })).toBeTruthy();
     expect(screen.getByText("Sale now — up to 20% off selected items")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Dismiss sale popup" }));

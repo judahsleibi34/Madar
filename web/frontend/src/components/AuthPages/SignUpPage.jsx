@@ -86,7 +86,7 @@ export default function SignUpPage({
     });
   };
 
-  const getErrorProps = (fieldName) => {
+  const getErrorProps = (fieldName, { markInput = true } = {}) => {
     const message = errors[fieldName];
 
     if (!message) {
@@ -96,7 +96,7 @@ export default function SignUpPage({
     return {
       "aria-invalid": "true",
       "aria-describedby": `signup-${fieldName}-error`,
-      className: "auth-field-error-input",
+      ...(markInput ? { className: "auth-field-error-input" } : {}),
     };
   };
 
@@ -609,7 +609,7 @@ export default function SignUpPage({
               checked={formData.acceptedTerms}
               onChange={handleChange}
               aria-required="true"
-              {...getErrorProps("acceptedTerms")}
+              {...getErrorProps("acceptedTerms", { markInput: false })}
             />
             <span className="auth-terms-copy">
               {t("signup.agreeToTerms")} {" "}

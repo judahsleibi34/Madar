@@ -3,7 +3,7 @@ import { getEcommerceCacheScope, readEcommerceAdminCacheSnapshot } from "./utils
 import { StorePreviewSkeleton, ThemeSkeleton } from "./CommerceLoadingLayouts";
 import { notifyCommerceAction } from "../../utils/commerceActionToast";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ExternalLink, LoaderCircle, Monitor, RotateCcw, Rocket, Smartphone } from "lucide-react";
+import { ExternalLink, LoaderCircle, Monitor, RotateCcw, Rocket, Sparkles, Smartphone } from "lucide-react";
 
 import EcommerceToast from "./EcommerceToast";
 import { fetchEcommerceTheme, saveEcommerceTheme } from "../../services/ecommerceApi";
@@ -87,6 +87,13 @@ export default function EcommerceThemePage({ user }) {
   const previewScale = Math.min(1, previewWidth / viewportWidth);
 
   const updateColor = (key, value) => setTheme((current) => ({ ...current, [key]: value.toLowerCase() }));
+  const toggleBlackFriday = () => setTheme((current) => ({
+    ...current,
+    seasonal_campaign: {
+      type: "black_friday",
+      enabled: current.seasonal_campaign?.enabled !== true,
+    },
+  }));
 
   const preview = () => {
     if (!valid) {
@@ -122,7 +129,7 @@ export default function EcommerceThemePage({ user }) {
     setSaving(true);
     try {
       const result = await saveEcommerceTheme(theme, { scope: cacheScope });
-      setTheme({ ...DEFAULT_THEME, ...(result?.theme || theme) });
+      setTheme(normalizeStoreTheme(result?.theme || theme));
       try { localStorage.removeItem(THEME_PREVIEW_KEY); } catch { /* Publishing succeeded; local draft storage is optional. */ }
       setToast({ id: Date.now(), type: "success", title: t("admin.designPublished"), message: t("admin.designPublishedBody") });
     } catch {
@@ -146,6 +153,28 @@ export default function EcommerceThemePage({ user }) {
       ) : (
         <div className="ecommerce-theme-layout">
           <section className="ecommerce-theme-controls" aria-label={t("admin.storeColors")}>
+            <h2 className="ecommerce-theme-section-title ecommerce-special-themes-title">{t("specialThemes")}</h2>
+            <div className={`ecommerce-seasonal-theme${theme.seasonal_campaign?.enabled ? " is-active" : ""}`}>
+              <span className="ecommerce-seasonal-theme-icon"><Sparkles size={20} aria-hidden="true" /></span>
+              <div>
+                <strong>{t("admin.blackFridayTheme")}</strong>
+                <small>{t("admin.blackFridayThemeHelp")}</small>
+                <span className="ecommerce-seasonal-theme-palette" aria-hidden="true">
+                  {[theme.accent, theme.background, theme.surface, theme.text].map((color, index) => <i key={`${color}:${index}`} style={{ background: color }} />)}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="ecommerce-seasonal-theme-switch"
+                role="switch"
+                aria-checked={theme.seasonal_campaign?.enabled === true}
+                aria-label={t("admin.blackFridayTheme")}
+                onClick={toggleBlackFriday}
+              >
+                <span />
+              </button>
+            </div>
+
             <h2 className="ecommerce-theme-section-title">{t("admin.storeColors")}</h2>
             <div className="ecommerce-theme-color-list">
               {COLOR_FIELDS.map(([key, label, description]) => (
@@ -157,7 +186,7 @@ export default function EcommerceThemePage({ user }) {
               ))}
             </div>
 
-            <button type="button" className="ecommerce-theme-reset" onClick={() => setTheme(DEFAULT_THEME)}><RotateCcw size={16} />{t("admin.restoreColors")}</button>
+            <button type="button" className="ecommerce-theme-reset" onClick={() => setTheme((current) => normalizeStoreTheme({ ...DEFAULT_THEME, seasonal_campaign: current.seasonal_campaign }))}><RotateCcw size={16} />{t("admin.restoreColors")}</button>
             <footer className="ecommerce-theme-settings-footer">
               <button type="button" className="ecommerce-primary-button" disabled={saving || loading} onClick={save}>
                 {saving ? <LoaderCircle size={18} className="is-spinning" /> : <Rocket size={18} />}

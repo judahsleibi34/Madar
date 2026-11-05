@@ -78,6 +78,7 @@ describe("PageBuilderPageInspector", () => {
 
     expect(screen.getByAltText("Current loading screen").getAttribute("src"))
       .toBe("/uploads/loading.png");
+    expect(screen.getByText("Display time · 10 seconds")).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Replace image"), {
       target: { files: [{ name: "new-loading.png" }] },
     });

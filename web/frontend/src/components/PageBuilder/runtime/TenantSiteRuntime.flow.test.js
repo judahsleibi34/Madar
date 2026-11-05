@@ -17,6 +17,7 @@ import {
   getSafeProtectedReturnPath,
   resolveRuntimePage,
   runtimePageRequiresAuthentication,
+  TENANT_LOADING_SCREEN_DURATION_MS,
 } from "./TenantSiteRuntime";
 
 const loginPage = {
@@ -41,6 +42,10 @@ const formPage = {
 };
 
 describe("tenant brand loading", () => {
+  it("uses a ten-second branded loading-screen duration", () => {
+    expect(TENANT_LOADING_SCREEN_DURATION_MS).toBe(10_000);
+  });
+
   it("caches a bounded tenant identity and restores it for repeat visits", () => {
     const values = new Map();
     const storage = {

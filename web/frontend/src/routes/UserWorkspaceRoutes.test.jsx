@@ -35,11 +35,11 @@ vi.mock("../components/DashboardBuilder/EcommerceSocialLinksPage", () => ({
 }));
 vi.mock("../components/DashboardBuilder/ReservationCalendarPage", async () => {
   const React = await import("react");
-  function CalendarMock({ user, initialView, onViewChange }) {
+  function CalendarMock({ user, initialView, onViewChange, standaloneAgenda }) {
     const [mountedTenant] = React.useState(user?.tenant_id || "missing");
     return (
       <div>
-        Calendar mounted for {mountedTenant} in {initialView || "calendar"} view
+        {standaloneAgenda ? "Agenda page" : "Calendar"} mounted for {mountedTenant} in {initialView || "calendar"} view
         <button type="button" onClick={() => onViewChange?.("agenda")}>Open agenda</button>
       </div>
     );
@@ -290,7 +290,7 @@ describe("workspace settings routes", () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByText("Calendar mounted for missing in agenda view")).toBeTruthy();
+    expect(await screen.findByText("Agenda page mounted for missing in agenda view")).toBeTruthy();
   });
 
   it("navigates from calendar to the refresh-safe agenda route", async () => {
@@ -301,7 +301,7 @@ describe("workspace settings routes", () => {
     );
 
     fireEvent.click(await screen.findByRole("button", { name: "Open agenda" }));
-    expect(await screen.findByText("Calendar mounted for missing in agenda view")).toBeTruthy();
+    expect(await screen.findByText("Agenda page mounted for missing in agenda view")).toBeTruthy();
   });
 });
 

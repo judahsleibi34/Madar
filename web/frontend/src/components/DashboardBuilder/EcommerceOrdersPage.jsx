@@ -1,3 +1,4 @@
+import DateTimeInput from "../common/DateTimeInput";
 import PageHeaderSkeleton from "../common/PageHeaderSkeleton";
 import { getEcommerceCacheScope, readEcommerceAdminCacheSnapshot } from "./utils/ecommerceAdminCache";
 import { useEffect, useRef, useState } from "react";
@@ -146,8 +147,8 @@ export default function EcommerceOrdersPage({ user }) {
           <label><span>{t("common.status")}</span><select aria-label={t("common.status")} value={filters.status} onChange={(event) => update("status", event.target.value)}><option value="">{t("merchant.allOrderStatuses")}</option>{["pending","confirmed","preparing","out_for_delivery","delivered","fulfilled","cancelled","rejected"].map((value) => <option key={value} value={value}>{statusLabel(value)}</option>)}</select></label>
           <label><span>{t("confirmation.paymentStatus")}</span><select aria-label={t("confirmation.paymentStatus")} value={filters.payment_status} onChange={(event) => update("payment_status", event.target.value)}><option value="">{t("merchant.allPaymentStatuses")}</option>{["unpaid","collected","paid","refunded"].map((value) => <option key={value} value={value}>{paymentLabel(value)}</option>)}</select></label>
           <label><span>{t("admin.serviceArea")}</span><select aria-label={t("admin.serviceArea")} value={filters.service_area_id} onChange={(event) => update("service_area_id", event.target.value)}><option value="">{t("admin.allDeliveryAreas")}</option>{areas.map((area) => <option key={area.id} value={area.id}>{locale === "ar" ? area.name_ar || area.name_en : area.name_en || area.name_ar}</option>)}</select></label>
-          <label><span>{t("admin.ordersFrom")}</span><input aria-label={t("admin.ordersFrom")} type="date"  value={filters.date_from} onChange={(event) => update("date_from", event.target.value)} /></label>
-          <label><span>{t("admin.ordersTo")}</span><input aria-label={t("admin.ordersTo")} type="date"  value={filters.date_to} onChange={(event) => update("date_to", event.target.value)} /></label>
+          <label><span>{t("admin.ordersFrom")}</span><DateTimeInput aria-label={t("admin.ordersFrom")} type="date"  value={filters.date_from} onChange={(event) => update("date_from", event.target.value)} /></label>
+          <label><span>{t("admin.ordersTo")}</span><DateTimeInput aria-label={t("admin.ordersTo")} type="date"  value={filters.date_to} onChange={(event) => update("date_to", event.target.value)} /></label>
           </div>
         </aside>
         <div className="ecommerce-orders-main">

@@ -57,6 +57,26 @@ describe("EcommerceThemePage", () => {
     expect(await screen.findByText("Store design published")).toBeTruthy();
   });
 
+  it("previews and publishes the Black Friday campaign without replacing saved colors", async () => {
+    render(<EcommerceThemePage />);
+
+    const campaignSwitch = await screen.findByRole("switch", { name: "Black Friday sale theme" });
+    expect(campaignSwitch.getAttribute("aria-checked")).toBe("false");
+    fireEvent.click(campaignSwitch);
+
+    expect(campaignSwitch.getAttribute("aria-checked")).toBe("true");
+    expect(JSON.parse(localStorage.getItem("madar-online-store-theme-preview"))).toMatchObject({
+      accent: "#852c21",
+      seasonal_campaign: { enabled: true, type: "black_friday" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Publish changes" }));
+    await waitFor(() => expect(saveEcommerceTheme).toHaveBeenCalledWith(expect.objectContaining({
+      accent: "#852c21",
+      seasonal_campaign: { enabled: true, type: "black_friday" },
+    }), { scope: "authenticated" }));
+  });
+
   it("renders and opens the exact browser-only storefront preview without publishing", async () => {
     const open = vi.spyOn(window, "open").mockImplementation(() => null);
     render(<EcommerceThemePage />);

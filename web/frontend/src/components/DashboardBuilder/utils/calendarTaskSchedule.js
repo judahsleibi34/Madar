@@ -1,5 +1,5 @@
 export function taskIsOpen(task) {
-  return !["done", "cancelled"].includes(task?.status);
+  return Boolean(task) && !task.archived_at && !["done", "cancelled"].includes(task.status);
 }
 
 export function taskPlacementStart(task) {

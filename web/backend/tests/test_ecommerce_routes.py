@@ -177,6 +177,14 @@ class EcommerceRoutesTests(unittest.TestCase):
         theme = StoreThemePayload(accent="#A33A2B")
         self.assertEqual(theme.accent, "#a33a2b")
 
+    def test_store_theme_accepts_black_friday_campaign_switch(self):
+        theme = StoreThemePayload(seasonal_campaign={"enabled": True, "type": "black_friday"})
+        self.assertTrue(theme.seasonal_campaign.enabled)
+        self.assertEqual(theme.seasonal_campaign.type, "black_friday")
+
+        with self.assertRaises(ValidationError):
+            StoreThemePayload(seasonal_campaign={"enabled": True, "type": "untrusted_campaign"})
+
     def test_store_theme_rejects_incomplete_colors(self):
         with self.assertRaises(ValidationError):
             StoreThemePayload(accent="#123")
@@ -448,6 +456,23 @@ class EcommerceRoutesTests(unittest.TestCase):
             brand="nike",
         )
         self.assertEqual([item["id"] for item in filtered], ["one"])
+
+    def test_public_catalog_combines_category_brand_and_tag_filters(self):
+        products = [
+            {"id": "match", "category_ids": ["shoes"], "brand_id": "adidas", "tag_ids": ["sale"]},
+            {"id": "wrong-brand", "category_ids": ["shoes"], "brand_id": "nike", "tag_ids": ["sale"]},
+            {"id": "wrong-tag", "category_ids": ["shoes"], "brand_id": "adidas", "tag_ids": []},
+        ]
+        filtered = _filter_catalog_taxonomy(
+            products,
+            category_rows=[{"id": "shoes", "slug": "shoes", "parent_id": None}],
+            tag_rows=[{"id": "sale", "slug": "sale"}],
+            brand_rows=[{"id": "adidas", "slug": "adidas"}, {"id": "nike", "slug": "nike"}],
+            category="shoes",
+            tag="sale",
+            brand="adidas",
+        )
+        self.assertEqual([item["id"] for item in filtered], ["match"])
 
 
 if __name__ == "__main__":

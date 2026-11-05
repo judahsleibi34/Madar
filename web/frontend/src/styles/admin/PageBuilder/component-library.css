@@ -1,0 +1,105 @@
+.page-builder .builder-layout { position: relative; }
+
+.page-builder .component-library > h2 { margin: 0 0 6px; }
+.page-builder .component-library > .panel-help { margin: 0 0 16px; }
+.page-builder .component-library-search { position: relative; display: flex; align-items: center; margin-bottom: 22px; }
+.page-builder .component-library-search > input[type="search"] { width: 100%; min-width: 0; }
+.page-builder .builder-sidebar:has(.component-library) .panel-navigator > button { display: flex !important; flex-direction: column; align-items: center; justify-content: center; gap: 5px; min-height: 54px !important; }
+.page-builder .builder-sidebar:has(.component-library) .panel-mode-select { padding: 0 !important; background: transparent !important; box-shadow: none !important; }
+.page-builder .builder-sidebar:has(.component-library) .panel-navigator > button strong { font-size: 11px !important; }
+.page-builder .component-library-list { display: flex; flex-direction: column; gap: 22px; }
+.page-builder .component-library-group { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.page-builder .component-library-group > h3 { margin: 0 0 5px; color: var(--theme-text-muted) !important; font-size: 11px !important; font-weight: 600 !important; letter-spacing: .06em; text-transform: uppercase; }
+.page-builder .component-library-list .component-library-row {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 14px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 70px;
+  padding: 10px 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--theme-text);
+  font-family: var(--font-family-base);
+  text-align: start;
+  cursor: pointer;
+}
+.page-builder .component-library-row:hover,
+.page-builder .component-library-row[aria-expanded="true"] { background: var(--theme-primary-soft); border-color: var(--theme-border); color: var(--theme-text); }
+.page-builder .component-library-row:focus-visible,
+.page-builder .component-details button:focus-visible { outline: 2px solid var(--color-focus-indicator); outline-offset: 2px; }
+.page-builder .component-library-icon { display: grid; place-items: center; width: 32px; height: 36px; color: var(--theme-text-muted); }
+.page-builder .component-library-label { display: grid; gap: 3px; min-width: 0; }
+.page-builder .component-library-label > strong { font-size: 12px; line-height: 1.4; font-weight: 600; overflow-wrap: anywhere; }
+.page-builder .component-library-label > small { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: 11px !important; line-height: 1.45 !important; }
+
+/* The original sidebar plus its details extension occupy half the workspace.
+   It overlays the canvas so opening a preview never changes authored geometry. */
+.page-builder .component-details {
+  position: absolute;
+  inset-block: 0;
+  grid-column: 2 / -1;
+  grid-row: 1;
+  inset-inline-start: 0;
+  width: max(300px, calc((100% - var(--component-sidebar-width)) / 2));
+  max-width: 100%;
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border-inline: 2px solid var(--theme-primary);
+  background: var(--surface-1);
+  color: var(--text-primary);
+  box-shadow: none;
+  font: 400 14px/1.6 var(--font-family-base);
+  animation: component-details-enter 180ms ease-out;
+}
+.page-builder .component-details.is-dragging { opacity: 0; pointer-events: none; }
+.page-builder .component-details > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--theme-primary); }
+.page-builder .component-details > header > span { color: var(--text-primary); font-size: 12px; font-weight: 600; }
+.page-builder .component-details .component-details-close {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--theme-primary) !important;
+  -webkit-text-fill-color: var(--theme-primary) !important;
+  cursor: pointer;
+  box-shadow: none !important;
+}
+.page-builder .component-details .component-details-close svg { stroke: currentColor !important; }
+.page-builder .component-details .component-details-close:hover { color: var(--theme-primary-hover) !important; }
+.page-builder .component-details .component-details-close:focus-visible { outline: 2px solid var(--theme-primary); outline-offset: 2px; }
+.page-builder .component-details-body { flex: 1; min-height: 0; overflow-y: auto; padding: 26px 22px; }
+.page-builder .component-details-category { color: var(--text-secondary); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
+.page-builder .component-details h2 { margin: 8px 0 12px; color: var(--text-primary); font: 600 20px/1.35 var(--font-family-base); overflow-wrap: anywhere; }
+.page-builder .component-details p { margin: 0 0 14px; color: var(--text-secondary); font-size: 13px; line-height: 1.65; }
+.page-builder .component-details-preview { margin-top: 26px; cursor: grab; }
+.page-builder .component-details-preview:active { cursor: grabbing; }
+.page-builder .component-details-preview > span { display: block; margin-top: 10px; color: var(--text-secondary); font-size: 11px; text-align: center; }
+.page-builder .component-example { display: grid; align-items: center; min-height: 220px; padding: 24px; border: 1px solid var(--border-strong); border-radius: var(--builder-ui-panel-radius); background: var(--surface-2); color: var(--text-primary); pointer-events: none; }
+.page-builder .component-example-title { display: block; color: var(--theme-text); font-size: 28px; line-height: 1.25; letter-spacing: -.025em; }
+.page-builder .component-example-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: fit-content; padding: 10px 16px; border-radius: 8px; background: var(--theme-primary); color: var(--theme-text-inverse); font-size: 12px; font-weight: 600; }
+.page-builder .component-example hr { width: 100%; border: 0; border-top: 1px solid var(--theme-border); }
+.page-builder .component-example ul { margin: 0; padding-inline-start: 18px; font-size: 12px; line-height: 2.1; }
+.page-builder .component-example-card { display: grid; gap: 12px; }
+.page-builder .component-example-media { display: grid; place-items: center; min-height: 120px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface-1); color: var(--text-secondary); }
+.page-builder .component-example-card strong { font-size: 15px; line-height: 1.4; }
+.page-builder .component-example-card p { margin: 0; font-size: 12px; }
+.page-builder .component-example-form,
+.page-builder .component-example-booking { display: grid; gap: 16px; font-size: 13px; }
+.page-builder .component-example-form > span:not(.component-example-button) { height: 28px; border: 1px solid var(--theme-border); border-radius: 6px; }
+.page-builder .component-example-booking > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.page-builder .component-example-booking > div > span { padding: 5px 8px; border: 1px solid var(--theme-border); border-radius: 6px; font-size: 11px; }
+.page-builder .component-details > footer { padding: 18px 22px; border-top: 1px solid var(--theme-primary); }
+.page-builder .component-details .component-details-add { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; cursor: pointer; box-shadow: none !important; }
+.page-builder .component-details > footer > p { margin: 8px 0 0; font-size: 11px; text-align: center; }
+@keyframes component-details-enter { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: translateX(0); } }
+@media (prefers-reduced-motion: reduce) { .page-builder .component-details { animation: none; } }

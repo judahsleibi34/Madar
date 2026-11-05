@@ -1,3 +1,4 @@
+import DateTimeInput from "../../common/DateTimeInput";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
@@ -317,7 +318,7 @@ export default function BuilderFormPreviewPage() {
       input = <input type="file" onChange={(event) => setAnswer(field.id, event.target.files?.[0]?.name || "")} />;
     } else {
       const inputType = field.type === "email" ? "email" : field.type === "number" || field.type === "money" ? "number" : field.type === "date" ? "date" : "text";
-      input = <input type={inputType} value={value} placeholder={placeholder} onChange={(event) => setAnswer(field.id, event.target.value)} />;
+      input = <DateTimeInput lang={formLang} type={inputType} value={value} placeholder={placeholder} onChange={(event) => setAnswer(field.id, event.target.value)} />;
     }
 
     return (

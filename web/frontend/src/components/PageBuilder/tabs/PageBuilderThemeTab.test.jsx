@@ -18,7 +18,7 @@ describe("PageBuilderThemeTab sidebar", () => {
     );
 
     expect(container.querySelector(".page-utility-actions.theme-sidebar-actions")).toBeTruthy();
-    expect(container.querySelector(".section-component-palette.theme-sidebar-palette")).toBeTruthy();
+    expect(container.querySelector(".theme-sidebar-palette")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Themes" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Theme colors" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Shape & typography" })).toBeTruthy();

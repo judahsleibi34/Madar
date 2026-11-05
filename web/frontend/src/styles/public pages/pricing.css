@@ -2319,3 +2319,177 @@ body.theme-dark .pricing-storage-callout {
     width: 100%;
   }
 }
+
+/* Consistent public plan cards: shared typography, flat surfaces, matched rows. */
+.launch-pricing .pricing-catalog-plan {
+  min-width: 0;
+  padding: var(--space-5);
+  border: 1px solid var(--theme-border);
+  border-radius: var(--radius-default);
+  background: var(--theme-surface);
+  box-shadow: none;
+  font-family: inherit;
+}
+
+.launch-pricing .launch-module-grid .pricing-catalog-plan-header {
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  min-height: 154px;
+  gap: var(--space-3);
+}
+
+.launch-pricing .pricing-catalog-plan h3 {
+  font-family: inherit;
+  font-size: var(--type-h3-size);
+  line-height: var(--type-h3-line);
+  font-weight: var(--weight-semibold);
+}
+
+.launch-pricing .pricing-catalog-plan-header p,
+.launch-pricing .pricing-catalog-heading p {
+  margin: 0;
+  font-size: var(--type-small-size);
+  line-height: var(--type-small-line);
+  font-weight: var(--weight-regular);
+  color: var(--theme-text-muted);
+}
+
+.launch-pricing .pricing-catalog-heading p {
+  margin-top: var(--space-2);
+}
+
+.launch-pricing .pricing-starting-price {
+  margin-top: var(--space-5);
+}
+
+.launch-pricing .pricing-starting-label {
+  color: var(--theme-text-muted);
+  font-size: var(--type-small-size);
+  line-height: var(--type-small-line);
+  font-weight: var(--weight-medium);
+}
+
+.launch-pricing .pricing-starting-price .pricing-catalog-price {
+  min-height: 0;
+  margin: var(--space-2) 0 0;
+  padding-bottom: var(--space-5);
+  flex-wrap: wrap;
+}
+
+.launch-pricing .pricing-catalog-price strong {
+  font-family: inherit;
+  font-size: var(--type-h1-size);
+  line-height: var(--type-h1-line);
+  font-weight: var(--weight-bold);
+  color: var(--color-accent-text);
+}
+
+.launch-pricing .pricing-pending-price {
+  margin-top: var(--space-5);
+  padding-block: var(--space-4);
+  border-bottom: 1px solid var(--theme-border);
+  color: var(--theme-text-muted);
+  font-size: var(--type-small-size);
+}
+
+.launch-pricing .pricing-catalog-plan .pricing-feature-list {
+  margin-top: var(--space-4);
+  gap: var(--space-3);
+}
+
+.launch-pricing .pricing-catalog-plan .pricing-feature-list li {
+  font-size: var(--type-small-size);
+  line-height: var(--type-small-line);
+  font-weight: var(--weight-regular);
+}
+
+@media (max-width: 1050px) {
+  .launch-pricing .launch-module-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .launch-pricing .launch-module-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .launch-pricing .launch-module-grid .pricing-catalog-plan-header {
+    min-height: 0;
+  }
+}
+
+.launch-pricing .pricing-catalog-plan .pricing-feature-list li > span {
+  font-size: inherit;
+  line-height: inherit;
+  font-weight: inherit;
+}
+
+.launch-pricing .launch-all-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-5) var(--space-8);
+  border-color: var(--theme-primary);
+}
+
+.launch-pricing .launch-all-card .pricing-starting-price {
+  margin-top: 0;
+  align-self: center;
+}
+
+.launch-pricing .launch-all-card .pricing-catalog-price {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.launch-pricing .launch-all-card .pricing-feature-list {
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin-top: 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--theme-border);
+}
+
+@media (max-width: 600px) {
+  .launch-pricing .launch-all-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Keep the plan introduction at the shared page-title scale. */
+:root .launch-pricing .pricing-inner-header.app-page-intro {
+  display: block;
+  margin-block-end: var(--space-6);
+  padding-block-end: 0;
+}
+
+.pricing-page.launch-pricing .pricing-inner-header .pricing-section-heading h1 {
+  max-width: 100%;
+  margin: 0;
+  font-family: inherit;
+  font-size: var(--type-h1-size);
+  line-height: var(--type-h1-line);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0;
+  color: var(--theme-text);
+}
+
+.launch-pricing .pricing-inner-header .pricing-section-heading p {
+  max-width: 65ch;
+  margin: var(--space-3) 0 0;
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
+  font-weight: var(--weight-regular);
+}
+
+:root .launch-pricing .pricing-inner-header.app-page-intro::after {
+  position: static;
+  width: 100%;
+  height: 0;
+  margin-block-start: var(--space-6);
+  background: none;
+}
+
+.launch-pricing .pricing-base-section > .launch-pricing-group:first-child {
+  margin-top: 0;
+}

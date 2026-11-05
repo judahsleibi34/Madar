@@ -44,6 +44,10 @@
 @import "./admin/PageBuilder/workspace-stability.css";
 @import "./admin/PageBuilder/selection-toolbar.css";
 @import "./admin/PageBuilder/workspace-controls.css";
+@import "./admin/PageBuilder/commerce-alignment.css";
+@import "./admin/PageBuilder/component-library.css";
+@import "./admin/PageBuilder/theme-editor.css";
+@import "./admin/PageBuilder/reservation-workspace.css";
 @import "/src/styles/admin/PageBuilder/footer-responsive.css";
 @import "./core/red-headings.css";
 @import "./core/neutral-focus.css";

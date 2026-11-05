@@ -1,0 +1,77 @@
+/* Expand over the canvas, keeping authored page geometry unchanged. */
+.page-builder .builder-sidebar:has(.theme-sidebar-editor) {
+  position: relative;
+  z-index: 46;
+  width: clamp(320px, 34vw, 460px);
+  max-width: calc(100vw - 88px);
+  box-sizing: border-box;
+  border-inline-end: 2px solid var(--theme-primary);
+}
+
+.page-builder .theme-sidebar-editor { gap: 14px; }
+.page-builder .builder-sidebar:has(.theme-sidebar-editor) .panel-mode-select {
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.page-builder .theme-sidebar-editor > h2 { margin: 0; }
+.page-builder .theme-sidebar-editor > .panel-help { margin: 0; }
+.page-builder .theme-sidebar-editor .theme-sidebar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+.page-builder .theme-sidebar-actions > button { flex: 1; white-space: nowrap; }
+.page-builder .theme-sidebar-palette { display: grid; gap: 24px; }
+.page-builder .theme-sidebar-section { gap: 10px; padding: 0; }
+.page-builder .theme-sidebar-section + .theme-sidebar-section { padding-top: 0; }
+.page-builder .theme-sidebar-section-heading h3 {
+  color: var(--theme-text-muted);
+  font: 600 11px/1.5 var(--font-family-base);
+  letter-spacing: .06em;
+}
+.page-builder .theme-sidebar-editor .theme-sidebar-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+.page-builder .theme-sidebar-editor .theme-sidebar-grid > label {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 144px;
+  align-items: center;
+  gap: 14px;
+  min-height: 52px;
+  margin: 0;
+  padding: 7px 0 !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--theme-border) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.page-builder .theme-sidebar-editor .theme-token-label {
+  min-height: 0;
+  display: block;
+  font: 500 12px/1.45 var(--font-family-base);
+}
+.page-builder .theme-sidebar-editor .theme-token-input {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 0 !important;
+}
+.page-builder .theme-sidebar-editor .theme-token-swatch { width: 30px; height: 30px; }
+.page-builder .theme-sidebar-editor .theme-token-hex-input {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 8px !important;
+  font: 400 12px/1.5 var(--font-family-base) !important;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.page-builder .theme-sidebar-editor .theme-sidebar-type-grid :is(input, select) {
+  min-width: 0;
+  min-height: 36px;
+  font-weight: 400 !important;
+}

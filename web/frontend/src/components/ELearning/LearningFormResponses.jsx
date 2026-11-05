@@ -1,3 +1,4 @@
+import DateTimeInput from "../common/DateTimeInput";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -122,7 +123,7 @@ export default function LearningFormResponses({
         <div className="learning-response-controls">
           <label>{content.display}<select value={view} onChange={event => setView(event.target.value)}><option value="both">{content.combinedView}</option><option value="table">{content.tableView}</option><option value="list">{content.listView}</option></select></label>
           <label>{label('identity')}<select value={params.get('identity') || ''} onChange={event => filter('identity',event.target.value)}><option value="">{label('all')}</option><option value="guest">{label('guest')}</option><option value="authenticated">{t('elearning.ui.member')}</option></select></label>
-          {['date_from','date_to'].map(key => <label key={key}>{label(key)}<input type="datetime-local" value={params.get(key) ? new Date(new Date(params.get(key)).getTime()-new Date(params.get(key)).getTimezoneOffset()*60000).toISOString().slice(0,16) : ''} onChange={event => filter(key,event.target.value ? new Date(event.target.value).toISOString() : '')}/></label>)}
+          {['date_from','date_to'].map(key => <label key={key}>{label(key)}<DateTimeInput type="datetime-local" value={params.get(key) ? new Date(new Date(params.get(key)).getTime()-new Date(params.get(key)).getTimezoneOffset()*60000).toISOString().slice(0,16) : ''} onChange={event => filter(key,event.target.value ? new Date(event.target.value).toISOString() : '')}/></label>)}
           {access?.capabilities?.reports && <button onClick={() => learningFormsApi(`/responses/export?${query}`,{download:'learning-form-responses.csv'}).catch(reportError)}>{label('export')}</button>}
         </div>
         {notice && <p role="status">{notice}</p>}

@@ -55,7 +55,8 @@ export default function PageBuilderPageInspector({
 
       <div className="inspector-group loading-screen-inspector" data-testid="loading-screen-inspector">
         <h3>Loading Screen</h3>
-        <p className="builder-note">Shown while the published site is loading. This setting applies to every page.</p>
+        <p className="builder-note">Shown for at least 10 seconds when the published site opens. If loading takes longer, it remains visible until the site is ready.</p>
+        <span className="loading-screen-duration">Display time · 10 seconds</span>
         <div className="loading-image-preview" aria-label="Loading image preview">
           {loadingImagePreviewUrl ? (
             <img src={loadingImagePreviewUrl} alt="Current loading screen" />

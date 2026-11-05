@@ -24,6 +24,7 @@ describe("calendar task scheduling", () => {
     expect(taskIsOpen({ status: "blocked" })).toBe(true);
     expect(taskIsOpen({ status: "done" })).toBe(false);
     expect(taskIsOpen({ status: "cancelled" })).toBe(false);
+    expect(taskIsOpen({ status: "todo", archived_at: "2026-11-03T00:00:00Z" })).toBe(false);
   });
 
   it("places scheduled and due-only tasks once in the requested range", () => {

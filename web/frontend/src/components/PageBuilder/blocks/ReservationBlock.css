@@ -1052,8 +1052,8 @@
 }
 
 .reservation-custom-text-component [dir="rtl"]:is(ul, ol) {
-  padding-inline-start: 0;
-  padding-inline-end: 1.5em;
+  padding-inline-start: 1.5em;
+  padding-inline-end: 0;
 }
 
 .reservation-custom-form [dir="rtl"] {

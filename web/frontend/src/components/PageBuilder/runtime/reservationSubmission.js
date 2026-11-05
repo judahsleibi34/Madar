@@ -21,6 +21,14 @@ export const getReservationErrorMessage = (error) => {
     return "That time is no longer available. Choose another time and try again.";
   }
 
+  if (error?.code === "reservation_capacity_unavailable") {
+    return "This group session cannot accept bookings yet. Please contact the organizer.";
+  }
+
+  if (["reservation_seats_invalid", "reservation_capacity_invalid"].includes(error?.code)) {
+    return "Choose a valid number of seats for this session and try again.";
+  }
+
   if (error?.code === "idempotency_conflict") {
     return "This retry no longer matches your original request. Review the details and submit again.";
   }

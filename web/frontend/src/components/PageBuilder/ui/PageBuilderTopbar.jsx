@@ -6,6 +6,7 @@ export default function PageBuilderTopbar({
   preview,
   copy,
   onPreviewClick,
+  actions,
 }) {
   const hasNestedPageTitle = ["responses", "data", "reservations"].includes(activeTab);
   const ProjectTitle = hasNestedPageTitle ? "span" : "h1";
@@ -28,6 +29,10 @@ export default function PageBuilderTopbar({
           >
             {copy?.exitPreview || "Exit preview"}
           </button>
+        </div>
+      ) : actions ? (
+        <div className="builder-topbar-actions builder-command-actions">
+          {actions}
         </div>
       ) : null}
     </header>

@@ -355,6 +355,7 @@ export default function UserWorkspaceRoutes({
             key={`agenda:${user?.tenant_id || ""}:${user?.id || user?.auth_id || ""}`}
             user={user}
             initialView="agenda"
+            standaloneAgenda
             onViewChange={(nextView) => {
               if (nextView !== "agenda") navigate(DASHBOARD_ROUTES.calendar, { state: { calendarView: nextView } });
             }}

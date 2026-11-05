@@ -37,6 +37,10 @@ import useAcademyCapabilities from "../../hooks/useAcademyCapabilities";
 import LanguageSwitcher from "../LanguageSwitcher";
 import NotificationBell from "./NotificationBell";
 import { DASHBOARD_ROUTES, PUBLIC_ROUTES } from "../../config/routes";
+import {
+  getBuilderProjectIdFromPath,
+  getBuilderWorkspacePath,
+} from "../PageBuilder/core/PageBuilder.workspaceRouting";
 
 function normalizeRoleValue(value) {
   return String(value || "").trim().toLowerCase();
@@ -142,27 +146,40 @@ export default function DashboardSidebar({
   const navigate = useNavigate();
   const location = useLocation();
   const sidebarRef = useRef(null);
+  const pageBuilderProjectId = location.pathname.startsWith("/page-builder/projects/")
+    ? getBuilderProjectIdFromPath(location.pathname)
+    : "";
 
   const activeSidebarLanguage =
     i18n?.resolvedLanguage?.split("-")[0] || lang;
   const isRtl = activeSidebarLanguage === "ar";
   const sidebarDir = isRtl ? "rtl" : "ltr";
 
-  const workspaceRouteActive = [
+  const routeMatches = (path) => location.pathname === path ||
+    location.pathname.startsWith(`${path}/`);
+  const siteManagementRouteActive = [
     DASHBOARD_ROUTES.pageBuilder,
     DASHBOARD_ROUTES.builderResponses,
+  ].some(routeMatches);
+  const planningRouteActive = [
+    DASHBOARD_ROUTES.calendar,
+    DASHBOARD_ROUTES.agenda,
+  ].some(routeMatches);
+  const dataInsightsRouteActive = [
     DASHBOARD_ROUTES.dataProjects,
     DASHBOARD_ROUTES.dataSources,
     DASHBOARD_ROUTES.businessIntelligence,
     DASHBOARD_ROUTES.builderData,
-    DASHBOARD_ROUTES.calendar,
-    DASHBOARD_ROUTES.agenda,
-    DASHBOARD_ROUTES.archive,
-  ].some(
-    (path) =>
-      location.pathname === path ||
-      location.pathname.startsWith(`${path}/`),
-  );
+  ].some(routeMatches);
+  const archiveRouteActive = routeMatches(DASHBOARD_ROUTES.archive);
+  const activeWorkspaceGroup = siteManagementRouteActive
+    ? "site"
+    : planningRouteActive
+      ? "planning"
+      : dataInsightsRouteActive
+        ? "data"
+        : null;
+  const workspaceRouteActive = Boolean(activeWorkspaceGroup) || archiveRouteActive;
   const settingsRouteActive =
     location.pathname === DASHBOARD_ROUTES.settings ||
     location.pathname.startsWith(DASHBOARD_ROUTES.settings + "/");
@@ -188,7 +205,7 @@ export default function DashboardSidebar({
     pathname: location.pathname,
   });
   const [workspaceExpansion, setWorkspaceExpansion] = useState({
-    open: workspaceRouteActive,
+    openGroup: activeWorkspaceGroup,
     pathname: location.pathname,
   });
   const [ecommerceExpansion, setEcommerceExpansion] = useState({
@@ -251,46 +268,73 @@ export default function DashboardSidebar({
     },
 ];
 
-  const workspaceItems = [
+  const workspaceGroups = [
     {
-      label: t("sidebar.pageBuilder"),
-      path: DASHBOARD_ROUTES.pageBuilder,
+      id: "site",
+      label: t("sidebar.siteManagement", { defaultValue: "Site & forms" }),
       icon: PanelsTopLeft,
+      items: [
+        {
+          label: t("sidebar.pageBuilder"),
+          path: DASHBOARD_ROUTES.pageBuilder,
+          icon: PanelsTopLeft,
+        },
+        ...(pageBuilderProjectId ? [{
+          label: t("sidebar.users", { defaultValue: "Users" }),
+          path: getBuilderWorkspacePath(pageBuilderProjectId, "users"),
+          icon: ShieldCheck,
+        }, {
+          label: t("sidebar.forms", { defaultValue: "Forms" }),
+          path: getBuilderWorkspacePath(pageBuilderProjectId, "forms"),
+          icon: ClipboardList,
+        }] : []),
+        {
+          label: t("sidebar.submissions"),
+          path: DASHBOARD_ROUTES.builderResponses,
+          icon: ClipboardList,
+        },
+        ...(pageBuilderProjectId ? [{
+          label: t("sidebar.reservations", { defaultValue: "Reservations" }),
+          path: getBuilderWorkspacePath(pageBuilderProjectId, "reservations"),
+          icon: CalendarDays,
+        }] : []),
+      ],
     },
     {
-      label: t("sidebar.submissions"),
-      path: DASHBOARD_ROUTES.builderResponses,
-      icon: ClipboardList,
-    },
-    {
-      label: t("sidebar.dataProjects", { defaultValue: "Projects" }),
-      path: DASHBOARD_ROUTES.dataProjects,
-      icon: FolderOpen,
-    },
-    {
-      label: t("sidebar.dataSources", { defaultValue: "Data Sources" }),
-      path: DASHBOARD_ROUTES.dataSources,
-      icon: Upload,
-    },
-    {
-      label: t("sidebar.businessIntelligence", { defaultValue: "Business Intelligence" }),
-      path: DASHBOARD_ROUTES.businessIntelligence,
-      icon: ChartNoAxesCombined,
-    },
-    {
-      label: t("sidebar.dataLogs"),
-      path: DASHBOARD_ROUTES.builderData,
-      icon: Database,
-    },
-    {
-      label: t("sidebar.calendar", { defaultValue: "Calendar" }),
-      path: DASHBOARD_ROUTES.calendar,
+      id: "planning",
+      label: t("sidebar.planning", { defaultValue: "Planning" }),
       icon: CalendarDays,
+      items: [{
+        label: t("sidebar.calendar", { defaultValue: "Calendar" }),
+        path: DASHBOARD_ROUTES.calendar,
+        icon: CalendarDays,
+      }, {
+        label: t("sidebar.agenda", { defaultValue: "My tasks" }),
+        path: DASHBOARD_ROUTES.agenda,
+        icon: ClipboardList,
+      }],
     },
     {
-      label: t("sidebar.archive", { defaultValue: "Archive" }),
-      path: DASHBOARD_ROUTES.archive,
-      icon: Archive,
+      id: "data",
+      label: t("sidebar.dataInsights", { defaultValue: "Data & insights" }),
+      icon: ChartNoAxesCombined,
+      items: [{
+        label: t("sidebar.dataProjects", { defaultValue: "Projects" }),
+        path: DASHBOARD_ROUTES.dataProjects,
+        icon: FolderOpen,
+      }, {
+        label: t("sidebar.dataSources", { defaultValue: "Data Sources" }),
+        path: DASHBOARD_ROUTES.dataSources,
+        icon: Upload,
+      }, {
+        label: t("sidebar.dataLogs"),
+        path: DASHBOARD_ROUTES.builderData,
+        icon: Database,
+      }, {
+        label: t("sidebar.businessIntelligence", { defaultValue: "Business Intelligence" }),
+        path: DASHBOARD_ROUTES.businessIntelligence,
+        icon: ChartNoAxesCombined,
+      }],
     },
   ];
   const ecommerceItems = [
@@ -350,13 +394,10 @@ export default function DashboardSidebar({
       icon: ShoppingBag,
     },
   ];
-  const workspaceLabel = t("sidebar.workspace", {
-    defaultValue: "Workspace",
-  });
-  const workspaceIsExpanded =
+  const workspaceOpenGroup =
     workspaceExpansion.pathname === location.pathname
-      ? workspaceExpansion.open
-      : workspaceRouteActive;
+      ? workspaceExpansion.openGroup
+      : activeWorkspaceGroup;
   const elearningIsExpanded = elearningExpansion.pathname === location.pathname
     ? elearningExpansion.open : elearningRouteActive;
   const ecommerceIsExpanded = ecommerceExpansion.open;
@@ -399,7 +440,7 @@ export default function DashboardSidebar({
     if (nextOpen) {
       setELearningExpansion({ open: false, pathname: location.pathname });
       setWorkspaceExpansion({
-        open: false,
+        openGroup: null,
         pathname: location.pathname,
       });
       setEcommerceExpansion({
@@ -410,6 +451,10 @@ export default function DashboardSidebar({
   };
 
   const isActive = (path) => {
+    if (path === DASHBOARD_ROUTES.pageBuilder && pageBuilderProjectId) {
+      return /^\/page-builder\/projects\/[^/]+\/pages(?:\/|$)/.test(location.pathname);
+    }
+
     if (path === "/my-learning") {
       return location.pathname === path || location.pathname.startsWith(`${path}/courses/`);
     }
@@ -420,9 +465,7 @@ export default function DashboardSidebar({
     if (path === DASHBOARD_ROUTES.calendar) {
       return (
         location.pathname === DASHBOARD_ROUTES.calendar ||
-        location.pathname.startsWith(`${DASHBOARD_ROUTES.calendar}/`) ||
-        location.pathname === DASHBOARD_ROUTES.agenda ||
-        location.pathname.startsWith(`${DASHBOARD_ROUTES.agenda}/`)
+        location.pathname.startsWith(`${DASHBOARD_ROUTES.calendar}/`)
       );
     }
 
@@ -526,61 +569,60 @@ export default function DashboardSidebar({
             );
           })}
 
-          {!isPlatformAdmin && <div className="admin-sidebar-group">
-            <SidebarRow
-                controls="dashboard-sidebar-workspace"
-                expanded={workspaceIsExpanded}
-                icon={PanelsTopLeft}
-                label={workspaceLabel}
+          {!isPlatformAdmin && workspaceGroups.map((group) => {
+            const groupIsExpanded = workspaceOpenGroup === group.id;
+
+            return <div className="admin-sidebar-group" key={group.id}>
+              <SidebarRow
+                controls={`dashboard-sidebar-workspace-${group.id}`}
+                expanded={groupIsExpanded}
+                icon={group.icon}
+                label={group.label}
                 onClick={() => {
-                  const nextOpen = !workspaceIsExpanded;
+                  const nextOpenGroup = groupIsExpanded ? null : group.id;
 
                   setWorkspaceExpansion({
-                    open: nextOpen,
+                    openGroup: nextOpenGroup,
                     pathname: location.pathname,
                   });
 
-                  if (nextOpen) {
+                  if (nextOpenGroup) {
                     setELearningExpansion({ open: false, pathname: location.pathname });
-                    setEcommerceExpansion({
-                      open: false,
-                      pathname: location.pathname,
-                    });
-                    setSettingsExpansion({
-                      open: false,
-                      pathname: location.pathname,
-                    });
+                    setEcommerceExpansion({ open: false, pathname: location.pathname });
+                    setSettingsExpansion({ open: false, pathname: location.pathname });
                   }
                 }}
               />
 
-            {workspaceIsExpanded && (
+              {groupIsExpanded && (
                 <div
                   className="admin-sidebar-subnav"
-                  id="dashboard-sidebar-workspace"
+                  id={`dashboard-sidebar-workspace-${group.id}`}
                 >
-                  {workspaceItems.map((item) => {
-                    const Icon = item.icon;
-                    const active = isActive(item.path);
+                  {group.items.map((item) => {
+                      const Icon = item.icon;
+                      const active = isActive(item.path);
 
-                    return (
-                      <button
-                        type="button"
-                        key={item.path}
-                        className={active ? "active" : ""}
-                        data-route-path={item.path}
-                onClick={() => goTo(item.path)}
-                        title={item.label}
-                        aria-current={active ? "page" : undefined}
-                      >
-                        <Icon size={16} aria-hidden="true" />
-                        <span>{item.label}</span>
-                      </button>
-                    );
-                  })}
+                      return (
+                        <button
+                          type="button"
+                          key={item.path}
+                          className={active ? "active" : ""}
+                          data-route-path={item.path}
+                          data-workspace-group={group.id}
+                          onClick={() => goTo(item.path)}
+                          title={item.label}
+                          aria-current={active ? "page" : undefined}
+                        >
+                          <Icon size={16} aria-hidden="true" />
+                          <span>{item.label}</span>
+                        </button>
+                      );
+                    })}
                 </div>
               )}
-          </div>}
+            </div>;
+          })}
 
           {!isPlatformAdmin && <div className="admin-sidebar-group">
             <SidebarRow
@@ -599,7 +641,7 @@ export default function DashboardSidebar({
                 if (nextOpen) {
                   setELearningExpansion({ open: false, pathname: location.pathname });
                   setWorkspaceExpansion({
-                    open: false,
+                    openGroup: null,
                     pathname: location.pathname,
                   });
                   setSettingsExpansion({
@@ -649,7 +691,7 @@ export default function DashboardSidebar({
                 const nextOpen = !elearningIsExpanded;
                 setELearningExpansion({ open: nextOpen, pathname: location.pathname });
                 if (nextOpen) {
-                  setWorkspaceExpansion({ open: false, pathname: location.pathname });
+                  setWorkspaceExpansion({ openGroup: null, pathname: location.pathname });
                   setEcommerceExpansion({ open: false, pathname: location.pathname });
                   setSettingsExpansion({ open: false, pathname: location.pathname });
                 }
@@ -676,6 +718,16 @@ export default function DashboardSidebar({
               />
             );
           })}
+
+          {!isPlatformAdmin && (
+            <SidebarRow
+              active={isActive(DASHBOARD_ROUTES.archive)}
+              icon={Archive}
+              label={t("sidebar.archive", { defaultValue: "Archive" })}
+              onClick={() => goTo(DASHBOARD_ROUTES.archive)}
+              path={DASHBOARD_ROUTES.archive}
+            />
+          )}
         </nav>
       </div>
 

@@ -50,6 +50,7 @@ DEFAULT_STORE_THEME = {
     "surface": "#f5f1eb",
     "text": "#162033",
     "muted": "#667085",
+    "seasonal_campaign": {"enabled": False, "type": "black_friday"},
 }
 LEGACY_DEFAULT_STORE_THEME = {
     "accent": "#2463eb",
@@ -185,12 +186,18 @@ class BrandPayload(BaseModel):
         return url
 
 
+class StoreSeasonalCampaignPayload(BaseModel):
+    enabled: bool = False
+    type: Literal["black_friday"] = "black_friday"
+
+
 class StoreThemePayload(BaseModel):
     accent: str = DEFAULT_STORE_THEME["accent"]
     background: str = DEFAULT_STORE_THEME["background"]
     surface: str = DEFAULT_STORE_THEME["surface"]
     text: str = DEFAULT_STORE_THEME["text"]
     muted: str = DEFAULT_STORE_THEME["muted"]
+    seasonal_campaign: StoreSeasonalCampaignPayload = Field(default_factory=StoreSeasonalCampaignPayload)
 
     @field_validator("accent", "background", "surface", "text", "muted")
     @classmethod

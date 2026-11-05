@@ -1,3 +1,4 @@
+import DateTimeInput from "../../common/DateTimeInput";
 import { isFormFieldVisible } from "./formVisibility";
 import { getBuilderWorkspaceFromPath, getBuilderProjectBasePath } from "../core/PageBuilder.workspaceRouting";
 import { getAcademyNavigationDestinations } from "../core/PageBuilder.academyProfile";
@@ -93,6 +94,7 @@ import {
 const runtimeFallbackCopy = getTenantRuntimeContent("en");
 const MADAR_ATTRIBUTION_URL = "https://madarportal.com/";
 const TENANT_BRAND_CACHE_PREFIX = "madar:tenant-brand:";
+export const TENANT_LOADING_SCREEN_DURATION_MS = 10_000;
 const PUBLICATION_VERSION_POLL_MS = 30_000;
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -465,7 +467,11 @@ export const getBuilderPreviewBasePath = (projectId, workspace = "page-builder")
 
 const AcademyPreviewProvider = lazy(() => import("../../ELearning/ELearningAcademy").then(module => ({ default: module.AcademyBuilderPreviewProvider })));
 
-export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier = "" } = {}) {
+export default function TenantSiteRuntime({
+  draftPreview = false,
+  siteIdentifier = "",
+  minimumLoadingScreenMs = TENANT_LOADING_SCREEN_DURATION_MS,
+} = {}) {
   const params = useParams();
   const { projectId = "", subdomain = "my-site" } = params;
   const location = useLocation();
@@ -473,6 +479,13 @@ export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier
 
   const cleanSubdomain = getCleanSubdomain(siteIdentifier || subdomain);
   const isPublicRuntime = !draftPreview;
+  const requestedLoadingScreenMs = Number(minimumLoadingScreenMs);
+  const loadingScreenDurationMs = Number.isFinite(requestedLoadingScreenMs)
+    ? Math.max(0, requestedLoadingScreenMs)
+    : TENANT_LOADING_SCREEN_DURATION_MS;
+  const [loadingScreenMinimumElapsed, setLoadingScreenMinimumElapsed] = useState(
+    () => !isPublicRuntime || loadingScreenDurationMs === 0
+  );
   const [runtimeLayout, setRuntimeLayout] = useState(() => {
     const availableWidth = getRuntimeAvailableWidth();
     return { availableWidth, ...getLiveArtboardProfile(availableWidth) };
@@ -536,6 +549,30 @@ export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier
   const loadedResumeTokenRef = useRef("");
   const detectedPublicationRef = useRef("");
   const recordedVisitRef = useRef("");
+
+  useEffect(() => {
+    if (!isPublicRuntime || loadingScreenDurationMs === 0) {
+      setLoadingScreenMinimumElapsed(true);
+      return undefined;
+    }
+
+    if (publicSiteState === "loading") {
+      setLoadingScreenMinimumElapsed(false);
+      return undefined;
+    }
+
+    if (publicSiteState !== "ready") {
+      setLoadingScreenMinimumElapsed(true);
+      return undefined;
+    }
+
+    setLoadingScreenMinimumElapsed(false);
+    const timeoutId = window.setTimeout(
+      () => setLoadingScreenMinimumElapsed(true),
+      loadingScreenDurationMs
+    );
+    return () => window.clearTimeout(timeoutId);
+  }, [cleanSubdomain, isPublicRuntime, loadingScreenDurationMs, publicSiteState]);
 
   useEffect(() => {
     if (!isPublicRuntime || !cleanSubdomain || publicSiteState !== "ready" || tenantAuth.loading) return;
@@ -1849,7 +1886,8 @@ export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier
     }
 
     return (
-      <input
+      <DateTimeInput
+        lang={formLang}
         dir={fieldDirection}
         type={inputTypeForField(field.type)}
         placeholder={placeholder}
@@ -2178,6 +2216,10 @@ export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier
             availableDates={reservation.availableDates}
             timeSlots={reservation.timeSlots}
             timeSlotsByDate={reservation.timeSlotsByDate}
+            weeklyRepeatDates={reservation.weeklyRepeatDates}
+            sessionType={reservation.sessionType}
+            seatCapacity={reservation.seatCapacity}
+            sessionSettingsByDate={reservation.sessionSettingsByDate}
             submitLabel={reservation.submitLabel}
             disabled={Boolean(status.submitting)}
             onSubmit={(values, idempotencyKey, honeypot, submissionElapsedMs) =>
@@ -2290,7 +2332,11 @@ export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier
     const loadingInitial = loadingBrand.trim().slice(0, 1).toUpperCase() || "M";
 
     return (
-      <main className="tenant-runtime-main tenant-runtime-loading-screen" aria-busy="true">
+      <main
+        className="tenant-runtime-main tenant-runtime-loading-screen"
+        aria-busy="true"
+        style={{ "--tenant-loading-duration": `${loadingScreenDurationMs}ms` }}
+      >
         <div className="tenant-brand-loader" role="status" aria-live="polite">
           <div className="tenant-brand-loader-mark" aria-hidden="true">
             <span>{loadingInitial}</span>
@@ -2306,8 +2352,18 @@ export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier
             )}
           </div>
           <p className="tenant-brand-loader-name">{loadingBrand}</p>
-          <span className="tenant-brand-loader-progress" aria-hidden="true" />
-          <span className="sr-only">{runtimeCopy.runtime.loadingTitle}</span>
+          <div className="tenant-brand-loader-copy">
+            <strong>{runtimeCopy.runtime.loadingTitle}</strong>
+            <span>{runtimeCopy.runtime.loadingBody}</span>
+          </div>
+          <span
+            className="tenant-brand-loader-progress"
+            role="progressbar"
+            aria-label={runtimeCopy.runtime.loadingTitle}
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuetext={runtimeCopy.runtime.loadingBody}
+          />
         </div>
       </main>
     );
@@ -2317,7 +2373,14 @@ export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier
     // A standalone form page renders only the form, which never reads visitor
     // state; it needs its own data, not the separate visitor-status request.
     // Site pages still wait because their visitor state gates page access.
-    if (isPublicRuntime && (publicSiteState === "loading" || (tenantAuth.loading && !standaloneFormId))) {
+    if (
+      isPublicRuntime &&
+      (
+        !loadingScreenMinimumElapsed ||
+        publicSiteState === "loading" ||
+        (tenantAuth.loading && !standaloneFormId)
+      )
+    ) {
       return renderLoadingState();
     }
 

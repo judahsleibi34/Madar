@@ -1,9 +1,11 @@
+import DateTimeInput from "../../common/DateTimeInput";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getReservationContent } from "../../../content/pageBuilder";
 import { createReservationIdempotencyKey } from "../runtime/reservationSubmission";
 import FixedSlotPicker from "./FixedSlotPicker";
+import { getReservationSession } from "./reservationAvailability";
 import ReservationFormItems from "./ReservationFormItems";
-import { getReservationAnswerError, normalizeReservationFormItems, reservationFormItemNeedsAnswer } from "./reservationForm";
+import { getReservationAnswerError, localizeReservationFormItem, normalizeReservationFormItems, reservationFormItemNeedsAnswer } from "./reservationForm";
 import "./ReservationBlock.css";
 
 const reservationDefaults = getReservationContent("en");
@@ -32,8 +34,8 @@ const normalizeServices = (services) => {
 };
 
 export default function ReservationBlock({
-  title = reservationDefaults.title,
-  description = reservationDefaults.description,
+  title,
+  description,
   services,
   fields,
   formItems,
@@ -41,8 +43,12 @@ export default function ReservationBlock({
   availableDates = [],
   timeSlots = [],
   timeSlotsByDate,
+  weeklyRepeatDates,
+  sessionType = "private",
+  seatCapacity = 1,
+  sessionSettingsByDate,
   disabled = false,
-  submitLabel = reservationDefaults.submitLabel,
+  submitLabel,
   lang = "en",
   onSubmit,
 }) {
@@ -50,7 +56,7 @@ export default function ReservationBlock({
   const fieldMeta = content.fieldMeta;
   const serviceOptions = useMemo(() => normalizeServices(services), [services]);
   const isFixedSlots = bookingMode !== "flexible";
-  const normalizedFormItems = useMemo(() => normalizeReservationFormItems(formItems), [formItems]);
+  const normalizedFormItems = useMemo(() => normalizeReservationFormItems(formItems).map(item => localizeReservationFormItem(item, lang)), [formItems, lang]);
   const hasCustomSubmit = normalizedFormItems.some((item) => item.type === "button");
   const hasCustomComposition = normalizedFormItems.length > 0;
   const hasAvailabilityComponent = normalizedFormItems.some((item) => item.type === "availability");
@@ -63,6 +69,9 @@ export default function ReservationBlock({
   const hasContactFields = ["name", "contact"].some((key) => enabledFields.includes(key));
   const hasScheduleFields = ["date", "time"].some((key) => enabledFields.includes(key));
   const [values, setValues] = useState(() => initialValues(serviceOptions[0]));
+  const session = getReservationSession({ sessionType, seatCapacity, sessionSettingsByDate, timeSlotsByDate, weeklyRepeatDates }, values.date, values.time);
+  const isGroupSession = isFixedSlots && session.sessionType === "group";
+  const maxSeats = isGroupSession && Number.isInteger(session.seatCapacity) && session.seatCapacity >= 2 && session.seatCapacity <= 1000 ? session.seatCapacity : 1;
   const [errors, setErrors] = useState({});
   const [customAnswers, setCustomAnswers] = useState({});
   const [idempotencyKey, setIdempotencyKey] = useState(createReservationIdempotencyKey);
@@ -96,7 +105,7 @@ export default function ReservationBlock({
   };
 
   const selectFixedSlot = (date, time) => {
-    setValues((prev) => ({ ...prev, date, time }));
+    setValues((prev) => ({ ...prev, date, time, guests: "1" }));
     setErrors((prev) => {
       const next = { ...prev };
       delete next.date;
@@ -126,10 +135,13 @@ export default function ReservationBlock({
         nextErrors[item.id] = content.required;
         return;
       }
-      const validationError = getReservationAnswerError(item, customAnswers[item.id]);
+      const validationError = getReservationAnswerError(item, customAnswers[item.id], lang);
       if (validationError) nextErrors[item.id] = validationError;
     });
 
+    if (isGroupSession && (!Number.isInteger(Number(values.guests)) || Number(values.guests) < 1 || Number(values.guests) > maxSeats)) {
+      nextErrors.guests = content.seatsError.replace("{max}", maxSeats);
+    }
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
@@ -139,7 +151,7 @@ export default function ReservationBlock({
       const submitted = await onSubmit?.({
         ...values,
         ...(isFixedSlots ? { contact: values.phone } : {}),
-        guests: Number(values.guests) || 1,
+        guests: isFixedSlots && !isGroupSession ? 1 : Number(values.guests) || 1,
         ...(normalizedFormItems.length > 0 ? { customAnswers } : {}),
       }, idempotencyKey, honeypot, Math.min(
         86_400_000,
@@ -177,9 +189,9 @@ export default function ReservationBlock({
             disabled={submissionDisabled}
             onChange={(event) => updateValue("service", event.target.value)}
           >
-            {serviceOptions.map((service) => (
+            {serviceOptions.map((service, index) => (
               <option key={service} value={service}>
-                {service}
+                {Array.isArray(services) ? service : content.defaultServices[index] || service}
               </option>
             ))}
           </select>
@@ -214,7 +226,7 @@ export default function ReservationBlock({
     return (
       <label className={`reservation-field reservation-field-${key} ${errors[key] ? "has-error" : ""}`} key={key}>
         {meta.label}
-        <input
+        <DateTimeInput lang={lang}
           {...inputProps}
           value={values[key]}
           disabled={submissionDisabled}
@@ -227,9 +239,9 @@ export default function ReservationBlock({
   };
 
   return (
-    <form className={`reservation-block ${isFixedSlots ? "is-fixed-slots" : "is-date-request"} ${hasCustomComposition ? "has-custom-composition" : ""}`} noValidate onSubmit={submitReservation}>
+    <form dir={String(lang).startsWith("ar") ? "rtl" : "ltr"} className={`reservation-block ${isFixedSlots ? "is-fixed-slots" : "is-date-request"} ${hasCustomComposition ? "has-custom-composition" : ""}`} noValidate onSubmit={submitReservation}>
       <label className="runtime-honeypot" aria-hidden="true">
-        Website
+        {content.website}
         <input
           type="text"
           name="website"
@@ -242,24 +254,34 @@ export default function ReservationBlock({
       {!hasCustomComposition && (
         <div className="reservation-block-header">
           <div>
-          {isFixedSlots && <span>Book an appointment</span>}
-          <h3>{title}</h3>
-          <p>{description}</p>
+          {isFixedSlots && <span>{content.appointmentKicker}</span>}
+          <h3>{title ?? content.title}</h3>
+          <p>{description ?? content.description}</p>
         </div>
 
         </div>
       )}
 
+      {isGroupSession && (
+        <label className={`reservation-field ${errors.guests ? "has-error" : ""}`}>
+          {content.seatsToBook}
+          <input type="number" aria-label={content.seatsToBook} aria-invalid={Boolean(errors.guests)} min="1" max={maxSeats} step="1" value={values.guests}
+            disabled={submissionDisabled} onChange={event => updateValue("guests", event.target.value)} />
+          {errors.guests && <strong role="alert">{errors.guests}</strong>}
+        </label>
+      )}
       {isFixedSlots && !hasCustomComposition && !hasAvailabilityComponent && (
         <FixedSlotPicker
           dates={availableDates}
           times={timeSlots}
           timesByDate={timeSlotsByDate}
+          weeklyRepeatDates={weeklyRepeatDates}
           selectedDate={values.date}
           selectedTime={values.time}
           disabled={submissionDisabled}
           error={errors.date || errors.time || ""}
           lang={lang}
+          direction={String(lang).startsWith("ar") ? "rtl" : "ltr"}
           onSelect={selectFixedSlot}
         />
       )}
@@ -267,17 +289,17 @@ export default function ReservationBlock({
       {!hasCustomComposition && (isFixedSlots ? (
         <div className="reservation-grid fixed-slot-contact-grid">
           <label className={`reservation-field reservation-field-name ${errors.name ? "has-error" : ""}`}>
-            Full name *
+            {content.fullName} *
             <input
               value={values.name}
               disabled={submissionDisabled}
-              placeholder="Enter your full name"
+              placeholder={content.fullNamePlaceholder}
               onChange={(event) => updateValue("name", event.target.value)}
             />
             {errors.name && <strong>{errors.name}</strong>}
           </label>
           <label className={`reservation-field reservation-field-email ${errors.email ? "has-error" : ""}`}>
-            Email address *
+            {content.emailAddress} *
             <input
               type="email"
               value={values.email}
@@ -288,7 +310,7 @@ export default function ReservationBlock({
             {errors.email && <strong>{errors.email}</strong>}
           </label>
           <label className={`reservation-field reservation-field-phone ${errors.phone ? "has-error" : ""}`}>
-            Phone number *
+            {content.phoneNumber} *
             <input
               type="tel"
               value={values.phone}
@@ -304,8 +326,8 @@ export default function ReservationBlock({
         <div className="reservation-request-form">
           {hasContactFields && <section className="reservation-request-section">
             <div className="reservation-request-heading">
-              <h4>Your details</h4>
-              <p>Tell us how to contact you.</p>
+              <h4>{content.detailsTitle}</h4>
+              <p>{content.detailsHelp}</p>
             </div>
             <div className="reservation-request-grid reservation-request-contact">
               {renderField("name")}
@@ -315,8 +337,8 @@ export default function ReservationBlock({
 
           {hasScheduleFields && <section className="reservation-request-section">
             <div className="reservation-request-heading">
-              <h4>Appointment details</h4>
-              <p>Choose when you prefer to visit.</p>
+              <h4>{content.appointmentTitle}</h4>
+              <p>{content.appointmentHelp}</p>
             </div>
             <div className="reservation-request-grid reservation-request-schedule">
               {renderField("date")}
@@ -327,8 +349,8 @@ export default function ReservationBlock({
           {enabledFields.includes("notes") && (
             <section className="reservation-request-section">
               <div className="reservation-request-heading">
-                <h4>Additional notes</h4>
-                <p>Share anything that will help us prepare.</p>
+                <h4>{content.notesTitle}</h4>
+                <p>{content.notesHelp}</p>
               </div>
               <div className="reservation-request-grid reservation-request-notes">
                 {renderField("notes")}
@@ -347,6 +369,7 @@ export default function ReservationBlock({
           availableDates={availableDates}
           timeSlots={timeSlots}
           timeSlotsByDate={timeSlotsByDate}
+          weeklyRepeatDates={weeklyRepeatDates}
           selectedDate={values.date}
           selectedTime={values.time}
           slotError={errors.date || errors.time || ""}
@@ -360,7 +383,7 @@ export default function ReservationBlock({
         <div className="reservation-footer">
           {!hasCustomSubmit && (
             <button type="submit" className="reservation-submit" disabled={submissionDisabled}>
-              {submitLabel}
+              {submitLabel ?? content.submitLabel}
             </button>
           )}
           {disabled && <p className="reservation-helper">{content.disabledHelper}</p>}

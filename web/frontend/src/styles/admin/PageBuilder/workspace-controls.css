@@ -73,3 +73,249 @@
     min-width: 42px;
   }
 }
+
+/* Calm builder chrome: keep the familiar destinations visible, make project
+   actions predictable, and prevent the global navigation from resizing the
+   canvas when it opens. */
+.page-builder .builder-topbar {
+  min-height: 60px;
+  padding-block: 7px;
+}
+
+.page-builder .builder-brand {
+  min-width: 0;
+}
+
+.page-builder .builder-brand :is(h1, .builder-brand-name) {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-builder .builder-command-actions,
+.page-builder .builder-command-bar {
+  min-width: 0;
+}
+
+.page-builder .builder-topbar > .builder-topbar-actions.builder-command-actions {
+  grid-column: 3 !important;
+  justify-self: end !important;
+  justify-content: flex-end !important;
+  margin-inline-start: auto !important;
+  margin-inline-end: 0 !important;
+}
+
+.page-builder .builder-command-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.page-builder .builder-command-status {
+  display: grid;
+  justify-items: end;
+  margin: 0 5px 0 0;
+  color: var(--pb-text);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.page-builder .builder-command-status small,
+.page-builder .builder-publication-state {
+  color: var(--pb-muted);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.page-builder .builder-publication-state {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.page-builder .builder-topbar-actions > .builder-command-bar > .builder-command-button {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 11px;
+  border: 1px solid var(--pb-border) !important;
+  border-radius: 8px;
+  background: var(--pb-surface) !important;
+  color: var(--pb-text) !important;
+  -webkit-text-fill-color: currentColor !important;
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.page-builder .builder-topbar-actions > .builder-command-bar > .builder-command-button:hover:not(:disabled) {
+  transform: none;
+  background: var(--pb-hover) !important;
+  color: var(--color-accent-text) !important;
+}
+
+.page-builder .builder-topbar-actions > .builder-command-bar > .builder-command-publish {
+  border-color: var(--theme-primary) !important;
+  background: var(--theme-primary) !important;
+  color: var(--theme-text-inverse) !important;
+  -webkit-text-fill-color: var(--theme-text-inverse) !important;
+}
+
+.page-builder .builder-topbar-actions > .builder-command-bar > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.page-builder .builder-layout {
+  --component-sidebar-width: 240px;
+  grid-template-columns: var(--component-sidebar-width) minmax(0, 1fr) 300px;
+}
+
+.page-builder .panel-mode-select {
+  margin: 0 0 14px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.page-builder .panel-navigator {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+:root .page-builder .panel-navigator > button {
+  min-width: 0;
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 3px;
+  padding: 5px 4px !important;
+  border: 1px solid transparent !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  text-align: center;
+}
+
+.page-builder .panel-navigator > button strong {
+  font-size: 11px;
+}
+
+@media (max-width: 1280px) {
+  .page-builder .builder-command-status {
+    display: none;
+  }
+
+  .page-builder .builder-layout {
+    --component-sidebar-width: 220px;
+    grid-template-columns: var(--component-sidebar-width) minmax(0, 1fr) 270px;
+  }
+}
+
+@media (min-width: 1101px) {
+  .admin-dashboard-layout.authenticated-shell.admin-dashboard-layout-builder {
+    --dashboard-sidebar-width: 72px;
+  }
+
+  .admin-dashboard-layout.authenticated-shell.admin-dashboard-layout-builder
+    > .admin-sidebar.dashboard-sidebar:not(.is-workspace-collapsed) {
+    position: fixed !important;
+    inset-block: 0 !important;
+    inset-inline-start: 0 !important;
+    width: 232px !important;
+    min-width: 232px !important;
+    max-width: 232px !important;
+    z-index: 180 !important;
+    box-shadow: 14px 0 36px rgba(var(--theme-shadow-rgb), 0.2);
+  }
+}
+
+/* Flat chrome: the editing UI should not stack tinted surfaces around the
+   customer's page. Inputs keep their field fill; structural chrome does not. */
+.page-builder,
+.page-builder .builder-desktop-shell,
+.page-builder .builder-topbar,
+.page-builder .builder-subbar,
+.page-builder .builder-layout,
+.page-builder .builder-sidebar,
+.page-builder .builder-inspector,
+.page-builder .builder-side-panel,
+.page-builder .panel-mode-select,
+.page-builder .builder-inspector .inspector-title,
+.page-builder .builder-inspector .inspector-group,
+.page-builder .builder-subbar-actions :is(.builder-history-controls, .artboard-camera-controls) {
+  background: none !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.page-builder .builder-inspector .inspector-group {
+  border-inline: 0 !important;
+  border-radius: 0 !important;
+}
+
+.page-builder .builder-topbar-actions > .builder-command-bar > .builder-command-button,
+.page-builder .panel-navigator > button,
+.page-builder .builder-subbar-actions :is(.builder-history-controls, .artboard-camera-controls) > button {
+  background: none !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.page-builder .builder-topbar-actions > .builder-command-bar > .builder-command-publish {
+  border-color: var(--pb-border) !important;
+  color: var(--pb-text) !important;
+  -webkit-text-fill-color: currentColor !important;
+}
+
+/* One continuous editing-sidebar surface. Section wrappers must not introduce
+   a second tint, gradient, overlay, or shadow. */
+.page-builder .builder-sidebar {
+  --builder-sidebar-bg: var(--builder-bg);
+  background: var(--builder-sidebar-bg) !important;
+  background-color: var(--builder-sidebar-bg) !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+.page-builder .builder-sidebar > .builder-side-panel,
+.page-builder .builder-sidebar :is(
+  .panel-mode-select,
+  .panel-navigator,
+  .builder-panel,
+  .pages-manager-panel,
+  .pages-panel-heading
+) {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+.page-builder .builder-sidebar::before,
+.page-builder .builder-sidebar::after,
+.page-builder .builder-sidebar > .builder-side-panel::before,
+.page-builder .builder-sidebar > .builder-side-panel::after,
+.page-builder .builder-sidebar .panel-mode-select::before,
+.page-builder .builder-sidebar .panel-mode-select::after {
+  content: none !important;
+  display: none !important;
+  background: none !important;
+  box-shadow: none !important;
+}

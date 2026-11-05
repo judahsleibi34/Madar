@@ -10,11 +10,6 @@ const judahLinksEn = [
     href: "https://www.linkedin.com/in/judah-sleibi-b8578b321",
   },
   {
-    label: "GitHub",
-    type: "github",
-    href: "https://github.com/judahsleibi34",
-  },
-  {
     label: "CV",
     type: "cv",
     href: judahCv,
@@ -23,11 +18,6 @@ const judahLinksEn = [
     label: "Email",
     type: "email",
     href: "mailto:judahsleibi34@gmail.com",
-  },
-  {
-    label: "Phone",
-    type: "phone",
-    href: "tel:+972599203857",
   },
 ];
 
@@ -38,11 +28,6 @@ const judahLinksAr = [
     href: "https://www.linkedin.com/in/judah-sleibi-b8578b321",
   },
   {
-    label: "GitHub",
-    type: "github",
-    href: "https://github.com/judahsleibi34",
-  },
-  {
     label: "السيرة الذاتية",
     type: "cv",
     href: judahCv,
@@ -52,11 +37,6 @@ const judahLinksAr = [
     type: "email",
     href: "mailto:judahsleibi34@gmail.com",
   },
-  {
-    label: "الهاتف",
-    type: "phone",
-    href: "tel:+972599203857",
-  },
 ];
 
 const salibaLinksEn = [
@@ -64,11 +44,6 @@ const salibaLinksEn = [
     label: "LinkedIn",
     type: "linkedin",
     href: "https://www.linkedin.com/in/saliba-rishmawi/",
-  },
-  {
-    label: "GitHub",
-    type: "github",
-    href: "https://github.com/Saliba-codes",
   },
   {
     label: "CV",
@@ -80,11 +55,6 @@ const salibaLinksEn = [
     type: "email",
     href: "mailto:rishmawisaliba12@gmail.com",
   },
-  {
-    label: "Phone",
-    type: "phone",
-    href: "tel:+970568691617",
-  },
 ];
 
 const salibaLinksAr = [
@@ -92,11 +62,6 @@ const salibaLinksAr = [
     label: "لينكدإن",
     type: "linkedin",
     href: "https://www.linkedin.com/in/saliba-rishmawi/",
-  },
-  {
-    label: "GitHub",
-    type: "github",
-    href: "https://github.com/Saliba-codes",
   },
   {
     label: "السيرة الذاتية",
@@ -107,11 +72,6 @@ const salibaLinksAr = [
     label: "البريد الإلكتروني",
     type: "email",
     href: "mailto:rishmawisaliba12@gmail.com",
-  },
-  {
-    label: "الهاتف",
-    type: "phone",
-    href: "tel:+970568691617",
   },
 ];
 
@@ -124,7 +84,7 @@ export const teamContent = {
     members: [
       {
         name: "Judah Sleibi",
-        role: "AI Engineer & Full-Stack Developer",
+        role: "CEO",
         description:
           "Leads the technical development of Madar, with a focus on AI-powered features, backend architecture, authentication systems, data workflows, and user experience.",
         initials: "JS",
@@ -135,7 +95,7 @@ export const teamContent = {
       },
       {
         name: "Saliba Rishmawi",
-        role: "Cyber Security & Full-Stack Developer",
+        role: "CTO",
         description:
           "Supports Madar's backend and AI direction, bringing experience in computer vision, medical imaging AI, and system-level problem solving.",
         initials: "SR",
@@ -155,7 +115,7 @@ export const teamContent = {
     members: [
       {
         name: "جودا صليبي",
-        role: "مهندس ذكاء اصطناعي ومطوّر Full-Stack",
+        role: "الرئيس التنفيذي (CEO)",
         description:
           "يقود التطوير التقني لمدار، مع تركيز على ميزات الذكاء الاصطناعي، وبنية الخلفية، وأنظمة المصادقة، وتدفقات البيانات، وتجربة المستخدم.",
         initials: "JS",
@@ -166,7 +126,7 @@ export const teamContent = {
       },
       {
         name: "صليبا ريشماوي",
-        role: "مطوّر أمن سيبراني وFull-Stack",
+        role: "الرئيس التنفيذي للتقنية (CTO)",
         description:
           "يدعم اتجاه مدار في الخلفية والذكاء الاصطناعي، بخبرة في الرؤية الحاسوبية، والذكاء الاصطناعي للتصوير الطبي، وحل المشكلات على مستوى الأنظمة.",
         initials: "SR",

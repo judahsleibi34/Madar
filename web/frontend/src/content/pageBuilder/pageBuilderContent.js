@@ -152,6 +152,22 @@ const starterTextEn = {
 
 export const mainBuilderHiddenTabs = ["data", "responses", "theme"];
 
+const builderWorkspaceCopyAr = {
+  ...builderWorkspaceCopyEn,
+  topbar: { templates: "القوالب", preview: "معاينة الموقع", exitPreview: "إنهاء المعاينة", save: "حفظ", goLive: "نشر الموقع", publishing: "جارٍ النشر..." },
+  tabs: {
+    design: { label: "الصفحات", helper: "صمّم الصفحات والأقسام والعناصر المرئية." },
+    forms: { label: "النماذج", helper: "أنشئ النماذج وأضفها إلى الصفحات." },
+    reservations: { label: "الحجوزات", helper: "أدر نماذج الحجز والمواعيد والأوقات المتاحة." },
+    chrome: { label: "رأس وتذييل الصفحة", helper: "أدر رأس الموقع وتذييله وروابط التنقل وبيانات التواصل." },
+    users: { label: "المستخدمون", helper: "أدر أعضاء الفريق والأدوار والصلاحيات." },
+    theme: { label: "المظهر", helper: "اختر ألوان الموقع وخطوطه وأزراره." },
+    publish: { label: "النشر", helper: "عاين موقعك واحفظه وانشره." },
+    responses: { label: "الردود", helper: "راجع الردود المرسلة عبر النماذج." },
+    data: { label: "البيانات", helper: "راجع بياناتك ونظمها وحللها." },
+  },
+};
+
 export const pageBuilderContent = {
   en: {
     builderWorkspaceCopy: builderWorkspaceCopyEn,
@@ -160,7 +176,7 @@ export const pageBuilderContent = {
     starterText: starterTextEn,
   },
   ar: {
-    builderWorkspaceCopy: builderWorkspaceCopyEn,
+    builderWorkspaceCopy: builderWorkspaceCopyAr,
     mobileBlockerCopy: mobileBlockerCopyEn,
     templateModalText: templateModalTextEn,
     starterText: starterTextEn,

@@ -113,6 +113,19 @@ class EcommerceGrowthSeoTests(unittest.TestCase):
         self.assertEqual(profile["growth"]["seo_title_ar"], "متجر الزيتون")
         self.assertEqual(profile["growth"]["featured_product_ids"], ["one"])
 
+    def test_public_profile_exposes_only_the_validated_seasonal_campaign(self):
+        profile = build_public_store_profile({
+            "ecommerce_theme": {
+                "accent": "#123456",
+                "seasonal_campaign": {"enabled": True, "type": "other", "private": "secret"},
+            },
+        }, "olive")
+        self.assertEqual(profile["store_theme"]["seasonal_campaign"], {
+            "enabled": True,
+            "type": "black_friday",
+        })
+        self.assertNotIn("secret", str(profile))
+
     def test_availability_uses_inventory_and_backorder_truth(self):
         base = {"id": "one", "slug": "one", "translations": {"en": {"name": "One"}}, "price": "10", "currency": "USD", "track_inventory": True, "inventory_quantity": 0, "images": []}
         unavailable = _public_catalog_product({**base, "allow_backorder": False}, locale="en", tag_ids=[])

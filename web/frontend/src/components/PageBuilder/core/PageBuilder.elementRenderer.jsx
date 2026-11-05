@@ -544,6 +544,10 @@ export const createElementRenderer = ({
             availableDates={reservation.availableDates}
             timeSlots={reservation.timeSlots}
             timeSlotsByDate={reservation.timeSlotsByDate}
+            weeklyRepeatDates={reservation.weeklyRepeatDates}
+            sessionType={reservation.sessionType}
+            seatCapacity={reservation.seatCapacity}
+            sessionSettingsByDate={reservation.sessionSettingsByDate}
             submitLabel={reservation.submitLabel}
             disabled
           />

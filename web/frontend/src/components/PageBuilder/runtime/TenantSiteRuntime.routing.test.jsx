@@ -1,8 +1,11 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import TenantSiteRuntime, { getBuilderPreviewBasePath } from "./TenantSiteRuntime";
+import TenantSiteRuntime, {
+  getBuilderPreviewBasePath,
+  TENANT_LOADING_SCREEN_DURATION_MS,
+} from "./TenantSiteRuntime";
 import { fetchBuilderProject } from "../services/PageBuilder.api";
 import {
   fetchProtectedSitePage,
@@ -88,6 +91,8 @@ const renderPublic = ({
   publishedPages = null,
   runtimePromise = null,
   runtimeError = null,
+  loadingImageUrl = "",
+  minimumLoadingScreenMs = 0,
 } = {}) => {
   getTenantVisitorStatus.mockResolvedValue({ logged_in: false, user: null });
   fetchPublicSiteBootstrap.mockResolvedValue({
@@ -108,6 +113,7 @@ const renderPublic = ({
           showHeader,
           showFooter,
           brand: "Route Test",
+          loadingImageUrl,
           footerShopLinks,
           footerHelpLinks,
           headerButtonLabel,
@@ -131,7 +137,10 @@ const renderPublic = ({
   return render(
     <MemoryRouter initialEntries={["/site/tenant-site/about/team"]}>
       <Routes>
-        <Route path="/site/:subdomain/*" element={<TenantSiteRuntime />} />
+        <Route
+          path="/site/:subdomain/*"
+          element={<TenantSiteRuntime minimumLoadingScreenMs={minimumLoadingScreenMs} />}
+        />
       </Routes>
     </MemoryRouter>
   );
@@ -159,11 +168,43 @@ const renderStandaloneForm = () => {
   return render(
     <MemoryRouter initialEntries={["/forms/tenant-site/form-1"]}>
       <Routes>
-        <Route path="/forms/:subdomain/:formId" element={<TenantSiteRuntime />} />
+        <Route path="/forms/:subdomain/:formId" element={<TenantSiteRuntime minimumLoadingScreenMs={0} />} />
       </Routes>
     </MemoryRouter>
   );
 };
+
+describe("TenantSiteRuntime branded loading screen", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it("uses the uploaded image and remains visible for ten seconds", async () => {
+    const loadingImageUrl = "/uploads/tenant_1/builder_assets/1234567890abcdef1234567890abcdef.png";
+    renderPublic({
+      loadingImageUrl,
+      minimumLoadingScreenMs: TENANT_LOADING_SCREEN_DURATION_MS,
+    });
+
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+
+    expect(screen.getByRole("progressbar", { name: "Loading site" })).toBeTruthy();
+    expect(document.querySelector(".tenant-brand-loader-mark img")?.getAttribute("src"))
+      .toContain(loadingImageUrl);
+    expect(document.querySelector('[data-page-id="team"]')).toBeNull();
+
+    await act(async () => vi.advanceTimersByTimeAsync(TENANT_LOADING_SCREEN_DURATION_MS - 1));
+    expect(screen.getByRole("progressbar", { name: "Loading site" })).toBeTruthy();
+
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(document.querySelector('[data-page-id="team"]')).toBeTruthy();
+  });
+});
 
 describe("TenantSiteRuntime standalone form requests", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -513,7 +554,7 @@ const renderProtectedPublic = () => {
           path="/site/:subdomain/*"
           element={(
             <>
-              <TenantSiteRuntime />
+              <TenantSiteRuntime minimumLoadingScreenMs={0} />
               <RuntimeLocation />
             </>
           )}

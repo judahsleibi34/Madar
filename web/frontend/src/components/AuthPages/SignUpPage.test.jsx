@@ -87,7 +87,11 @@ describe("signup terms consent", () => {
       screen.getByText("You must agree to the Terms and Conditions to create an account.")
     ).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("checkbox"));
+    const termsCheckbox = screen.getByRole("checkbox");
+    expect(termsCheckbox.getAttribute("aria-invalid")).toBe("true");
+    expect(termsCheckbox.classList.contains("auth-field-error-input")).toBe(false);
+
+    fireEvent.click(termsCheckbox);
     fireEvent.click(screen.getByRole("button", { name: "Create Account" }));
 
     await waitFor(() => expect(postAuthJson).toHaveBeenCalledTimes(1));

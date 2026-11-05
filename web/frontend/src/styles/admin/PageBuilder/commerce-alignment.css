@@ -1,0 +1,332 @@
+/* Commerce-aligned Page Builder chrome.
+   The editor UI follows the authenticated application system; the authored
+   website canvas remains controlled by the customer's site theme. */
+.page-builder {
+  --builder-ui-control-height: 44px;
+  --builder-ui-control-radius: 10px;
+  --builder-ui-panel-radius: 12px;
+  --builder-ui-font-size: var(--font-size-sm, 0.875rem);
+  --builder-ui-small-size: var(--font-size-xs, 0.75rem);
+  --builder-ui-weight: var(--font-weight-regular, 400);
+  --builder-ui-strong-weight: var(--font-weight-semibold, 600);
+}
+
+.page-builder :is(
+  .builder-topbar,
+  .builder-subbar,
+  .builder-sidebar,
+  .builder-inspector,
+  .workspace-page,
+  .builder-modal,
+  .template-picker-modal,
+  .quiz-options-drawer
+) {
+  color: var(--theme-text) !important;
+  font-family: var(--font-family-base) !important;
+  font-size: var(--builder-ui-font-size);
+}
+
+.page-builder :is(
+  .builder-topbar,
+  .builder-subbar,
+  .builder-sidebar,
+  .builder-inspector,
+  .workspace-page,
+  .builder-modal,
+  .template-picker-modal,
+  .quiz-options-drawer
+) :is(button, input, select, textarea, label, summary) {
+  font-family: var(--font-family-base) !important;
+}
+
+.page-builder :is(.builder-sidebar, .builder-inspector, .workspace-page)
+  :is(h2, .pages-panel-heading h2, .inspector-title h2):not(.booking-canvas-component-preview *) {
+  color: var(--theme-text) !important;
+  font-size: 1rem !important;
+  font-weight: var(--font-weight-bold, 700) !important;
+  line-height: 1.35 !important;
+  letter-spacing: -0.01em !important;
+}
+
+.page-builder :is(.builder-sidebar, .builder-inspector, .workspace-page) h3:not(.booking-canvas-component-preview *) {
+  color: var(--theme-text) !important;
+  font-size: var(--builder-ui-font-size) !important;
+  font-weight: var(--font-weight-bold, 700) !important;
+  line-height: 1.4 !important;
+}
+
+.page-builder :is(
+  .builder-sidebar,
+  .builder-inspector,
+  .workspace-page,
+  .builder-modal,
+  .template-picker-modal
+) :is(p, small, .panel-help, .builder-note, .field-help, .inspector-help-text):not(.booking-canvas-component-preview *) {
+  color: var(--theme-text-muted) !important;
+  font-size: var(--builder-ui-small-size) !important;
+  font-weight: var(--builder-ui-weight) !important;
+  line-height: 1.55 !important;
+}
+
+.page-builder :is(.builder-sidebar, .builder-inspector, .workspace-page)
+  label:not(.inspector-toggle-row) {
+  color: var(--theme-text) !important;
+  font-size: var(--builder-ui-small-size) !important;
+  font-weight: var(--builder-ui-strong-weight) !important;
+  line-height: 1.4 !important;
+}
+
+.page-builder :is(
+  .builder-sidebar,
+  .builder-inspector,
+  .workspace-page,
+  .builder-modal,
+  .template-picker-modal,
+  .quiz-options-drawer
+) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), select, textarea) {
+  box-sizing: border-box;
+  min-height: var(--builder-ui-control-height) !important;
+  padding: 10px 12px !important;
+  border: 1px solid var(--color-border-control) !important;
+  border-radius: var(--builder-ui-control-radius) !important;
+  background: var(--theme-input-bg, var(--theme-surface)) !important;
+  color: var(--theme-text) !important;
+  -webkit-text-fill-color: var(--theme-text) !important;
+  box-shadow: none !important;
+  font-size: var(--builder-ui-font-size) !important;
+  font-weight: var(--builder-ui-weight) !important;
+  line-height: 1.5 !important;
+}
+
+.page-builder :is(
+  .builder-sidebar,
+  .builder-inspector,
+  .workspace-page,
+  .builder-modal,
+  .template-picker-modal,
+  .quiz-options-drawer
+) :is(input, select, textarea):focus-visible {
+  border-color: var(--theme-border-strong) !important;
+  outline: 2px solid var(--color-focus-indicator) !important;
+  outline-offset: 1px !important;
+  box-shadow: none !important;
+}
+
+/* Commerce secondary-action contract. */
+.page-builder :is(
+  .builder-command-button,
+  .builder-history-controls > button,
+  .artboard-camera-controls > button,
+  .page-utility-actions > button,
+  .page-preview-action,
+  .layer-selection-actions > button,
+  .element-action-grid > button
+) {
+  min-height: 40px !important;
+  padding: 0 13px !important;
+  border: 1px solid var(--color-border-control) !important;
+  border-radius: var(--builder-ui-control-radius) !important;
+  background: var(--theme-surface) !important;
+  color: var(--theme-text) !important;
+  -webkit-text-fill-color: var(--theme-text) !important;
+  box-shadow: none !important;
+  font-size: var(--builder-ui-small-size) !important;
+  font-weight: var(--builder-ui-strong-weight) !important;
+  line-height: 1.2 !important;
+  transform: none !important;
+}
+
+.page-builder :is(
+  .builder-command-button,
+  .builder-history-controls > button,
+  .artboard-camera-controls > button,
+  .page-utility-actions > button,
+  .page-preview-action,
+  .layer-selection-actions > button,
+  .element-action-grid > button
+):hover:not(:disabled) {
+  border-color: var(--theme-primary) !important;
+  background: var(--theme-bg-soft) !important;
+  color: var(--theme-primary) !important;
+  -webkit-text-fill-color: var(--theme-primary) !important;
+}
+
+/* Commerce primary-action contract. */
+.page-builder :is(
+  .page-primary-action,
+  .primary-action,
+  .forms-primary-action,
+  .form-command-button-primary,
+  .builder-command-publish
+) {
+  min-height: var(--builder-ui-control-height) !important;
+  border: 1px solid var(--theme-primary) !important;
+  border-radius: var(--builder-ui-control-radius) !important;
+  background: var(--theme-primary) !important;
+  background-image: none !important;
+  color: var(--theme-text-inverse) !important;
+  -webkit-text-fill-color: var(--theme-text-inverse) !important;
+  box-shadow: none !important;
+  font-size: var(--builder-ui-font-size) !important;
+  font-weight: var(--builder-ui-strong-weight) !important;
+  transform: none !important;
+}
+
+.page-builder :is(
+  .page-primary-action,
+  .primary-action,
+  .forms-primary-action,
+  .form-command-button-primary,
+  .builder-command-publish
+):hover:not(:disabled) {
+  border-color: var(--theme-primary-hover) !important;
+  background: var(--theme-primary-hover) !important;
+  color: var(--theme-text-inverse) !important;
+  -webkit-text-fill-color: var(--theme-text-inverse) !important;
+}
+
+/* Destructive actions remain quiet until invoked, matching Commerce rows. */
+.page-builder :is(
+  .page-delete-action,
+  .danger-button,
+  .danger-lite,
+  .form-command-button-danger
+) {
+  min-height: 40px !important;
+  border: 1px solid color-mix(in srgb, var(--theme-danger) 48%, var(--color-border-control)) !important;
+  border-radius: var(--builder-ui-control-radius) !important;
+  background: var(--theme-surface) !important;
+  background-image: none !important;
+  color: var(--theme-danger) !important;
+  -webkit-text-fill-color: var(--theme-danger) !important;
+  box-shadow: none !important;
+  font-size: var(--builder-ui-small-size) !important;
+  font-weight: var(--builder-ui-strong-weight) !important;
+  transform: none !important;
+}
+
+.page-builder :is(
+  .page-delete-action,
+  .danger-button,
+  .danger-lite,
+  .form-command-button-danger
+) :is(span, svg) {
+  color: inherit !important;
+  -webkit-text-fill-color: inherit !important;
+  stroke: currentColor !important;
+}
+
+.page-builder :is(
+  .page-delete-action,
+  .danger-button,
+  .danger-lite,
+  .form-command-button-danger
+):hover:not(:disabled) {
+  border-color: var(--theme-danger) !important;
+  background: color-mix(in srgb, var(--theme-danger) 8%, var(--theme-surface)) !important;
+}
+
+/* Editing mode selector uses the same selected-row treatment as Commerce. */
+.page-builder .panel-navigator {
+  gap: 6px !important;
+}
+
+.page-builder .panel-navigator > button {
+  min-height: 42px !important;
+  padding: 7px 8px !important;
+  border: 1px solid var(--color-border-control) !important;
+  border-radius: var(--builder-ui-control-radius) !important;
+  background: var(--theme-surface) !important;
+  color: var(--theme-text) !important;
+  -webkit-text-fill-color: var(--theme-text) !important;
+  box-shadow: none !important;
+  font-size: var(--builder-ui-small-size) !important;
+  font-weight: var(--builder-ui-strong-weight) !important;
+  transform: none !important;
+}
+
+.page-builder .panel-navigator > button:hover:not(:disabled) {
+  border-color: var(--theme-primary) !important;
+  background: var(--theme-bg-soft) !important;
+  color: var(--theme-primary) !important;
+  -webkit-text-fill-color: var(--theme-primary) !important;
+}
+
+.page-builder .panel-navigator > button.active {
+  border-color: var(--theme-primary) !important;
+  background: var(--theme-primary-soft) !important;
+  color: var(--theme-primary) !important;
+  -webkit-text-fill-color: var(--theme-primary) !important;
+  box-shadow: none !important;
+}
+
+.page-builder .panel-navigator > button :is(strong, svg) {
+  color: inherit !important;
+  -webkit-text-fill-color: inherit !important;
+  stroke: currentColor !important;
+  font-size: inherit !important;
+  font-weight: inherit !important;
+}
+
+.page-builder .pages-count {
+  min-width: 28px !important;
+  height: 28px !important;
+  padding: 0 8px !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: var(--theme-primary-soft) !important;
+  color: var(--theme-primary) !important;
+  -webkit-text-fill-color: var(--theme-primary) !important;
+  font-size: var(--builder-ui-small-size) !important;
+  font-weight: var(--builder-ui-strong-weight) !important;
+}
+
+.page-builder .page-picker-field > span {
+  color: var(--theme-text-muted) !important;
+  font-size: var(--builder-ui-small-size) !important;
+  font-weight: var(--builder-ui-strong-weight) !important;
+  letter-spacing: 0.04em !important;
+}
+
+/* Panels and cards share the Commerce radius/border/surface system. */
+.page-builder .builder-inspector .inspector-group,
+.page-builder :is(
+  .site-chrome-card,
+  .reservation-settings-section,
+  .forms-section-sheet,
+  .simple-question-card,
+  .role-editor-card,
+  .permission-group,
+  .publish-card,
+  .publish-panel
+) {
+  border: 1px solid var(--theme-border) !important;
+  border-radius: var(--builder-ui-panel-radius) !important;
+  background: var(--theme-surface) !important;
+  color: var(--theme-text) !important;
+  box-shadow: none !important;
+}
+
+/* Preserve the requested single continuous left-sidebar surface. */
+.page-builder .builder-sidebar,
+.page-builder .builder-sidebar > .builder-side-panel,
+.page-builder .builder-sidebar :is(
+  .panel-mode-select,
+  .panel-navigator,
+  .builder-panel,
+  .pages-manager-panel,
+  .pages-panel-heading
+) {
+  background-color: var(--builder-sidebar-bg, var(--builder-bg)) !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+.page-builder button:disabled {
+  border-color: var(--color-disabled-border) !important;
+  background: var(--color-disabled-bg) !important;
+  color: var(--color-disabled-text) !important;
+  -webkit-text-fill-color: var(--color-disabled-text) !important;
+  box-shadow: none !important;
+  opacity: 1 !important;
+}

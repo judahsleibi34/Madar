@@ -368,6 +368,26 @@
   animation: tenant-brand-copy-in 420ms 120ms ease-out both;
 }
 
+.tenant-brand-loader-copy {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  max-width: min(520px, calc(100vw - 48px));
+  color: var(--theme-text);
+}
+
+.tenant-brand-loader-copy strong {
+  font-size: clamp(15px, 1.8vmin, 19px);
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.tenant-brand-loader-copy span {
+  color: var(--theme-text-muted);
+  font-size: clamp(12px, 1.5vmin, 15px);
+  line-height: 1.5;
+}
+
 .tenant-brand-loader-progress {
   position: relative;
   width: clamp(120px, 18vmin, 220px);
@@ -383,7 +403,7 @@
   inset: 0;
   border-radius: inherit;
   background: var(--theme-primary);
-  animation: tenant-brand-progress 1.15s ease-in-out infinite;
+  animation: tenant-brand-progress var(--tenant-loading-duration, 10000ms) linear forwards;
   transform-origin: left;
 }
 
@@ -403,9 +423,8 @@
 }
 
 @keyframes tenant-brand-progress {
-  0% { transform: translateX(-100%) scaleX(0.45); }
-  50% { transform: translateX(0) scaleX(0.75); }
-  100% { transform: translateX(100%) scaleX(0.45); }
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
 }
 
 .tenant-site-runtime > .tenant-runtime-main {
@@ -1332,7 +1351,7 @@ body.theme-dark .tenant-site-runtime .tenant-runtime-page .runtime-form-paginati
 }
 
 .tenant-brand-loader-mark:has(img) {
-  width: min(620px, 78vw);
+  width: min(420px, 72vw);
   aspect-ratio: 4 / 3;
 }
 
@@ -1352,10 +1371,25 @@ body.theme-dark .tenant-site-runtime .tenant-runtime-page .runtime-form-paginati
   height: 100%;
   border: 1px solid var(--theme-border);
   border-radius: 30px;
-  object-fit: cover;
+  object-fit: contain;
   object-position: center;
   background: var(--theme-surface);
   animation: tenant-brand-arrive 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.page-builder .loading-screen-duration {
+  width: max-content;
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 1px solid var(--theme-border);
+  border-radius: 999px;
+  background: var(--theme-primary-soft);
+  color: var(--theme-primary);
+  font-size: var(--font-size-xs, 0.75rem);
+  font-weight: var(--font-weight-semibold, 600);
 }
 
 .tenant-publication-warning-backdrop {

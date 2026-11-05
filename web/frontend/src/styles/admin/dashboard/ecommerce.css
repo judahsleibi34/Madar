@@ -1531,6 +1531,83 @@
 
 .ecommerce-theme-controls { padding: 24px; }
 
+.ecommerce-theme-page .ecommerce-special-themes-title { margin-bottom: 18px; }
+
+.ecommerce-seasonal-theme {
+  margin-bottom: 24px;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+  border: 1px solid var(--theme-border);
+  border-radius: 14px;
+  background: var(--theme-surface);
+  color: var(--theme-text);
+  font-family: var(--font-family-base);
+}
+
+.ecommerce-seasonal-theme.is-active {
+  border-color: var(--theme-primary);
+  background: color-mix(in srgb, var(--theme-primary) 5%, var(--theme-surface));
+}
+
+.ecommerce-seasonal-theme-icon {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--theme-border);
+  border-radius: 12px;
+  background: var(--theme-bg-soft);
+  color: var(--theme-primary);
+}
+
+.ecommerce-seasonal-theme > div { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.ecommerce-seasonal-theme strong { color: var(--theme-text); font-size: var(--font-size-sm, .875rem); font-weight: 600; line-height: 1.5; }
+.ecommerce-seasonal-theme small { color: var(--theme-text-muted); font-size: var(--font-size-xs, .75rem); font-weight: 400; line-height: 1.5; }
+.ecommerce-seasonal-theme-palette { margin-top: 6px; display: flex; gap: 5px; }
+.ecommerce-seasonal-theme-palette i { width: 18px; height: 7px; border: 1px solid var(--theme-border); border-radius: 999px; }
+
+.ecommerce-theme-page .ecommerce-seasonal-theme-switch {
+  position: relative;
+  width: 48px;
+  min-width: 48px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 8px;
+  background: transparent !important;
+  box-shadow: none !important;
+  cursor: pointer;
+}
+
+.ecommerce-theme-page .ecommerce-seasonal-theme-switch::before {
+  content: "";
+  position: absolute;
+  inset: 8px 0;
+  border: 1px solid var(--theme-border-strong);
+  border-radius: 999px;
+  background: var(--theme-border-strong);
+  transition: background-color 160ms ease;
+}
+
+.ecommerce-theme-page .ecommerce-seasonal-theme-switch span {
+  position: absolute;
+  top: 12px;
+  inset-inline-start: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--theme-surface);
+  transition: transform 160ms ease, background-color 160ms ease;
+}
+
+.ecommerce-theme-page .ecommerce-seasonal-theme-switch[aria-checked="true"]::before { border-color: var(--theme-primary); background: var(--theme-primary); }
+.ecommerce-theme-page .ecommerce-seasonal-theme-switch[aria-checked="true"] span { transform: translateX(20px); }
+[dir="rtl"] .ecommerce-theme-page .ecommerce-seasonal-theme-switch[aria-checked="true"] span { transform: translateX(-20px); }
+
 .ecommerce-theme-color-list {
   margin-top: 22px;
   display: flex;

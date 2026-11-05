@@ -232,8 +232,7 @@ export default function PageBuilderThemeTab({
           </button>
         </div>
 
-        <div className="section-component-palette theme-sidebar-palette">
-          <span>Site theme</span>
+        <div className="theme-sidebar-palette">
           <section className="theme-sidebar-section" aria-labelledby="theme-colors-heading">
             <div className="theme-sidebar-section-heading">
               <h3 id="theme-colors-heading">Theme colors</h3>

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import UserDashboard from "./UserDashboard";
 import { clearAllDashboardSnapshotCaches } from "./utils/dashboardSnapshotCache";
-import { listBuilderProjects, fetchBuilderStorageUsage, listBuilderReservations } from "../PageBuilder/services/PageBuilder.api";
+import { fetchWebsiteSettings, listBuilderProjects, fetchBuilderStorageUsage, listBuilderReservations } from "../PageBuilder/services/PageBuilder.api";
 import { fetchSiteVisitMetrics } from "../../services/siteVisitApi";
 import { fetchEcommerceDashboardSummary } from "../../services/ecommerceApi";
 
@@ -21,6 +21,10 @@ vi.mock("./WeeklyScreenTimePanel", () => ({
 vi.mock("../PageBuilder/services/PageBuilder.api", () => ({
   fetchBuilderSiteMembers: vi.fn().mockResolvedValue([]),
   fetchBuilderStorageUsage: vi.fn().mockResolvedValue({}),
+  fetchWebsiteSettings: vi.fn().mockResolvedValue({
+    subdomain: "olive-house",
+    published_project_id: "project-1",
+  }),
   listBuilderProjects: vi.fn().mockResolvedValue({
     projects: [{ id: "project-1", publish: { subdomain: "olive-house" } }],
   }),
@@ -120,6 +124,86 @@ describe("UserDashboard shortcuts", () => {
     expect(screen.getByText("Everyday Linen Shirt")).toBeTruthy();
     expect(screen.getByText("7 sold")).toBeTruthy();
     expect(screen.getByText("$1,234.50")).toBeTruthy();
+  });
+
+  it("shows the store independently for an ecommerce-only workspace", async () => {
+    listBuilderProjects.mockResolvedValueOnce({ projects: [] });
+    fetchWebsiteSettings.mockResolvedValueOnce({
+      subdomain: "commerce-only",
+      published_project_id: null,
+    });
+
+    render(
+      <MemoryRouter>
+        <UserDashboard user={{ id: 4, name: "Merchant" }} />
+      </MemoryRouter>,
+    );
+
+    expect(
+      (await screen.findByRole("link", { name: "View store" })).getAttribute("href"),
+    ).toBe("https://commerce-only.madarportal.com/shop");
+    expect(screen.queryByRole("link", { name: "View website" })).toBeNull();
+  });
+
+  it("shows the published website independently when ecommerce is unavailable", async () => {
+    fetchEcommerceDashboardSummary.mockRejectedValueOnce(Object.assign(new Error("Forbidden"), { status: 403 }));
+    fetchWebsiteSettings.mockResolvedValueOnce({
+      subdomain: "website-only",
+      published_project_id: "published-project",
+    });
+
+    render(
+      <MemoryRouter>
+        <UserDashboard user={{ id: 5, name: "Publisher" }} />
+      </MemoryRouter>,
+    );
+
+    expect(
+      (await screen.findByRole("link", { name: "View website" })).getAttribute("href"),
+    ).toBe("https://website-only.madarportal.com/");
+    expect(screen.queryByRole("link", { name: "View store" })).toBeNull();
+  });
+
+  it("keeps both shortcuts available when the project list request fails", async () => {
+    listBuilderProjects.mockRejectedValueOnce(new Error("Projects unavailable"));
+
+    render(
+      <MemoryRouter>
+        <UserDashboard user={{ id: 6, name: "Tenant" }} />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("link", { name: "View website" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "View store" })).toBeTruthy();
+  });
+
+  it("refreshes independent shortcuts while preserving cached project metrics", async () => {
+    const scope = "tenant:9:user:7";
+    sessionStorage.setItem("madar-dashboard-cache-v1", JSON.stringify({
+      [`metrics:${scope}`]: {
+        cachedAt: Date.now() - 31_000,
+        value: {
+          projects: 4,
+          forms: 6,
+          reservationForms: 2,
+          permissionTypes: ["Reservations"],
+          websiteUrl: "",
+          storeUrl: "",
+        },
+      },
+    }));
+    listBuilderProjects.mockRejectedValueOnce(new Error("Projects unavailable"));
+
+    render(
+      <MemoryRouter>
+        <UserDashboard user={{ id: 7, tenant_id: 9, name: "Cached tenant" }} />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("link", { name: "View website" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "View store" })).toBeTruthy();
+    expect(screen.getByText("Across 4 website projects")).toBeTruthy();
+    expect(screen.getByText("6")).toBeTruthy();
   });
 
   it("renders safely when an older cache entry lacks visit metrics", () => {

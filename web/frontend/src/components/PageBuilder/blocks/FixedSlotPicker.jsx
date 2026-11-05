@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { normalizeTimeSlotsByDate } from "./reservationAvailability";
+import { getWeeklySlotTimes, normalizeTimeSlotsByDate } from "./reservationAvailability";
+import { getReservationContent } from "../../../content/pageBuilder/reservationContent";
 
 const normalizeOptions = (items) => [...new Set(
   (Array.isArray(items) ? items : [])
@@ -38,6 +39,7 @@ export default function FixedSlotPicker({
   dates = [],
   times = [],
   timesByDate,
+  weeklyRepeatDates,
   selectedDate = "",
   selectedTime = "",
   disabled = false,
@@ -46,16 +48,19 @@ export default function FixedSlotPicker({
   direction = "ltr",
   onSelect,
 }) {
+  const content = getReservationContent(lang);
   const fixedDates = useMemo(() => normalizeOptions(dates).sort(), [dates]);
   const availableDateSet = useMemo(() => new Set(fixedDates), [fixedDates]);
   const normalizedTimesByDate = useMemo(
     () => normalizeTimeSlotsByDate(fixedDates, times, timesByDate),
     [fixedDates, times, timesByDate]
   );
-  const activeDate = fixedDates.includes(selectedDate) ? selectedDate : fixedDates[0] || "";
+  const activeDate = selectedDate && (fixedDates.includes(selectedDate)
+    || getWeeklySlotTimes(selectedDate, normalizedTimesByDate, weeklyRepeatDates).length)
+    ? selectedDate : fixedDates[0] || "";
   const activeTimes = useMemo(
-    () => normalizedTimesByDate[activeDate] || [],
-    [activeDate, normalizedTimesByDate]
+    () => getWeeklySlotTimes(activeDate, normalizedTimesByDate, weeklyRepeatDates),
+    [activeDate, normalizedTimesByDate, weeklyRepeatDates]
   );
   const activeDateValue = parseLocalDate(activeDate);
   const activeCalendarMonth = startOfMonth(activeDateValue || new Date());
@@ -102,15 +107,15 @@ export default function FixedSlotPicker({
 
   return (
     <fieldset className={`fixed-slot-picker ${error ? "has-error" : ""}`} dir={direction === "rtl" ? "rtl" : "ltr"}>
-      <legend className="sr-only">Choose an appointment date and time</legend>
+      <legend className="sr-only">{content.chooseAppointment}</legend>
 
       {fixedDates.length > 0 ? (
         <div className="fixed-slot-booking-controls">
-          <section className="fixed-slot-calendar" aria-label="Appointment date">
+          <section className="fixed-slot-calendar" aria-label={content.appointmentDate}>
             <header>
               <button
                 type="button"
-                aria-label="Previous month"
+                aria-label={content.previousMonth}
                 disabled={disabled}
                 onClick={() => setCalendarView({
                   activeDate,
@@ -122,7 +127,7 @@ export default function FixedSlotPicker({
               <p aria-live="polite">{monthFormatter.format(calendarMonth)}</p>
               <button
                 type="button"
-                aria-label="Next month"
+                aria-label={content.nextMonth}
                 disabled={disabled}
                 onClick={() => setCalendarView({
                   activeDate,
@@ -141,7 +146,7 @@ export default function FixedSlotPicker({
               {calendarCells.map((date, index) => {
                 if (!date) return <span className="is-empty" aria-hidden="true" key={`empty-${index}`} />;
                 const dateValue = formatLocalDate(date);
-                const available = availableDateSet.has(dateValue);
+                const available = availableDateSet.has(dateValue) || getWeeklySlotTimes(dateValue, normalizedTimesByDate, weeklyRepeatDates).length > 0;
                 const selected = dateValue === activeDate;
                 const dateLabel = fullDateFormatter.format(date);
                 return (
@@ -149,7 +154,7 @@ export default function FixedSlotPicker({
                     type="button"
                     className={`${available ? "is-available" : "is-unavailable"} ${selected ? "is-selected" : ""}`}
                     key={dateValue}
-                    aria-label={`${dateLabel}${available ? ", available" : ", unavailable"}`}
+                    aria-label={`${dateLabel}, ${available ? content.available : content.unavailable}`}
                     aria-pressed={selected}
                     disabled={disabled || !available}
                     onClick={() => onSelect?.(dateValue, "")}
@@ -163,7 +168,7 @@ export default function FixedSlotPicker({
           </section>
 
           <div className="fixed-slot-times">
-            <span>Available time slots</span>
+            <span>{content.availableTimes}</span>
             {activeTimes.length > 0 ? (
               <div>
                 {activeTimes.map((timeValue) => {
@@ -175,7 +180,7 @@ export default function FixedSlotPicker({
                       key={`${activeDate}_${timeValue}`}
                       className={selected ? "is-selected" : ""}
                       aria-pressed={selected}
-                      aria-label={`${activeDateValue ? fullDateFormatter.format(activeDateValue) : activeDate} at ${timeLabel}`}
+                      aria-label={`${activeDateValue ? fullDateFormatter.format(activeDateValue) : activeDate} ${content.at} ${timeLabel}`}
                       disabled={disabled || !activeDate}
                       onClick={() => onSelect?.(activeDate, timeValue)}
                     >
@@ -184,11 +189,11 @@ export default function FixedSlotPicker({
                   );
                 })}
               </div>
-            ) : <div className="fixed-slot-empty">No times are available for this date.</div>}
+            ) : <div className="fixed-slot-empty">{content.noTimes}</div>}
           </div>
         </div>
       ) : (
-        <div className="fixed-slot-empty">No appointment slots are available yet.</div>
+        <div className="fixed-slot-empty">{content.noSlots}</div>
       )}
 
       {error && <strong className="fixed-slot-error">{error}</strong>}

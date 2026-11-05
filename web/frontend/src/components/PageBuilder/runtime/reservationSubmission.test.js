@@ -6,6 +6,10 @@ import {
 } from "./reservationSubmission";
 
 describe("reservation submission recovery", () => {
+  it("explains unavailable group booking and invalid seat quantities", () => {
+    expect(getReservationErrorMessage({ code: "reservation_capacity_unavailable" })).toContain("contact the organizer");
+    expect(getReservationErrorMessage({ code: "reservation_seats_invalid" })).toContain("valid number of seats");
+  });
   it("creates bounded client idempotency keys", () => {
     const first = createReservationIdempotencyKey();
     const second = createReservationIdempotencyKey();

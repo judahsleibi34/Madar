@@ -821,6 +821,68 @@ describe("mounted PageBuilder semantic acknowledgement", () => {
       await waitFor(() => expect(frame.textContent).toContain("New copied data"));
     }
   });
+  it("drops a preview onto an auto-layout section while preserving its existing content", async () => {
+    const autoSchema = structuredClone(schemaA);
+    const section = autoSchema.pages[0].sections[0];
+    section.mode = "auto";
+    section.isPageCanvas = false;
+    section.rows = [{ id: "auto-row", columns: [{ id: "auto-column", elements: section.freeElements }] }];
+    section.freeElements = [];
+    apiMocks.fetchBuilderProject.mockResolvedValue({ id: projectId, draft_revision: 100, draft_schema: autoSchema });
+    const { container } = render(<MemoryRouter initialEntries={[`/page-builder/projects/${projectId}/pages`]}><PageBuilder user={user} /></MemoryRouter>);
+    await screen.findByLabelText("Page name");
+    fireEvent.click(screen.getByRole("tab", { name: /^Sections/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Preview Heading" }));
+    const values = new Map();
+    const dataTransfer = { types: ["application/x-madar-component"], setData: (key, value) => values.set(key, value), getData: (key) => values.get(key) || "" };
+    const preview = container.querySelector(".component-details-preview");
+    fireEvent.dragStart(preview, { dataTransfer });
+    expect(values.get("application/x-madar-component")).toBe("heading");
+    const target = container.querySelector(".site-section:not(.direct-section)");
+    expect(target).toBeTruthy();
+    fireEvent.dragOver(target, { dataTransfer });
+    fireEvent.drop(target, { dataTransfer, clientX: 160, clientY: 160 });
+    fireEvent.dragEnd(preview);
+    expect(container.querySelectorAll(".builder-element-heading")).toHaveLength(1);
+    expect(container.querySelectorAll(".direct-layout-frame")).toHaveLength(0);
+    expect(container.querySelector('[data-column-id="auto-column"]')?.textContent).toContain("Start");
+    expect(container.querySelectorAll('[data-column-id="auto-column"] .builder-element-heading')).toHaveLength(1);
+    expect(container.querySelector(".component-details")).toBeNull();
+  });
+
+  it("previews a component without changing the page, closes with Escape, and adds only on request", async () => {
+    const { container } = render(<MemoryRouter initialEntries={[`/page-builder/projects/${projectId}/pages`]}><PageBuilder user={user} /></MemoryRouter>);
+    await screen.findByLabelText("Page name");
+    fireEvent.click(screen.getByRole("tab", { name: /^Sections/ }));
+    const initialCount = container.querySelectorAll("[data-builder-element-id]").length;
+    const heading = screen.getByRole("button", { name: "Preview Heading" });
+    fireEvent.click(heading);
+    expect(screen.getByRole("region", { name: "Heading component details" })).toBeTruthy();
+    expect(container.querySelectorAll("[data-builder-element-id]")).toHaveLength(initialCount);
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Close component details" }));
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("region", { name: "Heading component details" })).toBeNull();
+    expect(document.activeElement).toBe(heading);
+    fireEvent.click(heading);
+    const dragButton = screen.getByRole("button", { name: "Add to page" });
+    const dataTransfer = { setData: vi.fn(), effectAllowed: "" };
+    fireEvent.dragStart(dragButton, { dataTransfer });
+    expect(dataTransfer.setData).toHaveBeenCalledWith("application/x-madar-component", "heading");
+    expect(screen.getByRole("region", { name: "Heading component details" }).classList.contains("is-dragging")).toBe(false);
+    await waitFor(() => expect(screen.getByRole("region", { name: "Heading component details" }).classList.contains("is-dragging")).toBe(true));
+    expect(dragButton.isConnected).toBe(true);
+    fireEvent.dragEnd(dragButton);
+    expect(screen.queryByRole("region", { name: "Heading component details" })).toBeNull();
+    expect(container.querySelectorAll("[data-builder-element-id]")).toHaveLength(initialCount);
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search components" }), { target: { value: "heading" } });
+    expect(screen.queryByRole("button", { name: "Preview Photographic hero" })).toBeNull();
+    fireEvent.click(heading);
+    fireEvent.click(screen.getByRole("button", { name: "Add to page" }));
+    expect(screen.queryByRole("region", { name: "Heading component details" })).toBeNull();
+    expect(container.querySelectorAll(".direct-element-frame-heading")).toHaveLength(1);
+    expect(container.querySelectorAll("[data-builder-element-id]").length).toBeGreaterThan(initialCount);
+  });
+
   it("keeps Academy on the native Pages, Themes, Header/Footer and history workflow", async () => {
     const schema = { ...structuredClone(schemaA), forms: [], usage_profile: "academy" };
     apiMocks.fetchBuilderProject.mockResolvedValue({ id: projectId, usage_profile: "academy", name: "Academy", draft_revision: 100, draft_schema: schema });
@@ -859,7 +921,7 @@ describe("mounted PageBuilder semantic acknowledgement", () => {
     expect(container.querySelectorAll(".builder-section-composition")).toHaveLength(0);
     expect(screen.queryByRole("button", { name: "Add section" })).toBeNull();
     expect(screen.getByRole("heading", { name: "Components" })).toBeTruthy();
-    expect(container.querySelector(".section-component-palette").textContent.includes("Featured Courses")).toBe(usage_profile === "academy");
+    expect(container.querySelector(".component-library-list").textContent.includes("Featured Courses")).toBe(usage_profile === "academy");
     fireEvent.click(screen.getByRole("tab", { name: /^Themes/ }));
     expect(container.querySelector(".builder-themes-panel")).toBeTruthy();
   });

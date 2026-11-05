@@ -90,6 +90,13 @@
     "bar": "تخفيضات الآن — خصم يصل إلى {{percentage}}٪ على منتجات مختارة", "shopSale": "استكشف منتجات التخفيض", "off": "خصم", "discountValue": "{{percentage}}٪",
     "dismissPopup": "إغلاق نافذة التخفيضات", "dismissBar": "إغلاق إعلان التخفيضات", "dialogLabel": "تخفيضات تصل إلى {{percentage}}٪"
   },
+  "specialThemes": "تصاميم خاصة",
+  "blackFriday": {
+    "kicker": "الجمعة السوداء", "event": "فعالية خاصة", "discount": "عرض لفترة محدودة", "title": "الجمعة السوداء بدأت.", "discountTitle": "وفّر حتى {{percentage}}٪ في الجمعة السوداء.",
+    "body": "استكشف واجهة الجمعة السوداء المحدودة واكتشف العروض المتاحة الآن.", "discountBody": "خصومات تصل إلى {{percentage}}٪ على منتجات مختارة خلال عرض الجمعة السوداء.",
+    "bar": "فعالية الجمعة السوداء بدأت", "barDiscount": "الجمعة السوداء — وفّر حتى {{percentage}}٪", "shop": "تسوق عروض الجمعة السوداء", "dismiss": "إغلاق رسالة الجمعة السوداء", "dismissBar": "إغلاق إعلان الجمعة السوداء", "dialogLabel": "فعالية الجمعة السوداء في المتجر",
+    "heroEyebrow": "أكبر فعالية للتسوق", "heroTitle": "الجمعة السوداء", "heroDiscount": "خصم يصل إلى {{percentage}}٪", "heroEvent": "العروض محدودة المدة بدأت", "heroBody": "تسوّق تخفيضات فعلية تصل إلى {{percentage}}٪ على منتجات مختارة خلال الفعالية.", "heroBodyNoDiscount": "واجهة الجمعة السوداء متاحة الآن. استكشف المنتجات والعروض المتوفرة.", "shopDeals": "تسوّق العروض"
+  },
   "product": {
     "sale": "تخفيض", "salePercentage": "خصم {{percentage}}٪",
     "addToCart": "أضف إلى السلة", "chooseOptions": "اختر الخيارات", "outOfStock": "نفدت الكمية", "lowStock": "مخزون منخفض",
@@ -203,7 +210,7 @@
     "moveAttributeUp": "نقل السمة لأعلى", "moveAttributeDown": "نقل السمة لأسفل", "moveOptionUp": "نقل الخيار لأعلى", "moveOptionDown": "نقل الخيار لأسفل", "moveValueUp": "نقل القيمة لأعلى", "moveValueDown": "نقل القيمة لأسفل",
     "variantImage": "النوع {{variant}}، الصورة {{image}}",
     "noDeliveryAreas": "لا تتوفر مناطق توصيل حاليًا.", "deliveryRequired": "يبقى إتمام الطلب غير متاح حتى تفعيل منطقة توصيل واحدة على الأقل وحفظها.",
-    "storeDesign": "تصميم المتجر", "storeDesignSubtitle": "صمّم بأمان، وعاين المسودة محليًا، ثم انشرها عندما تصبح جاهزة.", "openFullPreview": "فتح المعاينة الكاملة", "publishing": "جارٍ النشر…", "publishChanges": "نشر التغييرات", "loadingStoreDesign": "جارٍ تحميل تصميم المتجر", "storeColors": "ألوان المتجر", "restoreColors": "استعادة الألوان الأصلية",
+    "storeDesign": "تصميم المتجر", "storeDesignSubtitle": "صمّم بأمان، وعاين المسودة محليًا، ثم انشرها عندما تصبح جاهزة.", "openFullPreview": "فتح المعاينة الكاملة", "publishing": "جارٍ النشر…", "publishChanges": "نشر التغييرات", "loadingStoreDesign": "جارٍ تحميل تصميم المتجر", "storeColors": "ألوان المتجر", "restoreColors": "استعادة الألوان الأصلية", "blackFridayTheme": "تصميم تخفيضات الجمعة السوداء", "blackFridayThemeHelp": "أضف أقسام حملة الجمعة السوداء باستخدام ألوان علامتك الحالية وأسعار التخفيض الفعلية. يبقى تصميم المتجر وأسعاره دون تغيير.",
     "mainColor": "اللون الرئيسي", "mainColorHelp": "الأزرار والروابط والعناصر البارزة", "pageBackground": "خلفية الصفحة", "pageBackgroundHelp": "الخلفية الرئيسية للمتجر", "cardsSections": "البطاقات والأقسام", "cardsSectionsHelp": "بطاقات المنتجات واللوحات الثانوية", "mainText": "النص الرئيسي", "mainTextHelp": "العناوين والمعلومات المهمة", "secondaryText": "النص الثانوي", "secondaryTextHelp": "الأوصاف والمعلومات المساندة", "colorPicker": "منتقي لون {{label}}",
     "loadColorsError": "تعذر تحميل ألوان المتجر", "saveColorsError": "تعذر حفظ ألوان المتجر", "tryAgain": "يرجى المحاولة مرة أخرى. إذا استمرت المشكلة، حدّث الصفحة.", "checkColors": "تحقق من الألوان", "fixColors": "صحح قيم الألوان غير الصالحة قبل فتح معاينة المسودة.", "colorFormat": "يجب أن تكون قيمة كل لون مكتملة من ست خانات، مثل #852c21.", "addressNeeded": "عنوان المتجر مطلوب", "chooseAddress": "اختر عنوان المتجر من الإعدادات قبل فتح المعاينة.", "designPublished": "تم نشر تصميم المتجر", "designPublishedBody": "أصبحت الألوان الجديدة منشورة في متجرك الإلكتروني.",
     "exactPreview": "معاينة واجهة المتجر الفعلية", "customerPreview": "معاينة العميل", "previewUpdates": "واجهة المتجر الفعلية · تتحدث أثناء التعديل", "loadingExactPreview": "جارٍ تحميل معاينة واجهة المتجر", "setAddress": "عيّن عنوان المتجر للمعاينة", "openSettingsAddress": "افتح الإعدادات واختر عنوانًا عامًا لمتجرك الإلكتروني.", "draftPreviewTitle": "المعاينة الفعلية لمسودة المتجر",
