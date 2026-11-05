@@ -29,12 +29,21 @@ def unit_bytes(command, *, source=115, target=136):
         'NoNewPrivileges=yes\nTimeoutStartSec=300\nExecStart='+command+'\n'
         '[Install]\nWantedBy=multi-user.target docker.service\n').encode()
 
-def proxy_bytes(name,command):
+def proxy_bytes(name,command,*,proxy_id=None):
     # Dependency directives are additive in systemd drop-ins; an empty value
     # CANNOT reset them. Exact earlier preimages are narrowly superseded below.
     # ExecStartPre DOES support reset and replaces only the legacy actor calls.
+    lifecycle=''
+    if proxy_id is not None:
+        if not isinstance(proxy_id,str) or not re.fullmatch('[a-f0-9]{64}',proxy_id):
+            raise RuntimeError('completed_boot_proxy_identity_invalid')
+        # A historical proxy may belong to a different Compose project. Keep
+        # its admitted ID/image/spec; never create or recreate it at boot.
+        lifecycle=('ExecStart=\nExecStart=/usr/bin/docker start '+proxy_id+'\n'
+            'ExecStop=\nExecStop=/usr/bin/docker stop --time 15 '+proxy_id+'\n')
     return ('[Unit]\nRequires=docker.service '+name+'\nAfter=docker.service '+name+
-        '\n[Service]\nTimeoutStartSec=300\nExecStartPre=\nExecStartPre=+'+command+'\n').encode()
+        '\n[Service]\nTimeoutStartSec=300\nExecStartPre=\nExecStartPre=+'+command+'\n'+lifecycle).encode()
+
 
 def superseded_dependencies(body,old_units):
     """Remove only literal obsolete unit references, preserving all other bytes."""
@@ -145,9 +154,19 @@ class CompletedNormalBootInstallation:
         script=self.package/'source/web/scripts/continue_completed_normal_upgrade.py'
         return ('/usr/bin/python3 -I -B '+str(script)+' '+mode+' --source-package '+str(self.package)+
             ' --approved-source '+self.document['source_bundle_sha256']+' --approved-plan '+self.contract['plan_sha256'])
+    def historical_proxy_id(self):
+        if self.contract['source_roles'].get('origin_kind')!='independently-enrolled-historical-bootstrap-origin':
+            return None
+        value=self.document.get('proxy_runtime')
+        if (not isinstance(value,dict) or set(value)!={'id','image','spec_sha256'}
+                or not re.fullmatch('[a-f0-9]{64}',str(value.get('id')))
+                or not re.fullmatch('sha256:[a-f0-9]{64}',str(value.get('image')))
+                or not re.fullmatch('[a-f0-9]{64}',str(value.get('spec_sha256')))):
+            raise RuntimeError('completed_boot_proxy_identity_invalid')
+        return value['id']
     def paths(self):
         result={self.units/self.name:unit_bytes(self.command('boot'),source=self.profile.source,target=self.profile.target),
-                self.proxy:proxy_bytes(self.name,self.command('proxy-gate'))}
+                self.proxy:proxy_bytes(self.name,self.command('proxy-gate'),proxy_id=self.historical_proxy_id())}
         for name in self.baseline['old_units']:
             result[self.units/(name+'.d')/('99-superseded-'+digest(self.contract)[:12]+'.conf')]=(
                 '[Unit]\nRefuseManualStart=yes\nConditionPathExists=!'+str(self.root/'boot-installation.json')+'\n').encode()
@@ -237,13 +256,22 @@ class CompletedNormalBootInstallation:
             if (loaded.get('FragmentPath')!=str(UNITS/name)
                     or set(loaded.get('DropInPaths','').split())!=expected_dropins):
                 raise RuntimeError('completed_boot_effective_actor_controls_changed')
-        raw=self.ops.command('completed_boot_effective_proxy',['systemctl','show',PROXY,'--property=Requires,ExecStartPre,DropInPaths','--no-pager']).stdout
+        raw=self.ops.command('completed_boot_effective_proxy',['systemctl','show',PROXY,'--property=Requires,ExecStartPre,DropInPaths,ExecStart,ExecStop,FragmentPath','--no-pager']).stdout
         values=dict(line.split('=',1) for line in raw.splitlines() if '=' in line)
         requires=set(values.get('Requires','').split())
         if (self.name not in requires or set(self.baseline['old_units'])&requires
                 or self.command('proxy-gate') not in values.get('ExecStartPre','')
                 or set(values.get('DropInPaths','').split())!=set(self.baseline['proxy_dropins'])|{str(self.proxy)}|overlays.get(PROXY,set())):
             raise RuntimeError('completed_boot_effective_proxy_controls_changed')
+        identity=self.historical_proxy_id()
+        if identity is not None:
+            for key,argv in (('ExecStart','/usr/bin/docker start '+identity),
+                    ('ExecStop','/usr/bin/docker stop --time 15 '+identity)):
+                value=values.get(key,'')
+                if (value.count('argv[]=')!=1 or 'argv[]='+argv+' ;' not in value
+                        or 'path=/usr/bin/docker ;' not in value
+                        or values.get('FragmentPath')!=str(UNITS/PROXY)):
+                    raise RuntimeError('completed_boot_effective_proxy_lifecycle_changed')
         return record
     def provider_barrier_dropins(self):
         """Observe the existing maintenance overlay, never amend boot evidence.

@@ -3334,3 +3334,19 @@ signing still requires fresh valid JSON. Permanent/unknown errors, invalid
 responses and stale evidence refuse. Diagnostics retain only classification,
 attempt count, HTTP status and endpoint hash, never API stderr or credentials.
 This transport resilience neither retries a deployment nor reuses its approval.
+
+Historical proxy recovery preserves the independently admitted container identity.
+The root proxy gate still verifies the exact ID/image/spec, candidate state and
+route before startup. Its owned systemd drop-in resets the base Compose start/stop
+commands and starts/stops only the immutable proxy ID bound by the approved plan.
+This avoids recreating a historical proxy under a different Compose project after
+reboot. Missing/malformed binding or changed effective service commands refuse.
+Ordinary completed-origin unit behavior remains unchanged. Installation grants no
+new release authority and never starts a service; real reboot acceptance must
+verify the public route, not merely successful application boot-service exit.
+
+The reproducible `historical_proxy_boot_native.py` component exercises this
+project-mismatch boundary using a bounded network-none fixture, root pre-start
+identity guard and real User=madar transient service. It checks exact-ID startup,
+private HTTP readiness, exact-ID stop and owned retirement. It is component
+evidence, not preserved-upgrade or production authorization.

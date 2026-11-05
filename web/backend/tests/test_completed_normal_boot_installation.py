@@ -35,7 +35,9 @@ class Operations:
                 dropins=[] if name==installer.name else [*installer.baseline['old_unit_dropins'][name],
                     str(m.UNITS/(name+'.d')/('99-superseded-'+admission.digest(installer.contract)[:12]+'.conf'))]
                 return SimpleNamespace(stdout='FragmentPath='+str(m.UNITS/name)+'\nDropInPaths='+' '.join(dropins)+'\n')
-            return SimpleNamespace(stdout='Requires=docker.service '+installer.name+'\nExecStartPre='+installer.command('proxy-gate')+
+            identity=installer.historical_proxy_id()
+            lifecycle=('FragmentPath='+str(m.UNITS/m.PROXY)+'\nExecStart={ path=/usr/bin/docker ; argv[]=/usr/bin/docker start '+identity+' ; }\nExecStop={ path=/usr/bin/docker ; argv[]=/usr/bin/docker stop --time 15 '+identity+' ; }\n') if identity else ''
+            return SimpleNamespace(stdout=lifecycle+'Requires=docker.service '+installer.name+'\nExecStartPre='+installer.command('proxy-gate')+
                 '\nDropInPaths='+' '.join([*installer.baseline['proxy_dropins'],str(installer.proxy)])+'\n')
         if args[:2] not in (['systemctl','disable'],['systemctl','enable'],['systemctl','daemon-reload'],['systemd-analyze','verify']):
             raise AssertionError('unexpected effect in the boot installer')
@@ -54,6 +56,11 @@ class CompletedBootInstallationTests(unittest.TestCase):
         with patch.object(m,'profile',return_value=RECONCILED),patch('deployment.lib.historical_origin.recorded_observation',return_value=observed):
             instance=m.CompletedNormalBootInstallation(contract,document,self.installer.package,lambda:None,self.ops,units=self.units,admissions=self.path/'admissions')
             self.assertEqual(instance.baseline['old_units'],[]);self.assertTrue(instance.proxy.name.startswith('99zzzzzzz-'))
+            self.assertEqual(instance.historical_proxy_id(),'e'*64)
+            for value in (None,{},dict(document['proxy_runtime'],id='wrong'),dict(document['proxy_runtime'],image='mutable:tag')):
+                with patch.dict(document,{'proxy_runtime':value}):
+                    with self.assertRaisesRegex(RuntimeError,'proxy_identity_invalid'):instance.paths()
+
             observed['boot_controls']['files'][proxy]={'sha256':'f'*64}
             with self.assertRaisesRegex(RuntimeError,'historical_preimage_changed'):
                 m.CompletedNormalBootInstallation(contract,document,self.installer.package,lambda:None,self.ops,units=self.units,admissions=self.path/'admissions')
@@ -127,6 +134,16 @@ class CompletedBootInstallationTests(unittest.TestCase):
         self.ops.installation=instance;instance.root.mkdir()
         instance.install()
         self.assertEqual(barrier.read_bytes(),barrier_before)
+        actual_command=self.ops.command
+        def substitute(label,args,**kwargs):
+            result=actual_command(label,args,**kwargs)
+            if label=='completed_boot_effective_proxy':
+                result.stdout=result.stdout.replace('/usr/bin/docker start '+'e'*64,
+                    '/usr/bin/docker start '+'a'*64)
+            return result
+        with patch.object(self.ops,'command',side_effect=substitute):
+            with self.assertRaisesRegex(RuntimeError,'effective_proxy_lifecycle_changed'):
+                instance.installed()
         self.assertFalse((self.units/(barrier.name+'.d')).exists())
         self.assertEqual(self.ops.systemctl_state(name)['enabled'],'disabled')
         self.assertFalse(any(args[:2] in (['systemctl','start'],['systemctl','restart'])
@@ -239,6 +256,19 @@ class CompletedBootInstallationTests(unittest.TestCase):
         # disabled proxy activation. Its guarded boot dependency owns recovery.
         self.assertNotIn('ExecStartPost=',body)
 
+    def test_historical_proxy_starts_bound_id_without_compose_recreation(self):
+        identity='e'*64
+        body=m.proxy_bytes('madar-compatible-normal-boot-test.service','/measured/root-gate',proxy_id=identity).decode()
+        self.assertIn('ExecStartPre=+/measured/root-gate\n',body)
+        self.assertIn('ExecStart=\nExecStart=/usr/bin/docker start '+identity+'\n',body)
+        self.assertIn('ExecStop=\nExecStop=/usr/bin/docker stop --time 15 '+identity+'\n',body)
+        self.assertNotIn('compose',body);self.assertNotIn('create',body)
+        for changed in ('',None,'e'*63,'madar-release-proxy','e'*64+'\nExecStart=/evil'):
+            if changed is None:continue
+            with self.assertRaisesRegex(RuntimeError,'proxy_identity_invalid'):
+                m.proxy_bytes('unit','gate',proxy_id=changed)
+        self.assertNotIn('ExecStart=',m.proxy_bytes('unit','gate').decode())
+
     def test_proxy_gate_runs_as_root_without_changing_proxy_service_identity(self):
         body=m.proxy_bytes('madar-compatible-normal-boot-test.service','/usr/bin/python3 /root-private/gate.py').decode()
         self.assertIn('ExecStartPre=+/usr/bin/python3 /root-private/gate.py\n',body)
@@ -263,6 +293,7 @@ class CompletedBootInstallationTests(unittest.TestCase):
         states={name:{'enabled':'enabled','active':'active'} for name in [m.PROXY,*old]}
         states[m.PROXY]['active']='failed' # Real current manager/runtime split.
         document={'operation':admission.OPERATION,'source_bundle_sha256':'a'*64,
+            'proxy_runtime':{'id':'e'*64,'image':'sha256:'+'f'*64,'spec_sha256':'d'*64},
             'boot_resources':{'files':files,'proxy_dropins':proxy_dropins,'old_units':old,
                 'old_unit_dropins':{n:[] for n in old},'unit_states':states}}
         self.contract=fixture_contract();self.contract['plan_sha256']=admission.digest(document)
