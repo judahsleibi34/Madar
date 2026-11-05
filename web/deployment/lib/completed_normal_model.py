@@ -155,4 +155,9 @@ def render_candidate_model(actor, *, read_only=False):
         operations._compose(sha,slot,images,'config','--format','json',workers_active=True)
     guard()
     if len(captured)!=1:raise RuntimeError('completed_model_loader_inventory_invalid')
+    if selected is RECONCILED:
+        from deployment.lib.completed_normal_resources import allocation
+        from deployment.lib.completed_normal_private_provider import require_business_model
+        gateway=allocation(contract,slot,preparation150=read_only)['containers']['provider-gateway']
+        require_business_model(captured[0],gateway_name=gateway)
     return captured[0]

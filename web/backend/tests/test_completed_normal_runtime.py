@@ -164,6 +164,12 @@ class RuntimeModelTests(unittest.TestCase):
                 'tmpfs':['/tmp:rw,noexec,nosuid,size=16m,mode=1777'],
                 'healthcheck':{'test':['CMD','true'],'interval':'1s'}}
             backend=self.model['services']['backend'];backend['networks']['supabase_client']={}
+            for role in ('backend',*m.BUSINESS):
+                service=self.model['services'][role]
+                service['environment'].update(SUPABASE_URL='http://'+name+':8000',
+                    MADAR_SUPABASE_CLIENT_NETWORK='madar-supabase-client')
+                self.rows[self.selected['containers'][role]]['Config']['Env']=[
+                    'PATH=/fixture',*(k+'='+v for k,v in service['environment'].items())]
             backend['environment'].update(SUPABASE_URL='http://'+name+':8000',
                 MADAR_CALENDAR_DATABASE_DSN='postgresql://authenticator:synthetic@'+name+':5432/postgres?sslmode=disable',
                 MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER=self.contract['database']['system_identifier'])

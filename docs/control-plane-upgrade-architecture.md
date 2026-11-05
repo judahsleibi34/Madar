@@ -3224,3 +3224,14 @@ provider and worker fences remain active until the real authority transition.
 This fixes application startup validation, not a failed operation in place. Frozen
 candidate images and consumed approvals remain immutable; a changed application
 requires newly authenticated image artifacts and independently scoped acceptance.
+
+The canonical controller overlay must also export the fixed client-network
+identifier to every grant-bearing container. Attaching a Compose network or
+setting a variable in the interpolation process does not place that variable in
+the container environment. The historical env file legitimately lacks it.
+Preapproval now checks the actual `docker compose config` model for the exact
+private URL and client-network declaration on backend and all three business
+workers. Runtime and provider inventory revalidation enforce the same contract.
+Missing or substituted declarations refuse before approval, and again before
+activation; no application guard is weakened. Native Compose regression uses a
+historical env file without this key, not a hand-filled container environment.

@@ -12,6 +12,21 @@ NATIVE_NETWORK='madar-local-supabase_default'
 CLIENT_NETWORK='madar-supabase-client'
 CONFIG='/etc/nginx/private-provider160.conf'
 GATEWAY_ENV={'PATH','NGINX_VERSION','PKG_RELEASE','DYNPKG_RELEASE','NJS_VERSION','NJS_RELEASE','ACME_VERSION'}
+BUSINESS_ROLES=('backend','notification-worker','calendar-sync-worker','data-deletion-worker')
+
+
+def require_business_environment(env, *, gateway_name):
+    """Validate container inputs, not just Compose's interpolation environment."""
+    if (not isinstance(env,dict)
+            or env.get('MADAR_SUPABASE_CLIENT_NETWORK')!=CLIENT_NETWORK
+            or env.get('SUPABASE_URL')!='http://'+gateway_name+':8000'):
+        raise RuntimeError('completed_private_business_runtime_contract_invalid')
+
+
+def require_business_model(model, *, gateway_name):
+    for role in BUSINESS_ROLES:
+        require_business_environment(model.get('services',{}).get(role,{}).get('environment'),
+            gateway_name=gateway_name)
 
 
 def environment(items):
@@ -116,6 +131,9 @@ def verify_topology(inventory, binding, rows):
         if name in {row.get('Name','').lstrip('/'),*(peer.get('Aliases') or []),*(peer.get('DNSNames') or [])}:
             owners.add(row['Id'])
     if owners!={gateway['id']}:raise RuntimeError('completed_private_gateway_dns_ambiguous')
+    for role in BUSINESS_ROLES:
+        row=actual[actors['candidate:'+role]['id']]
+        require_business_environment(environment(row['Config'].get('Env')),gateway_name=name)
     backend=actual[actors['candidate:backend']['id']]
     host=backend['HostConfig']
     if host.get('ExtraHosts') or host.get('Dns') or host.get('DnsSearch') or host.get('DnsOptions'):

@@ -1,6 +1,18 @@
 # Loaded only for the exact canonical160 maintenance candidate. No host ports,
 # credentials, writable objects or application authority are given to this role.
 services:
+  backend:
+    environment:
+      MADAR_SUPABASE_CLIENT_NETWORK: madar-supabase-client
+  notification-worker:
+    environment:
+      MADAR_SUPABASE_CLIENT_NETWORK: madar-supabase-client
+  calendar-sync-worker:
+    environment:
+      MADAR_SUPABASE_CLIENT_NETWORK: madar-supabase-client
+  data-deletion-worker:
+    environment:
+      MADAR_SUPABASE_CLIENT_NETWORK: madar-supabase-client
   provider-gateway:
     image: ${MADAR_FRONTEND_IMAGE:?accepted frontend image required}
     container_name: ${MADAR_CONTAINER_PREFIX:?exact prefix required}-${MADAR_SLOT:?slot required}-provider-gateway

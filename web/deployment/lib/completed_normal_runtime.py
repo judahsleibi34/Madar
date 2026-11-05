@@ -252,6 +252,10 @@ def validate_model(contract,model,runtime, *, phase='running'):
                 system_identifier=contract['database']['system_identifier'])
         if role in {'backend',*BUSINESS}:
             from deployment.lib.completed_normal_profile import RECONCILED
+            if release is RECONCILED:
+                from deployment.lib.completed_normal_private_provider import require_business_environment
+                require_business_environment(expected_env,
+                    gateway_name=selected['containers']['provider-gateway'])
             if release is RECONCILED and (
                     expected_env.get('MADAR_RELEASE_CONTROLLER_SHA')!=contract['candidate']['controller_sha']
                     or expected_env.get('MADAR_RELEASE_MIGRATION_MANIFEST_SHA256')!=contract['migration_manifest_sha256']):

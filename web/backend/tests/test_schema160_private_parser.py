@@ -65,7 +65,12 @@ def canonical_parser(data, scope, rows):
             'states':{p:{'running':p in {'private','active'},'restarting':False,'restart':'no'} for p in inventory.PHASES}}
         rows.append(gateway)
         backend=next(r for r in rows if r['Id']==data['containers']['candidate:backend']['id'])
-        backend['Config']['Env'] += ['SUPABASE_URL=http://'+name+':8000',
+        for role in ('backend','notification-worker','calendar-sync-worker','data-deletion-worker'):
+            row=next(r for r in rows if r['Id']==data['containers']['candidate:'+role]['id'])
+            row['Config']['Env'] += ['SUPABASE_URL=http://'+name+':8000',
+                'MADAR_SUPABASE_CLIENT_NETWORK=madar-supabase-client']
+            data['containers']['candidate:'+role]['spec_sha256']=measured_spec(row)
+        backend['Config']['Env'] += [
             'MADAR_CALENDAR_DATABASE_DSN=postgresql://authenticator:synthetic@'+name+':5432/postgres?sslmode=disable',
             'MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER='+scope['system_identifier']]
         data['containers']['candidate:backend']['spec_sha256']=measured_spec(backend)

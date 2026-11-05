@@ -22,6 +22,17 @@ from test_completed_normal_compose import cli,WEB
 
 
 class PrivateProviderTests(unittest.TestCase):
+    def test_business_runtime_requires_actual_container_network_declaration(self):
+        name='madar-schema160-'+'a'*16+'-blue-provider-gateway'
+        env={'SUPABASE_URL':'http://'+name+':8000',
+            'MADAR_SUPABASE_CLIENT_NETWORK':provider.CLIENT_NETWORK}
+        provider.require_business_environment(env,gateway_name=name)
+        for bad in (None,{},dict(env,MADAR_SUPABASE_CLIENT_NETWORK=None),
+                dict(env,MADAR_SUPABASE_CLIENT_NETWORK='foreign'),
+                {'SUPABASE_URL':env['SUPABASE_URL']},dict(env,SUPABASE_URL='http://madar-supabase:8000')):
+            with self.assertRaisesRegex(RuntimeError,'business_runtime_contract_invalid'):
+                provider.require_business_environment(bad,gateway_name=name)
+
     def test_historical_calendar_projection_breaks_no_hash_or_credential_boundary(self):
         source={'SUPABASE_URL':'http://madar-supabase:8000',
             'MADAR_CALENDAR_DATABASE_DSN':'postgresql://authenticator:synthetic%40private@supabase-db:5432/postgres?sslmode=require',
@@ -159,6 +170,13 @@ class PrivateProviderTests(unittest.TestCase):
             with patch.dict(os.environ,env),patch('deployment.lib.completed_normal_admission.require_candidate_authority',side_effect=AssertionError('preauthorization must issue/read no grant')):
                 ops._compose(contract['candidate']['source_sha'],'green',images,'config','--format','json',workers_active=True)
             services=models[0]['services'];self.assertEqual(set(services),set(candidate_roles(contract)))
+            provider.require_business_model(models[0],gateway_name=name)
+            for role in provider.BUSINESS_ROLES:
+                for value in (None,'foreign'):
+                    bad=copy.deepcopy(models[0])
+                    bad['services'][role]['environment']['MADAR_SUPABASE_CLIENT_NETWORK']=value
+                    with self.subTest(role=role,value=value),self.assertRaisesRegex(RuntimeError,'business_runtime_contract_invalid'):
+                        provider.require_business_model(bad,gateway_name=name)
             gateway=services['provider-gateway'];self.assertEqual(gateway['image'],contract['candidate']['images']['frontend'])
             self.assertFalse(gateway.get('ports'));self.assertFalse(gateway.get('volumes'));self.assertFalse(gateway.get('environment'))
             self.assertEqual(set(gateway['networks']),{'supabase_client','provider_native'})
