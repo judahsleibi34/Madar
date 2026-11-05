@@ -121,8 +121,28 @@ class BusinessWriteAuthorityTests(unittest.TestCase):
             env=dict(endpoint,SCHEMA_COMPATIBLE_MIN=str(self.data['compatible_min']),SCHEMA_COMPATIBLE_MAX='160',
                 MADAR_RELEASE_CONTROLLER_SHA='c'*40,MADAR_RELEASE_DATABASE_SYSTEM_IDENTIFIER='123456789',
                 MADAR_RELEASE_MIGRATION_MANIFEST_SHA256=self.data.get('migration_manifest_sha256',''))
+            if version == 3:
+                env['SUPABASE_URL']='http://madar-schema160-'+self.data['contract_digest'][:16]+'-blue-provider-gateway:8000'
             with self.subTest(version=version),patch.dict(os.environ,env):
                 recovery.validate_configuration()
+                if version == 3:
+                    with patch.dict(os.environ,{'SUPABASE_URL':env['SUPABASE_URL'].replace('-blue-', '-green-')}):
+                        recovery.validate_configuration()
+                        self.assertTrue(authority.restricted())
+                        self.assertFalse(recovery.worker_consumption_allowed())
+                    for url in ('http://madar-supabase:8000',
+                            env['SUPABASE_URL'].replace('a'*16,'d'*16),
+                            env['SUPABASE_URL'].replace('-blue-', '-active-'),
+                            env['SUPABASE_URL'].replace(':8000', ':8001'),
+                            env['SUPABASE_URL']+'/', env['SUPABASE_URL']+'.foreign',
+                            env['SUPABASE_URL'].replace('http://','https://')):
+                        with self.subTest(url=url),patch.dict(os.environ,{'SUPABASE_URL':url}),self.assertRaises(RuntimeError):
+                            recovery.validate_configuration()
+                else:
+                    # Generic/legacy authority cannot opt into the canonical
+                    # private topology by setting its own endpoint.
+                    with patch.dict(os.environ,{'SUPABASE_URL':'http://madar-schema160-'+'a'*16+'-blue-provider-gateway:8000'}),self.assertRaises(RuntimeError):
+                        recovery.validate_configuration()
                 for bad in ({'SCHEMA_COMPATIBLE_MAX':'161'},{'SUPABASE_URL':'http://foreign:8000'},
                         {'MADAR_SUPABASE_CLIENT_NETWORK':'foreign'},{'MADAR_RELEASE_CONTROLLER_SHA':'f'*40}):
                     with patch.dict(os.environ,bad),self.assertRaises(RuntimeError):recovery.validate_configuration()

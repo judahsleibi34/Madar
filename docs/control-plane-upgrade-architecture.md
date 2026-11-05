@@ -3208,3 +3208,19 @@ the exact admitted local OCI image IDs for canonical candidates: a loaded local
 manifest ID is not a registry RepoDigest, so `tag@ID` must not be sent to Docker
 as if it were a registry-qualified reference. No tag mutation or digest relabeling
 is permitted. The existing tag/ID reobservation still runs before creation.
+
+### Canonical private gateway application contract (2026-11-05)
+
+The v3 application grant binds the canonical160 provider URL to the first sixteen
+characters of the root-verified context digest and a blue/green gateway name,
+matching the existing resource allocator. The controller independently attests
+which slot and immutable gateway actually own that context. The backend still
+requires the fixed `madar-supabase-client` network, exact schema bounds, controller
+and manifest bindings, and the root-owned read-only authority mount. A v3 grant
+cannot select the old public gateway, another context, an arbitrary port or host.
+Other grant versions retain their existing endpoint contract. Read-only request,
+provider and worker fences remain active until the real authority transition.
+
+This fixes application startup validation, not a failed operation in place. Frozen
+candidate images and consumed approvals remain immutable; a changed application
+requires newly authenticated image artifacts and independently scoped acceptance.
