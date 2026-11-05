@@ -153,6 +153,25 @@ class MaintenanceRecoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError,'committed_target_required'):
                 driver.observe_maintenance_finalization()
 
+    def test_restart_uses_durable_timer_preimages_not_current_timer_state(self):
+        from deployment.lib import completed_normal_execution as execution
+        from deployment.lib.control_plane_upgrade import BACKUP_TIMERS
+        driver=self.f.driver;driver.root=self.f.root/'timer-records';driver.root.mkdir()
+        expected={name:{'enabled':'disabled','active':'inactive'} for name in BACKUP_TIMERS}
+        driver.document['backup_timer_states']=expected
+        path=driver.root/'backup-timer-preimages.json';path.write_text(json.dumps(expected))
+        driver.ops.interlock_backup_states=Mock(return_value=expected)
+        with patch.object(execution,'protected',lambda p,**kw:Path(p)):
+            self.assertEqual(driver.maintenance_recovery_timer_snapshot(),expected)
+            driver.ops.interlock_backup_states.assert_called_with(driver.controller)
+            driver.ops.interlock_backup_states.return_value=None
+            with self.assertRaisesRegex(RuntimeError,'preimages_changed'):
+                driver.maintenance_recovery_timer_snapshot()
+            driver.ops.interlock_backup_states.return_value=expected
+            path.write_text('{}')
+            with self.assertRaisesRegex(RuntimeError,'preimages_changed'):
+                driver.maintenance_recovery_timer_snapshot()
+
     def test_issuer_cannot_dispatch_sql_or_child_using_recovery(self):
         from deployment.lib.control_plane_upgrade import SystemOperations
         s=object.__new__(SystemOperations);s.canonical_maintenance_recovery={'kind':recovery.KIND}

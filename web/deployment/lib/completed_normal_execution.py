@@ -739,6 +739,16 @@ class CompletedNormalUpgrade:
         self.provider_adapter=provider
         return provider,ProviderMaintenance150(binding,ProtectedProviderJournal(self.root/'provider-journal'),provider)
 
+    def maintenance_recovery_timer_snapshot(self):
+        """Read the existing durable timer preimages; never recapture current state."""
+        from .control_plane_upgrade import validate_backup_timer_states
+        expected=validate_backup_timer_states(self.document['backup_timer_states'])
+        recorded=json.loads(protected(self.root/'backup-timer-preimages.json',private=True).read_bytes())
+        durable=self.ops.interlock_backup_states(self.controller)
+        if recorded!=expected or durable!=expected:
+            raise RuntimeError('maintenance_recovery_backup_timer_preimages_changed')
+        return expected
+
     def observe_maintenance_finalization(self):
         """Read-only exact F04 state; earlier or ambiguous effects are not resumed."""
         from .completed_normal_profile import RECONCILED
@@ -811,8 +821,9 @@ class CompletedNormalUpgrade:
         self.actor.guard()
         return {'schema':schema,'database_system_identifier':self.contract['database']['system_identifier'],
             'boot_id':Path('/proc/sys/kernel/random/boot_id').read_text().strip(),
-            'phase':'service_adopt_completed','files':{n:file_digest(protected(self.root/n,private=True)) for n in names},
+            'phase':'service_adopt_completed','backup_timer_states':self.maintenance_recovery_timer_snapshot(),'files':{n:file_digest(protected(self.root/n,private=True)) for n in names},
             'provider_journal_sha256':digest(records),'grant_sha256':digest(grant),
+            'interlock_sha256':file_digest(protected(self.ops.interlock_file,private=False)),
             'worker_owner_sha256':file_digest(owner_path),'route_sha256':hashlib.sha256(route).hexdigest(),
             'actors_sha256':digest(actors),'current_data_sha256':digest(current),'stale_credentials':stale}
 
@@ -828,10 +839,16 @@ class CompletedNormalUpgrade:
             self.ops.automatic_upgrade_lock=self.lock
             self.ops.deploy_lock_descriptor=acquire_lock(self.ops.state_root/'deploy.lock',create=False)
             recovery.verify(self.ops,value,consume=True,token=token);consumed=True
+            self.admitted=True  # Existing admitted operation was revalidated under both locks.
             self.ops.canonical_maintenance_recovery=value
             self.phase='maintenance_recovery_finalization'
             execution_event(self.ops,value,'EXECUTING',{'parent_request_id':value['parent_request_id']})
             recovery.retire_parent_credential(self.ops,value)
+            timers=self.maintenance_recovery_timer_snapshot()
+            if timers!=value['observation']['backup_timer_states']:
+                raise RuntimeError('maintenance_recovery_backup_timer_preimages_changed')
+            self.ops.backup_timer_states=timers
+            self.ops.backup_timer_sha=self.controller
             with self.root_credential():
                 provider,lifecycle=self.maintenance_recovery_components()
                 provider.verify_target_route()

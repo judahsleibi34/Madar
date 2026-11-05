@@ -3432,3 +3432,9 @@ existing environment and supervisor lifetimes; it does not extend the original
 2500-second deployment window or renew its authority. Native root-parent and
 User=madar LoadCredential tests verify transport and stale-lease refusal only,
 not application recovery. Installer closure includes the recovery module.
+
+A fresh recovery process restores its backup-timer context only from preimages
+that match both the immutable plan and the original durable interlock. It does
+not recapture stopped timers as their original state. The approved observation
+also binds the interlock bytes. Recovery failures retain the existing admitted
+operation's durable failure diagnostics and maintenance compensation.
