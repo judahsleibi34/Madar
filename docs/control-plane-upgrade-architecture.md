@@ -3273,3 +3273,7 @@ not replay role restoration or migration effects. The existing compatible boot
 kernel starts the sealed private candidate gateway before backend and workers.
 These changes require fresh real guest reboot acceptance; component tests alone
 do not establish unattended availability.
+The cold database boundary also observes delivery, outbox and deletion protocols
+through read-only SQL and requires the existing exact target protocol contract
+before starting the remaining providers. A matching schema number alone is not
+sufficient; missing, malformed or incompatible capabilities remain fenced.

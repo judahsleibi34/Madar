@@ -413,6 +413,15 @@ class CompletedNormalBootActor:
                         schema=self.native()
                         require_normal_migration_boundary(self.contract,schema,self.root,Path('/var/lib/madar/releases'))
                         if schema!=self.profile.target:raise RuntimeError('completed_boot_provider_schema_changed')
+                        from deployment.lib.completed_normal_profile import maintenance_role
+                        from deployment.lib.schema160_release import require_target_protocols
+                        query=('BEGIN READ ONLY; SELECT json_build_array(public.notification_delivery_protocol(),'
+                            'public.notification_outbox_protocol(),public.data_deletion_ownership_protocol()); COMMIT;')
+                        protocols=json.loads(self.runtime.command(['docker','exec',row['Id'],'psql','-XqAt',
+                            '-v','ON_ERROR_STOP=1','-U',maintenance_role(self.contract),'-d','postgres','-c',query]))
+                        if not isinstance(protocols,list) or len(protocols)!=3:
+                            raise RuntimeError('completed_boot_provider_protocol_observation_invalid')
+                        require_target_protocols(schema,*protocols)
         self.event('completed_native_providers_ready',schema=self.profile.target)
 
     def resume(self):

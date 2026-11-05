@@ -17,6 +17,7 @@ class CompletedProviderBootTests(unittest.TestCase):
         self.actor.contract = {'source_roles':{'origin_kind':'independently-enrolled-historical-bootstrap-origin'}}
         self.actor.root = Path('/nonexistent/modeled-completed-scope')
         self.calls = []
+        self.protocols = '[2,2,2]'
         self.actor.guard = lambda: self.calls.append('guard')
         self.actor.event = lambda *a,**k: self.calls.append('ready')
         self.actor.native = lambda: self.calls.append('schema') or 160
@@ -24,6 +25,8 @@ class CompletedProviderBootTests(unittest.TestCase):
                      for role in ('native:db','native:auth','native:rest','native:storage','native:gateway')}
         self.actor.completed_provider_rows = lambda: self.rows
         def command(args):
+            if args[:2]==['docker','exec']:
+                self.calls.append('protocols');return self.protocols
             self.calls.append(tuple(args)); self.rows[args[-1]]['State']['Running'] = True
         self.actor.runtime = SimpleNamespace(command=command,budget=lambda _:1)
         self.enterContext(patch.object(boot,'verification_window',lambda *_:nullcontext()))
@@ -52,6 +55,14 @@ class CompletedProviderBootTests(unittest.TestCase):
         self.actor.native=lambda:159
         with self.assertRaisesRegex(RuntimeError,'schema_changed'):self.actor.resume_completed_providers()
         self.assertEqual([c[-1] for c in self.calls if isinstance(c,tuple)],['native:db'])
+
+    def test_missing_or_incompatible_protocols_never_start_other_providers(self):
+        for value in ('[2,2,0]', '[2,1,2]', '[]', '{}'):
+            self.protocols=value
+            for row in self.rows.values():row['State']['Running']=False
+            self.calls.clear()
+            with self.subTest(protocols=value),self.assertRaises(RuntimeError):self.actor.resume_completed_providers()
+            self.assertEqual([c[-1] for c in self.calls if isinstance(c,tuple)],['native:db'])
 
     def test_unknown_commit_never_starts_provider(self):
         self.boundary.side_effect=RuntimeError('uncertain_commit')
