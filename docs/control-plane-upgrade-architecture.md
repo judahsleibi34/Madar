@@ -3350,3 +3350,25 @@ project-mismatch boundary using a bounded network-none fixture, root pre-start
 identity guard and real User=madar transient service. It checks exact-ID startup,
 private HTTP readiness, exact-ID stop and owned retirement. It is component
 evidence, not preserved-upgrade or production authorization.
+
+## Finite canonical interruption acceptance
+
+Gate A fault acceptance uses four observed maintenance-controller boundaries:
+pre-migration backup before intent/SQL, target backup after independently
+verified canonical commits, accepted-worker startup after the child ownership
+transfer, and service adoption after ingress but before final completion.
+The same run must bind source, operation, process identity and database history.
+The bounded staging helper pins a process with pidfd, observes its stopped state,
+rechecks the durable boundary and only then interrupts that exact owned session.
+A missed/changed boundary refuses and resumes the stopped session; no arbitrary
+sleep selects a migration boundary. Private durable intent precedes signals.
+Native harmless-process tests establish targeting only, not upgrade safety.
+
+Historical maintenance recovery remains distinct from legacy READ_ONLY bridge
+resumption. Current boot requires genuine NORMAL completion before restoring
+historical providers; incomplete states fence. Existing SQL-only forward repair
+requires service_migrate_pending and a READ_ONLY runtime and is not proof of
+maintenance-first parent_migration_pending recovery. Full fault acceptance must
+exercise independently authorized recovery rather than label fencing as healthy
+availability or replay a consumed release approval. Accepted success receipts
+remain immutable and source-specific while this recovery coverage is completed.
