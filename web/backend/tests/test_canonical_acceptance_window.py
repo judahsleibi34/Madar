@@ -1,8 +1,10 @@
 import importlib.util
+import os
 from pathlib import Path
 import unittest
 
-path = Path(__file__).resolve().parents[2]/'staging/integration/canonical_acceptance_window.py'
+root = Path(os.getenv('MADAR_TEST_REPOSITORY_ROOT') or Path(__file__).resolve().parents[2])
+path = root/'staging/integration/canonical_acceptance_window.py'
 spec = importlib.util.spec_from_file_location('canonical_acceptance_window', path)
 window = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(window)
