@@ -33,6 +33,27 @@ def phases(fault_boundary=None):
     return ((PHASES[0][0],PHASES[0][1]+extra),*PHASES[1:])
 
 
+RECOVERY_PREPARATION_RESERVE = 1800
+
+
+def fresh_recovery_expiry(*, now, origin_deadline, supervisor_deadline, fault_boundary=None):
+    """Budget NEW evidence before backup effects, never extend an existing receipt.
+
+    The independently observed origin and original supervisor bound every value.
+    F04 includes restoration/package preparation plus the full execution/recovery
+    window. Routine callers retain their existing ninety-minute upper bound.
+    """
+    phases(fault_boundary)  # Reject unknown actions before any evidence is made.
+    if any(type(v) is not int for v in (now,origin_deadline,supervisor_deadline)):
+        raise RuntimeError('canonical_fresh_recovery_clock_invalid')
+    deadline=min(origin_deadline,supervisor_deadline,now+(10800 if fault_boundary else 5400))
+    needed=(sum(budget for _,budget in phases(fault_boundary))+WINDOW_OVERHEAD+
+            RETIREMENT_RESERVE+RECOVERY_PREPARATION_RESERVE) if fault_boundary else 1
+    if deadline-now<needed:
+        raise RuntimeError('canonical_fresh_recovery_preparation_window_insufficient')
+    return deadline
+
+
 def protected_execution_timeout(*, started, now):
     """Reserve the actual remaining remote window before consuming approval.
 

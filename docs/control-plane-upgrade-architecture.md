@@ -3438,3 +3438,13 @@ that match both the immutable plan and the original durable interlock. It does
 not recapture stopped timers as their original state. The approved observation
 also binds the interlock bytes. Recovery failures retain the existing admitted
 operation's durable failure diagnostics and maintenance compensation.
+
+The first installed F04 attempt refused before approval because the old fresh
+physical-restoration producer capped evidence at5400 seconds, below the5940
+seconds reserved for F04 acceptance alone. New evidence now derives its expiry
+from the unchanged supervisor and independently observed origin deadlines,
+with an additional1800-second preparation reserve and a10800-second maximum.
+The source-controlled historical backup producer checks this before fencing or
+backup effects. Existing packets are never extended or rebound. Routine
+ninety-minute evidence retains its existing upper bound. A short remaining
+lifetime requires retirement and genuinely new scoped evidence.

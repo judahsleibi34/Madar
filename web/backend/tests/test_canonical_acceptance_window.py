@@ -57,6 +57,41 @@ class AcceptanceWindowTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'fault_scope_unsupported'):
             window.phases('arbitrary-resumption')
 
+    def test_fresh_fault_evidence_covers_preparation_and_full_window(self):
+        expiry=window.fresh_recovery_expiry(now=1000,origin_deadline=11000,
+            supervisor_deadline=10000,fault_boundary='ingress_finalization')
+        self.assertEqual(expiry,10000)
+        value=window.require_window({'kind':'isolated-canonical-controller-acceptance',
+            'created_at':2800,'expires_at':expiry},now=2800,supervisor_deadline=10000,
+            fault_boundary='ingress_finalization')
+        self.assertGreaterEqual(value['remaining_seconds'],value['required_seconds'])
+        for origin,supervisor in ((6400,12000),(12000,6400),(12000,8739)):
+            with self.subTest(origin=origin,supervisor=supervisor),self.assertRaisesRegex(RuntimeError,'preparation_window_insufficient'):
+                window.fresh_recovery_expiry(now=1000,origin_deadline=origin,
+                    supervisor_deadline=supervisor,fault_boundary='ingress_finalization')
+        self.assertEqual(window.fresh_recovery_expiry(now=1000,origin_deadline=20000,
+            supervisor_deadline=20000),6400)
+        self.assertEqual(window.fresh_recovery_expiry(now=1000,origin_deadline=20000,
+            supervisor_deadline=20000,fault_boundary='ingress_finalization'),11800)
+
+    def test_real_backup_producer_refuses_short_window_before_fencing(self):
+        import json,runpy,tempfile,time,types,sys
+        from unittest.mock import patch,Mock
+        from datetime import datetime,timezone
+        now=int(time.time())
+        with tempfile.TemporaryDirectory() as tmp:
+            rpc=types.ModuleType('automatic_rpc');rpc.ROOT=Path(tmp);rpc.EVIDENCE=Path(tmp)
+            rpc.GUEST={'guest_uuid':'owned-synthetic-test'};rpc.SSH=[]
+            rpc.MANIFEST={'created_at':datetime.fromtimestamp(now,timezone.utc).isoformat(),
+                'max_lifetime_seconds':10800,'fault_boundary':'ingress_finalization'}
+            rpc.call=Mock(return_value=json.dumps({'source':'a'*40,'slot':'blue','origin_expires_at':now+5400}))
+            with patch.dict(sys.modules,{'automatic_rpc':rpc,'canonical_acceptance_window':window}):
+                with self.assertRaisesRegex(RuntimeError,'preparation_window_insufficient'):
+                    runpy.run_path(str(root/'staging/integration/prepare-historical-offhost-backup.py'))
+            self.assertEqual(rpc.call.call_count,1)
+            self.assertEqual(rpc.call.call_args.kwargs['name'],'offhost-source-known-good')
+            self.assertEqual(list(Path(tmp).iterdir()),[])
+
     def test_nested_execution_budget_covers_observed1600_second_kill(self):
         timeout = window.protected_execution_timeout(started=1000, now=1300)
         self.assertEqual(timeout, 2140)
