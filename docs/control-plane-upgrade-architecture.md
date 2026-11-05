@@ -3321,3 +3321,7 @@ local remaining time by the signed admission expiry, preserving60 seconds for
 final observation; less than2100 seconds refuses before consumption. Approval
 issuance/consumption still has its separate300-second validity and controller
 revalidation. A longer process timeout does not extend signed execution rights.
+
+The child adapter preserves stdout and stderr separately in exclusive private
+files. Diagnostic output cannot corrupt the controller's JSON completion stream;
+retaining diagnostics must not introduce a post-effect response-parsing failure.

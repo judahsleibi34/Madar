@@ -55,9 +55,10 @@ def bounded_child(argv, *, timeout, log, input=None):
         raise RuntimeError('canonical_child_budget_invalid')
     log = Path(log)
     fd = os.open(log, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-    with os.fdopen(fd, 'wb') as output:
+    with os.fdopen(fd, 'wb') as output, os.fdopen(os.open(str(log)+'.stderr',
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600), 'wb') as errors:
         child = subprocess.Popen(argv, stdin=subprocess.PIPE if input is not None else subprocess.DEVNULL,
-                                 stdout=output, stderr=subprocess.STDOUT, start_new_session=True)
+                                 stdout=output, stderr=errors, start_new_session=True)
         try:
             child.communicate(input=input, timeout=timeout)
         except BaseException:
@@ -72,7 +73,7 @@ def bounded_child(argv, *, timeout, log, input=None):
             output.flush(); os.fsync(output.fileno())
             raise
         output.flush(); os.fsync(output.fileno())
-    return subprocess.CompletedProcess(argv, child.returncode, log.read_bytes(), b'')
+    return subprocess.CompletedProcess(argv, child.returncode, log.read_bytes(), Path(str(log)+'.stderr').read_bytes())
 
 
 def execute_protected_child(argv, *, started, expires_at, log, input=None, clock=time.monotonic, wall_clock=time.time):

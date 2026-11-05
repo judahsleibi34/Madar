@@ -87,9 +87,10 @@ class NativeChildAdapterTests(unittest.TestCase):
         import tempfile, sys, json
         with tempfile.TemporaryDirectory() as directory:
             log=Path(directory)/'execution.log'
-            argv=[sys.executable,'-c','import os,json; print(json.dumps({"uid":os.getuid(),"gid":os.getgid()}))']
+            argv=[sys.executable,'-c','import os,json,sys; print("diagnostic",file=sys.stderr); print(json.dumps({"uid":os.getuid(),"gid":os.getgid()}))']
             result=window.execute_protected_child(argv,started=0,clock=lambda:1,expires_at=3000,wall_clock=lambda:1,log=log)
             self.assertEqual(result.returncode,0)
+            self.assertEqual(result.stderr,b'diagnostic\n')
             self.assertEqual(json.loads(result.stdout),{'uid':os.getuid(),'gid':os.getgid()})
             self.assertEqual(log.stat().st_mode & 0o777,0o600)
             with self.assertRaises(FileExistsError):
