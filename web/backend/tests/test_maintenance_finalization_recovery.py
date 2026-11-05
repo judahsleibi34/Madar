@@ -18,6 +18,16 @@ class MaintenanceRecoveryTests(unittest.TestCase):
     def setUp(self):
         self.f=Fixture();self.f.setUp();self.addCleanup(self.f.doCleanups)
         f=self.f;f.p['version']=3;f.p['recovery_actions']=[recovery.ACTION]
+        actual_policy=recovery.policy
+        def measured_policy(system):
+            from deployment.lib import automatic_release_admission as admission
+            f.driver.observe_maintenance_environment=Mock(return_value={
+                'realm_id':'test','database_system_identifier':f.p['database_system_identifier']})
+            with patch.object(admission,'execution_policy_configuration',return_value={
+                    'environment_id':'isolated-test','denied_database_identifiers':['999']}), \
+                    patch.object(approval,'_policy_material',return_value=(copy.deepcopy(f.p),f.key)):
+                return actual_policy(system)
+        self.enterContext(patch.object(recovery,'policy',side_effect=measured_policy))
         f.driver.observe_maintenance_finalization=Mock(return_value={'phase':'service_adopt_completed','schema':160,'data':'measured','stale_credentials':{'root':None,'issuer':None}})
         self.enterContext(patch.object(recovery,'protected',lambda p,**kw:Path(p)))
         self.enterContext(patch.object(approval,'root',return_value=f.root))
@@ -193,3 +203,44 @@ class MaintenanceRecoveryTests(unittest.TestCase):
                      {'completed_normal_contract':{},'recovery':True}):
             with self.subTest(args=args),self.assertRaisesRegex(RuntimeError,'finalization_only'):
                 s.write_authorization('a'*40,**args)
+
+
+class RecoveryPolicyBoundaryTests(unittest.TestCase):
+    """Exercise real policy dispatch; fixture observations are not runtime PASS."""
+    def test_recovery_uses_installed_post_transition_observer_not_origin_scope(self):
+        from deployment.lib import automatic_release_admission as admission
+        driver=Mock();driver.observe_maintenance_environment.return_value={
+            'realm_id':'fresh','database_system_identifier':'123'}
+        p={'version':3,'recovery_actions':[recovery.ACTION]}
+        with patch.object(admission,'execution_policy_configuration',return_value={
+                'environment_id':'isolated-fresh','denied_database_identifiers':['999']}), \
+                patch.object(approval,'canonical_driver',return_value=driver), \
+                patch.object(approval,'_policy_material',return_value=(p,b'separate-key')) as material, \
+                patch.object(approval,'policy',side_effect=AssertionError('obsolete origin observer')):
+            self.assertEqual(recovery.policy(object()),(p,b'separate-key'))
+            driver.observe_maintenance_environment.assert_called_once_with()
+            self.assertEqual(material.call_args.args[1],'123')
+            for replacement in ({'realm_id':'foreign','database_system_identifier':'123'},
+                                {'realm_id':'fresh','database_system_identifier':'999'}):
+                driver.observe_maintenance_environment.return_value=replacement
+                with self.assertRaisesRegex(RuntimeError,'environment_changed'):recovery.policy(object())
+            driver.observe_maintenance_environment.side_effect=RuntimeError('substituted_actor')
+            with self.assertRaisesRegex(RuntimeError,'substituted_actor'):recovery.policy(object())
+
+    def test_decision_dispatch_requires_live_policy_and_unchanged_audit_key(self):
+        p={'policy':'exact'};key=b'independent-key'
+        with patch.object(approval,'audit_policy',return_value=(p,key)), \
+                patch.object(recovery,'policy',return_value=(p,key)) as current, \
+                patch.object(approval,'policy',return_value=(p,key)) as ordinary:
+            self.assertEqual(approval.decision_policy(object(),{'admission':{'kind':recovery.KIND}}),(p,key))
+            current.assert_called_once();ordinary.assert_not_called()
+            approval.decision_policy(object(),{'admission':{'kind':approval.CANONICAL_KIND}})
+            ordinary.assert_called_once()
+            current.return_value=(p,b'changed')
+            with self.assertRaisesRegex(RuntimeError,'policy_changed'):
+                approval.decision_policy(object(),{'admission':{'kind':recovery.KIND}})
+
+    def test_environment_requires_reconciled_profile_before_observation(self):
+        from deployment.lib.completed_normal_execution import CompletedNormalUpgrade
+        driver=CompletedNormalUpgrade.__new__(CompletedNormalUpgrade);driver.profile=None
+        with self.assertRaisesRegex(RuntimeError,'profile_invalid'):driver.observe_maintenance_environment()

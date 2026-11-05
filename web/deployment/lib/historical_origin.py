@@ -296,13 +296,17 @@ def boot_controls(system):
         **({'network_barriers':barriers} if barriers else {})}
 
 
-def policy(system):
+def policy(system, *, recovery=False):
     """Independent root inputs only; a candidate cannot select the trust root."""
     from .automatic_release_admission import execution_policy_configuration
     from .isolated_release_environment import observe
     from .exceptional_release_approval import KEY
     from .control_plane_upgrade_authorization import RELEASE_OPERATOR_KEY
-    execution=execution_policy_configuration(system);environment=observe()
+    execution=execution_policy_configuration(system)
+    if recovery:
+        from .exceptional_release_approval import canonical_driver
+        environment=canonical_driver(system).observe_maintenance_environment()
+    else:environment=observe()
     p=strict_json(protected(POLICY,private=True).read_bytes())
     fields={'version','kind','environment_id','database_system_identifier','controller_sha',
             'source_sha','source_tree_sha','images','observation_sha256','approval_key_sha256',

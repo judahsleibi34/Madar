@@ -54,7 +54,13 @@ def owner_live(owner):
 
 
 def policy(system):
-    p,key=approvals.policy(system)
+    from .automatic_release_admission import execution_policy_configuration
+    execution=execution_policy_configuration(system)
+    environment=approvals.canonical_driver(system).observe_maintenance_environment()
+    if (execution['environment_id']!='isolated-'+environment['realm_id']
+            or environment['database_system_identifier'] in execution['denied_database_identifiers']):
+        raise RuntimeError('maintenance_recovery_environment_changed')
+    p,key=approvals._policy_material(execution,environment['database_system_identifier'])
     if p['version']!=3 or p['recovery_actions']!=[ACTION]:
         raise RuntimeError('maintenance_recovery_not_independently_enrolled')
     return p,key
@@ -94,7 +100,7 @@ def observe(system,parent_id,request_id,*,created_at=None,expires_at=None):
         from .schema160_release import isolated_registration
         from .historical_origin import policy as origin_policy
         from .automatic_release_admission import PHYSICAL_RECOVERY
-        registration=isolated_registration(driver.contract);origin,_,_=origin_policy(system)
+        registration=isolated_registration(driver.contract);origin,_,_=origin_policy(system, recovery=True)
         trust=strict_json(protected(PHYSICAL_RECOVERY/(p['physical_recovery_receipt_sha256']+'.json'),private=True).read_bytes())
         now=int(time.time());start=now if created_at is None else created_at
         cap=min(start+min(1800,p['execution_max_seconds']),registration['expires_at'],origin['expires_at'],trust['expires_at'])

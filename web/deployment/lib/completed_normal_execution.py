@@ -739,6 +739,50 @@ class CompletedNormalUpgrade:
         self.provider_adapter=provider
         return provider,ProviderMaintenance150(binding,ProtectedProviderJournal(self.root/'provider-journal'),provider)
 
+    def observe_maintenance_environment(self):
+        """Observe the sealed post-handoff actors, not the obsolete origin set.
+
+        This is observation only. Parent signatures, fresh approval, consumption
+        and both locks remain mandatory in the recovery adapter.
+        """
+        from .isolated_release_environment import observe_host,observe_effect_fence,verify_host_interfaces
+        from .schema150_actor_inventory import bind_staged_candidates,attest_containers
+        from .completed_normal_profile import RECONCILED
+        if self.profile is not RECONCILED:
+            raise RuntimeError('maintenance_recovery_profile_invalid')
+        self.actor.guard()
+        environment=observe_host();interface=observe_effect_fence(execution=True)
+        if (environment['version']!=2
+                or environment['database_container_id']!=self.contract['database']['container_id']
+                or environment['database_system_identifier']!=self.contract['database']['system_identifier']):
+            raise RuntimeError('maintenance_recovery_environment_changed')
+        provider,_=self.maintenance_recovery_components()
+        if provider._database_identity()!=self.profile.target:
+            raise RuntimeError('maintenance_recovery_committed_target_required')
+        stage=json.loads(protected(self.root/'candidate-staged-runtime.json',private=True).read_bytes())
+        interlock=json.loads(protected(self.ops.interlock_file,private=False).read_bytes())
+        # The original root issuer bound this stage before handing off writers.
+        # No stale bearer credential is loaded or reused for this observation.
+        if (digest(stage)!=interlock.get('candidate_stage_sha256')
+                or stage.get('context_sha256')!=digest(self.contract)
+                or stage.get('source_sha')!=self.contract['candidate']['source_sha']
+                or stage.get('images')!=self.contract['candidate']['images']):
+            raise RuntimeError('maintenance_recovery_candidate_changed')
+        rows=provider._rows()
+        inventory=bind_staged_candidates(provider.original_inventory,provider.binding,stage,rows,phase='active')
+        attest_containers(inventory,rows,phase='active',binding=provider.binding)
+        # Exact runtime network IDs come from the authenticated original and
+        # root-sealed candidate. Reobserve their driver and host interfaces too.
+        ids={v['NetworkID'] for row in rows for v in row['NetworkSettings']['Networks'].values() if v['NetworkID']}
+        networks=json.loads(self.actor.runtime.command(['docker','network','inspect',*sorted(ids)]))
+        if ({n['Id'] for n in networks}!=ids or any(n.get('EnableIPv6') or
+                n.get('Driver') not in {'bridge','host'} or
+                n.get('Driver')=='host' and n.get('Name')!='host' for n in networks)):
+            raise RuntimeError('maintenance_recovery_network_changed')
+        verify_host_interfaces(interface,[n for n in networks if n['Driver']=='bridge'])
+        self.actor.guard()
+        return {**environment,'control_interface':interface}
+
     def maintenance_recovery_timer_snapshot(self):
         """Read the existing durable timer preimages; never recapture current state."""
         from .control_plane_upgrade import validate_backup_timer_states

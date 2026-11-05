@@ -3457,3 +3457,16 @@ revalidate time there. Existing consumed origins cannot be repinned. Routine
 enrollment retains its two-hour cap. This applies only before new disposable
 enrollment; signed prior policies, enrollment receipts and consumed approvals
 are never extended. The installed verifier's four-hour maximum is unchanged.
+
+Maintenance finalization recovery observes the post-handoff environment through
+its installed canonical driver. The original isolated enrollment inventory is
+still mandatory for ordinary deployment admission; it is not rewritten when
+candidate actors are added. Recovery rechecks the enrolled host and effect
+fence, actual database identity, authenticated historical provider inventory,
+root-interlock-bound candidate stage, complete active actor set and network
+identities. Independent issuer configuration and fresh recovery approval remain
+mandatory. Approval dispatch authenticates the request before choosing this
+observer, and rechecks policy after technical observation. Historical policy
+expiry is validated against the same post-transition observer for recovery only.
+This does not authorize earlier partial-SQL or handoff states, and it does not
+turn reboot fencing into recovered service availability.

@@ -449,11 +449,23 @@ def inspect(system,request_id):
             'approval':approval,'consumed':consumed,'audit':entries}
 
 
+def decision_policy(system,request):
+    """Authenticate request kind before selecting its live environment observer."""
+    p,key=audit_policy(system)
+    from .completed_normal_maintenance_recovery import KIND,policy as recovery_policy
+    current,current_key=(recovery_policy(system) if request['admission'].get('kind')==KIND else policy(system))
+    if current!=p or not hmac.compare_digest(current_key,key):
+        raise RuntimeError('exceptional_policy_changed')
+    return current,current_key
+
+
 def decide(system,request_id,action,token,confirmation):
     if action not in {'approve','reject','revoke'}:raise RuntimeError('exceptional_operator_action_invalid')
-    p,key=policy(system);operator=system.authenticate_operator(token)
+    p,key=audit_policy(system);operator=system.authenticate_operator(token)
     with journal_lock(request_id) as path:
-        request=_request(path,key);entries=history(path,key);state=entries[-1]['state'];now=int(time.time())
+        request=_request(path,key)
+        p,key=decision_policy(system,request)
+        entries=history(path,key);state=entries[-1]['state'];now=int(time.time())
         if confirmation!=digest(request):raise RuntimeError('exceptional_explicit_confirmation_required')
         if request['policy_sha256']!=digest(p):raise RuntimeError('exceptional_policy_changed')
         if request['expires_at']<=now:
@@ -472,7 +484,7 @@ def decide(system,request_id,action,token,confirmation):
             if observed!=request['admission']:raise RuntimeError('exceptional_technical_observation_changed')
             # Approval has not been issued yet. Recheck identity/policy and
             # request expiry after potentially expensive technical observation.
-            current,current_key=policy(system)
+            current,current_key=decision_policy(system,request)
             if current!=p or not hmac.compare_digest(current_key,key):raise RuntimeError('exceptional_policy_changed')
             fresh=system.authenticate_operator(token)
             if any(fresh[k]!=operator[k] for k in ('operator_auth_id','policy_sha256','session_id_sha256')):
