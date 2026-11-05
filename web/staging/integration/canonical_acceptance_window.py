@@ -75,10 +75,16 @@ def bounded_child(argv, *, timeout, log, input=None):
     return subprocess.CompletedProcess(argv, child.returncode, log.read_bytes(), b'')
 
 
-def execute_protected_child(argv, *, started, log, input=None, clock=time.monotonic):
+def execute_protected_child(argv, *, started, expires_at, log, input=None, clock=time.monotonic, wall_clock=time.time):
     """Shared actual remote adapter: check the remaining local clock, then run once."""
-    return bounded_child(argv, timeout=protected_execution_timeout(started=started, now=clock()),
-                         log=log, input=input)
+    import math
+    timeout = protected_execution_timeout(started=started, now=clock())
+    if type(expires_at) is not int:
+        raise RuntimeError('canonical_admission_expiry_invalid')
+    remaining = math.floor(expires_at - wall_clock() - REMOTE_COMPLETION_RESERVE)
+    if remaining < MIN_PROTECTED_EXECUTION_SECONDS:
+        raise RuntimeError('canonical_signed_execution_window_insufficient')
+    return bounded_child(argv, timeout=min(timeout, remaining), log=log, input=input)
 
 
 def require_window(registration, *, now, supervisor_deadline):
@@ -122,7 +128,10 @@ def main():
     from datetime import datetime
     # The existing supervisor has a fixed three-hour lifetime, never extended.
     deadline = int(datetime.fromisoformat(manifest['created_at']).timestamp()) + 10800
-    registration = json.loads((root/'canonical-operation-registration.json').read_bytes())['registration']
+    enrollment = json.loads((root/'canonical-operation-registration.json').read_bytes())
+    registration = enrollment['registration']
+    if enrollment['exact_approval_policy']['execution_max_seconds'] != REMOTE_REQUEST_TIMEOUT:
+        raise RuntimeError('canonical_fresh_execution_policy_window_invalid')
     if registration['controller_sha'] != manifest['source_current']:
         raise RuntimeError('canonical_acceptance_controller_changed')
     evidence = Path(manifest['evidence'])

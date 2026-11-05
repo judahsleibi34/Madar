@@ -3313,3 +3313,11 @@ controller boundary. The adapter runs once with exclusive private diagnostics
 and kills/reaps its owned process group on timeout, without replay or signalling
 independently managed application/systemd actors. Native harmless subprocess
 coverage establishes wrapper behavior, not migration or recovery acceptance.
+
+Fresh isolated enrollment selects the same2500-second execution-policy maximum
+from the immutable package. Existing1800-second enrollments are never rewritten
+or renewed. The wrapper reads the authenticated approval inspection and caps its
+local remaining time by the signed admission expiry, preserving60 seconds for
+final observation; less than2100 seconds refuses before consumption. Approval
+issuance/consumption still has its separate300-second validity and controller
+revalidation. A longer process timeout does not extend signed execution rights.

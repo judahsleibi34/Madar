@@ -88,12 +88,12 @@ class NativeChildAdapterTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             log=Path(directory)/'execution.log'
             argv=[sys.executable,'-c','import os,json; print(json.dumps({"uid":os.getuid(),"gid":os.getgid()}))']
-            result=window.execute_protected_child(argv,started=0,clock=lambda:1,log=log)
+            result=window.execute_protected_child(argv,started=0,clock=lambda:1,expires_at=3000,wall_clock=lambda:1,log=log)
             self.assertEqual(result.returncode,0)
             self.assertEqual(json.loads(result.stdout),{'uid':os.getuid(),'gid':os.getgid()})
             self.assertEqual(log.stat().st_mode & 0o777,0o600)
             with self.assertRaises(FileExistsError):
-                window.execute_protected_child(argv,started=0,clock=lambda:1,log=log)
+                window.execute_protected_child(argv,started=0,clock=lambda:1,expires_at=3000,wall_clock=lambda:1,log=log)
 
     def test_actual_adapter_insufficient_budget_has_no_child_effect(self):
         import tempfile,sys
@@ -101,7 +101,7 @@ class NativeChildAdapterTests(unittest.TestCase):
             effect=Path(directory)/'effect';log=Path(directory)/'log'
             with self.assertRaisesRegex(RuntimeError,'window_insufficient'):
                 window.execute_protected_child([sys.executable,'-c',f'open({str(effect)!r},"w").close()'],
-                                               started=0,clock=lambda:400,log=log)
+                                               started=0,clock=lambda:400,expires_at=3000,wall_clock=lambda:1,log=log)
             self.assertFalse(effect.exists());self.assertFalse(log.exists())
 
     def test_timeout_retains_diagnostics_and_kills_owned_descendants(self):
@@ -124,7 +124,22 @@ class NativeChildAdapterTests(unittest.TestCase):
     def test_real_request_wrapper_uses_shared_adapter_and_no1600_limit(self):
         source=(path.parent/'request-and-execute-approved-canonical-upgrade.py').read_text()
         self.assertIn('executed=execute_protected_child(',source)
-        self.assertIn('started=remote_started,log=log',source)
+        self.assertIn("expires_at=scope['request']['admission']['expires_at']",source)
         self.assertIn('timeout=REMOTE_REQUEST_TIMEOUT',source)
         self.assertNotIn('timeout=1600',source)
         self.assertEqual(window.WINDOW_TIMEOUT,3960)
+
+    def test_signed_admission_expiry_refuses_even_with_remote_time_remaining(self):
+        import tempfile,sys
+        with tempfile.TemporaryDirectory() as directory:
+            log=Path(directory)/'log'
+            for expiry in (1800,2159):
+                with self.assertRaisesRegex(RuntimeError,'signed_execution_window_insufficient'):
+                    window.execute_protected_child([sys.executable,'-c','raise AssertionError("must not launch")'],
+                        started=0,clock=lambda:0,expires_at=expiry,wall_clock=lambda:0,log=log)
+            self.assertFalse(log.exists())
+
+    def test_new_enrollment_uses_same_bounded_contract(self):
+        source=(path.parent/'enroll-frozen-canonical-operation.py').read_text()
+        self.assertIn("'execution_max_seconds':REMOTE_REQUEST_TIMEOUT",source)
+        self.assertNotIn("'execution_max_seconds':1800",source)

@@ -77,8 +77,11 @@ assert all(execution_identity[k]==identity[k] for k in ('operator_auth_id','poli
 elevated=renewed
 print(json.dumps({'execution_mfa_fresh':True,'same_approved_operator_session':True}),flush=True)
 # Actual installed/frozen protected controller owns every SQL and runtime effect.
+from deployment.lib import exceptional_release_approval as approval_api
+scope=approval_api.inspect(system,review['request_id'])
+assert scope['state']=='APPROVED' and not scope['consumed']
 log=Path('/opt/madar-test/origin146/canonical-approved-execution.log')
-executed=execute_protected_child(base+['approved-execute',*operation],input=elevated['access_token'].encode(),started=remote_started,log=log)
+executed=execute_protected_child(base+['approved-execute',*operation],input=elevated['access_token'].encode(),started=remote_started,expires_at=scope['request']['admission']['expires_at'],log=log)
 if executed.returncode:raise RuntimeError('actual_canonical_protected_execution_failed')
 completion_envelope=json.loads(executed.stdout);assert completion_envelope['operation']=='approved-execute';completion=completion_envelope['result'];assert completion['schema']==160 and completion['mode']=='NORMAL'
 root=Path('/var/lib/madar-control-plane/upgrades/completed-normal-admissions')/result['context_sha256']
