@@ -14,6 +14,17 @@ def observation(boundary):
                 schema=160 if committed else 146,committed=list(range(147,161)) if committed else [],
                 executor_status='completed' if committed else None,migration_intent=committed)
 
+def idle_child():
+    # Popen returning is not proof that exec has settled its command line.
+    # Synchronize through the child's actual executable before pinning identity.
+    child=subprocess.Popen([sys.executable,'-c','import time; print("ready",flush=True); time.sleep(60)'],
+                           start_new_session=True,stdout=subprocess.PIPE,text=True)
+    if child.stdout.readline() != 'ready\n':
+        child.kill();child.wait();raise RuntimeError('native_fixture_not_ready')
+    child.stdout.close()
+    return child
+
+
 class Boundaries(unittest.TestCase):
     def test_four_finite_boundaries(self):
         self.assertEqual(len(f.BOUNDARIES),4)
@@ -36,7 +47,7 @@ class Boundaries(unittest.TestCase):
             if child.poll() is None:os.killpg(child.pid,9);child.wait()
             child.stdout.close()
     def test_changed_boundary_resumes_exact_child_without_kill(self):
-        child=subprocess.Popen(['sleep','60'],start_new_session=True);calls=[]
+        child=idle_child();calls=[]
         def observe():
             calls.append(1)
             return observation('before_sql') if len(calls)==1 else observation('committed_sql')
@@ -47,7 +58,7 @@ class Boundaries(unittest.TestCase):
             self.assertNotEqual(Path('/proc',str(child.pid),'stat').read_text().rsplit(')',1)[1].split()[0],'T')
         finally:os.killpg(child.pid,9);child.wait()
     def test_wrong_identity_refuses_without_signal(self):
-        child=subprocess.Popen(['sleep','60'],start_new_session=True)
+        child=idle_child()
         try:
             start,argv,group=f.process_identity(child.pid)
             with self.assertRaisesRegex(RuntimeError,'identity_changed'):
@@ -55,7 +66,7 @@ class Boundaries(unittest.TestCase):
             self.assertIsNone(child.poll())
         finally:os.killpg(child.pid,9);child.wait()
     def test_missing_boundary_times_out_without_signal(self):
-        child=subprocess.Popen(['sleep','60'],start_new_session=True)
+        child=idle_child()
         try:
             with self.assertRaisesRegex(RuntimeError,'boundary_not_observed'):
                 f.interrupt_exact_process(child.pid,f.process_identity(child.pid),boundary='before_sql',observe=lambda:observation('committed_sql'),guard=lambda:None,record=lambda *a:None,timeout=.1)
@@ -63,7 +74,7 @@ class Boundaries(unittest.TestCase):
         finally:os.killpg(child.pid,9);child.wait()
 
     def test_diagnostic_failure_resumes_without_killing(self):
-        child=subprocess.Popen(['sleep','60'],start_new_session=True)
+        child=idle_child()
         def record(name,value):
             if name=='kill_intent':raise OSError('owned evidence unavailable')
         try:
