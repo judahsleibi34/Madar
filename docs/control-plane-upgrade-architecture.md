@@ -3247,3 +3247,16 @@ refusal after canonical160 private acceptance. It does not authorize continuatio
 of the consumed operation or establish full protected completion. Regression
 executes the actual pure application version-response function against both
 consumers; modeled transports remain component evidence, not operational PASS.
+
+### Disposable canonical acceptance lifetime
+
+The canonical rehearsal must reserve its full bounded execution, preserved
+business verification, target reboot and retirement budget before requesting
+single-use approval. `web/staging/integration/canonical_acceptance_window.py`
+checks the observed frozen registration and the existing three-hour supervisor
+limit, then runs the existing privileged-operation, business and reboot scripts
+consecutively. It neither authenticates nor renews authority: installed-controller
+policy and effect-boundary checks remain mandatory. An expired isolated policy
+still refuses boot. Preserve the completed operation separately from that failed
+availability test, retire its owned resources, and obtain fresh evidence in a new
+scope; never extend expired registration or replay consumed approval.
