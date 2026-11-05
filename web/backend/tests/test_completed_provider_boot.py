@@ -21,14 +21,16 @@ class CompletedProviderBootTests(unittest.TestCase):
         self.actor.guard = lambda: self.calls.append('guard')
         self.actor.event = lambda *a,**k: self.calls.append('ready')
         self.actor.native = lambda: self.calls.append('schema') or 160
-        self.rows = {role:{'Id':role, 'State':{'Running':False,'Health':{'Status':'healthy'}}}
+        self.rows = {role:{'Id':role, 'State':{'Running':False,'Health':{'Status':'healthy'}},
+                     'NetworkSettings':{'Networks':{'madar-local-supabase_default':{'IPAddress':'172.19.0.5'}}}}
                      for role in ('native:db','native:auth','native:rest','native:storage','native:gateway')}
         self.actor.completed_provider_rows = lambda: self.rows
         def command(args):
             if args[:2]==['docker','exec']:
                 self.calls.append('protocols');return self.protocols
             self.calls.append(tuple(args)); self.rows[args[-1]]['State']['Running'] = True
-        self.actor.runtime = SimpleNamespace(command=command,budget=lambda _:1)
+        self.actor.runtime = SimpleNamespace(command=command,budget=lambda _:1,
+            http_status=lambda url:self.calls.append('http:'+url))
         self.enterContext(patch.object(boot,'verification_window',lambda *_:nullcontext()))
         self.enterContext(patch.object(boot,'runtime_mutation_lock',lambda *_:nullcontext()))
         self.completion = self.enterContext(patch.object(database,'require_manual_normal_completion',side_effect=lambda *_:self.calls.append('completion')))
@@ -82,6 +84,13 @@ class CompletedProviderBootTests(unittest.TestCase):
     def test_ordinary_origin_unchanged(self):
         self.actor.profile=LEGACY;self.actor.resume_completed_providers();self.assertEqual(self.calls,[])
 
+    def test_actual_native_roles_without_docker_healthchecks_can_converge(self):
+        for role in ('native:rest','native:storage','native:gateway'):
+            self.rows[role]['State'].pop('Health')
+        self.actor.resume_completed_providers()
+        self.assertEqual(sum(c.startswith('http:') for c in self.calls if isinstance(c,str)),6)
+        self.assertEqual(self.calls[-1],'ready')
+
     def test_private_gateway_before_backend_and_consumers(self):
         actor=CompatibleNormalBoot.__new__(CompatibleNormalBoot);calls=[]
         actor.source_guard=lambda:None
@@ -90,6 +99,47 @@ class CompletedProviderBootTests(unittest.TestCase):
         actor._start(rows)
         self.assertLess(calls.index('provider-gateway'),calls.index('backend'))
         self.assertLess(calls.index('provider-gateway'),calls.index('notification-worker'))
+
+
+class CompletedProviderReadinessTests(unittest.TestCase):
+    def setUp(self):
+        self.urls=[]
+        self.runtime=SimpleNamespace(http_status=self.urls.append)
+        self.row={'State':{'Running':True},'NetworkSettings':{'Networks':{
+            'madar-local-supabase_default':{'IPAddress':'172.19.0.8'}}}}
+
+    def test_gateway_requires_all_three_fixed_routes(self):
+        self.assertTrue(boot.completed_provider_ready(self.runtime,'native:gateway',self.row))
+        self.assertEqual(self.urls,[f'http://172.19.0.8:8000{path}' for path in
+            ('/auth/v1/health','/rest/v1/','/storage/v1/status')])
+
+    def test_unready_transport_retries_but_redirect_or_denial_refuses(self):
+        for error, transient in ((boot.AvailabilityFailure('pending'),True),(RuntimeError('http_unavailable'),False)):
+            self.runtime.http_status=lambda url:(_ for _ in ()).throw(error)
+            if transient:self.assertFalse(boot.completed_provider_ready(self.runtime,'native:storage',self.row))
+            else:
+                with self.assertRaisesRegex(RuntimeError,'http_unavailable'):
+                    boot.completed_provider_ready(self.runtime,'native:storage',self.row)
+
+    def test_database_and_auth_still_require_real_docker_health(self):
+        for role in ('native:db','native:auth'):
+            with self.assertRaisesRegex(RuntimeError,'health_contract_changed'):
+                boot.completed_provider_ready(self.runtime,role,self.row)
+        self.row['State']['Health']={'Status':'starting'}
+        self.assertFalse(boot.completed_provider_ready(self.runtime,'native:rest',self.row))
+        self.assertEqual(self.urls,[])
+
+    def test_stopped_foreign_network_and_unknown_role_do_not_probe(self):
+        self.row['State']['Running']=False
+        self.assertFalse(boot.completed_provider_ready(self.runtime,'native:storage',self.row))
+        self.row['State']['Running']=True
+        for address in ('8.8.8.8','127.0.0.1','::1','169.254.169.254',''):
+            self.row['NetworkSettings']['Networks']['madar-local-supabase_default']['IPAddress']=address
+            with self.subTest(address=address),self.assertRaisesRegex(RuntimeError,'probe_network_invalid'):
+                boot.completed_provider_ready(self.runtime,'native:storage',self.row)
+        with self.assertRaisesRegex(RuntimeError,'role_invalid'):
+            boot.completed_provider_ready(self.runtime,'unknown',self.row)
+        self.assertEqual(self.urls,[])
 
 
 class CompletedProviderInventoryTests(unittest.TestCase):

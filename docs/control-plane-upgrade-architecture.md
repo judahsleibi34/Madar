@@ -3277,3 +3277,14 @@ The cold database boundary also observes delivery, outbox and deletion protocols
 through read-only SQL and requires the existing exact target protocol contract
 before starting the remaining providers. A matching schema number alone is not
 sufficient; missing, malformed or incompatible capabilities remain fenced.
+
+Readiness follows the preserved provider's actual contract. PostgreSQL and Auth
+retain their required Docker health observations. REST, storage and the native
+gateway may have no Docker healthcheck; after exact inventory/network validation,
+the actor probes their fixed private HTTP interfaces instead. REST must answer
+its root endpoint, storage its status endpoint, and the gateway all three fixed
+Auth/REST/storage routes. Freshly observed RFC1918 addresses on the enrolled
+native bridge are required; no caller URL, credential, redirect or ambient proxy
+is accepted. Temporary transport failures retry only within the existing boot
+deadline. A running container alone never establishes readiness. These probes
+do not replace final authenticated application and worker acceptance.

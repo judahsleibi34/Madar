@@ -32,6 +32,48 @@ HISTORICAL_CONFIGURATIONS={key:CONFIGURATIONS[key] for key in
 HISTORICAL_CONFIGURATIONS['database_transport']=(Path('/etc/madar/automatic-database.dsn'),True)
 
 
+def completed_provider_ready(runtime, role, row):
+    """Read readiness only after the caller authenticates the live Docker row.
+
+    REST, storage and Envoy have no Docker healthcheck in the preserved origin.
+    Never confuse their running state with readiness or invent a healthcheck.
+    Fixed credential-free probes use the freshly observed enrolled bridge IP.
+    """
+    from ipaddress import IPv4Address, IPv4Network
+    from deployment.lib.schema150_actor_inventory import DEFAULT_NETWORK
+    endpoints = {
+        'native:auth': (9999, ('/health',)),
+        'native:rest': (3000, ('/',)),
+        'native:storage': (5000, ('/status',)),
+        'native:gateway': (8000, ('/auth/v1/health', '/rest/v1/', '/storage/v1/status')),
+    }
+    if role not in {'native:db', *endpoints}:
+        raise RuntimeError('completed_boot_provider_role_invalid')
+    if not row['State']['Running']:
+        return False
+    health = row['State'].get('Health')
+    if role in {'native:db', 'native:auth'} and not isinstance(health, dict):
+        raise RuntimeError('completed_boot_provider_health_contract_changed')
+    if health is not None and (not isinstance(health, dict) or health.get('Status') != 'healthy'):
+        return False
+    if role == 'native:db':
+        return True
+    try:
+        address = IPv4Address(row['NetworkSettings']['Networks'][DEFAULT_NETWORK]['IPAddress'])
+        if not any(address in IPv4Network(cidr) for cidr in
+                   ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16')):
+            raise ValueError()
+    except (KeyError, ValueError, TypeError):
+        raise RuntimeError('completed_boot_provider_probe_network_invalid') from None
+    port, paths = endpoints[role]
+    try:
+        for path in paths:
+            runtime.http_status(f'http://{address}:{port}{path}')
+    except AvailabilityFailure:
+        return False
+    return True
+
+
 def configuration_names(document):
     """Input shape only; authentic observations are required below."""
     contract=document.get('admission_contract',{})
@@ -407,7 +449,7 @@ class CompletedNormalBootActor:
                     while True:
                         self.runtime.budget(1)
                         current=self.completed_provider_rows()[role]
-                        if current['State']['Running'] and current['State'].get('Health',{}).get('Status')=='healthy':break
+                        if completed_provider_ready(self.runtime,role,current):break
                         __import__('time').sleep(self.runtime.budget(1))
                     if role=='native:db':
                         schema=self.native()
