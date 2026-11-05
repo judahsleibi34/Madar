@@ -10,8 +10,7 @@ import os
 from pathlib import Path
 import sys
 import time
-
-from canonical_fault_matrix import BOUNDARIES, interrupt_exact_process, process_identity
+import importlib.util
 
 PLAN = Path('/opt/madar-test/origin146/fault-plan.json')
 
@@ -39,9 +38,22 @@ def main():
         raise RuntimeError('canonical_fault_plan_not_frozen')
     raw = path.read_bytes(); plan = json.loads(raw)
     fields = {'version','boundary','request_id','request_sha256','context_sha256',
-              'controller_sha','guest_uuid','operation_id','expires_at'}
-    if (set(plan) != fields or plan['version'] != 1 or plan['boundary'] not in BOUNDARIES
+              'controller_sha','guest_uuid','operation_id','expires_at',
+              'adapter_sha256','helper_sha256'}
+    if (set(plan) != fields or plan['version'] != 1
             or type(plan['expires_at']) is not int or not time.time() < plan['expires_at'] <= time.time()+900):
+        raise RuntimeError('canonical_fault_plan_scope_invalid')
+    # Isolated Python omits the script directory from sys.path. Load only the
+    # exact root-protected helper independently pinned in this frozen plan.
+    adapter = protected(Path(__file__), private=False)
+    helper = protected(adapter.with_name('canonical_fault_matrix.py'), private=False)
+    if (hashlib.sha256(adapter.read_bytes()).hexdigest() != plan['adapter_sha256']
+            or hashlib.sha256(helper.read_bytes()).hexdigest() != plan['helper_sha256']):
+        raise RuntimeError('canonical_fault_runner_changed')
+    spec = importlib.util.spec_from_file_location('canonical_fault_matrix', helper)
+    fault = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fault)
+    if plan['boundary'] not in fault.BOUNDARIES:
         raise RuntimeError('canonical_fault_plan_scope_invalid')
     system = SystemOperations()
     _, key = approval.audit_policy(system)
@@ -118,7 +130,7 @@ def main():
             'context_sha256':plan['context_sha256'],'operation_id':plan['operation_id'],
             'at':int(time.time()),'observation':value}, exclusive=True)
     try:
-        result = interrupt_exact_process(pid, expected, boundary=plan['boundary'], observe=observe,
+        result = fault.interrupt_exact_process(pid, expected, boundary=plan['boundary'], observe=observe,
             guard=guard, record=record, timeout=min(900,plan['expires_at']-time.time()))
         print(json.dumps({'fault_injected':True,'boundary':plan['boundary'],'observation':result,
                           'recovery_authority_issued':False,'completion_claimed':False}))

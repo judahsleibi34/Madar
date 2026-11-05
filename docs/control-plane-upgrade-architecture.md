@@ -3379,3 +3379,7 @@ an expired observation cannot authorize a late signal. If expiry occurs after
 stopping, the pinned live session is resumed without killing it. Native tests
 exercise slow observation and both intent-write boundaries. These constraints
 govern fault injection only and grant no recovery or deployment authority.
+The root-controlled fault plan also pins the adapter and helper file digests.
+Under isolated Python, the adapter explicitly loads that root-protected helper;
+ambient module lookup cannot substitute it. This plan is test targeting policy,
+not an approval or a continuation grant.

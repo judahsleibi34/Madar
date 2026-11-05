@@ -106,6 +106,6 @@ class Boundaries(unittest.TestCase):
     def test_real_adapter_refuses_nonroot_without_reading_policy(self):
         if os.geteuid()==0:self.skipTest('requires actual nonroot execution user')
         adapter=Path(f.__file__).with_name('canonical_fault_adapter.py')
-        result=subprocess.run([sys.executable,'-B',str(adapter),'--plan','/tmp/untrusted.json'],capture_output=True,timeout=5)
+        result=subprocess.run([sys.executable,'-I','-B',str(adapter),'--plan','/tmp/untrusted.json'],capture_output=True,timeout=5)
         self.assertNotEqual(result.returncode,0)
         self.assertIn(b'canonical_fault_root_required',result.stderr)
