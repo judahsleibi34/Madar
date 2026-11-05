@@ -797,10 +797,17 @@ class CompletedNormalUpgrade:
         stopped_originals(self.contract,self.actor.runtime,original_runtime(self.contract))
         actual={r['Id']:r for r in rows.values()}
         from .completed_normal_resources import measured_spec_matches
-        for record in staged['runtimes'].values():
+        for role,record in staged['runtimes'].items():
             row=actual[record['id']]
+            # Match the existing staged-candidate observer's narrowly defined
+            # Docker start normalization, including non-worker created actors.
+            started=staged.get('preparation_mode')=='created-fenced' or role.endswith('-worker')
             if (row['State']['Running'] is not True or row['State']['Restarting'] is not False
-                    or row['Image']!=record['image'] or not measured_spec_matches(row,record['spec_sha256'])):
+                    or row['Image']!=record['image']
+                    or not measured_spec_matches(row,record['spec_sha256'],started_worker=started)
+                    or {k:v['NetworkID'] for k,v in row['NetworkSettings']['Networks'].items()}!=record['networks']
+                    or {k:sorted(v.get('Aliases') or []) for k,v in row['NetworkSettings']['Networks'].items()}
+                        !={k:sorted(v) for k,v in record['network_aliases'].items()}):
                 raise RuntimeError('maintenance_recovery_candidate_not_running_exactly')
         actors={r['Id']:{'image':r['Image'],'configuration_sha256':digest(r['Config']),
             'host_sha256':digest(r['HostConfig']),'running':r['State']['Running'],
