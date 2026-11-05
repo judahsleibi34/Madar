@@ -946,7 +946,7 @@ class Schema150ProviderAdapter:
             if (version.get('release_sha')!=self.binding['source_sha'] or version.get('release_slot')!=slot
                     or version.get('schema_compatible_min')!=self.binding['source_schema']
                     or version.get('schema_compatible_max')!=self.binding['target_schema']
-                    or version.get('schema_excluded_versions')!=[]
+                    or version.get('schema_excluded_versions',[])!=[]
                     or self.runtime.json_http(base+'/health/recovery')!=
                         {'restricted':not normal,'business_writes_enabled':normal}):
                 raise RuntimeError('schema150_private_handoff_serving_identity_changed')
@@ -1113,7 +1113,7 @@ class Schema150ProviderAdapter:
                     or identity.get('release_slot')!=self.contract['candidate']['slot']
                     or identity.get('schema_compatible_min')!=self.binding['source_schema']
                     or identity.get('schema_compatible_max')!=self.binding['target_schema']
-                    or identity.get('schema_excluded_versions')!=[] or ready.get('ready') is not True
+                    or identity.get('schema_excluded_versions',[])!=[] or ready.get('ready') is not True
                     or self.runtime.json_http(base+'/health/recovery')!=
                         {'restricted':False,'business_writes_enabled':True}):
                 raise RuntimeError('schema150_provider_public_target_not_accepted')

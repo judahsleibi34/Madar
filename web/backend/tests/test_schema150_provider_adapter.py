@@ -130,6 +130,56 @@ class ConcreteAdapterTests(unittest.TestCase):
                 actor.runtime.command.assert_not_called()
                 self.assertFalse((actor.root/'normal-publication.json').exists())
 
+    def application_version_response(self, actor):
+        """Execute the actual pure application response producer; no HTTP fixture PASS."""
+        import ast, os
+        path=Path(__file__).resolve().parents[1]/'routes/health_routes.py'
+        tree=ast.parse(path.read_text())
+        function=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='version')
+        function.decorator_list=[]
+        namespace={'os':os}
+        with patch.dict(os.environ,{'MADAR_RELEASE_SHA':actor.binding['source_sha'],
+                'MADAR_RELEASE_SLOT':actor.contract['candidate']['slot'],
+                'SCHEMA_COMPATIBLE_MIN':str(actor.binding['source_schema']),
+                'SCHEMA_COMPATIBLE_MAX':str(actor.binding['target_schema']),
+                'SCHEMA_EXCLUDED_VERSIONS':''},clear=True):
+            exec(compile(ast.Module(body=[function],type_ignores=[]),str(path),'exec'),namespace)
+            return namespace['version']()
+
+    def test_private_handoff_accepts_actual_application_optional_exclusions_contract(self):
+        for target,normal in ((150,False),(150,True),(160,False),(160,True)):
+            with self.subTest(target=target,normal=normal):
+                actor,_,_,_,_,_,version,_=self.private_handoff_component(normal=normal,target=target)
+                version.clear();version.update(self.application_version_response(actor))
+                self.assertNotIn('schema_excluded_versions',version)
+                actor.verify_private_handoff(normal=normal)
+                actor.runtime.command.assert_not_called()
+
+    def test_private_handoff_refuses_explicit_invalid_or_nonempty_exclusions(self):
+        for value in (None,False,0,'',{},[142],[159],[160]):
+            with self.subTest(value=value):
+                actor,_,_,_,_,_,version,_=self.private_handoff_component()
+                version['schema_excluded_versions']=value
+                with self.assertRaisesRegex(RuntimeError,'serving_identity_changed'):
+                    actor.verify_private_handoff(normal=False)
+                actor.runtime.command.assert_not_called()
+
+    def test_public_target_accepts_actual_application_optional_exclusions_contract(self):
+        actor,_,_,_,_=self.route_component()
+        actor.public_version.clear();actor.public_version.update(self.application_version_response(actor))
+        self.assertNotIn('schema_excluded_versions',actor.public_version)
+        actor._public_target_round()
+        actor.runtime.command.assert_not_called()
+
+    def test_public_target_refuses_explicit_invalid_or_nonempty_exclusions(self):
+        for value in (None,False,0,'',{},[142],[159],[160]):
+            with self.subTest(value=value):
+                actor,_,_,_,_=self.route_component()
+                actor.public_version['schema_excluded_versions']=value
+                with self.assertRaisesRegex(RuntimeError,'public_target_not_accepted'):
+                    actor._public_target_round()
+                actor.runtime.command.assert_not_called()
+
     def test_private_handoff_rejects_pending_journal_missing_acceptance_and_started_consumer(self):
         for fault in ('pending','missing_private_acceptance','started_worker','role','session','protocol','object'):
             with self.subTest(fault=fault):

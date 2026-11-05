@@ -3235,3 +3235,15 @@ workers. Runtime and provider inventory revalidation enforce the same contract.
 Missing or substituted declarations refuse before approval, and again before
 activation; no application guard is weakened. Native Compose regression uses a
 historical env file without this key, not a hand-filled container environment.
+
+
+Private handoff and final public route checks interpret an omitted
+`schema_excluded_versions` as the application's existing empty-exclusion response,
+matching ordinary completed compatibility validation. Explicit null, malformed
+values and nonempty exclusions still refuse; source, slot, exact schema bounds,
+recovery mode, readiness, authority and runtime seals remain mandatory. This
+corrects the actual post-SQL `schema150_private_handoff_serving_identity_changed`
+refusal after canonical160 private acceptance. It does not authorize continuation
+of the consumed operation or establish full protected completion. Regression
+executes the actual pure application version-response function against both
+consumers; modeled transports remain component evidence, not operational PASS.
