@@ -11,7 +11,7 @@ f=importlib.util.module_from_spec(spec);spec.loader.exec_module(f)
 
 def observation(boundary):
     phase,committed=f.BOUNDARIES[boundary]
-    return dict(phase=phase,normal_completion=False,approval_consumed=True,
+    return dict(phase=phase,normal_completion=False,normal_acceptance=False,approval_consumed=True,
                 schema=160 if committed else 146,committed=list(range(147,161)) if committed else [],
                 executor_status='completed' if committed else None,migration_intent=committed)
 

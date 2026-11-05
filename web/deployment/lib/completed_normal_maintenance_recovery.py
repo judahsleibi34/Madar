@@ -83,6 +83,14 @@ def observe(system,parent_id,request_id,*,created_at=None,expires_at=None):
         if not entries or entries[-1]['state'] not in {'EXECUTING','VERIFYING','RECOVERY_REQUIRED'}:
             raise RuntimeError('maintenance_recovery_parent_state_invalid')
         snapshot=driver.observe_maintenance_finalization()
+        for credential in snapshot['stale_credentials'].values():
+            if credential is None:continue
+            lease=credential['lease']
+            if (lease.get('request_id')!=parent_id or lease.get('admission_sha256')!=digest(original)
+                    or lease.get('approval_sha256')!=digest(consent)
+                    or lease.get('context_sha256')!=original['context_sha256']
+                    or any(lease.get(k)!=consumed[k] for k in ('pid','process_start','boot_id'))):
+                raise RuntimeError('maintenance_recovery_stale_credential_not_parent')
         from .schema160_release import isolated_registration
         from .historical_origin import policy as origin_policy
         from .automatic_release_admission import PHYSICAL_RECOVERY
@@ -186,3 +194,27 @@ def require_lease(system,contract,value):
         'execution_expires_at':value['expires_at'],'pid':os.getpid(),
         'process_start':Path('/proc/self/stat').read_text().rsplit(')',1)[1].split()[19],
         'boot_id':Path('/proc/sys/kernel/random/boot_id').read_text().strip()}
+
+
+def retire_parent_credential(system,value):
+    """Retire only a hash-bound dead parent's ephemeral root credential.
+
+    Signed approvals, journals and runtime grants are not removed or changed.
+    The separately consumed recovery request and both locks are mandatory.
+    """
+    verify(system,value)
+    path=system.runtime_root/('root-credentials-'+value['context_sha256'][:16])/'madar-control-plane-upgrade'
+    expected=value['observation']['stale_credentials']['root']
+    if expected is None:
+        if path.exists() or path.is_symlink():raise RuntimeError('maintenance_recovery_credential_changed')
+        return
+    if file_digest(protected(path,private=True))!=expected['sha256']:
+        raise RuntimeError('maintenance_recovery_credential_changed')
+    p,key=policy(system)
+    record={'parent_request_id':value['parent_request_id'],'credential_sha256':expected['sha256'],
+            'recovery_request_id':value['request_id'],'parent_consumption_sha256':value['parent_consumption_sha256']}
+    atomic_json(approvals.root()/value['request_id']/'retired-parent-credential.json',approvals.sign(record,key),exclusive=True)
+    path.unlink()
+    fd=os.open(path.parent,os.O_RDONLY|os.O_DIRECTORY)
+    try:os.fsync(fd)
+    finally:os.close(fd)

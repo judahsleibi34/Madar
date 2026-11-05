@@ -4,6 +4,8 @@ from pathlib import Path
 import json,base64,sys,subprocess
 sys.path.insert(0,'/opt/madar-development/repository/web')
 from deployment.lib.migration_inventory import canonical
+fault=MANIFEST.get('fault_boundary')
+if fault not in (None,'ingress_finalization'):raise RuntimeError('canonical_fault_scope_unsupported')
 result=json.loads((ROOT/'canonical-package-result.json').read_bytes())
 script=render("""from pathlib import Path
 import sys,time,hashlib
@@ -25,9 +27,11 @@ registration={'version':1,'kind':'isolated-canonical-controller-acceptance','env
 atomic_json(ISOLATED_REGISTRATION,registration,exclusive=True);ISOLATED_REGISTRATION.chmod(0o444);isolated_registration(contract)
 scope={'context_sha256':digest(contract),'plan_sha256':digest(document),'source_bundle_sha256':document['source_bundle_sha256'],'enrollment_sha256':contract['source_roles']['enrollment_sha256'],'candidate_source_sha':contract['candidate']['source_sha'],'operation_id':document['operation_id'],'attempt_id':document['attempt_id']};approval.validate_canonical_scope(scope)
 p={'version':2,'policy_id':'isolated-exact-canonical146-160-'+document['attempt_id'],'environment_id':registration['environment_id'],'database_system_identifier':registration['database_system_identifier'],'controller_sha':system.installed_sha(),'enabled':True,'contracts':[approval.CANONICAL],'approval_key_sha256':hashlib.sha256(approval.KEY.read_bytes()).hexdigest(),'max_approval_seconds':300,'max_request_seconds':600,'require_physical_restore':True,'physical_recovery_receipt_sha256':trust['receipt_sha256'],'canonical_scope':scope,'execution_max_seconds':REMOTE_REQUEST_TIMEOUT}
+if FAULT is not None:
+ p.update(version=3,recovery_actions=['finalize-target160-v1'])
 atomic_json(approval.POLICY,p,exclusive=True);approval.policy(system)
 print(json.dumps({'registration':registration,'exact_approval_policy':p,'package':str(package),'plan_sha256':digest(document),'context_sha256':digest(contract),'operation_id':document['operation_id'],'attempt_id':document['attempt_id'],'production_authorization':False,'approval_issued':False,'sql_migration_executed':False}))
-""",RESULT=result)
+""",RESULT=result,FAULT=fault)
 v=json.loads(call(script,name='independent-frozen-canonical-operation-registration',timeout=120));(ROOT/'canonical-operation-registration.json').write_bytes(canonical(v));(EVIDENCE/'independent-frozen-canonical-operation-registration.json').write_bytes(canonical(v))
 # Pin the same exact plan and stage scopes at the independently protected receiver.
 receiver=json.loads((ROOT/'maintenance-receiver.json').read_bytes());policy=receiver['policy'];base=receiver['receiver']['base']

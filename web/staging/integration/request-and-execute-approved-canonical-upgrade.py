@@ -7,7 +7,7 @@ from automatic_rpc import ROOT,EVIDENCE,MANIFEST,call
 from remote_template import render
 from pathlib import Path
 import json,sys
-from canonical_acceptance_window import REMOTE_REQUEST_TIMEOUT
+from canonical_acceptance_window import REMOTE_REQUEST_TIMEOUT,FAULT_RECOVERY_SECONDS
 def canonical(value):
  return json.dumps(value,sort_keys=True,separators=(',',':')).encode()
 # Extra native acceptance gate before any new one-time approval. This is a
@@ -17,6 +17,8 @@ if not native.exists():raise RuntimeError('preapproval_native_restore_acceptance
 proof=json.loads(native.read_bytes())
 assert proof['status']=='PASS' and proof['source_sha']==MANIFEST['source_current']
 assert proof['owned_containers_removed'] is True and proof['scratch_removed'] is True
+fault=MANIFEST.get('fault_boundary')
+if fault not in (None,'ingress_finalization'):raise RuntimeError('canonical_fault_scope_unsupported')
 result=json.loads((ROOT/'canonical-package-result.json').read_bytes())
 script=render("""from pathlib import Path
 import sys,time,hashlib
@@ -81,9 +83,18 @@ from deployment.lib import exceptional_release_approval as approval_api
 scope=approval_api.inspect(system,review['request_id'])
 assert scope['state']=='APPROVED' and not scope['consumed']
 log=Path('/opt/madar-test/origin146/canonical-approved-execution.log')
-executed=execute_protected_child(base+['approved-execute',*operation],input=elevated['access_token'].encode(),started=remote_started,expires_at=scope['request']['admission']['expires_at'],log=log)
-if executed.returncode:raise RuntimeError('actual_canonical_protected_execution_failed')
-completion_envelope=json.loads(executed.stdout);assert completion_envelope['operation']=='approved-execute';completion=completion_envelope['result'];assert completion['schema']==160 and completion['mode']=='NORMAL'
+fault_recovery=None
+if FAULT is None:
+ executed=execute_protected_child(base+['approved-execute',*operation],input=elevated['access_token'].encode(),started=remote_started,expires_at=scope['request']['admission']['expires_at'],log=log)
+ if executed.returncode:raise RuntimeError('actual_canonical_protected_execution_failed')
+ completion_envelope=json.loads(executed.stdout);assert completion_envelope['operation']=='approved-execute';completion=completion_envelope['result']
+ completed_request_id=review['request_id'];completed_request_sha256=review['request_sha256']
+else:
+ from canonical_finalization_rehearsal import execute_and_recover
+ fault_recovery=execute_and_recover(base=base,arguments=arguments,operation=operation,review=review,scope=scope,system=system,token=elevated['access_token'],started=remote_started,session=session,smoke=smoke)
+ completion=fault_recovery['recovered']['completion']
+ completed_request_id=fault_recovery['recovery_request_id'];completed_request_sha256=fault_recovery['recovery_request_sha256']
+assert completion['schema']==160 and completion['mode']=='NORMAL'
 root=Path('/var/lib/madar-control-plane/upgrades/completed-normal-admissions')/result['context_sha256']
 receipts={}
 for name in ('normal-completion.json','normal-acceptance.json','migration-execution.json','operator-authorization.json','worker-owner.json','boot-installation.json','pre-migration-backup.json','post-migration-backup.json'):
@@ -91,12 +102,12 @@ for name in ('normal-completion.json','normal-acceptance.json','migration-execut
  if path.exists():receipts[name]={'sha256':hashlib.sha256(path.read_bytes()).hexdigest(),'record':json.loads(path.read_bytes())}
 assert receipts['normal-completion.json']['record']==completion
 state=json.loads((system.state_root/'state.json').read_bytes());assert state['known_good_release']['schema']==160 and not state.get('in_progress_release')
-report={'controller_sha':system.installed_sha(),'source_sha':completion['application_sha'],'database_system_identifier':view['database_system_identifier'],'origin_schema':146,'target_schema':160,'operation_id':document['operation_id'],'attempt_id':document['attempt_id'],'approval_request_id':review['request_id'],'request_sha256':review['request_sha256'],'completion':completion,'receipts':receipts,'release_state':state,'production_modified':False}
+report={'controller_sha':system.installed_sha(),'source_sha':completion['application_sha'],'database_system_identifier':view['database_system_identifier'],'origin_schema':146,'target_schema':160,'operation_id':document['operation_id'],'attempt_id':document['attempt_id'],'approval_request_id':completed_request_id,'request_sha256':completed_request_sha256,'fault_recovery':fault_recovery,'completion':completion,'receipts':receipts,'release_state':state,'production_modified':False}
 atomic_json(Path('/opt/madar-test/origin146/canonical-actual-completed-report.json'),report,exclusive=True)
 print(json.dumps(report),flush=True)
-""",RESULT=result,CONTROLLER=MANIFEST['source_current'])
+""",RESULT=result,CONTROLLER=MANIFEST['source_current'],FAULT=fault)
 try:
- raw=call(script,name='actual-protected-canonical-approval-and-execution',timeout=REMOTE_REQUEST_TIMEOUT)
+ raw=call(script,name='actual-protected-canonical-approval-and-execution',timeout=REMOTE_REQUEST_TIMEOUT+(FAULT_RECOVERY_SECONDS if fault is not None else 0))
 finally:
  # Capture the existing authentic root journals regardless of the operation's
  # result. This witness grants no authority and never changes source state.

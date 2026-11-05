@@ -3419,3 +3419,16 @@ fault, recovered application, reboot or production acceptance. Extracting the
 shared finalization body affects the ordinary success tail, so its operational
 success/reboot acceptance must be repeated at the corrected source;938e2ace
 receipts remain specific to938e2ace.
+
+Recovery observations also bind any private credential left by the dead parent.
+Only fresh recovery consumption under both locks permits retirement of the exact
+matching ephemeral root credential. Changed bytes or a live parent refuse; the
+original signed approval, consumption and audit records remain immutable.
+
+The existing isolated runner can select the F04 ingress-finalization fault before
+enrollment. Its version3 policy requires a fresh genuine operator approval for
+recovery. The separately reserved 1800-second recovery window must fit inside
+existing environment and supervisor lifetimes; it does not extend the original
+2500-second deployment window or renew its authority. Native root-parent and
+User=madar LoadCredential tests verify transport and stale-lease refusal only,
+not application recovery. Installer closure includes the recovery module.

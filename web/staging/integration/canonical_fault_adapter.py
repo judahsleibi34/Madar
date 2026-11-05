@@ -122,6 +122,7 @@ def main():
                 'committed':committed,'executor_status':record.get('status'),
                 'migration_intent':(root/'migration-intent.json').exists(),
                 'normal_completion':(root/'normal-completion.json').exists(),'approval_consumed':True,
+                'normal_acceptance':(root/'normal-acceptance.json').exists(),
                 'worker_owner_sha256':hashlib.sha256((system.state_root/'worker-ownership.json').read_bytes()).hexdigest(),
                 'route_sha256':hashlib.sha256(Path('/var/lib/madar/proxy/active-upstreams.conf').read_bytes()).hexdigest()}
 

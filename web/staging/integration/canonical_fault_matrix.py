@@ -23,6 +23,8 @@ def matches(name, observation):
         return False
     if observation.get('approval_consumed') is not True:
         return False
+    if name=='ingress_finalization' and observation.get('normal_acceptance') is not False:
+        return False
     if committed:
         return (observation.get('schema') == 160
                 and observation.get('committed') == list(range(147, 161))

@@ -771,23 +771,50 @@ class CompletedNormalUpgrade:
         route=readonly_configuration(UPSTREAM,private=False).read_bytes()
         if route!=provider.target_route():raise RuntimeError('maintenance_recovery_route_changed')
         ids=self.actor.runtime.command(['docker','ps','-aq','--no-trunc']).split()
+        if not ids or len(ids)>1024 or len(set(ids))!=len(ids):
+            raise RuntimeError('maintenance_recovery_actor_inventory_invalid')
         rows=self.actor.runtime.inspect(ids)
+        staged=json.loads(protected(self.root/'candidate-staged-runtime.json',private=True).read_bytes())
+        if (staged.get('context_sha256')!=digest(self.contract)
+                or staged.get('source_sha')!=self.contract['candidate']['source_sha']
+                or staged.get('images')!=self.contract['candidate']['images']):
+            raise RuntimeError('maintenance_recovery_candidate_changed')
+        originals=provider.original_inventory['containers']
+        expected_ids={r['id'] for r in originals.values()}|set(provider.original_inventory['exclusions'])|{r['id'] for r in staged['runtimes'].values()}
+        if set(ids)!=expected_ids or {r['Id'] for r in rows.values()}!=expected_ids:
+            raise RuntimeError('maintenance_recovery_unexpected_actor')
+        from .historical_origin import stopped_originals,original_runtime
+        stopped_originals(self.contract,self.actor.runtime,original_runtime(self.contract))
+        actual={r['Id']:r for r in rows.values()}
+        from .completed_normal_resources import measured_spec_matches
+        for record in staged['runtimes'].values():
+            row=actual[record['id']]
+            if (row['State']['Running'] is not True or row['State']['Restarting'] is not False
+                    or row['Image']!=record['image'] or not measured_spec_matches(row,record['spec_sha256'])):
+                raise RuntimeError('maintenance_recovery_candidate_not_running_exactly')
         actors={r['Id']:{'image':r['Image'],'configuration_sha256':digest(r['Config']),
             'host_sha256':digest(r['HostConfig']),'running':r['State']['Running'],
             'restarting':r['State']['Restarting'],'status':r['State']['Status']}
             for r in rows.values()}
         names=('migration-intent.json','migration-completion.json','migration-execution.json',
-            'migration-manifest.json','migration-customer-preservation.json','candidate-runtime.json',
+            'migration-manifest.json','migration-customer-preservation.json','candidate-runtime.json','candidate-staged-runtime.json',
             'post-migration-backup.json','target-route-publication.json','provider-barrier.json')
         original=json.loads(protected(self.root/'pre-migration-customer-snapshot.json',private=True).read_bytes())
         current=migration_customer_snapshot(self.contract,self.actor.runtime,columns=original['columns'])
+        stale={}
+        for label,path in {'root':self.ops.runtime_root/('root-credentials-'+digest(self.contract)[:16])/'madar-control-plane-upgrade',
+                           'issuer':self.ops.authorization_file}.items():
+            if not path.exists() and not path.is_symlink():stale[label]=None;continue
+            body=protected(path,private=True).read_bytes()
+            credential=json.loads(body)
+            stale[label]={'sha256':hashlib.sha256(body).hexdigest(),'lease':credential.get('canonical_exceptional_approval',{})}
         self.actor.guard()
         return {'schema':schema,'database_system_identifier':self.contract['database']['system_identifier'],
             'boot_id':Path('/proc/sys/kernel/random/boot_id').read_text().strip(),
             'phase':'service_adopt_completed','files':{n:file_digest(protected(self.root/n,private=True)) for n in names},
             'provider_journal_sha256':digest(records),'grant_sha256':digest(grant),
             'worker_owner_sha256':file_digest(owner_path),'route_sha256':hashlib.sha256(route).hexdigest(),
-            'actors_sha256':digest(actors),'current_data_sha256':digest(current)}
+            'actors_sha256':digest(actors),'current_data_sha256':digest(current),'stale_credentials':stale}
 
     def recover_maintenance_finalization(self,value,token):
         """Freshly approved F04 only; no SQL, prepare, activate, adopt or grant replay."""
@@ -804,6 +831,7 @@ class CompletedNormalUpgrade:
             self.ops.canonical_maintenance_recovery=value
             self.phase='maintenance_recovery_finalization'
             execution_event(self.ops,value,'EXECUTING',{'parent_request_id':value['parent_request_id']})
+            recovery.retire_parent_credential(self.ops,value)
             with self.root_credential():
                 provider,lifecycle=self.maintenance_recovery_components()
                 provider.verify_target_route()

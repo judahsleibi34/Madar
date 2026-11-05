@@ -23,6 +23,14 @@ WINDOW_TIMEOUT = sum(seconds for _, seconds in PHASES) + WINDOW_OVERHEAD
 REMOTE_REQUEST_TIMEOUT = 2500
 MIN_PROTECTED_EXECUTION_SECONDS = 2100
 REMOTE_COMPLETION_RESERVE = 60
+FAULT_RECOVERY_SECONDS = 1800
+
+
+def phases(fault_boundary=None):
+    if fault_boundary not in (None,'ingress_finalization'):
+        raise RuntimeError('canonical_fault_scope_unsupported')
+    extra=FAULT_RECOVERY_SECONDS if fault_boundary is not None else 0
+    return ((PHASES[0][0],PHASES[0][1]+extra),*PHASES[1:])
 
 
 def protected_execution_timeout(*, started, now):
@@ -88,8 +96,8 @@ def execute_protected_child(argv, *, started, expires_at, log, input=None, clock
     return bounded_child(argv, timeout=min(timeout, remaining), log=log, input=input)
 
 
-def require_window(registration, *, now, supervisor_deadline):
-    required = WINDOW_TIMEOUT + RETIREMENT_RESERVE
+def require_window(registration, *, now, supervisor_deadline, fault_boundary=None):
+    required = sum(budget for _,budget in phases(fault_boundary)) + WINDOW_OVERHEAD + RETIREMENT_RESERVE
     if (not isinstance(registration, dict)
             or registration.get('kind') != 'isolated-canonical-controller-acceptance'
             or any(type(v) is not int for v in
@@ -105,13 +113,13 @@ def require_window(registration, *, now, supervisor_deadline):
             'remaining_seconds': deadline - now, 'authority_issued': False}
 
 
-def execute_steps(run):
+def execute_steps(run, *, fault_boundary=None):
     """No pause between completion, preservation verification and real reboot.
 
     Exceptions stop the sequence; the existing owner supervisor retains cleanup
     responsibility. In particular, a failed execution never triggers reboot.
     """
-    for name, timeout in PHASES:
+    for name, timeout in phases(fault_boundary):
         run(name, timeout)
 
 
@@ -138,7 +146,8 @@ def main():
     evidence = Path(manifest['evidence'])
     if evidence != Path('/opt/madar-development/evidence/integration')/root.name:
         raise RuntimeError('canonical_acceptance_evidence_scope_changed')
-    result = require_window(registration, now=int(time.time()), supervisor_deadline=deadline)
+    fault=manifest.get('fault_boundary')
+    result = require_window(registration, now=int(time.time()), supervisor_deadline=deadline,fault_boundary=fault)
     path = evidence/'preapproval-acceptance-window.json'
     with path.open('x') as output:
         os.fchmod(output.fileno(), 0o600)
@@ -152,7 +161,7 @@ def main():
         result = bounded_child([sys.executable, '-B', str(script)], timeout=timeout, log=log)
         result.check_returncode()
         print(json.dumps({'completed_step': name}), flush=True)
-    execute_steps(run)
+    execute_steps(run,fault_boundary=fault)
 
 
 if __name__ == '__main__':

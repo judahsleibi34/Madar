@@ -45,6 +45,18 @@ class AcceptanceWindowTests(unittest.TestCase):
         window.require_window(record, now=2000, supervisor_deadline=8000)
         self.assertEqual(record, original)
 
+    def test_fault_recovery_has_separate_reserved_time_without_extending_deployment(self):
+        record=self.registration();before=dict(record)
+        value=window.require_window(record,now=2000,supervisor_deadline=9000,fault_boundary='ingress_finalization')
+        self.assertEqual(value['required_seconds'],5940)
+        self.assertEqual(window.REMOTE_REQUEST_TIMEOUT,2500)
+        self.assertEqual(window.protected_execution_timeout(started=1000,now=1300),2140)
+        self.assertEqual(record,before)
+        with self.assertRaisesRegex(RuntimeError,'window_insufficient'):
+            window.require_window(record,now=2000,supervisor_deadline=7939,fault_boundary='ingress_finalization')
+        with self.assertRaisesRegex(RuntimeError,'fault_scope_unsupported'):
+            window.phases('arbitrary-resumption')
+
     def test_nested_execution_budget_covers_observed1600_second_kill(self):
         timeout = window.protected_execution_timeout(started=1000, now=1300)
         self.assertEqual(timeout, 2140)

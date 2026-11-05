@@ -18,7 +18,7 @@ class MaintenanceRecoveryTests(unittest.TestCase):
     def setUp(self):
         self.f=Fixture();self.f.setUp();self.addCleanup(self.f.doCleanups)
         f=self.f;f.p['version']=3;f.p['recovery_actions']=[recovery.ACTION]
-        f.driver.observe_maintenance_finalization=Mock(return_value={'phase':'service_adopt_completed','schema':160,'data':'measured'})
+        f.driver.observe_maintenance_finalization=Mock(return_value={'phase':'service_adopt_completed','schema':160,'data':'measured','stale_credentials':{'root':None,'issuer':None}})
         self.enterContext(patch.object(recovery,'protected',lambda p,**kw:Path(p)))
         self.enterContext(patch.object(approval,'root',return_value=f.root))
         self.enterContext(patch.object(recovery,'owner_live',return_value=False))
@@ -65,6 +65,33 @@ class MaintenanceRecoveryTests(unittest.TestCase):
             driver.recover_maintenance_finalization(value,'stdin-token')
         self.assertFalse((self.f.root/value['request_id']/'approval-consumed.json').exists())
 
+    def test_dead_parent_credential_retirement_requires_fresh_consumption_and_exact_bytes(self):
+        f=self.f;f.system.runtime_root=f.root/'runtime';f.system.runtime_root.mkdir()
+        consumed=approval.verified(f.root/self.parent_id/'approval-consumed.json',f.key)
+        lease={k:consumed[k] for k in ('pid','process_start','boot_id','admission_sha256','approval_sha256')}
+        lease.update(request_id=self.parent_id,context_sha256=self.parent['context_sha256'])
+        body=canonical({'canonical_exceptional_approval':lease,'test_bearer':'private-fixture-only'})
+        import hashlib
+        expected={'sha256':hashlib.sha256(body).hexdigest(),'lease':lease}
+        f.driver.observe_maintenance_finalization.return_value['stale_credentials']['root']=expected
+        path=f.system.runtime_root/('root-credentials-'+self.parent['context_sha256'][:16])/'madar-control-plane-upgrade'
+        path.parent.mkdir();path.write_bytes(body);path.chmod(0o600)
+        value=self.approved()
+        with f.held_locks():
+            with self.assertRaisesRegex(RuntimeError,'not_current_owner'):
+                recovery.retire_parent_credential(f.system,value)
+            self.assertTrue(path.exists())
+            recovery.verify(f.system,value,consume=True,token='stdin-token')
+            path.write_bytes(b'changed')
+            with self.assertRaisesRegex(RuntimeError,'credential_changed'):
+                recovery.retire_parent_credential(f.system,value)
+            path.write_bytes(body)
+            recovery.retire_parent_credential(f.system,value)
+        self.assertFalse(path.exists())
+        record=approval.verified(f.root/value['request_id']/'retired-parent-credential.json',f.key)
+        self.assertEqual(record['credential_sha256'],expected['sha256'])
+        self.assertNotIn('private-fixture-only',json.dumps(record))
+
     def test_wrong_source_database_operation_or_parent_digest_refuses(self):
         value=self.approved()
         for key,bad in [('source_sha','f'*40),('operation_id','00000000-0000-4000-8000-000000000000'),
@@ -76,7 +103,7 @@ class MaintenanceRecoveryTests(unittest.TestCase):
             recovery.verify(self.f.system,altered,consume=True,token='stdin-token')
 
     def test_changed_observation_refuses_before_consumption(self):
-        value=self.approved();self.f.driver.observe_maintenance_finalization.return_value={'schema':146}
+        value=self.approved();self.f.driver.observe_maintenance_finalization.return_value={'schema':146,'stale_credentials':{'root':None,'issuer':None}}
         with self.f.held_locks(),self.assertRaisesRegex(RuntimeError,'observation_changed'):
             recovery.verify(self.f.system,value,consume=True,token='stdin-token')
         self.assertFalse((self.f.root/value['request_id']/'approval-consumed.json').exists())
