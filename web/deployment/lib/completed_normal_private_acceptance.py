@@ -21,7 +21,7 @@ from deployment.lib.completed_normal_profile import RECONCILED
 from deployment.lib.emergency_routing_repair import exclusive
 from deployment.lib.provider_recovery_runtime import protected,file_digest,readonly_configuration
 from deployment.lib.schema150_provider_adapter import private_json,NoRedirect,_env,Schema150ProviderAdapter
-from deployment.lib.schema150_provider_lifecycle import validate_binding,release_contract
+from deployment.lib.schema150_provider_lifecycle import validate_binding,release_contract,digest as provider_digest
 
 SUBJECT_KEYS={'auth_id','user_id','tenant_id','email','password','factor_id','totp_secret','bucket','object','object_sha256'}
 UUID_RE=r'[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}'
@@ -311,10 +311,10 @@ class CompletedNormalMaintenanceGuards:
         if grant!=observed_grant:raise RuntimeError('maintenance_activation_grant_changed')
         if grant['mode']=='NORMAL' and grant['schema']!=160:
             raise RuntimeError('maintenance_target_authority_schema_invalid')
-        return {'binding_sha256':digest(binding),'schema':schema,
+        return {'binding_sha256':provider_digest(binding),'schema':schema,
             'delivery_protocol':protocols[0],'outbox_protocol':protocols[1],'deletion_protocol':protocols[2],
             'target_write_authority':grant['mode']=='NORMAL',
-            'write_authority_sha256':digest(grant) if grant['mode']=='NORMAL' else None,
+            'write_authority_sha256':provider_digest(grant) if grant['mode']=='NORMAL' else None,
             'migration_receipts':True,'preservation':True,'accepted_images':True,'backup_restore_replica':True,
             'worker_ownership':True,'boot_recovery':True,'private_provider_boundary':True}
 

@@ -120,8 +120,11 @@ class ConcreteAdapterTests(unittest.TestCase):
                 actor,scope,stage,_,journal,grant,_,_=self.private_handoff_component(normal=normal,target=target)
                 result=actor.verify_private_handoff(normal=normal)
                 self.assertEqual(result['mode'],grant['mode'])
-                self.assertEqual(result['candidate_stage_sha256'],lifecycle.digest(stage))
-                self.assertEqual(result['provider_journal_sha256'],lifecycle.digest(journal.read()))
+                from deployment.lib.completed_normal_admission import digest as admission_digest
+                self.assertEqual(result['candidate_stage_sha256'],admission_digest(stage))
+                self.assertEqual(result['provider_journal_sha256'],admission_digest(journal.read()))
+                self.assertEqual(result['write_authority_sha256'],admission_digest(grant))
+                self.assertNotEqual(result['candidate_stage_sha256'],lifecycle.digest(stage))
                 self.assertFalse(result['workers_started']);self.assertFalse(result['ingress_restored'])
                 self.assertEqual(actor.runtime.denied.call_count,0 if normal else 2)
                 actor.runtime.command.assert_not_called()

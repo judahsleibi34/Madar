@@ -221,6 +221,34 @@ class ActivationObservationTests(unittest.TestCase):
         owner(target=True,generation='d'*64)
         with self.assertRaisesRegex(RuntimeError,'ownership_changed'):observer.activation(binding,private=False)
 
+    def test_actual_activation_producer_matches_lifecycle_digest_contract(self):
+        # The real producer and consumer must agree, rather than two fixtures
+        # independently inventing compatible PASS packets. Runtime observations
+        # remain injected here; this is not privileged activation acceptance.
+        from deployment.lib import schema150_provider_lifecycle as lifecycle
+        observer,binding,_,grant,owner,_=self.activation_fixture()
+        driver=object.__new__(lifecycle.ProviderMaintenance150)
+        driver.binding=binding
+        driver._preimage=lambda:{}
+        driver.actor=SimpleNamespace(activation_evidence=lambda b,p:observer.activation(b,private=True))
+        for normal in (False,True):
+            if normal:
+                grant.update(mode='NORMAL',schema=160);owner(target=True)
+            with self.subTest(normal=normal):
+                value=driver._activation_evidence(granted=normal)
+                self.assertEqual(value['binding_sha256'],lifecycle.digest(binding))
+                self.assertNotEqual(value['binding_sha256'],acceptance.digest(binding))
+                self.assertEqual(value['write_authority_sha256'],lifecycle.digest(grant) if normal else None)
+                # Substitution remains refused, including the formerly emitted
+                # pretty-JSON digest. No consumer fallback accepts both formats.
+                for altered in (dict(value,binding_sha256=acceptance.digest(binding)),
+                                dict(value,preservation=False),
+                                dict(value,target_write_authority=not normal)):
+                    driver.actor.activation_evidence=lambda b,p,v=altered:v
+                    with self.assertRaisesRegex(RuntimeError,'activation_not_authorized'):
+                        driver._activation_evidence(granted=normal)
+                driver.actor.activation_evidence=lambda b,p:observer.activation(b,private=True)
+
     def test_missing_backup_artifact_boot_or_barrier_cannot_be_replaced_by_flags(self):
         for name in ('backup','artifact','boot','barrier'):
             observer,binding,provider,_,_,artifacts=self.activation_fixture()

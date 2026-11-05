@@ -970,8 +970,11 @@ class Schema150ProviderAdapter:
             raise RuntimeError('schema150_private_handoff_journal_changed')
         return {'operation':self.binding['operation'],'context_sha256':self.binding['context_sha256'],
             'schema':self.binding['target_schema'],'mode':grant['mode'],
-            'candidate_stage_sha256':digest(stage),'provider_journal_sha256':digest(records),
-            'write_authority_sha256':digest(grant),'workers_started':False,'ingress_restored':False}
+            # This projection is consumed by completed_normal_admission, not
+            # the provider journal. Preserve that consumer's established hash
+            # encoding; provider-local activation/publication stay compact.
+            'candidate_stage_sha256':contract_digest(stage),'provider_journal_sha256':contract_digest(records),
+            'write_authority_sha256':contract_digest(grant),'workers_started':False,'ingress_restored':False}
 
     def observe_private_boundary(self,binding):
         self.require_authority(binding,purpose='prepare_private_activation')

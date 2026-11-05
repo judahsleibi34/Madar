@@ -1,5 +1,18 @@
 # Privileged control-plane upgrade architecture
 
+The measured activation observer uses the provider lifecycle's existing compact
+JSON digest for its binding and observed write-grant projections. Package and
+admission digests retain their separate existing encoding. The lifecycle accepts
+only its established digest; no alternate-hash fallback is allowed. All migration,
+preservation, backup, image, worker, boot and private-boundary observations still
+precede this projection. A source correction never rewrites signed evidence or
+permits replay of an already consumed post-SQL operation.
+The subsequent maintenance handoff projection uses the admission consumer's
+existing indented-JSON digests for stage, journal prefix and grant. Internal
+provider journals and route-publication records retain compact encoding. These
+are distinct wire contracts; changing one global digest function would invalidate
+previous evidence and is prohibited.
+
 The installed controller includes the selected schema146–160 release descriptor.
 Read-only coordinator preflight now requires its selected metadata to be a
 root-owned, singly linked, nonsecret0644 regular file parsed by the same
