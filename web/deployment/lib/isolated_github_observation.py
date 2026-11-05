@@ -88,6 +88,48 @@ def validate_request(request,p,*,now):
     return request
 
 
+class ParentObservationError(RuntimeError):
+    """Allowlisted diagnostic only; never retain raw API output or credentials."""
+    def __init__(self,classification,attempts,endpoint,status=None):
+        self.diagnostic={'classification':classification,'attempts':attempts,
+            'endpoint_sha256':hashlib.sha256(endpoint.encode()).hexdigest(),'http_status':status}
+        super().__init__('isolated_github_parent_api_failed:'+classification+
+            ':attempts='+str(attempts)+':http='+str(status))
+
+
+def parent_get(request,p):
+    # One original nonce/expiry, fixed host and GET only. Monotonic bounds local
+    # elapsed time; wall-clock expiry is independently checked at each attempt.
+    deadline=time.monotonic()+min(55,max(0,min(request['expires_at'],p['expires_at'])-time.time()-2))
+    for attempt in range(1,4):
+        now=int(time.time());validate_policy(p,now=now);validate_request(request,p,now=now)
+        remaining=min(deadline-time.monotonic(),min(request['expires_at'],p['expires_at'])-time.time()-2)
+        if remaining<=0:raise ParentObservationError('deadline',attempt-1,request['endpoint'])
+        status=None
+        try:
+            result=subprocess.run(['/usr/bin/gh','api','--hostname','github.com','--method','GET',request['endpoint']],
+                capture_output=True,timeout=min(15,remaining),
+                env={'PATH':os.defpath,'HOME':os.path.expanduser('~'),'LANG':'C.UTF-8'})
+            if result.returncode==0:return result
+            # Classify only gh's bounded stderr; never expose it in diagnostics.
+            error=getattr(result,'stderr',b'')[:8192].decode('utf-8',errors='replace')
+            match=re.search(r'\(HTTP ([1-5][0-9]{2})\)',error)
+            status=int(match[1]) if match else None
+            transient=status in (429,500,502,503,504)
+            transport=not status and any(x in error.lower() for x in
+                ('connection reset by peer','connection timed out','temporary failure in name resolution',
+                 'tls handshake timeout','unexpected eof','i/o timeout'))
+            classification='transient_http' if transient else 'transport' if transport else 'permanent_or_unknown'
+        except subprocess.TimeoutExpired:
+            classification='transport_timeout';transient=True;transport=False
+        if not (transient or transport) or attempt==3:
+            raise ParentObservationError(classification,attempt,request['endpoint'],status)
+        delay=attempt
+        if min(deadline-time.monotonic(),min(request['expires_at'],p['expires_at'])-time.time()-2)<=delay:
+            raise ParentObservationError('deadline',attempt,request['endpoint'],status)
+        time.sleep(delay)
+
+
 def observe_on_parent(request,p,private_key):
     """Parent supplies its independently pinned policy, not guest policy input.
 
@@ -102,9 +144,7 @@ def observe_on_parent(request,p,private_key):
         raise RuntimeError('isolated_github_parent_key_changed')
     # A controlled environment prevents GH_HOST or an alternate credential
     # configuration from redirecting this query to another GitHub service.
-    result=subprocess.run(['/usr/bin/gh','api','--hostname','github.com','--method','GET',request['endpoint']],
-        capture_output=True,timeout=30,env={'PATH':os.defpath,'HOME':os.path.expanduser('~'),'LANG':'C.UTF-8'})
-    if result.returncode!=0:raise RuntimeError('isolated_github_parent_api_failed')
+    result=parent_get(request,p)
     if not 0<len(result.stdout)<=MAX_BYTES:raise RuntimeError('isolated_github_parent_api_size')
     value=strict_json(result.stdout)
     if not isinstance(value,dict):raise RuntimeError('isolated_github_parent_api_shape')

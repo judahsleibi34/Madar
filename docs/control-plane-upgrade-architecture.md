@@ -3325,3 +3325,12 @@ revalidation. A longer process timeout does not extend signed execution rights.
 The child adapter preserves stdout and stderr separately in exclusive private
 files. Diagnostic output cannot corrupt the controller's JSON completion stream;
 retaining diagnostics must not introduce a post-effect response-parsing failure.
+
+The isolated parent GitHub observer retries only the same fixed-host GET for
+allowlisted transient transport errors or HTTP429/500/502/503/504. At most three
+attempts fit within55 seconds and the original request/policy expiry, with a
+two-second delivery reserve. Each attempt revalidates scope and expiry; response
+signing still requires fresh valid JSON. Permanent/unknown errors, invalid
+responses and stale evidence refuse. Diagnostics retain only classification,
+attempt count, HTTP status and endpoint hash, never API stderr or credentials.
+This transport resilience neither retries a deployment nor reuses its approval.

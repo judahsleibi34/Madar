@@ -73,8 +73,47 @@ class GitHubObservationTests(unittest.TestCase):
             with self.subTest(result=result),patch.object(g.subprocess,'run',return_value=result),self.assertRaises((RuntimeError,ValueError)):
                 g.observe_on_parent(self.request,self.p,self.key)
         with patch.object(g.subprocess,'run',return_value=SimpleNamespace(returncode=0,stdout=b'{}')),\
-                patch.object(g.time,'time',side_effect=[self.now,self.now+61]),self.assertRaisesRegex(RuntimeError,'freshness'):
+                patch.object(g.time,'time',side_effect=[self.now,self.now,self.now,self.now,self.now+61]),self.assertRaisesRegex(RuntimeError,'freshness'):
             g.observe_on_parent(self.request,self.p,self.key)
+
+    def test_transient_get_retries_same_nonce_then_verifies_real_signature(self):
+        failed=SimpleNamespace(returncode=1,stdout=b'',stderr=b'gh: unavailable (HTTP 503)')
+        success=SimpleNamespace(returncode=0,stdout=canonical(self.value))
+        with patch.object(g.subprocess,'run',side_effect=[failed,success]) as run,patch.object(g.time,'sleep'):
+            packet=g.observe_on_parent(self.request,self.p,self.key)
+        self.assertEqual(run.call_count,2)
+        self.assertEqual(run.call_args_list[0].args,run.call_args_list[1].args)
+        self.assertLessEqual(run.call_args.kwargs['timeout'],15)
+        self.assertEqual(g.verify_response(packet,self.request,self.p,self.public,now=self.now),self.value)
+
+    def test_permanent_api_errors_never_retry_or_expose_stderr(self):
+        for status in (401,403,404,422):
+            with self.subTest(status=status),patch.object(g.subprocess,'run',return_value=SimpleNamespace(
+                    returncode=1,stdout=b'',stderr=f'PRIVATE TOKEN (HTTP {status})'.encode())) as run:
+                with self.assertRaises(g.ParentObservationError) as caught:g.observe_on_parent(self.request,self.p,self.key)
+                self.assertEqual(run.call_count,1);self.assertNotIn('PRIVATE',str(caught.exception))
+                self.assertEqual(caught.exception.diagnostic['http_status'],status)
+
+    def test_transient_attempts_are_bounded_and_do_not_sign_failure(self):
+        with patch.object(g.subprocess,'run',side_effect=g.subprocess.TimeoutExpired('gh',15)) as run,patch.object(g.time,'sleep'):
+            with self.assertRaisesRegex(g.ParentObservationError,'transport_timeout:attempts=3'):
+                g.observe_on_parent(self.request,self.p,self.key)
+            self.assertEqual(run.call_count,3)
+
+    def test_retry_revalidates_original_expiry_and_never_renews_it(self):
+        now=[self.now]
+        def expire(_):now[0]=self.request['expires_at']
+        with patch.object(g.time,'time',side_effect=lambda:now[0]),patch.object(g.time,'sleep',side_effect=expire),\
+                patch.object(g.subprocess,'run',return_value=SimpleNamespace(returncode=1,stdout=b'',stderr=b'(HTTP 502)')) as run:
+            with self.assertRaisesRegex(RuntimeError,'freshness'):g.observe_on_parent(self.request,self.p,self.key)
+            self.assertEqual(run.call_count,1)
+        self.assertEqual(self.request['expires_at'],self.now+60)
+
+    def test_insufficient_transport_budget_refuses_without_query(self):
+        request=dict(self.request,expires_at=self.now+1)
+        with patch.object(g.subprocess,'run') as run,self.assertRaisesRegex(g.ParentObservationError,'deadline'):
+            g.observe_on_parent(request,self.p,self.key)
+        run.assert_not_called()
 
     def test_root_query_waits_for_nonce_bound_signature_and_preserves_compact_audit(self):
         with tempfile.TemporaryDirectory() as tmp:
