@@ -153,6 +153,19 @@ class MaintenanceRecoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError,'committed_target_required'):
                 driver.observe_maintenance_finalization()
 
+    def test_preconsumption_refusal_does_not_clear_parent_credentials(self):
+        from deployment.lib import completed_normal_execution as execution
+        from deployment.lib.control_plane_upgrade import SystemOperations
+        driver=self.f.driver;driver.lock=None
+        driver.ops.clear_authorization=Mock()
+        driver.ops.close_locks=lambda:SystemOperations.release_deployment_lock(driver.ops)
+        with patch.object(execution.os,'geteuid',return_value=0),patch.object(recovery,'verify',side_effect=RuntimeError('stale_observation')):
+            with self.assertRaisesRegex(RuntimeError,'stale_observation'):
+                driver.recover_maintenance_finalization({},'stdin-token')
+        driver.ops.clear_authorization.assert_not_called()
+        self.assertIsNone(driver.lock)
+        self.assertIsNone(driver.ops.deploy_lock_descriptor)
+
     def test_restart_uses_durable_timer_preimages_not_current_timer_state(self):
         from deployment.lib import completed_normal_execution as execution
         from deployment.lib.control_plane_upgrade import BACKUP_TIMERS

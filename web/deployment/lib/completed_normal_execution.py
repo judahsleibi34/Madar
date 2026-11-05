@@ -868,7 +868,8 @@ class CompletedNormalUpgrade:
                     self.fenced=True;self.failure(error)
             raise
         finally:
-            try:self.ops.clear_authorization()
+            try:
+                if consumed:self.ops.clear_authorization()
             finally:
                 self.ops.canonical_maintenance_recovery=None
                 self.ops.close_locks()
