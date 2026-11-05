@@ -3372,3 +3372,10 @@ maintenance-first parent_migration_pending recovery. Full fault acceptance must
 exercise independently authorized recovery rather than label fencing as healthy
 availability or replay a consumed release approval. Accepted success receipts
 remain immutable and source-specific while this recovery coverage is completed.
+
+The fault helper's elapsed budget includes its independent observations and
+durable evidence writes. It rechecks both policy and time before stop/kill;
+an expired observation cannot authorize a late signal. If expiry occurs after
+stopping, the pinned live session is resumed without killing it. Native tests
+exercise slow observation and both intent-write boundaries. These constraints
+govern fault injection only and grant no recovery or deployment authority.

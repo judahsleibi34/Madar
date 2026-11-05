@@ -55,24 +55,35 @@ def interrupt_exact_process(pid, expected, *, boundary, observe, guard, record,
         raise RuntimeError('fault_scope_or_budget_invalid')
     if not all(callable(x) for x in (observe, guard, record)):
         raise RuntimeError('fault_independent_observers_required')
+    deadline = clock()+timeout
+    def require_budget():
+        if clock() >= deadline:
+            raise RuntimeError('fault_boundary_deadline_expired')
     guard()
+    require_budget()
     if process_identity(pid) != expected or expected[2] != pid:
         raise RuntimeError('fault_process_identity_changed')
     fd = os.pidfd_open(pid)
     stopped = False
     killed = False
-    deadline = clock()+timeout
     try:
+        if process_identity(pid) != expected:
+            raise RuntimeError('fault_process_identity_changed')
         while True:
             guard()
+            require_budget()
             if process_identity(pid) != expected:
                 raise RuntimeError('fault_process_identity_changed')
-            if matches(boundary, observe()):
+            observation = observe()
+            require_budget()
+            if matches(boundary, observation):
                 break
             if clock() >= deadline:
                 raise RuntimeError('fault_boundary_not_observed')
             time.sleep(min(.05, max(0, deadline-clock())))
         record('stop_intent', {'boundary': boundary, 'pid': pid, 'start_ticks': expected[0]})
+        guard()
+        require_budget()
         signal.pidfd_send_signal(fd, signal.SIGSTOP)
         stopped = True
         stop_deadline = clock()+2
@@ -91,9 +102,12 @@ def interrupt_exact_process(pid, expected, *, boundary, observe, guard, record,
         os.killpg(pid, signal.SIGSTOP)
         guard()
         frozen = observe()
+        require_budget()
         if not matches(boundary, frozen):
             raise RuntimeError('fault_boundary_changed_while_stopping')
         record('kill_intent', {'boundary': boundary, 'observation': frozen})
+        guard()
+        require_budget()
         os.killpg(pid, signal.SIGKILL)
         killed = True
         if not select.select([fd], [], [], 5)[0]:

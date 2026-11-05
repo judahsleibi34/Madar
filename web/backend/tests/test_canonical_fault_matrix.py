@@ -42,7 +42,9 @@ class Boundaries(unittest.TestCase):
             self.assertEqual(events,['stop_intent','kill_intent','leader_exited'])
             # A zombie has no running execution; reaping belongs to its parent.
             p=Path('/proc')/str(descendant)/'stat'
-            if p.exists():self.assertEqual(p.read_text().rsplit(')',1)[1].split()[0],'Z')
+            try:state=p.read_text().rsplit(')',1)[1].split()[0]
+            except (FileNotFoundError,ProcessLookupError):state=None  # Reaped during procfs read.
+            self.assertIn(state,(None,'Z'))
         finally:
             if child.poll() is None:os.killpg(child.pid,9);child.wait()
             child.stdout.close()
@@ -68,10 +70,29 @@ class Boundaries(unittest.TestCase):
     def test_missing_boundary_times_out_without_signal(self):
         child=idle_child()
         try:
-            with self.assertRaisesRegex(RuntimeError,'boundary_not_observed'):
+            with self.assertRaisesRegex(RuntimeError,'boundary_(not_observed|deadline_expired)'):
                 f.interrupt_exact_process(child.pid,f.process_identity(child.pid),boundary='before_sql',observe=lambda:observation('committed_sql'),guard=lambda:None,record=lambda *a:None,timeout=.1)
             self.assertIsNone(child.poll())
         finally:os.killpg(child.pid,9);child.wait()
+
+    def test_slow_observation_or_record_cannot_signal_after_deadline(self):
+        for delay_at in ('observe', 'stop_intent', 'kill_intent'):
+            with self.subTest(delay_at=delay_at):
+                child=idle_child();now=[0];events=[]
+                def observe():
+                    if delay_at=='observe':now[0]=2
+                    return observation('before_sql')
+                def record(name,value):
+                    events.append(name)
+                    if delay_at==name:now[0]=2
+                try:
+                    with self.assertRaisesRegex(RuntimeError,'deadline_expired'):
+                        f.interrupt_exact_process(child.pid,f.process_identity(child.pid),boundary='before_sql',
+                            observe=observe,guard=lambda:None,record=record,timeout=1,clock=lambda:now[0])
+                    self.assertIsNone(child.poll())
+                    self.assertNotEqual(Path('/proc',str(child.pid),'stat').read_text().rsplit(')',1)[1].split()[0],'T')
+                    self.assertNotIn('leader_exited',events)
+                finally:os.killpg(child.pid,9);child.wait()
 
     def test_diagnostic_failure_resumes_without_killing(self):
         child=idle_child()
