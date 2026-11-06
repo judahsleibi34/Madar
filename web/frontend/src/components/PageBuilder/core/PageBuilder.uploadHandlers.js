@@ -1,12 +1,6 @@
-export const getBuilderAssetFileName = (value) => {
-  const cleanValue = String(value || "").split(/[?#]/, 1)[0].replace(/\\/g, "/");
-  const encodedName = cleanValue.slice(cleanValue.lastIndexOf("/") + 1);
-  try {
-    return decodeURIComponent(encodedName);
-  } catch {
-    return encodedName;
-  }
-};
+import { getMediaFileName as getBuilderAssetFileName } from "../../../utils/media";
+
+export { getBuilderAssetFileName };
 
 export const parsePhotoProofingContent = (content = "") =>
   String(content)

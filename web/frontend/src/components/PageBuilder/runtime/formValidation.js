@@ -1,13 +1,9 @@
+import { getAnswerValue as unwrapValue } from "./formAnswers";
 const isEmpty = (value) =>
   value === undefined ||
   value === null ||
   (typeof value === "string" && value.trim() === "") ||
   (Array.isArray(value) && value.length === 0);
-
-const unwrapValue = (value) =>
-  value && typeof value === "object" && !Array.isArray(value) && "value" in value
-    ? value.value
-    : value;
 
 const validCalendarDate = (value) => {
   const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);

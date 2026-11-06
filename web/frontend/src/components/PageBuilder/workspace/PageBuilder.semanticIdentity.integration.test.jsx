@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation, useNavigate, useNavigationType } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { builderInitialProjectLoadPromises } from "../core/PageBuilder.config";
@@ -93,6 +93,17 @@ const flushMicrotasks = async () => {
   });
 };
 
+function RoutingProbe() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const navigationType = useNavigationType();
+  return <>
+    <output data-testid="editor-route">{location.pathname}</output>
+    <output data-testid="editor-navigation-type">{navigationType}</output>
+    <button onClick={() => navigate(-1)}>Test browser back</button>
+  </>;
+}
+
 describe("mounted PageBuilder semantic acknowledgement", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -145,6 +156,88 @@ describe("mounted PageBuilder semantic acknowledgement", () => {
     vi.useRealTimers();
     vi.restoreAllMocks();
     builderInitialProjectLoadPromises.clear();
+  });
+
+  it.each(["page-builder", "e-learning/landing-page"])("navigates panels and tabs without saving content in %s", async workspace => {
+    if (workspace === "e-learning/landing-page") {
+      apiMocks.fetchBuilderProject.mockResolvedValue({ id: projectId, usage_profile: "academy", draft_revision: 100, draft_schema: structuredClone(schemaA) });
+    }
+    const base = `/${workspace}/projects/${projectId}`;
+    const { container } = render(<MemoryRouter initialEntries={[`${base}/pages`]}><RoutingProbe /><PageBuilder user={user} /></MemoryRouter>);
+    await screen.findByLabelText("Page name");
+    fireEvent.click(screen.getByRole("tab", { name: /^Sections/ }));
+    expect(screen.getByTestId("editor-route").textContent).toBe(`${base}/pages/sections`);
+    fireEvent.click(screen.getByRole("tab", { name: /^Themes/ }));
+    expect(screen.getByTestId("editor-route").textContent).toBe(`${base}/pages/themes`);
+    expect(container.querySelector(".builder-themes-panel")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Test browser back" }));
+    await waitFor(() => expect(screen.getByTestId("editor-route").textContent).toBe(`${base}/pages/sections`));
+    expect(screen.getByRole("heading", { name: "Components" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("link", { name: "Header & Footer" }));
+    expect(screen.getByTestId("editor-route").textContent).toBe(`${base}/header-footer`);
+    await screen.findByLabelText("Brand name");
+    await flushMicrotasks();
+    expect(apiMocks.updateBuilderProject).not.toHaveBeenCalled();
+    expect(apiMocks.updateWebsiteSettings).not.toHaveBeenCalled();
+    expect(schemaA.pages[0].name).toBe("Home");
+  });
+
+  it("keeps hidden workspace panel navigation local", async () => {
+    const path = `/page-builder/projects/${projectId}/pages`;
+    const { container } = render(<MemoryRouter initialEntries={[path]}><RoutingProbe /><PageBuilder user={user} hideWorkspaceTabs /></MemoryRouter>);
+    await screen.findByLabelText("Page name");
+    fireEvent.click(screen.getByRole("tab", { name: /^Themes/ }));
+    expect(container.querySelector(".builder-themes-panel")).toBeTruthy();
+    expect(screen.getByTestId("editor-route").textContent).toBe(path);
+    expect(apiMocks.updateBuilderProject).not.toHaveBeenCalled();
+    expect(apiMocks.updateWebsiteSettings).not.toHaveBeenCalled();
+  });
+
+  it("replaces the legacy workspace root on initial navigation", async () => {
+    render(<MemoryRouter initialEntries={["/page-builder/"]}><RoutingProbe /><PageBuilder demoMode /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByTestId("editor-route").textContent).toBe("/page-builder/pages"));
+    expect(screen.getByTestId("editor-navigation-type").textContent).toBe("REPLACE");
+  });
+
+  it.each([false, true])("synchronizes settings after the project acknowledgement, settings failure=%s", async fails => {
+    if (fails) apiMocks.updateWebsiteSettings.mockRejectedValue(new Error("Settings unavailable"));
+    render(<MemoryRouter initialEntries={[`/page-builder/projects/${projectId}/header-footer`]}><PageBuilder user={user} /></MemoryRouter>);
+    const brand = await screen.findByLabelText("Brand name");
+    fireEvent.change(brand, { target: { value: "  Updated Brand  " } });
+    fireEvent.click(screen.getByRole("link", { name: "Pages" }));
+    await screen.findByLabelText("Page name");
+    fireEvent.click(screen.getByRole("button", { name: /^Save$/i }));
+    await waitFor(() => expect(apiMocks.updateWebsiteSettings).toHaveBeenCalled());
+    expect(apiMocks.updateWebsiteSettings.mock.calls[0][0].brand).toBe("Updated Brand");
+    expect(apiMocks.updateBuilderProject.mock.calls[0][1].draft_schema.siteChrome.brand).toBe("  Updated Brand  ");
+    expect(apiMocks.updateBuilderProject.mock.invocationCallOrder[0]).toBeLessThan(apiMocks.updateWebsiteSettings.mock.invocationCallOrder[0]);
+    if (fails) await screen.findByText("Your builder changes are saved, but Website Settings could not be synchronized.");
+    await waitFor(() => expect(screen.getAllByText(/^Saved$/).length).toBeGreaterThan(0));
+  });
+
+  it.each(["website", "academy"])("preserves raw hydration and settings exclusion for %s", async usage_profile => {
+    apiMocks.fetchWebsiteSettings.mockResolvedValue({ subdomain: "semantic-test", brand: "  Website Brand  " });
+    apiMocks.fetchBuilderProject.mockResolvedValue({ id: projectId, usage_profile, draft_revision: 100, draft_schema: structuredClone(schemaA) });
+    const acknowledgeProject = apiMocks.updateBuilderProject.getMockImplementation();
+    apiMocks.updateBuilderProject.mockImplementation(async (...args) => ({
+      ...await acknowledgeProject(...args), usage_profile,
+    }));
+    render(<MemoryRouter initialEntries={[`/page-builder/projects/${projectId}/header-footer`]}><RoutingProbe /><PageBuilder user={user} /></MemoryRouter>);
+    await screen.findByLabelText("Brand name");
+    await waitFor(() => expect(screen.getByLabelText("Brand name").value).toBe(usage_profile === "academy" ? "Madar" : "  Website Brand  "));
+    if (usage_profile === "academy") {
+      fireEvent.change(screen.getByLabelText("Brand name"), { target: { value: "Academy Brand" } });
+      fireEvent.click(screen.getByRole("link", { name: "Pages" }));
+      await screen.findByLabelText("Page name");
+      fireEvent.click(screen.getByRole("button", { name: /^Save$/i }));
+      await waitFor(() => expect(apiMocks.updateBuilderProject).toHaveBeenCalled());
+      await waitFor(() => expect(screen.getAllByText(/^Saved$/).length).toBeGreaterThan(0));
+    }
+    fireEvent.click(screen.getByRole("link", { name: "Pages" }));
+    await screen.findByLabelText("Page name");
+    fireEvent.click(screen.getByRole("link", { name: "Header & Footer" }));
+    expect(screen.getByLabelText("Brand name").value).toBe(usage_profile === "academy" ? "Academy Brand" : "  Website Brand  ");
+    expect(apiMocks.updateWebsiteSettings).not.toHaveBeenCalled();
   });
 
   it("renders recovery choices for a missing routed project instead of a retry-only dead end", async () => {

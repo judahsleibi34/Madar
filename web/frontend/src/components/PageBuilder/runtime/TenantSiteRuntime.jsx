@@ -1,3 +1,4 @@
+import { getAnswerValue, isOptionAnswerChecked, isCheckboxOptionChecked } from "./formAnswers";
 import DateTimeInput from "../../common/DateTimeInput";
 import { isFormFieldVisible } from "./formVisibility";
 import { getBuilderWorkspaceFromPath, getBuilderProjectBasePath } from "../core/PageBuilder.workspaceRouting";
@@ -219,32 +220,10 @@ const getRuntimeFieldOptions = (field, lang = "en") =>
     String(option || "").trim()
   );
 
-const getAnswerValue = (answer) =>
-  answer && typeof answer === "object" && !Array.isArray(answer) && "value" in answer
-    ? answer.value
-    : answer;
-
 const normalizeRuntimeAnswerValue = (value) => {
   if (Array.isArray(value)) return value.map(normalizeRuntimeAnswerValue);
   return getAnswerValue(value);
 };
-
-const isOptionAnswerChecked = (answer, option, optionIndex) => {
-  if (answer && typeof answer === "object" && !Array.isArray(answer)) {
-    return answer.optionIndex === optionIndex;
-  }
-
-  return answer === option;
-};
-
-const isCheckboxOptionChecked = (answers, option, optionIndex) =>
-  answers.some((answer) => {
-    if (answer && typeof answer === "object" && !Array.isArray(answer)) {
-      return answer.optionIndex === optionIndex;
-    }
-
-    return answer === option;
-  });
 
 const carouselElementTypes = new Set(["card", "carousel", "logoSlider", "carouselCards", "carouselSplit", "carouselSpotlight", "carouselStack", "carouselEditorial", "circularGallery"]);
 const authElementTypes = new Set(["loginBlock", "registrationBlock"]);

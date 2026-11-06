@@ -1,3 +1,4 @@
+import { getAnswerValue, isOptionAnswerChecked, isCheckboxOptionChecked } from "../runtime/formAnswers";
 import {
   getFormSections,
   getFormFields,
@@ -23,28 +24,6 @@ const getContentDirection = (value, fallback = "ltr") =>
   /[\u0590-\u05ff\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff]/.test(String(value || ""))
     ? "rtl"
     : fallback;
-
-const getAnswerValue = (answer) =>
-  answer && typeof answer === "object" && !Array.isArray(answer) && "value" in answer
-    ? answer.value
-    : answer;
-
-const isOptionAnswerChecked = (answer, option, optionIndex) => {
-  if (answer && typeof answer === "object" && !Array.isArray(answer)) {
-    return answer.optionIndex === optionIndex;
-  }
-
-  return answer === option;
-};
-
-const isCheckboxOptionChecked = (answers, option, optionIndex) =>
-  answers.some((answer) => {
-    if (answer && typeof answer === "object" && !Array.isArray(answer)) {
-      return answer.optionIndex === optionIndex;
-    }
-
-    return answer === option;
-  });
 
 export const createRuntimeFormRenderers = ({
   project,

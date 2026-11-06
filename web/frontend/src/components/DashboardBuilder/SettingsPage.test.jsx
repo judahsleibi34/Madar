@@ -151,10 +151,12 @@ describe("SettingsPage canonical email handling", () => {
     expect(screen.queryByDisplayValue("other@example.com")).toBeNull();
   });
 
-  it("shows only the logo filename while retaining the backend path", async () => {
+  it.each([
+    ["/uploads/tenant_7/builder_assets/56fee3e0f73c4110abdf423c12345678.png", "56fee3e0f73c4110abdf423c12345678.png"],
+    ["https://images.example.com/My%20Logo.png?version=2#preview", "My Logo.png"],
+    ["https://images.example.com/bad%ZZ.png", "bad%ZZ.png"],
+  ])("shows logo filename %s while retaining the backend path", async (logoPath, logoFileName) => {
     const currentUser = { id: 23, tenant_id: 7, email: "owner@example.com" };
-    const logoFileName = "56fee3e0f73c4110abdf423c12345678.png";
-    const logoPath = `/uploads/tenant_7/builder_assets/${logoFileName}`;
     listBuilderProjects.mockResolvedValue({
       projects: [{ id: "builder-project-1" }],
       pagination: { count: 1, has_more: false },

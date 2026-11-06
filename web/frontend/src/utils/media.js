@@ -1,3 +1,13 @@
+export const getMediaFileName = (value) => {
+  const cleanValue = String(value || "").split(/[?#]/, 1)[0].replace(/\\/g, "/");
+  const encodedName = cleanValue.slice(cleanValue.lastIndexOf("/") + 1);
+  try {
+    return decodeURIComponent(encodedName);
+  } catch {
+    return encodedName;
+  }
+};
+
 const CANONICAL_API_ORIGIN = "https://api.madarportal.com";
 const BLOCKED_MEDIA_SCHEMES = new Set(["javascript", "data", "vbscript", "file", "ftp"]);
 const URL_SCHEME_PATTERN = /^([a-z][a-z0-9+.-]*):/i;

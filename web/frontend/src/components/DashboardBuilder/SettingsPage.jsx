@@ -20,9 +20,8 @@ import {
   updateBuilderProject,
   uploadBuilderAsset,
 } from "../PageBuilder/services/PageBuilder.api";
-import { getBuilderAssetFileName } from "../PageBuilder/core/PageBuilder.uploadHandlers";
 import { apiFetch } from "../../utils/apiClient";
-import { resolveMediaUrl } from "../../utils/media";
+import { getMediaFileName, resolveMediaUrl } from "../../utils/media";
 import { buildCanonicalTenantUrl } from "../../utils/hostedAddress";
 import { clearEcommerceAdminCache, getEcommerceCacheScope } from "./utils/ecommerceAdminCache";
 import { clearAllEcommerceCatalogCaches } from "./utils/ecommerceCatalogCache";
@@ -1178,7 +1177,7 @@ export default function SettingsPage({
               <label>
                 {t.logoUrl}
                 <input
-                  value={getBuilderAssetFileName(siteForm.logoUrl)}
+                  value={getMediaFileName(siteForm.logoUrl)}
                   className={fieldErrors.logoUrl ? "field-has-error" : ""}
                   readOnly
                 />
@@ -1382,7 +1381,7 @@ export default function SettingsPage({
                 <label>
                   {t.storeLogo}
                   <input
-                    value={getBuilderAssetFileName(siteForm.logoUrl)}
+                    value={getMediaFileName(siteForm.logoUrl)}
                     className={fieldErrors.logoUrl ? "field-has-error" : ""}
                     readOnly
                   />

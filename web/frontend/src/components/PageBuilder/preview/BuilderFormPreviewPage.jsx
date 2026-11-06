@@ -1,3 +1,4 @@
+import { getAnswerValue, isOptionAnswerChecked, isCheckboxOptionChecked } from "../runtime/formAnswers";
 import DateTimeInput from "../../common/DateTimeInput";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -36,26 +37,6 @@ const getFieldOptions = (field = {}, lang = "en") =>
   getLocalizedOptions(field, lang).filter((option) =>
     String(option || "").trim()
   );
-
-const getAnswerValue = (answer) =>
-  answer && typeof answer === "object" && !Array.isArray(answer) && "value" in answer
-    ? answer.value
-    : answer;
-
-const isOptionAnswerChecked = (answer, option, optionIndex) => {
-  if (answer && typeof answer === "object" && !Array.isArray(answer)) {
-    return answer.optionIndex === optionIndex;
-  }
-  return answer === option;
-};
-
-const isCheckboxOptionChecked = (answers, option, optionIndex) =>
-  answers.some((answer) => {
-    if (answer && typeof answer === "object" && !Array.isArray(answer)) {
-      return answer.optionIndex === optionIndex;
-    }
-    return answer === option;
-  });
 
 export default function BuilderFormPreviewPage() {
   const { formId = "", projectId = "" } = useParams();

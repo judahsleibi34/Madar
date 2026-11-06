@@ -1,3 +1,4 @@
+import { getWebsiteSettingsPayload, websiteSettingsPayloadChanged } from "./PageBuilder.websiteSettings";
 import { useTranslation } from "react-i18next";
 import BuilderProjectLoadError from "./BuilderProjectLoadError";
 import { AcademyBuilderPreviewProvider } from "../../ELearning/ELearningAcademy";
@@ -325,6 +326,10 @@ import {
   resolveInspectorPage,
 } from "../core/PageBuilder.inspector";
 import {
+  builderTabPathById,
+  builderDesignPanelPathById,
+  getBuilderTabFromPath,
+  getBuilderDesignPanelFromPath,
   getBuilderProjectIdFromPath,
   getBuilderWorkspaceFromPath,
   getBuilderWorkspacePath,
@@ -372,45 +377,6 @@ import {
 } from "../core/PageBuilder.siteChrome";
 const getFieldType = (type) => getFieldTypeById(fieldTypes, type);
 
-const builderTabPathById = {
-  design: "/page-builder/pages",
-  forms: "/page-builder/forms",
-  reservations: "/page-builder/reservations",
-  chrome: "/page-builder/header-footer",
-  users: "/page-builder/users",
-  theme: "/page-builder/website-theme",
-  publish: "/page-builder/publish",
-  data: "/page-builder/data",
-  responses: "/page-builder/responses",
-  workflows: "/page-builder/workflows",
-};
-
-const builderDesignPanelPathById = {
-  Pages: "/page-builder/pages",
-  Sections: "/page-builder/pages/sections",
-  Themes: "/page-builder/pages/themes",
-};
-
-const builderTabIdByPathSegment = {
-  pages: "design",
-  design: "design",
-  forms: "forms",
-  reservations: "reservations",
-  chrome: "chrome",
-  "header-footer": "chrome",
-  header: "chrome",
-  footer: "chrome",
-  users: "users",
-  theme: "design",
-  themes: "design",
-  "website-theme": "design",
-  "site-theme": "design",
-  publish: "publish",
-  data: "data",
-  responses: "responses",
-  workflows: "workflows",
-};
-
 const STARTER_MODAL_DISMISSED_KEY = `${STORAGE_KEY}:starter-template-selected`;
 const BUILDER_DRAFT_SYNC_CHANNEL = "madar-builder-draft-sync";
 const BUILDER_CLOUD_SYNC_CHANNEL = "madar-builder-cloud-sync";
@@ -438,23 +404,6 @@ const inlineTextToolbarButtons = [
   { id: "align-justify", icon: AlignJustify, label: "Justify" },
 ];
 
-const getBuilderTabFromPath = (pathname = "") => {
-  const match = pathname.match(/^\/(?:page-builder|e-learning\/landing-page)\/(?:projects\/[^/?#]+\/)?([^/?#]+)/);
-  if (!match) return null;
-  return builderTabIdByPathSegment[match[1]] || null;
-};
-
-const getBuilderDesignPanelFromPath = (pathname = "") => {
-  const builderPath = String(pathname).replace(/^\/(?:page-builder|e-learning\/landing-page)\/projects\/[^/?#]+/, "/page-builder");
-  if (/^\/page-builder\/(?:theme|themes|website-theme|site-theme)(?:[/?#]|$)/.test(builderPath)) {
-    return "Themes";
-  }
-  const match = builderPath.match(/^\/page-builder\/(?:pages|design)\/([^/?#]+)/);
-  if (match?.[1] === "themes") return "Themes";
-  if (match?.[1] === "sections") return "Sections";
-  return "Pages";
-};
-
 const isDefaultShowcaseProject = (project = {}) => {
   const pageNames = Array.isArray(project.pages)
     ? project.pages.map((page) => String(page?.name || ""))
@@ -467,23 +416,6 @@ const isDefaultShowcaseProject = (project = {}) => {
 };
 
 const createCleanBlankProject = () => cleanBuilderProject(createBlankWorkspaceProject());
-
-const getWebsiteSettingsPayload = (project = {}) => {
-  const siteChrome = { ...defaultSiteChrome, ...(project.siteChrome || {}) };
-  return {
-    subdomain: sanitizeSubdomain(project.publish?.subdomain || ""),
-    brand: String(siteChrome.brand || "").trim(),
-    footer_store_name: String(siteChrome.footerStoreName || "").trim(),
-    logo_url: String(siteChrome.logoUrl || "").trim(),
-    contact_email: String(siteChrome.contactEmail || "").trim(),
-    phone: String(siteChrome.phone || "").trim(),
-    description: String(siteChrome.description || "").trim(),
-  };
-};
-
-const websiteSettingsPayloadChanged = (previousProject, nextProject) =>
-  JSON.stringify(getWebsiteSettingsPayload(previousProject)) !==
-  JSON.stringify(getWebsiteSettingsPayload(nextProject));
 
 // Non-content placeholder used only while an existing routed project is being
 // fetched. It is never rendered, persisted, recovered, or published.
