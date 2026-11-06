@@ -1,7 +1,7 @@
 # MADAR Frontend Architecture Exception Register
 
 **Status:** APPROVED GOVERNANCE ARTIFACT — contains no approved exceptions
-**Governing constitution:** `MADAR_FRONTEND_ARCHITECTURE_CONSTITUTION.md` v0.2, product-owner approved with repository activation pending
+**Governing constitution:** `MADAR_FRONTEND_ARCHITECTURE_CONSTITUTION.md`; v0.2 is committed locally, while v0.2.2 is product-owner approved for the local governance record as of 2026-11-06. Repository-wide adoption remains pending independent review and authorized merge.
 **Final architectural approving authority:** Madar product owner
 
 This register records time-limited deviations only where the constitution expressly permits an exception or from an approved lower-level architecture rule. An exception does not amend a constitutional **MUST** or **MUST NOT** and does not grant authority to bypass security, tenant authorization, QA, CI, migration, deployment, production-release, or other higher-level requirements. A binding constitutional change requires the versioned amendment procedure. File presence, a proposed row, or implementation does not constitute approval.

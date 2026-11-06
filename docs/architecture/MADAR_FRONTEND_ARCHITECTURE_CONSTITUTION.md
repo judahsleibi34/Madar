@@ -1,14 +1,17 @@
 # MADAR — Frontend Architecture Constitution & Expansion Rules
 
 **Document ID:** MADAR-ARCH-FE-001
-**Version:** 0.2
-**Status:** APPROVED — REPOSITORY ACTIVATION PENDING
+**Version:** 0.2.2
+**Status:** APPROVED FOR LOCAL GOVERNANCE RECORD — REPOSITORY-WIDE ADOPTION PENDING
 **Prepared:** 2026-11-06
 **Approval authority:** Madar product owner
 **Approval date:** 2026-11-06
 **Approved scope:** `web/frontend`, hosted tenant frontend delivery, frontend-facing FastAPI contracts, and future Madar web frontend modules
-**Effective date:** Pending completion of repository adoption gates
-**Supersedes:** Version 0.1 upon repository activation. Existing root `AGENTS.md` security, development, QA, CI, migration, deployment, and production-release rules remain in effect.
+**Local effective date:** 2026-11-06
+**Local effective status:** APPROVED FOR LOCAL GOVERNANCE RECORD
+**Repository-wide status:** PENDING INDEPENDENT REVIEW AND AUTHORIZED MERGE
+**Repository-wide effective date:** NOT YET ESTABLISHED
+**Supersedes:** Version 0.2.1 for the local governance record. Repository-wide supersession remains pending independent review and authorized merge. Existing root `AGENTS.md` security, development, QA, CI, migration, deployment, and production-release rules remain in effect.
 
 > **Architecture objective:** Madar must be able to add substantial products and features repeatedly without requiring repeated structural rewrites, duplicating shared engines, weakening tenant isolation, breaking published content, or making routine AI-assisted work depend on reading unrelated modules.
 
@@ -61,9 +64,9 @@ The following is a *current-state baseline*, not a mandate to preserve all imple
 
 **Evidence disclaimer:** Six reports are static-source investigations; no production workload, full regression suite, actual AI token usage, or real user performance was measured by those reports. Verify facts at implementation time.
 
-## 4. Architectural direction proposed for approval and unresolved decisions
+## 4. Locally approved architectural direction and unresolved decisions
 
-The proposed architectural direction for formal owner review and staged adoption is **domain ownership + modular monolith + limited first-party extension contracts**. It is not approved until the product owner adopts this constitution.
+The product-owner-approved logical architectural direction is **domain ownership + modular monolith + limited first-party extension contracts**. Approval is recorded for local governance; repository-wide adoption remains pending independent review and authorized merge. This direction does not authorize implementation or any optional registry, plugin mechanism, or deployment change.
 
 1. **Domain ownership:** Define which business capability is responsible for decisions, data shapes, workflows, screens, tests, and APIs.
 2. **Modular monolith:** Keep a coordinated web deployment while making source boundaries, dependencies, and public module interfaces explicit and enforceable.
@@ -116,7 +119,7 @@ The direction above does not decide the unresolved commercial packaging, deploym
 | **Hosted/public delivery** | Host-derived site/academy/storefront composition, public runtime integration, guest UX | Substituting frontend checks for FastAPI's public entitlement and resource checks |
 | **FastAPI** | Business authority, tenant/security enforcement, persistence, publication checks, AI processing and job controls | Frontend layout composition |
 
-A capability can have **multiple consumers but one accountable contract owner**. The Page Builder editor is a user-facing application; the underlying rendering/schema contracts are deliberately shared. Ownership of themes, reservations, academy block extension semantics, and common forms UI remains to be formally confirmed; do not guess from folder names alone.
+A capability can have **multiple consumers but one accountable contract owner**. The Page Builder editor is a user-facing application; the underlying rendering/schema contracts are deliberately shared. Platform Shared Forms owns generic frontend Forms concepts under ADR-FE-002, while Website and E-learning retain their product-specific workflows, persistence, and server validation. Reservations owns booking and availability semantics; Shared Page Builder owns reservation presentation integration; Calendar / Planning consumes an authorized read-only reservation projection under ADR-FE-004. Platform Hosted Composition owns common hosted entry and route governance, while products own their hosted business behavior under ADR-FE-005. Existing physical implementations remain supported. Technical maintainers, unestablished theme/media and extension contracts, and future public interfaces remain unresolved where recorded. These logical decisions do not authorize implementation, extraction, migration, or physical restructuring.
 
 ## 7. Dependencies and module public surfaces
 
@@ -142,7 +145,11 @@ entry / application shell
 
 Before implementation, each new product/domain MUST have a compact `MODULE.md` (or agreed equivalent) recording:
 
-1. **Identity:** stable module ID, name, owning domain/maintainer, current lifecycle (`experimental`, `under development`, `released`, `deprecated`), and scope.
+1. **Identity:** stable module ID, name, owning domain/maintainer, current lifecycle (`experimental`, `under-development`, `released`, `deprecated`), and scope.
+
+   These are the only canonical technical module lifecycle identifiers. "Under development" may be used as ordinary descriptive English, but it is not a separate lifecycle identifier.
+
+   Module lifecycle does not determine commercial status, backend entitlement, operational availability, or release readiness, and these identifiers do not establish an enforced state machine.
 2. **Capabilities:** user-visible workflows, dependencies on shared engines, and non-goals.
 3. **Integration:** route(s), navigation contribution, localized labels, entry component(s), loading/error behavior, and hosted exposure if relevant.
 4. **Access:** required FastAPI authorization checks, permission/capability identifiers, and optional commercial entitlement mapping; clearly distinguish each.
@@ -300,6 +307,32 @@ Every amendment requires a version change, change summary, documented impact rev
 
 Architecture evolves through approved evidence, ADRs, and versioned amendments—not as an incidental side effect of feature delivery.
 
+### Amendment record — Constitution v0.2.1
+
+- **Amendment ID:** Constitution v0.2.1
+- **Approval authority:** Madar product owner
+- **Approval date:** 2026-11-06
+- **Change summary:** Canonical technical module lifecycle terminology normalized to `under-development`.
+- **Scope:** Section 8 lifecycle documentation requirement.
+- **Impact review:** Terminology only. This amendment does not change domain ownership, module business semantics, commercial packaging, FastAPI access authority, tenant or resource permissions, operational availability, release readiness, security requirements, QA or CI requirements, database or migration policy, or deployment and release procedures.
+- **Local effective date:** 2026-11-06, following proper recording of this approved amendment.
+- **Local effective status:** APPROVED FOR LOCAL GOVERNANCE RECORD
+- **Repository-wide status:** PENDING INDEPENDENT REVIEW AND AUTHORIZED MERGE
+- **Repository-wide effective date:** NOT YET ESTABLISHED
+
+### Amendment record — Constitution v0.2.2
+
+- **Amendment ID:** Constitution v0.2.2
+- **Approval authority:** Madar product owner
+- **Approval date:** 2026-11-06
+- **Change summary:** Reconcile local logical approval wording, established ownership references and local-versus-repository adoption bookkeeping.
+- **Scope:** Sections 4, 6, 17 and 18, plus required current-version and amendment-history metadata.
+- **Impact review:** Governance clarification only. No change to product-domain or shared-capability ownership decisions, dependency restrictions, commercial packaging, FastAPI authority, tenant security, authorization or entitlements, lifecycle identifiers, QA/CI requirements, migration procedures, release and deployment controls, or implementation permissions.
+- **Local effective date:** 2026-11-06
+- **Local effective status:** APPROVED FOR LOCAL GOVERNANCE RECORD
+- **Repository-wide status:** PENDING INDEPENDENT REVIEW AND AUTHORIZED MERGE
+- **Repository-wide effective date:** NOT YET ESTABLISHED
+
 ## 16. New feature acceptance checklist
 
 A feature is architecturally ready only when reviewers can answer:
@@ -319,10 +352,12 @@ A feature is architecturally ready only when reviewers can answer:
 
 ### Required before policy adoption
 
-- [x] The product owner completes final review and records explicit approval of version 0.2.
+- [x] The product owner completes final review and records explicit approval of version 0.2.2 for the local governance record.
 - [x] Final wording, document version, approval date, and effective status are internally consistent.
-- [ ] The constitution, ADR template, and exception register are tracked in Git at their approved paths.
-- [ ] Root `AGENTS.md` authority reference is committed through an authorized Git workflow.
+- [x] Constitution v0.2, the ADR template, and exception register are tracked and committed locally in `6f10318f31acd84896644692bc184da8465f88e1`.
+- [x] The root `AGENTS.md` architecture authority reference is committed locally in that commit; its activation remains conditional on repository adoption gates.
+- [ ] The locally approved constitutional amendments and approved ADR documents are recorded through a separately authorized Git workflow.
+- [ ] Independent repository review and authorized merge are complete; repository-wide effectiveness is recorded only when the applicable adoption gates are satisfied.
 - [x] The precedence, definitions, approval procedure, reporting integration, and existing-system compatibility rules are accepted.
 - [x] Domain ownership decisions are recorded, or unresolved owners are marked `PENDING OWNER DECISION` with the preservation-first interim rule.
 - [x] Level 3 governance fields exist for accountable owner, existing/proposed checks, milestones, and review trigger/date; specific values may remain `PENDING OWNER DECISION`, and future automation is not an adoption prerequisite.
@@ -345,7 +380,7 @@ Before treating optional machinery as mandatory, confirm:
 1. Product roadmap and approximate expected module count/teams in the next 6–24 months.
 2. Coordinated versus independent product release/deployment requirements.
 3. Whether customers/partners will ever supply **executable** plugins versus using first-party products and configurable content.
-4. Product-authoritative owner of shared themes, forms UI, reservations, media, academy block contracts, and historical page schemas.
+4. Remaining contract-level ownership, accountable maintainers, and supported interfaces for themes, media, Academy block extensions, and historical page-schema compatibility, within established Shared Page Builder responsibilities. Platform Shared Forms and Reservations / Calendar logical ownership is recorded in ADR-FE-002 and ADR-FE-004; their unresolved interface, maintainer, and implementation decisions remain pending.
 5. Published-site backward compatibility duration and supported schema migration policy.
 6. Desired behavior for multi-tenant memberships, tenant switching, and identity/cache transition.
 7. Visibility rules for under-development, unavailable, discoverable, and commercially launched products.
@@ -357,10 +392,13 @@ Before treating optional machinery as mandatory, confirm:
 
 ---
 
-**Review status:** Product-owner approved v0.2; repository activation pending. This is not a claim that current code conforms.
+**Review status:** Product-owner approved v0.2.2 for the local governance record; repository-wide adoption remains pending independent review and authorized merge. This is not a claim that current code conforms.
 **Approval authority:** Madar product owner.
 **Approval date:** 2026-11-06.
-**Effective date:** Pending completion of repository adoption gates.
+**Local effective date:** 2026-11-06.
+**Local effective status:** APPROVED FOR LOCAL GOVERNANCE RECORD.
+**Repository-wide status:** PENDING INDEPENDENT REVIEW AND AUTHORIZED MERGE.
+**Repository-wide effective date:** NOT YET ESTABLISHED.
 **Approved scope:** `web/frontend`, hosted tenant frontend delivery, frontend-facing FastAPI contracts, and future Madar web frontend modules.
 **Repository path:** `docs/architecture/MADAR_FRONTEND_ARCHITECTURE_CONSTITUTION.md`
 **Activation requirement:** The governance documents and approved root `AGENTS.md` authority reference must be tracked and committed through a separately authorized Git workflow. Until those repository adoption gates are satisfied, product-owner approval is granted but repository activation remains pending.
