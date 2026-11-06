@@ -1,10 +1,12 @@
-// Documentary reporting only. No input can authorize acceptance or change a runner exit.
+// Documentary and optional live-authenticated reporting only. No input can authorize acceptance or change a runner exit.
 import { readFileSync, lstatSync, realpathSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { execFileSync } from "node:child_process";
 import { isDeepStrictEqual } from "node:util";
 import { sha256, loadEvidenceWriter, pixelDifferences } from "../e2e/academy-visual-contract.mjs";
+
+import { verifyLiveReview } from "./github-visual-review.mjs";
 
 const uncertainDirectory = "/home/judah/madar-qa-evidence/phase-38.1/offline-skia-analysis/execution-20261106-01";
 const safeName = name => typeof name === "string" && /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(name) && name !== "." && name !== "..";
@@ -96,7 +98,7 @@ export function reconcile({ suiteDirectory, decisionDirectory, sourceRoot }) {
       requireValue(pixels.referenceSize[0] === metadata.width && pixels.actualSize[0] === metadata.width && pixels.referenceSize[1] >= metadata.height && pixels.actualSize[1] >= metadata.height, "Screenshot dimensions do not match viewport");
       requireValue(isDeepStrictEqual(pixels, review.pixels), "Pixel evidence mismatch");
       requireValue(Array.isArray(review.checks) && review.checks.length > 0 && review.checks.every(c => typeof c.name === "string" && typeof c.pass === "boolean") && review.expected && Array.isArray(review.metadataDifferences) && Array.isArray(review.identityDifferences) && Array.isArray(review.failedChecks), "Missing mandatory checks");
-      const guardFailed = review.checks.some(c => !c.pass) || review.failedChecks.length > 0 || review.identityDifferences.length > 0 || !isDeepStrictEqual(review.expected, metadata) || !isDeepStrictEqual(pixels.referenceSize, pixels.actualSize);
+      const guardFailed = review.checks.some(c => !c.pass) || review.failedChecks.length > 0 || review.metadataDifferences.length > 0 || review.identityDifferences.length > 0 || !isDeepStrictEqual(review.expected, metadata) || !isDeepStrictEqual(pixels.referenceSize, pixels.actualSize);
       const machineStatus = guardFailed ? "FAIL" : reference.equals(actual) ? "EXACT_PASS" : "REVIEW_REQUIRED";
       requireValue(capture.status === machineStatus && review.status === machineStatus, "Machine verdict inconsistent with evidence");
       requireValue(review.machineFailure === (reference.equals(actual) ? null : "EXACT_PNG_EQUALITY_FAILED"), "Original pixel failure classification mismatch");
@@ -113,19 +115,27 @@ export function reconcile({ suiteDirectory, decisionDirectory, sourceRoot }) {
     requireValue(run.exit !== 0 || occurrences.filter(o => o.run === run.i + 1).every(o => o.machineStatus === "EXACT_PASS"), "Non-green captures with a successful runner exit");
   }
   const counts = Object.fromEntries(["EXACT_PASS", "REVIEW_REQUIRED", "FAIL"].map(s => [s, occurrences.filter(o => o.machineStatus === s).length]));
-  return { schemaVersion: 1, purpose: "LOCAL_DOCUMENTARY_REPORT_ONLY", evidenceTrust: "LOCAL_CHECKSUM_VERIFIED_NOT_AUTHENTICATED", suite: { directory: suiteDirectory, manifestSha256: suite.manifestHash }, machineCounts: counts, originalPlaywrightResults: originals, decisionInput, documentaryBoundClaims: occurrences.filter(o => o.documentary.status === "BOUND_HISTORICAL_CLAIM").length, unusedDocumentaryDecisions: decisions.map((d, i) => ({ i, run: d.run, scenario: d.scenario })).filter(d => !usedDecisions.has(d.i)), sourceComparisons: Object.fromEntries(sourceChecks), occurrences, automaticAcceptance: false, authenticatedApproval: false, blockers: ["AUTOMATED_ACCEPTANCE_NOT_IMPLEMENTED: GitHub owner PR reviews are a future target, not an authenticated provider", ...(counts.REVIEW_REQUIRED ? ["ORIGINAL_REVIEW_REQUIRED_REMAINS_NON_GREEN"] : []), ...(counts.FAIL ? ["MANDATORY_GUARD_FAILURE"] : []), ...(originals.some(r => r.playwrightExit !== 0) ? ["ORIGINAL_PLAYWRIGHT_EXECUTION_FAILED"] : []), ...([...sourceChecks.values()].some(s => !s.checked || !s.currentIdentityMatchesHistorical) ? ["CURRENT_IDENTITY_NOT_PROVEN_IDENTICAL_TO_HISTORICAL_CAPTURE"] : [])] };
+  return { schemaVersion: 1, purpose: "LOCAL_DOCUMENTARY_REPORT_ONLY", evidenceTrust: "LOCAL_CHECKSUM_VERIFIED_NOT_AUTHENTICATED", suite: { directory: suiteDirectory, manifestSha256: suite.manifestHash }, machineCounts: counts, originalPlaywrightResults: originals, decisionInput, documentaryBoundClaims: occurrences.filter(o => o.documentary.status === "BOUND_HISTORICAL_CLAIM").length, unusedDocumentaryDecisions: decisions.map((d, i) => ({ i, run: d.run, scenario: d.scenario })).filter(d => !usedDecisions.has(d.i)), sourceComparisons: Object.fromEntries(sourceChecks), occurrences, automaticAcceptance: false, authenticatedApproval: false, blockers: ["AUTOMATED_ACCEPTANCE_NOT_IMPLEMENTED: reporting cannot authorize CI or release acceptance", ...(counts.REVIEW_REQUIRED ? ["ORIGINAL_REVIEW_REQUIRED_REMAINS_NON_GREEN"] : []), ...(counts.FAIL ? ["MANDATORY_GUARD_FAILURE"] : []), ...(originals.some(r => r.playwrightExit !== 0) ? ["ORIGINAL_PLAYWRIGHT_EXECUTION_FAILED"] : []), ...([...sourceChecks.values()].some(s => !s.checked || !s.currentIdentityMatchesHistorical) ? ["CURRENT_IDENTITY_NOT_PROVEN_IDENTICAL_TO_HISTORICAL_CAPTURE"] : [])] };
 }
 export async function writeReport(options) {
   const writer = await loadEvidenceWriter(options.writerPath);
   return writer(options.outputDirectory, async ({ write, writeJson }) => {
     const report = reconcile(options);
+    if (options.pullNumber !== undefined) {
+      const authenticatedReview = verifyLiveReview({ report, pullNumber: Number(options.pullNumber), trustedRuntimeSha256: options.trustedRuntimeSha256, sourceRoot: options.sourceRoot });
+      // Re-read all evidence and source after network reads; never seal stale input.
+      requireValue(isDeepStrictEqual(report, reconcile(options)), "Evidence changed during live verification");
+      report.authenticatedReview = authenticatedReview;
+      report.purpose = "AUTHENTICATED_RECONCILIATION_REPORT_ONLY";
+      report.blockers.push("LIVE_REVIEW_IS_NOT_CI_OR_RELEASE_ACCEPTANCE");
+    } else requireValue(!options.trustedRuntimeSha256, "Runtime pin requires --github-pr");
     writeJson("reconciliation.json", report);
-    write("REPORT.txt", `LOCAL DOCUMENTARY RECONCILIATION — AUTOMATED ACCEPTANCE STILL BLOCKED\n\nMachine counts: ${JSON.stringify(report.machineCounts)}\nOriginal Playwright exits: ${JSON.stringify(report.originalPlaywrightResults)}\nBound documentary claims: ${report.documentaryBoundClaims}\nTrust: DOCUMENTARY_UNAUTHENTICATED. No owner identity or consent is verified by this tool.\nNo machine verdict is changed. A completed report is not a QA PASS.\nBlockers:\n${report.blockers.join("\n")}\n\nFull exact bindings, missing/stale claims and unchanged machine failures: reconciliation.json\n`);
+    write("REPORT.txt", `VISUAL REVIEW RECONCILIATION — AUTOMATED ACCEPTANCE STILL BLOCKED\n\nMachine counts: ${JSON.stringify(report.machineCounts)}\nOriginal Playwright exits: ${JSON.stringify(report.originalPlaywrightResults)}\nBound documentary claims: ${report.documentaryBoundClaims}\nDocumentary trust: DOCUMENTARY_UNAUTHENTICATED.\nLive review: ${report.authenticatedReview ? JSON.stringify(report.authenticatedReview) : "NOT_VERIFIED"}.\nNo machine verdict is changed. A completed report is not a QA PASS.\nBlockers:\n${report.blockers.join("\n")}\n\nFull exact bindings, missing/stale claims and unchanged machine failures: reconciliation.json\n`);
   }, ["reconciliation.json", "REPORT.txt"]);
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   try {
-    const names = { "--suite": "suiteDirectory", "--decisions": "decisionDirectory", "--source-root": "sourceRoot", "--writer": "writerPath", "--output": "outputDirectory" }, options = {};
+    const names = { "--suite": "suiteDirectory", "--decisions": "decisionDirectory", "--source-root": "sourceRoot", "--writer": "writerPath", "--output": "outputDirectory", "--github-pr": "pullNumber", "--trusted-runtime-sha256": "trustedRuntimeSha256" }, options = {};
     for (let i = 2; i < process.argv.length; i += 2) {
       requireValue(names[process.argv[i]] && process.argv[i + 1] && !options[names[process.argv[i]]], "Invalid or duplicate CLI arguments");
       options[names[process.argv[i]]] = process.argv[i + 1];

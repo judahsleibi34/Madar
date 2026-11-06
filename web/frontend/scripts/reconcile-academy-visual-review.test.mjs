@@ -111,3 +111,10 @@ test("CLI success means report generation only, never QA PASS", () => {
   const r = spawnSync(process.execPath, [script, "--suite", normal.suiteDirectory, "--decisions", normal.decisionDirectory, "--writer", writerPath, "--output", path.join(root, "cli-report")], { encoding: "utf8" });
   assert.equal(r.status, 0, r.stderr); assert.equal(JSON.parse(r.stdout).qaPass, false);
 });
+test("live reporting without trusted runtime fails without sealing an approval", async () => {
+  const destination = path.join(root, "untrusted-live-report");
+  await assert.rejects(writeReport({ ...normal, writerPath, outputDirectory: destination, pullNumber: 12 }), /fingerprint/);
+  assert.equal(existsSync(path.join(destination, "completion.json")), false);
+  assert.equal(existsSync(path.join(destination, "reconciliation.json")), false);
+  const r = reconcile(normal); assert.equal(r.authenticatedApproval, false); assert.equal(r.originalPlaywrightResults[0].playwrightExit, 1);
+});
