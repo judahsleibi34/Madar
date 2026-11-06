@@ -162,6 +162,29 @@ def verify(root: Path, *, dump: bool = True) -> dict:
     return manifest
 
 
+def verify_reconciled_maintenance(root: Path, *, expected_sha256: str, schema: int, scope: str) -> dict:
+    """Exact canonical checkpoint contract; not backup or restore authority.
+
+    Shared by sender and receiver without importing privileged controller code.
+    The independently pinned inner digest covers original roles, objects and
+    recovery identities. The append-only transfer scope binds its operation,
+    context and stage;160 is never admitted by a number-only allowlist.
+    """
+    if not isinstance(expected_sha256,str) or not re.fullmatch('[0-9a-f]{64}',expected_sha256):
+        raise BackupError('reconciled_maintenance_checkpoint_digest_required')
+    value=verify_maintenance(root,expected_sha256=expected_sha256)
+    binding=value['binding'];operation='completed-normal-schema146-160-coordinated-release'
+    expected_scope=hashlib.sha256((json.dumps({'operation':operation,
+        'context_sha256':binding['context_sha256'],'backup_stage':value['stage']},sort_keys=True,indent=2)+'\n').encode()).hexdigest()
+    if (type(schema) is not int or schema not in {146,160} or value['schema']!=schema
+            or binding['operation']!=operation or binding['source_schema']!=146 or binding['target_schema']!=160
+            or value['stage']!=('pre-migration' if schema==146 else 'post-migration')
+            or value['recovery']['migration_manifest_sha256']!='7633a15a9f531874409577fb9696e472631d3bbde63ae2603be0a4d23ef7c08f'
+            or scope!=expected_scope):
+        raise BackupError('reconciled_maintenance_checkpoint_binding_invalid')
+    return value
+
+
 def verify_maintenance(root: Path, *, expected_sha256: str | None = None) -> dict:
     """Verify maintenance recovery material, never authorize its use.
 
@@ -185,7 +208,7 @@ def verify_maintenance(root: Path, *, expected_sha256: str | None = None) -> dic
     value = json.loads(body)
     keys = {'version','binding','stage','schema','bootstrap_role','roles_sha256','roles_snapshot_sha256',
             'objects_sha256','objects_measurement','database_fingerprint','recovery','authority_issued'}
-    if (not isinstance(value,dict) or set(value)!=keys or type(value['version']) is not int or value['version']!=1
+    if (not isinstance(value,dict) or set(value)!=keys or type(value['version']) is not int or value['version'] not in (1,2)
             or value['authority_issued'] is not False or value['stage'] not in {'pre-migration','post-migration'}
             or type(value['schema']) is not int or value['schema']<=0
             or not re.fullmatch('[a-zA-Z_][a-zA-Z0-9_]*',str(value['bootstrap_role']))
@@ -294,13 +317,14 @@ ROLE_SNAPSHOT_SQL = """SELECT json_build_object(
  '[]'::json) FROM pg_db_role_setting s LEFT JOIN pg_database d ON d.oid=s.setdatabase));"""
 
 
-def database_snapshot(query) -> list:
+def database_snapshot(query, *, acl_semantics=False) -> list:
     """Measure data, sequences and role-based ownership/ACLs, with no raw rows.
 
     query is a fixed code-owned read-only transport, never serialized evidence.
     Callers must retain quiescence; bounded server timeouts fail on large data
     instead of claiming a partial recovery. Restore cluster OIDs may differ.
     """
+    if type(acl_semantics) is not bool:raise BackupError('maintenance_acl_semantics_invalid')
     rows=json.loads(query("SELECT coalesce(json_agg(json_build_object('schema',n.nspname,'name',c.relname,"
         "'kind',c.relkind) ORDER BY n.nspname,c.relname),'[]'::json) FROM pg_class c JOIN pg_namespace n "
         "ON n.oid=c.relnamespace WHERE n.nspname IN ('public','auth','storage') AND c.relkind IN ('r','p','S');"))
@@ -319,14 +343,20 @@ def database_snapshot(query) -> list:
             statements.append("SELECT json_build_array('"+name+"',count(*),encode(sha256(convert_to(coalesce("
                 "string_agg(h,'' ORDER BY h COLLATE \"C\"),''),'UTF8')),'hex'))::text FROM "
                 "(SELECT encode(sha256(convert_to(to_jsonb(t)::text,'UTF8')),'hex') h FROM "+table+' t) rows;')
-    statements.append("SELECT json_build_object('database',(SELECT json_build_array(datname,datdba::regrole::text,datacl) "
+    database_acl="coalesce(datacl,acldefault('d',datdba))" if acl_semantics else 'datacl'
+    relation_acl=("CASE WHEN c.relkind IN ('r','p','v','m','f','S') THEN coalesce(c.relacl,"
+        "acldefault(CASE WHEN c.relkind='S' THEN 'S' ELSE 'r' END::\"char\",c.relowner)) ELSE c.relacl END"
+        if acl_semantics else 'c.relacl')
+    schema_acl="coalesce(nspacl,acldefault('n',nspowner))" if acl_semantics else 'nspacl'
+    function_acl="coalesce(p.proacl,acldefault('f',p.proowner))" if acl_semantics else 'p.proacl'
+    statements.append("SELECT json_build_object('database',(SELECT json_build_array(datname,datdba::regrole::text,"+database_acl+") "
         "FROM pg_database WHERE datname=current_database()),'relations',(SELECT json_agg(json_build_array(n.nspname,"
-        "c.relname,c.relkind,c.relowner::regrole::text,c.relacl,c.relrowsecurity,c.relforcerowsecurity) "
+        "c.relname,c.relkind,c.relowner::regrole::text,"+relation_acl+",c.relrowsecurity,c.relforcerowsecurity) "
         "ORDER BY n.nspname,c.relname) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
         "WHERE n.nspname IN ('public','auth','storage')),'schemas',(SELECT json_agg(json_build_array(nspname,"
-        "nspowner::regrole::text,nspacl) ORDER BY nspname) FROM pg_namespace WHERE nspname IN ('public','auth','storage')),"
+        "nspowner::regrole::text,"+schema_acl+") ORDER BY nspname) FROM pg_namespace WHERE nspname IN ('public','auth','storage')),"
         "'functions',(SELECT json_agg(json_build_array(n.nspname,p.proname,pg_get_function_identity_arguments(p.oid),"
-        "p.proowner::regrole::text,p.proacl,p.prosecdef,p.proconfig,pg_get_functiondef(p.oid)) ORDER BY "
+        "p.proowner::regrole::text,"+function_acl+",p.prosecdef,p.proconfig,pg_get_functiondef(p.oid)) ORDER BY "
         "n.nspname,p.proname,pg_get_function_identity_arguments(p.oid)) FROM pg_proc p JOIN pg_namespace n "
         "ON n.oid=p.pronamespace WHERE n.nspname IN ('public','auth','storage') AND p.prokind IN ('f','p')))::text;")
     raw=query('\n'.join(statements))
@@ -334,7 +364,9 @@ def database_snapshot(query) -> list:
     if len(packet)!=len(rows)+1:raise BackupError('maintenance_database_fingerprint_incomplete')
     # pg_restore may emit semantically identical ACL items in a different array
     # order. Keep every privilege/grantee/grantor token (including duplicates),
-    # and distinguish NULL/default ACLs from an explicitly empty ACL.
+    # In v2 PostgreSQL expands only NULL/default ACLs above. An explicitly
+    # empty ACL stays empty; every privilege, grant option and grantor survives.
+    # V1 retains its original raw catalog representation for old signed inputs.
     metadata=packet[-1]
     grants=[(metadata['database'],2)]
     for key,index in (('relations',4),('schemas',2),('functions',4)):
@@ -347,8 +379,8 @@ def database_snapshot(query) -> list:
     return packet
 
 
-def database_fingerprint(query) -> str:
-    packet=database_snapshot(query)
+def database_fingerprint(query, *, acl_semantics=False) -> str:
+    packet=database_snapshot(query,acl_semantics=acl_semantics)
     return hashlib.sha256(json.dumps(packet,sort_keys=True,separators=(',',':'),ensure_ascii=True).encode()).hexdigest()
 
 
@@ -507,10 +539,14 @@ LOCAL_DATABASE_FD = 'MADAR_LOCAL_DATABASE_BINDING_FD'
 DATABASE_SEALS = fcntl.F_SEAL_WRITE | fcntl.F_SEAL_GROW | fcntl.F_SEAL_SHRINK | fcntl.F_SEAL_SEAL
 
 
-def sealed_local_database_binding() -> int:
+def sealed_local_database_binding(*, maintenance_role='postgres',database_contract=None) -> int:
     if os.geteuid() != 0 or LOCAL_DATABASE_FD in os.environ:
         raise BackupError('local_backup_binding_root_required')
-    address = direct_local_database_address()
+    if not isinstance(maintenance_role,str) or maintenance_role not in {'postgres','supabase_admin'}:
+        raise BackupError('local_backup_maintenance_role_invalid')
+    if database_contract is not None and maintenance_role!='supabase_admin':
+        raise BackupError('local_backup_historical_maintenance_role_required')
+    address = direct_local_database_address(**({'database_contract':database_contract} if database_contract is not None else {}))
     fd = os.memfd_create('madar-native-backup-address', os.MFD_ALLOW_SEALING)
     try:
         # fd 9 belongs to backup_madar.sh's existing backup lock.
@@ -518,8 +554,9 @@ def sealed_local_database_binding() -> int:
         os.close(fd)
         fd = inherited
         os.fchmod(fd, 0o400)
-        payload = json.dumps({'version': 1, 'address': address,
-                              'expires': time.monotonic() + 7200}).encode()
+        value={'version':1,'address':address,'expires':time.monotonic()+7200}
+        if maintenance_role!='postgres':value.update(version=2,maintenance_role=maintenance_role)
+        payload = json.dumps(value).encode()
         os.write(fd, payload)
         fcntl.fcntl(fd, fcntl.F_ADD_SEALS, DATABASE_SEALS)
         return fd
@@ -528,7 +565,7 @@ def sealed_local_database_binding() -> int:
         raise
 
 
-def leased_local_database_address() -> str:
+def local_database_lease() -> dict:
     try:
         raw = os.environ[LOCAL_DATABASE_FD]
         if not re.fullmatch(r'[0-9]{1,6}', raw):
@@ -542,18 +579,61 @@ def leased_local_database_address() -> str:
         value = json.loads(os.pread(fd, 4096, 0))
         remaining = value['expires'] - time.monotonic()
         address = ipaddress.ip_address(value['address'])
-        if (set(value) != {'version', 'address', 'expires'} or value['version'] != 1
+        version=value.get('version');keys={'version','address','expires'}
+        if type(version) is int and version==2:keys.add('maintenance_role')
+        if (set(value)!=keys or type(version) is not int or version not in {1,2}
+                or version==2 and value['maintenance_role']!='supabase_admin'
                 or not 0 < remaining <= 7200 or address.version != 4
                 or not address.is_private or address.is_loopback or address.is_link_local
                 or address.is_unspecified or address.is_multicast):
             raise ValueError('lease')
-        return str(address)
+        return dict(value,address=str(address))
     except (OSError, ValueError, KeyError, TypeError):
         raise BackupError('local_backup_binding_invalid') from None
 
 
-def direct_local_database_address() -> str:
+def leased_local_database_address() -> str:
+    return local_database_lease()['address']
+
+
+def leased_local_database_role() -> str:
+    # A caller-selected PGUSER never enables privileged backup. Only the
+    # existing root-owned sealed descriptor may carry the reviewed role.
+    return local_database_lease().get('maintenance_role','postgres')
+
+
+def direct_local_database_address(*,database_contract=None) -> str:
     """Resolve only the healthy native DB; never persist a Docker bridge address."""
+    if database_contract is not None:
+        if os.geteuid()!=0 or LOCAL_DATABASE_FD in os.environ:
+            raise BackupError('local_backup_historical_root_observer_required')
+        from deployment.lib.completed_normal_admission import validate_provider_preparation
+        from deployment.lib.completed_normal_profile import RECONCILED,maintenance_role
+        from deployment.lib.historical_origin import KIND
+        if (validate_provider_preparation(database_contract) is not RECONCILED
+                or database_contract['source_roles'].get('origin_kind')!=KIND
+                or maintenance_role(database_contract)!='supabase_admin'):
+            raise BackupError('local_backup_historical_contract_invalid')
+        from deployment.lib.completed_normal_database import observe_native
+        from deployment.lib.emergency_routing_repair import Runtime
+        runtime=Runtime();observe_native(database_contract,runtime)
+        expected=database_contract['database'];rows=runtime.inspect([expected['container_id']])
+        row=next(iter(rows.values())) if len(rows)==1 else None
+        if row is None or row['Id']!=expected['container_id']:
+            raise BackupError('local_backup_historical_database_changed')
+        from deployment.lib.completed_normal_resources import measured_spec
+        from deployment.lib.historical_origin import database_networks
+        topology=database_networks(database_contract);networks=row['NetworkSettings']['Networks']
+        if (measured_spec(row)!=expected['spec_sha256'] or not row['State']['Running']
+                or row['State'].get('Health',{}).get('Status')!='healthy'
+                or {name:entry.get('NetworkID') for name,entry in networks.items()}!=topology):
+            raise BackupError('local_backup_historical_database_changed')
+        try:address=ipaddress.ip_address(networks[expected['network_name']]['IPAddress'])
+        except (ValueError,KeyError,TypeError):raise BackupError('local_backup_historical_address_invalid') from None
+        if (address.version!=4 or not address.is_private or address.is_loopback or address.is_link_local
+                or address.is_unspecified or address.is_multicast):
+            raise BackupError('local_backup_historical_address_invalid')
+        return str(address)
     if LOCAL_DATABASE_FD in os.environ:
         return leased_local_database_address()
     shape = ('{"running":{{json .State.Running}},"health":{{json .State.Health.Status}},'
@@ -580,8 +660,10 @@ def direct_local_database_address() -> str:
 
 
 def direct_local_database_shape() -> bool:
+    role='postgres'
+    if LOCAL_DATABASE_FD in os.environ:role=leased_local_database_role()
     return all(os.environ.get(key) == value for key, value in {
-        'PGHOST': 'supabase-db', 'PGPORT': '5432', 'PGUSER': 'postgres',
+        'PGHOST': 'supabase-db', 'PGPORT': '5432', 'PGUSER': role,
         'PGDATABASE': 'postgres', 'PGSSLMODE': 'disable'}.items())
 
 

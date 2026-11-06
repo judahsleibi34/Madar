@@ -422,3 +422,354 @@ if __name__ == '__main__':
     parser.add_argument('--repair-driver-sha')
     args = parser.parse_args()
     print(json.dumps(main(args.mode, args.source_sha, args.repair_driver_sha), sort_keys=True))
+
+
+class AutomaticReleaseGuest:
+    """Bounded Node2 test profile using the same official-image/KVM machinery.
+
+    Historical phase7 commands/paths are unchanged. This profile accepts only
+    the current owned /opt execution manifest; never a production disk, bridge,
+    mount, source-controlled host path or caller-selected QEMU command.
+    """
+    def __init__(self):
+        import uuid
+        manifest=Path('/opt/madar-development/inventory/CURRENT-AUTOMATIC-EXECUTION.json')
+        value=json.loads(manifest.read_bytes());self.run_id=value['run_id']
+        if (socket.gethostname()!='madar-gpu' or os.getuid()!=1000
+                or not re.fullmatch(r'codex-[0-9]{8}T[0-9]{6}Z-automatic-execution-[a-f0-9]{8}',self.run_id)
+                or value['production_modified'] is not False):
+            raise RuntimeError('automatic_guest_owned_node2_manifest_required')
+        parent=Path('/opt/madar-development/scratch/codex-runs')/self.run_id
+        if value['scratch']!=str(parent) or parent.is_symlink():raise RuntimeError('automatic_guest_scratch_changed')
+        from datetime import datetime
+        lifetime=value.get('max_lifetime_seconds');created=datetime.fromisoformat(value['created_at'])
+        if (created.tzinfo is None or type(lifetime) is not int or not 0<lifetime<=10800
+                or not created.timestamp()<=time.time()<created.timestamp()+lifetime):
+            raise RuntimeError('automatic_guest_bounded_lifetime_required')
+        self.deadline=created.timestamp()+lifetime
+        self.monotonic_deadline=time.monotonic()+min(lifetime,self.deadline-time.time())
+        private_directory(parent)
+        self.directory=parent/'guest';self.directory.mkdir(mode=0o700)
+        self.evidence=Path(value['evidence']);private_directory(self.evidence)
+        self.uuid=str(uuid.uuid4());self.process=None;self.pid=None
+        # Two live application slots plus native providers need the same bounded
+        # budget as the accepted historical running-application rehearsal.
+        self.memory=8192;self.cpus=4;self.disk_gib=32
+        self.mac='52:54:'+':'.join(self.uuid.replace('-','')[i:i+2] for i in (0,2,4,6))
+        with socket.socket() as port:port.bind(('127.0.0.1',0));self.port=port.getsockname()[1]
+        self.record={'run_id':self.run_id,'guest_uuid':self.uuid,'directory':str(self.directory),
+            'memory_mib':self.memory,'cpus':self.cpus,'disk_gib':self.disk_gib,'port':self.port,
+            'production_authority':False,'resources_removed':False}
+        self.save()
+
+    def save(self):
+        path=self.evidence/'automatic-guest.json';path.write_text(json.dumps(self.record,indent=2)+'\n');path.chmod(0o600)
+
+    def command(self,args,*,data=None,timeout=60,pass_fds=()):
+        result=subprocess.run(args,input=data,capture_output=True,timeout=timeout,pass_fds=pass_fds,
+            env={'PATH':os.defpath,'HOME':'/nonexistent'})
+        if result.returncode:
+            path=self.evidence/'private-guest-command-error.log';path.write_bytes((result.stdout+result.stderr)[-65536:]);path.chmod(0o600)
+            raise RuntimeError('automatic_guest_command_failed_private_evidence')
+        return result.stdout
+
+    def write(self,name,body):
+        fd=os.open(self.directory/name,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+        with os.fdopen(fd,'wb') as out:
+            out.write(body.encode() if isinstance(body,str) else body);out.flush();os.fsync(out.fileno())
+
+    def prepare(self):
+        if shutil.disk_usage(self.directory).free<20*1024**3:
+            raise RuntimeError('automatic_guest_disk_headroom_insufficient')
+        available=int(next(v.split()[1] for v in Path('/proc/meminfo').read_text().splitlines() if v.startswith('MemAvailable:')))*1024
+        if available<12*1024**3:raise RuntimeError('automatic_guest_memory_headroom_insufficient')
+        bundle=Path('/opt/madar-development/evidence/historical/madar-phase7-official-cloudimage-20261018')
+        checksums=read(bundle/'SHA256SUMS');signature=read(bundle/'SHA256SUMS.gpg')
+        self.write('SHA256SUMS',checksums);self.write('SHA256SUMS.gpg',signature)
+        status=self.command(['/usr/bin/gpgv','--status-fd','1','--keyring',str(KEYRING),str(self.directory/'SHA256SUMS.gpg'),str(self.directory/'SHA256SUMS')])
+        if SIGNER not in status.decode() or re.findall(r'^([a-f0-9]{64}) [ *]'+re.escape(IMAGE)+r'$',checksums.decode(),re.M)!=[IMAGE_SHA256]:
+            raise RuntimeError('automatic_guest_official_image_signature_refused')
+        # Capture/hash one immutable unnamed snapshot before qemu-img reads it.
+        with (bundle/IMAGE).open('rb') as source,tempfile.TemporaryFile(dir=self.directory) as frozen:
+            sha=hashlib.sha256();size=0
+            while block:=source.read(1024**2):
+                size+=len(block)
+                if size>IMAGE_MAX_BYTES:raise RuntimeError('automatic_guest_image_size_limit')
+                frozen.write(block);sha.update(block)
+            if not IMAGE_MIN_BYTES<size or sha.hexdigest()!=IMAGE_SHA256:raise RuntimeError('automatic_guest_image_hash_changed')
+            frozen.flush();frozen.seek(0)
+            info=json.loads(self.command(['/usr/bin/qemu-img','info','--output=json','/proc/self/fd/'+str(frozen.fileno())],pass_fds=(frozen.fileno(),)))
+            if info.get('format')!='qcow2' or info.get('backing-filename') or info.get('encrypted'):
+                raise RuntimeError('automatic_guest_official_image_layout_refused')
+            self.command(['/usr/bin/qemu-img','convert','-f','qcow2','-O','qcow2','/proc/self/fd/'+str(frozen.fileno()),str(self.directory/'guest.qcow2')],pass_fds=(frozen.fileno(),),timeout=120)
+        (self.directory/'guest.qcow2').chmod(0o600)
+        self.command(['/usr/bin/qemu-img','resize',str(self.directory/'guest.qcow2'),str(self.disk_gib)+'G'])
+        for name in ('identity','host-key'):
+            self.command(['/usr/bin/ssh-keygen','-q','-t','ed25519','-N','','-C',self.run_id,'-f',str(self.directory/name)])
+            for suffix in ('','.pub'):(self.directory/(name+suffix)).chmod(0o600)
+        host_public=(self.directory/'host-key.pub').read_text().strip()
+        self.write('known_hosts','[127.0.0.1]:'+str(self.port)+' '+host_public+'\n')
+        cloud={'hostname':'madar-release-test','manage_etc_hosts':True,'ssh_pwauth':False,'disable_root':True,
+            'package_update':False,'package_upgrade':False,
+            'ssh_keys':{'ed25519_private':(self.directory/'host-key').read_text(),'ed25519_public':host_public},
+            'users':[{'name':'madar','uid':1000,'shell':'/bin/bash','lock_passwd':True,
+                'sudo':['ALL=(ALL) NOPASSWD:ALL'],'ssh_authorized_keys':[(self.directory/'identity.pub').read_text().strip()]}],
+            'write_files':[{'path':'/etc/madar-disposable-parent.json','permissions':'0600','owner':'root:root',
+                'content':json.dumps(self.record)}]}
+        self.write('user-data','#cloud-config\n'+json.dumps(cloud)+'\n')
+        self.write('meta-data',json.dumps({'instance-id':self.uuid,'local-hostname':'madar-release-test'})+'\n')
+        # The execution fence precedes networking after reboot. Static addressing
+        # avoids adding DHCP/public DNS exceptions to that strict reviewed fence.
+        # Each QEMU user-network is a distinct owned10.0.2.0/24 realm.
+        self.write('network-config',json.dumps({'version':2,'ethernets':{'guestnet':{
+            'match':{'macaddress':self.mac},'set-name':'ens3','dhcp4':False,'dhcp6':False,
+            'addresses':['10.0.2.15/24'],'routes':[{'to':'0.0.0.0/0','via':'10.0.2.2'}],
+            'nameservers':{'addresses':['10.0.2.3']}}}})+'\n')
+        self.command(['/usr/bin/xorriso','-as','mkisofs','-o',str(self.directory/'seed.iso'),'-V','cidata','-J','-r',
+            str(self.directory/'user-data'),str(self.directory/'meta-data'),str(self.directory/'network-config')])
+        (self.directory/'seed.iso').chmod(0o600)
+        self.record['image_sha256']=IMAGE_SHA256;self.save()
+
+    def ssh_args(self):
+        return ['/usr/bin/ssh','-F','/dev/null','-o','BatchMode=yes','-o','IdentitiesOnly=yes',
+            '-o','StrictHostKeyChecking=yes','-o','GlobalKnownHostsFile=/dev/null',
+            '-o','UserKnownHostsFile='+str(self.directory/'known_hosts'),'-o','ConnectTimeout=3',
+            '-o','ProxyCommand=none','-o','ProxyJump=none','-i',str(self.directory/'identity'),
+            '-p',str(self.port),'madar@127.0.0.1']
+
+    def launch(self):
+        args=['/usr/bin/sudo','-n','-u','madar','-g','kvm','--','/usr/bin/qemu-system-x86_64',
+            '-name',self.run_id,'-uuid',self.uuid,'-machine','q35,accel=kvm','-cpu','host','-smp',str(self.cpus),'-m',str(self.memory),
+            '-nodefaults','-no-user-config','-display','none','-monitor','none',
+            '-serial','file:'+str(self.directory/'serial.log'),'-pidfile',str(self.directory/'qemu.pid'),
+            '-sandbox','on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny',
+            '-drive','file='+str(self.directory/'guest.qcow2')+',if=virtio,format=qcow2,cache=none',
+            '-drive','file='+str(self.directory/'seed.iso')+',if=virtio,format=raw,readonly=on',
+            '-netdev','user,id=owned,net=10.0.2.0/24,hostfwd=tcp:127.0.0.1:'+str(self.port)+'-:22',
+            '-device','virtio-net-pci,netdev=owned,mac='+self.mac]
+        with (self.directory/'qemu.log').open('xb') as out:
+            os.fchmod(out.fileno(),0o600)
+            self.process=subprocess.Popen(args,stdin=subprocess.DEVNULL,stdout=out,stderr=out,start_new_session=True,
+                env={'PATH':os.defpath,'HOME':'/nonexistent'})
+        for _ in range(120):
+            if self.process.poll() is not None:raise RuntimeError('automatic_guest_qemu_launch_failed')
+            path=self.directory/'qemu.pid'
+            if path.exists():
+                descriptor=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK|os.O_CLOEXEC)
+                with os.fdopen(descriptor,'rb') as source:
+                    metadata=os.fstat(source.fileno());value=source.read(33).strip()
+                    if (metadata.st_uid!=1000 or not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink!=1
+                            or len(value)>32 or value and not re.fullmatch(rb'[1-9][0-9]{0,9}',value)):
+                        raise RuntimeError('automatic_guest_pidfile_ownership_refused')
+                    if not value:time.sleep(1);continue
+                    self.pid=int(value);self.require_owned_pid();os.fchmod(source.fileno(),0o600)
+                result=subprocess.run(self.ssh_args()+['true'],capture_output=True,timeout=6)
+                if result.returncode==0:
+                    facts=json.loads(self.command(self.ssh_args()+['sudo -n python3 -'],data=b'import json,pathlib,socket,subprocess;print(json.dumps({"uuid":pathlib.Path("/sys/class/dmi/id/product_uuid").read_text().strip().lower(),"hostname":socket.gethostname(),"virt":subprocess.check_output(["systemd-detect-virt"]).decode().strip()}))'))
+                    if facts!={'uuid':self.uuid,'hostname':'madar-release-test','virt':'kvm'}:
+                        raise RuntimeError('automatic_guest_positive_identity_failed')
+                    self.record.update(pid=self.pid,identity=facts);self.save();return facts
+            time.sleep(1)
+        raise RuntimeError('automatic_guest_ssh_deadline_exceeded')
+
+    def require_owned_pid(self):
+        p=Path('/proc')/str(self.pid)
+        arguments=(p/'cmdline').read_bytes().split(b'\0')
+        if (p.stat().st_uid!=1000 or not arguments or b'qemu-system' not in arguments[0]
+                or self.run_id.encode() not in arguments or self.uuid.encode() not in arguments
+                or not any(str(self.directory/'guest.qcow2').encode() in a for a in arguments)):
+            raise RuntimeError('automatic_guest_pid_ownership_refused')
+
+    def resume_after_poweroff(self):
+        """Restart this owned inactive disk, not a clone or a fresh authority.
+
+        The caller retires any independent receiver first. A source hold remains
+        enforced during boot and is released through the authenticated guest
+        control channel only after receiver retirement. Existing boot policy decides whether actors may
+        start. This method cannot bypass that policy or extend the run lifetime.
+        """
+        if (self.process is None or self.process.poll() is None or type(self.pid) is not int or self.pid<=0
+                or Path('/proc',str(self.pid)).exists()):
+            raise RuntimeError('automatic_guest_resume_requires_observed_poweroff')
+        if (self.directory!=Path('/opt/madar-development/scratch/codex-runs')/self.run_id/'guest'
+                or any(p.is_symlink() for p in (self.directory,*self.directory.parents)) or self.directory.stat().st_uid!=1000
+                or self.directory.stat().st_mode&0o077 or self.record.get('resources_removed') is not False
+                or self.record.get('production_authority') is not False
+                or self.record.get('run_id')!=self.run_id or self.record.get('directory')!=str(self.directory)
+                or self.evidence!=Path('/opt/madar-development/evidence/integration')/self.run_id
+                or self.record.get('guest_uuid')!=self.uuid or self.record.get('pid')!=self.pid
+                or self.record.get('identity')!={'uuid':self.uuid,'hostname':'madar-release-test','virt':'kvm'}):
+            raise RuntimeError('automatic_guest_resume_scope_changed')
+        cycles=self.record.get('power_cycles',0)
+        if type(cycles) is not int or not 0<=cycles<2:raise RuntimeError('automatic_guest_resume_budget_exceeded')
+        current=json.loads(Path('/opt/madar-development/inventory/CURRENT-AUTOMATIC-EXECUTION.json').read_bytes())
+        from datetime import datetime
+        if (current.get('run_id')!=self.run_id or current.get('scratch')!=str(self.directory.parent)
+                or type(current.get('max_lifetime_seconds')) is not int or not 0<current['max_lifetime_seconds']<=10800
+                or time.time()>=datetime.fromisoformat(current['created_at']).timestamp()+current['max_lifetime_seconds']):
+            raise RuntimeError('automatic_guest_resume_run_expired_or_changed')
+        for name in ('guest.qcow2','seed.iso','identity','known_hosts','qemu.log'):
+            path=self.directory/name;metadata=path.lstat()
+            if (path.is_symlink() or not stat.S_ISREG(metadata.st_mode) or metadata.st_uid!=1000
+                    or metadata.st_nlink!=1 or metadata.st_mode&0o077):
+                raise RuntimeError('automatic_guest_resume_file_ownership_changed')
+        pidfile=self.directory/'qemu.pid'
+        self.verify_inactive_pidfile(pidfile,self.pid)
+        # This host's psmisc fuser does not accept a standalone "--".
+        # The already verified absolute owned path cannot become an option.
+        references=subprocess.run(['/usr/bin/sudo','-n','/usr/bin/fuser','-I',str(self.directory/'guest.qcow2')],
+            capture_output=True,timeout=10,env={'PATH':os.defpath,'HOME':'/nonexistent'})
+        if references.returncode!=1 or references.stdout.strip() or references.stderr.strip():
+            raise RuntimeError('automatic_guest_resume_disk_referenced_or_unverified')
+        info=json.loads(self.command(['/usr/bin/qemu-img','info','--output=json',str(self.directory/'guest.qcow2')]))
+        if (info.get('format')!='qcow2' or info.get('backing-filename') or info.get('encrypted')
+                or info.get('virtual-size')!=self.disk_gib*1024**3):
+            raise RuntimeError('automatic_guest_resume_disk_changed')
+        for name in ('qemu.log','serial.log'):
+            path=self.directory/name
+            if not path.exists():continue
+            if path.is_symlink() or path.stat().st_uid!=1000 or path.stat().st_nlink!=1:
+                raise RuntimeError('automatic_guest_resume_log_ownership_changed')
+            target=self.evidence/('private-guest-poweroff-'+str(cycles+1)+'-'+name)
+            with target.open('xb') as out:out.write(path.read_bytes()[-65536:])
+            target.chmod(0o600);path.unlink()
+        old=self.pid;pidfile.unlink(missing_ok=True);self.pid=None;self.process=None
+        facts=self.launch();self.record.update(power_cycles=cycles+1,resumed_from_pid=old);self.save()
+        return facts
+
+    @staticmethod
+    def verify_inactive_pidfile(path,pid):
+        # QEMU removes its PID file on clean exit. Its absence is acceptable
+        # only AFTER the original Popen exited, /proc was checked and the exact
+        # owned disk/scope/lifetime were verified above. A surviving file still
+        # has to describe that original process; never follow a substituted link.
+        try:metadata=path.lstat()
+        except FileNotFoundError:return
+        if (not stat.S_ISREG(metadata.st_mode) or metadata.st_uid!=1000
+                or metadata.st_nlink!=1 or metadata.st_mode&0o077):
+            raise RuntimeError('automatic_guest_resume_pidfile_ownership_changed')
+        descriptor=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK|os.O_CLOEXEC)
+        with os.fdopen(descriptor,'rb') as source:
+            actual=os.fstat(source.fileno());value=source.read(33).strip()
+            if ((actual.st_dev,actual.st_ino)!=(metadata.st_dev,metadata.st_ino)
+                    or actual.st_uid!=1000 or not stat.S_ISREG(actual.st_mode)
+                    or actual.st_nlink!=1 or actual.st_mode&0o077
+                    or value!=str(pid).encode()):
+                raise RuntimeError('automatic_guest_resume_pidfile_changed')
+
+    def pin_restoration_resume(self):
+        """Read the actual stopped source's root hold over its pinned SSH link."""
+        from deployment.lib.automatic_release_recovery import validate_restoration_hold
+        from deployment.lib.migration_inventory import digest
+        self.require_owned_pid()
+        if 'restoration_hold' in self.record:raise RuntimeError('automatic_guest_restoration_already_pinned')
+        code="""import sys,json
+sys.path.insert(0,'/opt/madar/control-plane')
+from deployment.lib.automatic_release_recovery import inspect_independent_restoration_hold
+from deployment.lib.control_plane_upgrade import SystemOperations
+print(json.dumps(inspect_independent_restoration_hold(SystemOperations()),sort_keys=True))
+"""
+        import shlex
+        hold=json.loads(self.command(self.ssh_args()+[shlex.join(['sudo','-n','python3','-I','-B','-c',code])],timeout=60))
+        validate_restoration_hold(hold)
+        if hold['guest_uuid']!=self.uuid:raise RuntimeError('automatic_guest_restoration_hold_wrong_guest')
+        self.record['restoration_hold']=hold;self.save()
+        return {'operation':'pin-independent-restoration-source-hold','hold_sha256':digest(hold),
+            'guest_uuid':self.uuid,'deployment_authority_issued':False}
+
+    def resume_after_receiver_retirement(self,packet,hold_sha):
+        """One bounded parent resume; source root separately verifies retirement."""
+        from deployment.lib.automatic_release_recovery import verify_receiver_retirement
+        from deployment.lib.migration_inventory import canonical,digest
+        from deployment.lib.migration_executor import atomic_json
+        hold=self.record.get('restoration_hold')
+        if not isinstance(hold,dict) or digest(hold)!=hold_sha or hold['guest_uuid']!=self.uuid:
+            raise RuntimeError('automatic_guest_restoration_hold_not_pinned')
+        verify_receiver_retirement(hold,packet)
+        consumed=self.evidence/'restoration-resume-consumed.json'
+        atomic_json(consumed,{'operation':'resume-owned-guest-after-independent-retirement','run_id':self.run_id,
+            'guest_uuid':self.uuid,'hold_sha256':hold_sha,'retirement_receipt_sha256':digest(packet),
+            'previous_pid':self.pid,'consumed_at':int(time.time()),'production_authority_issued':False},exclusive=True)
+        self.resume_after_poweroff()
+        # Boot sees the existing hold and must keep every actor stopped. This
+        # command grants no deployment authority and does not itself start them.
+        raw=self.command(self.ssh_args()+['sudo -n /usr/local/sbin/madar-control-plane-upgrade --release-independent-restore-hold'],
+            data=canonical(packet),timeout=60)
+        released=json.loads(raw)
+        if (released.get('hold_sha256')!=hold_sha or released.get('retirement_receipt_sha256')!=digest(packet)
+                or any(released.get(k) is not False for k in ('application_started','migration_sql_executed','deployment_authority_issued'))):
+            raise RuntimeError('automatic_guest_restoration_hold_release_invalid')
+        result={'operation':'resumed-owned-guest-after-independent-retirement','run_id':self.run_id,
+            'guest_uuid':self.uuid,'hold_sha256':hold_sha,'retirement_receipt_sha256':digest(packet),
+            'hold_release':released,'application_recovery_pending':True,'deployment_authority_issued':False}
+        atomic_json(self.evidence/'restoration-resume-completed.json',result,exclusive=True)
+        return result
+
+    def service_control(self):
+        """Exact parent-owned IPC; no new process can adopt an existing disk."""
+        from deployment.lib.migration_inventory import strict_json
+        from deployment.lib.migration_executor import atomic_json
+        path=self.directory.parent/'guest-control-request.json'
+        if not path.exists() and not path.is_symlink():return None
+        private_directory(self.directory.parent);raw=read(path,maximum=65536);request=strict_json(raw)
+        common={'version','kind','run_id','guest_uuid','nonce','action'}
+        action=request.get('action') if isinstance(request,dict) else None
+        fields=common|({'hold_sha256','retirement_receipt'} if action=='resume-after-retirement' else set())
+        if (not isinstance(request,dict) or set(request)!=fields or type(request['version']) is not int or request['version']!=1
+                or request['kind']!='owned-guest-control' or request['run_id']!=self.run_id or request['guest_uuid']!=self.uuid
+                or action not in {'pin-independent-restoration','resume-after-retirement'}):
+            raise RuntimeError('automatic_guest_control_scope_invalid')
+        import uuid
+        if str(uuid.UUID(request['nonce']))!=request['nonce']:raise RuntimeError('automatic_guest_control_nonce_invalid')
+        if len(list(self.evidence.glob('guest-control-*.consumed.json')))>=4:
+            raise RuntimeError('automatic_guest_control_budget_exceeded')
+        consumed=self.evidence/('guest-control-'+request['nonce']+'.consumed.json')
+        atomic_json(consumed,request,exclusive=True)
+        result=(self.pin_restoration_resume() if action=='pin-independent-restoration' else
+            self.resume_after_receiver_retirement(request['retirement_receipt'],request['hold_sha256']))
+        atomic_json(path.parent/('guest-control-response-'+request['nonce']+'.json'),result,exclusive=True)
+        if read(path,maximum=65536)!=raw:raise RuntimeError('automatic_guest_control_request_replaced')
+        path.unlink()
+        return result
+
+    def supervise(self):
+        """Run in the original bounded parent, retaining the original Popen."""
+        try:
+            while time.time()<self.deadline and time.monotonic()<self.monotonic_deadline:
+                stop=self.directory.parent/'stop-owned-guest.json'
+                if stop.exists() or stop.is_symlink():
+                    if json.loads(read(stop,maximum=1024))!={'run_id':self.run_id,'guest_uuid':self.uuid,'stop':True}:
+                        raise RuntimeError('automatic_guest_stop_scope_invalid')
+                    break
+                self.service_control();time.sleep(.5)
+        finally:self.close()
+
+    def close(self):
+        if self.directory.is_symlink() or self.directory.parent.name!=self.run_id:
+            raise RuntimeError('automatic_guest_cleanup_path_changed')
+        if not self.directory.exists():
+            if self.record.get('resources_removed') is True and (self.process is None or self.process.poll() is not None):
+                return
+            raise RuntimeError('automatic_guest_cleanup_scope_missing_without_receipt')
+        if self.pid is not None:
+            try:
+                self.require_owned_pid();os.kill(self.pid,15)
+                for _ in range(100):
+                    if not Path('/proc',str(self.pid)).exists():break
+                    time.sleep(.1)
+                if Path('/proc',str(self.pid)).exists():
+                    self.require_owned_pid();os.kill(self.pid,9)
+            except FileNotFoundError:pass
+        if self.process is not None:
+            try:self.process.wait(timeout=10)
+            except subprocess.TimeoutExpired:raise RuntimeError('automatic_guest_process_not_reaped')
+        if self.directory.is_symlink() or self.directory.parent.name!=self.run_id:
+            raise RuntimeError('automatic_guest_cleanup_path_changed')
+        for name in ('serial.log','qemu.log'):
+            p=self.directory/name
+            if p.exists():
+                target=self.evidence/('private-guest-'+name);target.write_bytes(p.read_bytes()[-65536:]);target.chmod(0o600)
+        shutil.rmtree(self.directory)
+        if self.directory.exists() or self.directory.is_symlink():
+            raise RuntimeError('automatic_guest_cleanup_incomplete')
+        self.record['resources_removed']=True;self.record['remaining_disk_bytes']=0;self.save()

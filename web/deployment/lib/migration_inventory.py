@@ -151,6 +151,7 @@ class Inventory:
     history_base_sha: str
     migrations: tuple[MigrationBytes, ...]
     excluded_versions: tuple[int, ...]
+    history_scope: tuple[tuple[str, str], ...] = ()
 
     @property
     def target(self): return max(m.number for m in self.migrations if m.number not in self.excluded_versions)
@@ -172,7 +173,8 @@ class Inventory:
         return tuple(result)
 
     def document(self):
-        return {'version': 1, 'repository': REPOSITORY, 'source_sha': self.source_sha,
+        return {**({'history_scope':dict(self.history_scope)} if self.history_scope else {}),
+                'version': 1, 'repository': REPOSITORY, 'source_sha': self.source_sha,
                 'history_base_sha': self.history_base_sha, 'target_schema': self.target,
                 'excluded_versions': list(self.excluded_versions),
                 'migrations': [m.record() for m in self.migrations], 'authority_issued': False}

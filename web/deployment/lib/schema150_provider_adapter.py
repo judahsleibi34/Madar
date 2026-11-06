@@ -18,6 +18,8 @@ from urllib.parse import urlsplit, unquote, parse_qs
 from urllib.error import HTTPError
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
+from deployment.lib.completed_normal_profile import maintenance_role
+
 from deployment.lib.completed_normal_admission import (ADMISSIONS, digest as contract_digest,
     validate_provider_preparation)
 from deployment.lib.completed_normal_profile import DELETION, RECONCILED, provider_preparation_profile
@@ -48,10 +50,27 @@ class NoRedirect(HTTPRedirectHandler):
 
 
 def private_json(path):
-    source = protected(path, private=True)
+    # The issuer deliberately publishes this one root-owned interlock as0644:
+    # non-root services read its SHA/digests, never the private bearer token.
+    # require_authority verifies that separate credential before reading it.
+    # All provider inputs, journals and receipts retain private-file checks.
+    source = protected(path, private=Path(path) != UPGRADE_INTERLOCK)
     if source.stat().st_size > 2 * 1024 * 1024:
         raise RuntimeError('schema150_provider_private_input_limit')
     return json.loads(source.read_bytes())
+
+
+def supervisor_bus_path(name):
+    """Encode the already authenticated fixed unit name, not a caller object path.
+
+    systemd's unit-property lookup loads the configuration on demand. GetUnit
+    instead requires it already resident, which is false for idle supervisors.
+    No start job, enablement change or persistent reference is requested.
+    """
+    if not isinstance(name,str) or not re.fullmatch(r'madar-[A-Za-z0-9-]+\.(service|timer)',name):
+        raise RuntimeError('schema150_provider_effective_boot_unit_invalid')
+    label=''.join(char if char.isascii() and char.isalnum() else '_'+format(ord(char),'02x') for char in name)
+    return '/org/freedesktop/systemd1/unit/'+label
 
 
 def require_owned_lock(descriptor, path):
@@ -82,7 +101,7 @@ def _env(row):
     return values
 
 
-def require_provider_database_bindings(rows, database_id):
+def require_provider_database_bindings(rows, database_id, *, enrolled_database_networks=None):
     """Bind each measured native provider URI to the measured database network.
 
     URI text never becomes a SQL/command argument. Provider HTTP success at the
@@ -92,8 +111,20 @@ def require_provider_database_bindings(rows, database_id):
     if len(databases) != 1:
         raise RuntimeError('schema150_provider_database_binding_missing')
     database = databases[0]
-    if len(database.get('NetworkSettings',{}).get('Networks',{}))!=1:
-        raise RuntimeError('schema150_provider_database_uri_scope_invalid')
+    networks=database.get('NetworkSettings',{}).get('Networks',{})
+    if enrolled_database_networks is None:
+        if len(networks)!=1:raise RuntimeError('schema150_provider_database_uri_scope_invalid')
+        provider_networks=set(networks)
+    else:
+        # Only a root-authenticated historical inventory may supply this exact
+        # projection. Providers use the native bridge; a separately pinned
+        # loopback control bridge must never become an alternate DNS authority.
+        from .schema150_actor_inventory import DEFAULT_NETWORK
+        if (not isinstance(enrolled_database_networks,dict) or not 1<=len(enrolled_database_networks)<=16
+                or DEFAULT_NETWORK not in enrolled_database_networks or set(networks)!=set(enrolled_database_networks)
+                or any(v.get('NetworkID')!=enrolled_database_networks[k] for k,v in networks.items())):
+            raise RuntimeError('schema150_provider_database_uri_scope_invalid')
+        provider_networks={DEFAULT_NETWORK}
     expected = {'supabase-rest': ('PGRST_DB_URI','authenticator'),
         'supabase-auth': ('GOTRUE_DB_DATABASE_URL','supabase_auth_admin'),
         'supabase-storage': ('DATABASE_URL','supabase_storage_admin')}
@@ -102,7 +133,7 @@ def require_provider_database_bindings(rows, database_id):
         if len(services) != 1:
             raise RuntimeError('schema150_provider_database_binding_missing')
         service = services[0]
-        if set(service.get('NetworkSettings',{}).get('Networks',{}))!=set(database['NetworkSettings']['Networks']):
+        if set(service.get('NetworkSettings',{}).get('Networks',{}))!=provider_networks:
             raise RuntimeError('schema150_provider_database_uri_scope_invalid')
         host = service.get('HostConfig',{})
         if (host.get('ExtraHosts') or host.get('Dns') or host.get('DnsSearch')
@@ -128,6 +159,7 @@ def require_provider_database_bindings(rows, database_id):
                 raise ValueError('unexpected native database URI')
             targets = []
             for network, db in database['NetworkSettings']['Networks'].items():
+                if network not in provider_networks:continue
                 provider = service['NetworkSettings']['Networks'].get(network)
                 if not provider or provider['NetworkID'] != db['NetworkID']:
                     continue
@@ -168,6 +200,124 @@ def role_measurements(snapshot):
     return result
 
 
+
+def supervisor_idle(name,fields,*,stopped=False):
+    """Use live service PIDs; timer units have no process properties.
+
+    ExecMainPID records the last service process even after successful oneshot
+    completion. It cannot prove a currently running writer. Missing live PID
+    properties still refuse a SERVICE; they are not defaulted to zero. A timer
+    must expose no PID properties and must have no queued job; after fencing,
+    both types must actually be inactive/dead.
+    """
+    if fields.get('Job')!='' or fields.get('ActiveState') not in {'active','inactive'}:
+        return False
+    if name.endswith('.service'):
+        pid=fields.get('MainPID')
+        if (fields.get('ControlPID')!='0' or not isinstance(pid,str)
+                or not re.fullmatch(r'0|[1-9][0-9]{0,9}',pid) or int(pid)>2147483647
+                or stopped and pid!='0'):
+            return False
+    elif name.endswith('.timer'):
+        if any(k in fields for k in ('MainPID','ControlPID','ExecMainPID')):return False
+    else:return False
+    return not stopped or (fields.get('ActiveState')=='inactive' and fields.get('SubState')=='dead')
+
+
+def capture_original_inventory(package, contract, runtime, *, source_guard):
+    """Publish independently reobserved preparation, never operation authority.
+
+    The expected inventory is root-private and already pinned by the approved
+    contract. Only fixed read-only probes run. No adapter effects, credentials,
+    candidate creation or operation registration occur at this boundary.
+    """
+    from deployment.lib.completed_normal_baseline import BASE
+    from deployment.lib.completed_normal_admission import encoded as admission_encoded
+    from deployment.lib.schema150_actor_inventory import validate_inventory, attest_containers
+    from deployment.lib.schema150_object_inventory import measure_roots
+    selected = validate_provider_preparation(contract)
+    package = Path(package)
+    if (os.geteuid() != 0 or package.parent != BASE
+            or not re.fullmatch('normal-source-[0-9a-f]{64}', package.name)):
+        raise RuntimeError('schema160_inventory_capture_root_package_required')
+    if selected is not RECONCILED:
+        raise RuntimeError('schema160_original_capture_profile_required')
+    destination = package / 'provider-inventory.json'
+    if destination.exists() or destination.is_symlink():
+        raise RuntimeError('schema160_inventory_capture_already_published')
+    source_guard()
+    binding = {'operation': selected.operation, 'context_sha256': contract_digest(contract),
+        'source_sha': contract['candidate']['source_sha'], 'controller_sha': contract['candidate']['controller_sha'],
+        'inventory_sha256': contract['writer_inventory_sha256'],
+        'system_identifier': contract['database']['system_identifier'],
+        'source_schema': selected.source, 'target_schema': selected.target}
+    inventory = validate_inventory(private_json(package / 'provider-inventory-input.json'), binding)
+    if inventory['session_scope']['maintenance_role']!=maintenance_role(contract):
+        raise RuntimeError('schema160_inventory_maintenance_role_changed')
+    if (inventory['version']==1 and inventory['exclusions']) or any(k.startswith('candidate:') for k in inventory['containers']):
+        raise RuntimeError('schema160_original_inventory_scope_not_proven')
+    database = inventory['containers']['native:db']
+    if (database['id'] != contract['database']['container_id']
+            or database['image'] != contract['database']['image']):
+        raise RuntimeError('schema160_inventory_database_substitution')
+
+    def containers():
+        identifiers = runtime.command(['docker', 'ps', '-aq', '--no-trunc']).split()
+        if (not identifiers or len(identifiers) > 1024 or len(set(identifiers)) != len(identifiers)
+                or any(not re.fullmatch('[0-9a-f]{64}', x) for x in identifiers)):
+            raise RuntimeError('schema160_inventory_snapshot_unbounded')
+        rows = json.loads(runtime.command(['docker', 'inspect', *identifiers]))
+        if {r.get('Id') for r in rows} != set(identifiers):
+            raise RuntimeError('schema160_inventory_snapshot_incomplete')
+        attest_containers(inventory, rows, phase='prepared', binding=binding)
+        if inventory['version']==2:
+            from deployment.lib.historical_origin import verify_actor_inventory
+            verify_actor_inventory(contract,inventory,rows)
+        elif contract['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin':
+            raise RuntimeError('historical_origin_inventory_enrollment_required')
+        return set(identifiers)
+
+    def sql(body):
+        # Database ID is independently bound above; SQL is source-owned only.
+        return runtime.command(['docker', 'exec', '-i', database['id'], 'psql', '-XqAt',
+            '-v', 'ON_ERROR_STOP=1', '-U', maintenance_role(contract), '-d', 'postgres'],
+            input="SET search_path=pg_catalog,public,extensions; SET statement_timeout='10s'; "
+                  "BEGIN READ ONLY; " + body + ' COMMIT;')
+
+    def observe():
+        ids = containers()
+        identity = json.loads(sql("SELECT json_build_array((SELECT system_identifier::text FROM pg_control_system()),"
+            "(SELECT schema_version FROM public.application_schema_state WHERE contract_key='core'));"))
+        if identity != [binding['system_identifier'], selected.source]:
+            raise RuntimeError('schema160_inventory_database_origin_changed')
+        if role_measurements(json.loads(sql(ROLE_SQL))) != inventory['roles']:
+            raise RuntimeError('schema160_inventory_original_roles_changed')
+        for name, expected in inventory['supervisors'].items():
+            text = runtime.command(['systemctl', 'show', name,
+                '--property=FragmentPath,DropInPaths,UnitFileState,ActiveState,SubState,Job,MainPID,ControlPID', '--no-pager'])
+            fields = dict(line.split('=', 1) for line in text.splitlines() if '=' in line)
+            fragment = Path(fields.get('FragmentPath', ''))
+            if not fragment.is_absolute():
+                raise RuntimeError('schema160_inventory_supervisor_unmeasurable')
+            dropins = {path: hashlib.sha256(protected(Path(path)).read_bytes()).hexdigest()
+                for path in fields.get('DropInPaths', '').split()}
+            if (hashlib.sha256(protected(fragment).read_bytes()).hexdigest() != expected['fragment_sha256']
+                    or digest(dropins) != expected['dropins_sha256'] or fields.get('UnitFileState') != expected['enabled']
+                    or not supervisor_idle(name,fields)):
+                raise RuntimeError('schema160_inventory_supervisor_changed_or_pending')
+        return ids, measure_roots(inventory['object_roots'], phase='identity')
+
+    first = observe()
+    source_guard()
+    if observe() != first:
+        raise RuntimeError('schema160_inventory_capture_changed')
+    source_guard()
+    exclusive(destination, admission_encoded(inventory))
+    return {'operation': selected.operation, 'inventory_sha256': binding['inventory_sha256'],
+        'containers': len(inventory['containers']), 'schema': selected.source,
+        'authority_issued': False, 'writers_fenced': False, 'object_bytes_backed_up': False}
+
+
 class Schema150ProviderAdapter:
     """Actual Docker/systemd/PostgreSQL effects using immutable accepted identities.
 
@@ -196,9 +346,16 @@ class Schema150ProviderAdapter:
         self.root = ADMISSIONS / self.binding['context_sha256']
         from deployment.lib.schema150_actor_inventory import validate_inventory
         self.inventory = validate_inventory(private_json(self.root / 'provider-inventory.json'), self.binding)
+        if self.inventory['session_scope']['maintenance_role']!=maintenance_role(contract):
+            raise RuntimeError('schema160_inventory_maintenance_role_changed')
         self.original_inventory = json.loads(json.dumps(self.inventory))
-        if self.inventory['exclusions']:
+        if self.inventory['version']==2:
+            from deployment.lib.historical_origin import verify_actor_inventory
+            verify_actor_inventory(contract,self.inventory,self._rows())
+        elif self.inventory['exclusions']:
             raise RuntimeError('schema150_provider_live_exclusion_proofs_required')
+        elif contract['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin':
+            raise RuntimeError('historical_origin_inventory_enrollment_required')
         self.barrier = self.root / 'provider-barrier.json'
         self.dropin_name = '99zzzzzz-schema'+str(selected.target)+'-' + self.binding['context_sha256'][:12] + '.conf'
 
@@ -258,16 +415,8 @@ class Schema150ProviderAdapter:
             path = UNITS/(name+'.d')/self.dropin_name
             if protected(path).read_bytes() != expected or str(path) not in self._unit(name)['DropInPaths'].split():
                 raise RuntimeError('schema150_provider_effective_boot_barrier_missing')
-            unit = json.loads(self.runtime.command(['busctl','--json=short','call',
-                'org.freedesktop.systemd1','/org/freedesktop/systemd1',
-                'org.freedesktop.systemd1.Manager','GetUnit','s',name]))
-            if (not isinstance(unit,dict) or unit.get('type') != 'o'
-                    or not isinstance(unit.get('data'),list) or len(unit['data']) != 1
-                    or not isinstance(unit['data'][0],str)
-                    or not re.fullmatch(r'/org/freedesktop/systemd1/unit/[A-Za-z0-9_]+',unit['data'][0])):
-                raise RuntimeError('schema150_provider_effective_boot_unit_invalid')
             conditions = json.loads(self.runtime.command(['busctl','--json=short','get-property',
-                'org.freedesktop.systemd1',unit['data'][0],'org.freedesktop.systemd1.Unit','Conditions']))
+                'org.freedesktop.systemd1',supervisor_bus_path(name),'org.freedesktop.systemd1.Unit','Conditions']))
             # D-Bus a(sbbsi): type, trigger, negate, parameter, last result.
             # A substring, positive condition, or trigger cannot fence startup.
             if (not isinstance(conditions,dict) or conditions.get('type') != 'a(sbbsi)'
@@ -294,7 +443,7 @@ class Schema150ProviderAdapter:
         # Only internal constants and validated original preimages reach this method.
         identifier = self.contract['database']['container_id']
         return self.runtime.command(['docker', 'exec', '-i', identifier, 'psql', '-XqAt',
-            '-v', 'ON_ERROR_STOP=1', '-U', 'postgres', '-d', 'postgres'],
+            '-v', 'ON_ERROR_STOP=1', '-U', maintenance_role(self.contract), '-d', 'postgres'],
             input="SET search_path=pg_catalog,public,extensions; SET statement_timeout='10s'; SET lock_timeout='2s';\n" + body)
 
     def _database_identity(self):
@@ -318,7 +467,10 @@ class Schema150ProviderAdapter:
         if phase in ('private','private-boundary','active','active-boundary') and any(
                 key.startswith('candidate:') for key in self.inventory['containers']):
             self.verify_candidate_stage(rows=rows,phase=phase)
-        proof=attest_containers(self.inventory, rows, phase=phase)
+        if self.original_inventory['version']==2:
+            from deployment.lib.historical_origin import verify_actor_inventory
+            verify_actor_inventory(self.contract,self.original_inventory,rows)
+        proof=attest_containers(self.inventory, rows, phase=phase, binding=self.binding)
         if phase in ('private','private-boundary'):
             for row in rows:
                 if row.get('Name','').lstrip('/') in PROVIDER_NAMES:self._private_ports(row)
@@ -333,7 +485,7 @@ class Schema150ProviderAdapter:
         grant authority, accept health, or permit any worker to consume.
         """
         from deployment.lib.completed_normal_admission import credential_witness
-        from deployment.lib.completed_normal_resources import ROLES,measured_spec_matches
+        from deployment.lib.completed_normal_resources import candidate_roles,candidate_image,measured_spec_matches
         path=self.root/'candidate-staged-runtime.json'
         if not path.exists() or path.is_symlink():
             raise RuntimeError('schema150_private_candidate_stage_required')
@@ -347,7 +499,7 @@ class Schema150ProviderAdapter:
                 or stage['context_sha256']!=self.binding['context_sha256']
                 or stage['source_sha']!=self.binding['source_sha']
                 or stage['images']!=self.contract['candidate']['images']
-                or not isinstance(stage['runtimes'],dict) or set(stage['runtimes'])!=set(ROLES)):
+                or not isinstance(stage['runtimes'],dict) or set(stage['runtimes'])!=set(candidate_roles(self.contract))):
             raise RuntimeError('schema150_private_candidate_stage_changed')
         rows=self._rows() if rows is None else rows
         inventory=self.inventory
@@ -355,11 +507,10 @@ class Schema150ProviderAdapter:
             from deployment.lib.schema150_actor_inventory import bind_staged_candidates
             inventory=bind_staged_candidates(inventory,self.binding,stage,rows,phase=phase)
         actual={row['Id']:row for row in rows}
-        for role in ROLES:
+        for role in candidate_roles(self.contract):
             record=inventory['containers'].get('candidate:'+role)
             sealed=stage['runtimes'][role]
-            expected_image=(self.contract['candidate']['redis_image'] if role=='redis'
-                else self.contract['candidate']['images']['frontend' if role=='frontend' else 'backend'])
+            expected_image=candidate_image(self.contract,role)
             runtime_keys={'id','image','spec_sha256','networks','network_aliases'}
             if stage.get('preparation_mode')=='created-fenced':runtime_keys.add('name')
             if (record is None or not isinstance(sealed,dict)
@@ -369,9 +520,13 @@ class Schema150ProviderAdapter:
                     or any(sealed[k]!=record[k] for k in ('id','image','spec_sha256','networks'))):
                 raise RuntimeError('schema150_private_candidate_identity_changed')
             row=actual.get(record['id'])
+            canonical_started = (self.binding['target_schema']==160
+                and stage.get('preparation_mode')=='created-fenced' and row is not None
+                and row.get('State',{}).get('Status') in {'running','exited'})
             if (row is None or row.get('Image')!=sealed['image']
                     or 'name' in sealed and row.get('Name')!='/'+sealed['name']
-                    or not measured_spec_matches(row,sealed['spec_sha256'],started_worker=role.endswith('-worker'))
+                    or not measured_spec_matches(row,sealed['spec_sha256'],
+                        started_worker=canonical_started or role.endswith('-worker'))
                     or {k:sorted(v.get('Aliases') or []) for k,v in row['NetworkSettings']['Networks'].items()}
                         !={k:sorted(v) for k,v in sealed['network_aliases'].items()}):
                 raise RuntimeError('schema150_private_candidate_identity_changed')
@@ -395,7 +550,7 @@ class Schema150ProviderAdapter:
         return all(r['role'] in roles and r['address'] in addresses and r['address'] is not None for r in sessions)
 
     def _unit(self, name):
-        value = self.runtime.command(['systemctl', 'show', name, '--property=FragmentPath,DropInPaths,UnitFileState,ActiveState,SubState,Job,ExecMainPID,ControlPID', '--no-pager'])
+        value = self.runtime.command(['systemctl', 'show', name, '--property=FragmentPath,DropInPaths,UnitFileState,ActiveState,SubState,Job,MainPID,ControlPID', '--no-pager'])
         fields = dict(row.split('=',1) for row in value.splitlines() if '=' in row)
         fragment = Path(fields.get('FragmentPath',''))
         expected = self.inventory['supervisors'][name]
@@ -404,17 +559,21 @@ class Schema150ProviderAdapter:
         paths = fields.get('DropInPaths','').split()
         original = [p for p in paths if Path(p).name != self.dropin_name]
         actual = {p: hashlib.sha256(protected(Path(p)).read_bytes()).hexdigest() for p in original}
-        if fields.get('UnitFileState') != expected['enabled']:
+        enabled=expected['enabled'];dropins_digest=expected['dropins_sha256']
+        if self.inventory['version']==2:
+            from deployment.lib.historical_origin import supervisor_controls
+            controls,enabled=supervisor_controls(self.contract,name,self.root)
+            dropins_digest=digest(controls)
+        if fields.get('UnitFileState') != enabled:
             raise RuntimeError('schema150_provider_supervisor_enablement_changed')
-        if digest(actual) != expected['dropins_sha256']:
+        if digest(actual) != dropins_digest:
             raise RuntimeError('schema150_provider_supervisor_dropins_changed')
         return fields
 
     def _supervisors_stopped(self):
         for name in self.inventory['supervisors']:
             state=self._unit(name)
-            if (state.get('ActiveState')!='inactive' or state.get('SubState')!='dead'
-                    or state.get('Job')!='' or state.get('ExecMainPID')!='0' or state.get('ControlPID')!='0'):
+            if not supervisor_idle(name,state,stopped=True):
                 raise RuntimeError('schema150_provider_supervisor_not_quiescent')
         return True
 
@@ -438,7 +597,9 @@ class Schema150ProviderAdapter:
 
     def positive_identity_probes(self, binding):
         self.require_authority(binding, purpose='prepare'); self._attest('prepared')
-        require_provider_database_bindings(self._rows(),self.contract['database']['container_id'])
+        database_networks=self.inventory['containers']['native:db']['networks'] if self.inventory['version']==2 else None
+        require_provider_database_bindings(self._rows(),self.contract['database']['container_id'],
+            **({} if database_networks is None else {'enrolled_database_networks':database_networks}))
         rest = _env(self._row('supabase-rest'))
         auth = _env(self._row('supabase-auth'))
         storage = _env(self._row('supabase-storage'))
@@ -470,7 +631,7 @@ class Schema150ProviderAdapter:
         if role_measurements(roles) != self.inventory['roles']:
             raise RuntimeError('schema150_provider_measured_role_scope_changed')
         if not self._known_sessions(sessions): raise RuntimeError('schema150_provider_unknown_session')
-        allowed = set(self.inventory['session_scope']['writer_roles']) | {'postgres'}
+        allowed = set(self.inventory['session_scope']['writer_roles']) | {maintenance_role(self.contract)}
         if any(r['rolcanlogin'] and name not in allowed and not name.startswith('pg_') for name,r in roles['roles'].items()):
             raise RuntimeError('schema150_provider_unknown_login_role')
         if int(self._sql('BEGIN READ ONLY;'+BACKGROUND_WRITER_SQL+';COMMIT;'))!=0:
@@ -480,7 +641,7 @@ class Schema150ProviderAdapter:
         states={r['Id']:{'running':r['State']['Running'],'restart':r['HostConfig']['RestartPolicy']['Name']}
                 for r in rows if r['Id'] in known}
         archive = self.runtime.command(['docker','exec',self.contract['database']['container_id'],
-            'pg_dumpall','-U','postgres','--roles-only'])
+            'pg_dumpall','-U',maintenance_role(self.contract),'--roles-only'])
         if not archive.startswith('--') or len(archive.encode())>1024*1024:
             raise RuntimeError('schema150_provider_role_archive_invalid')
         return {'ingress':{'containers':states},'supervisors':{'units':units,'sessions':sessions},
@@ -617,7 +778,7 @@ class Schema150ProviderAdapter:
         if step=='restore_ingress':
             self._attest('active')
             self.verify_target_route()
-            return self.activation_guard(binding,private=False).get('public_acceptance') is True
+            return True
         if step=='clear_boot_interlock':
             if self.barrier.exists():return False
             self.verify_target_route()
@@ -705,8 +866,10 @@ class Schema150ProviderAdapter:
                 or any(type(value.get(k)) is not int or value[k]!=0 for k in DATABASE_COUNTERS)):
             raise RuntimeError('schema150_provider_database_not_quiescent')
         self._object_preservation(binding,preimage,capture=True)
+        from deployment.lib.completed_normal_admission import require_candidate_authority
+        grant=require_candidate_authority(self.contract,mode='READ_ONLY')
         value.update(ingress_fenced=True,supervisors_fenced=True,objects_fenced=True,
-            roles_fenced=True,boot_interlock_armed=self.barrier.exists(),candidate_read_only=self.activation_guard(binding,private=True).get('candidate_read_only') is True)
+            roles_fenced=True,boot_interlock_armed=self.barrier.exists(),candidate_read_only=grant['mode']=='READ_ONLY')
         return value
 
     def backup_role_archive(self, binding):
@@ -783,7 +946,7 @@ class Schema150ProviderAdapter:
             if (version.get('release_sha')!=self.binding['source_sha'] or version.get('release_slot')!=slot
                     or version.get('schema_compatible_min')!=self.binding['source_schema']
                     or version.get('schema_compatible_max')!=self.binding['target_schema']
-                    or version.get('schema_excluded_versions')!=[]
+                    or version.get('schema_excluded_versions',[])!=[]
                     or self.runtime.json_http(base+'/health/recovery')!=
                         {'restricted':not normal,'business_writes_enabled':normal}):
                 raise RuntimeError('schema150_private_handoff_serving_identity_changed')
@@ -807,16 +970,21 @@ class Schema150ProviderAdapter:
             raise RuntimeError('schema150_private_handoff_journal_changed')
         return {'operation':self.binding['operation'],'context_sha256':self.binding['context_sha256'],
             'schema':self.binding['target_schema'],'mode':grant['mode'],
-            'candidate_stage_sha256':digest(stage),'provider_journal_sha256':digest(records),
-            'write_authority_sha256':digest(grant),'workers_started':False,'ingress_restored':False}
+            # This projection is consumed by completed_normal_admission, not
+            # the provider journal. Preserve that consumer's established hash
+            # encoding; provider-local activation/publication stay compact.
+            'candidate_stage_sha256':contract_digest(stage),'provider_journal_sha256':contract_digest(records),
+            'write_authority_sha256':contract_digest(grant),'workers_started':False,'ingress_restored':False}
 
     def observe_private_boundary(self,binding):
         self.require_authority(binding,purpose='prepare_private_activation')
         self._attest('private-boundary')
         self._supervisors_stopped()
         sessions=self._sessions()
+        from deployment.lib.completed_normal_admission import require_candidate_authority
+        grant=require_candidate_authority(self.contract,mode='READ_ONLY')
         return {'binding_sha256':digest(binding),'ingress_fenced':True,'workers_fenced':True,
-            'boot_interlock_armed':self.barrier.exists(),'candidate_read_only':self.activation_guard(binding,private=True).get('target_write_authority') is False,
+            'boot_interlock_armed':self.barrier.exists(),'candidate_read_only':grant['mode']=='READ_ONLY',
             'unknown_writers':int(self._sql('BEGIN READ ONLY;'+BACKGROUND_WRITER_SQL+';COMMIT;')),
             'unknown_client_sessions':0 if self._known_sessions(sessions) else len(sessions),
             'prepared_transactions':int(self._sql('SELECT count(*) FROM pg_prepared_xacts;'))}
@@ -837,10 +1005,10 @@ class Schema150ProviderAdapter:
             row=self._row(name)
             self._private_ports(row)
             self.runtime.command(['docker','start',row['Id']])
-        from deployment.lib.schema150_actor_inventory import PRIVATE_CANDIDATE_ROLES
+        from deployment.lib.schema150_actor_inventory import private_candidate_roles
         if any(key.startswith('candidate:') for key in self.inventory['containers']):
             self.verify_candidate_stage()
-            for logical in PRIVATE_CANDIDATE_ROLES:
+            for logical in private_candidate_roles(binding):
                 self.runtime.command(['docker','start',self.inventory['containers'][logical]['id']])
 
     def verify_native_acceptance(self,binding,preimage):
@@ -861,9 +1029,9 @@ class Schema150ProviderAdapter:
                 or owner['old']!={'sha':self.contract['source_roles']['application_sha'],'slot':self.contract['origin']['slot']}
                 or owner['candidate']!={'sha':self.binding['source_sha'],'slot':self.contract['candidate']['slot']}):
             raise RuntimeError('schema150_provider_accepted_worker_owner_required')
-        from deployment.lib.schema150_actor_inventory import WORKER_ROLES
+        from deployment.lib.schema150_actor_inventory import consuming_worker_roles
         for logical,record in self.inventory['containers'].items():
-            if logical.startswith('candidate:') and logical.split(':',1)[1] in WORKER_ROLES:
+            if logical.startswith('candidate:') and logical.split(':',1)[1] in consuming_worker_roles(binding):
                 self.runtime.command(['docker','start',record['id']])
 
     def restore_ingress(self,binding,preimage):
@@ -945,7 +1113,7 @@ class Schema150ProviderAdapter:
                     or identity.get('release_slot')!=self.contract['candidate']['slot']
                     or identity.get('schema_compatible_min')!=self.binding['source_schema']
                     or identity.get('schema_compatible_max')!=self.binding['target_schema']
-                    or identity.get('schema_excluded_versions')!=[] or ready.get('ready') is not True
+                    or identity.get('schema_excluded_versions',[])!=[] or ready.get('ready') is not True
                     or self.runtime.json_http(base+'/health/recovery')!=
                         {'restricted':False,'business_writes_enabled':True}):
                 raise RuntimeError('schema150_provider_public_target_not_accepted')
@@ -967,8 +1135,6 @@ class Schema150ProviderAdapter:
     def clear_boot_interlock(self,binding,preimage):
         self.require_authority(binding,purpose='clear_boot_interlock');self._attest('active')
         self.verify_target_route()
-        if self.activation_guard(binding,private=False).get('public_acceptance') is not True:
-            raise RuntimeError('schema150_provider_public_acceptance_required')
         if private_json(self.barrier)!={'binding':binding,'preimage_sha256':digest(preimage)}:
             raise RuntimeError('schema150_provider_barrier_identity_changed')
         self.barrier.unlink()

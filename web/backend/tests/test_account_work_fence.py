@@ -116,3 +116,51 @@ class AccountWorkFenceTests(unittest.TestCase):
         with account_lock(7,2,exclusive=True) as marker:publish_hold(marker,{'action':'deactivate'})
         with self.assertRaises(HTTPException):deliver({'user_id':2,'tenant_id':1},client=client)
         self.assertEqual(len(sent),1)
+
+
+class AccountJobDatabaseBindingTests(unittest.TestCase):
+    def test_sync_async_and_file_jobs_keep_their_own_database_client(self):
+        from contextlib import nullcontext
+        from services import account_work_fence as fence
+        from unittest.mock import sentinel
+        import asyncio
+        calls=[]
+        @fence.scoped_work('row','owner_user_id')
+        def sync(row,*,client):calls.append('sync')
+        @fence.scoped_work('row','owner_user_id')
+        async def asynchronous(row,*,client):calls.append('async')
+        @fence.account_file_work
+        def file_job(*,tenant_id,user_id,client):calls.append('file')
+        with patch.object(fence,'account_lock',side_effect=lambda *a,**k:nullcontext()) as lock:
+            row={'tenant_id':1,'owner_user_id':2}
+            sync(row,client=sentinel.database)
+            asyncio.run(asynchronous(row,client=sentinel.database))
+            file_job(tenant_id=1,user_id=2,client=sentinel.database)
+        self.assertEqual(calls,['sync','async','file'])
+        self.assertEqual(len(lock.call_args_list),3)
+        for call in lock.call_args_list:
+            self.assertEqual(call.args,(1,2));self.assertIs(call.kwargs['client'],sentinel.database)
+    def test_registration_refusal_prevents_all_job_effects(self):
+        from services import account_work_fence as fence
+        calls=[]
+        @fence.scoped_work('row','owner_user_id')
+        def job(row,*,client):calls.append('effect')
+        with patch.object(fence,'account_lock',side_effect=AccountWorkBusy('wrong_database_or_account')):
+            with self.assertRaises(AccountWorkBusy):job({'tenant_id':1,'owner_user_id':2},client=object())
+        self.assertEqual(calls,[])
+
+
+class CalendarJobDatabaseBindingTests(unittest.TestCase):
+    def test_calendar_schema_observation_uses_the_job_client_and_refuses_unknown_schema(self):
+        from services import account_work_fence as fence
+        from unittest.mock import sentinel
+        calls=[]
+        @fence.calendar_work
+        def job(row,*,client):calls.append('effect')
+        with patch('services.project_dataset_service.schema_version',return_value=160) as schema:
+            job({'tenant_id':1},client=sentinel.database)
+            schema.assert_called_once_with(client=sentinel.database)
+        self.assertEqual(calls,['effect'])
+        with patch('services.project_dataset_service.schema_version',return_value=0):
+            with self.assertRaises(HTTPException):job({'tenant_id':1},client=sentinel.database)
+        self.assertEqual(calls,['effect'])

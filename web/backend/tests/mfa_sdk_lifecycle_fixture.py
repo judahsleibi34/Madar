@@ -90,6 +90,9 @@ class ProfileStore:
         self.single_row = False
         self.found = True
     def table(self, _name):
+        if _name=='application_schema_state':
+            from tests.account_schema_fixture import SchemaStateQuery
+            return SchemaStateQuery()
         return ProfileStore()
     def select(self, *_args): return self
     def eq(self, field, value):

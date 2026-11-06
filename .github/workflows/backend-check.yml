@@ -37,8 +37,19 @@ jobs:
       - name: Build locked backend test image
         run: docker build --target test -t madar-backend-test web/backend
 
+      - name: Verify concurrent synthetic PostgreSQL allocation and cleanup
+        run: timeout 3m python3 web/scripts/test_synthetic_postgres_native.py
+
+      - name: Verify native maintenance restore and privilege integrity
+        run: timeout --kill-after=15s 3m python3 web/scripts/test_maintenance_restore_native.py
+
       - name: Validate loopback notification alert inspection
         run: python3 web/staging/integration/test_notification_observer.py
+
+      - name: Render protected private provider topology without authority
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=web:web/backend/tests python3 -m unittest \
+            test_schema160_private_provider.PrivateProviderTests.test_real_preauthorization_compose_contains_the_gateway_and_private_calendar_without_a_grant -v
 
       - name: Run backend tests
         run: |
@@ -55,7 +66,7 @@ jobs:
             --env XDG_CACHE_HOME=/tmp/madar-ci/cache/xdg \
             --env PYGWALKER_TELEMETRY_ENABLED=false \
             --env MADAR_TEST_REPOSITORY_ROOT=/test-repository \
-            --tmpfs /tmp:rw,exec,nosuid,nodev,size=1g,mode=1777 \
+            --tmpfs /tmp:rw,exec,nosuid,nodev,size=4g,mode=1777 \
             --volume "$PWD/web/scripts:/scripts:ro" \
             --volume "$PWD/web/demo-data:/demo-data:ro" \
             --volume "$PWD/web/frontend/public:/frontend/public:ro" \
@@ -63,6 +74,9 @@ jobs:
             --volume "$PWD/web/supabase:/app/supabase:ro" \
             --volume "$PWD/web/scripts:/test-repository/scripts:ro" \
             --volume "$PWD/web/deployment:/test-repository/deployment:ro" \
+            --volume "$PWD/web/deployment:/web/deployment:ro" \
+            --volume "$PWD/web/database:/web/database:ro" \
+            --volume "$PWD/web/supabase:/web/supabase:ro" \
             --volume "$PWD/web/precutover:/test-repository/precutover:ro" \
             --volume "$PWD/web/staging:/test-repository/staging:ro" \
             --volume "$PWD/web/database:/workspace/database:ro" \

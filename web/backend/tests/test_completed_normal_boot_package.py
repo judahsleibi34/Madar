@@ -56,12 +56,66 @@ class PackageTests(unittest.TestCase):
     def test_noncanonical_plan_cannot_have_a_second_authorization_digest(self):
         raw=json.dumps(self.document).encode();(self.package/'plan.json').write_bytes(raw)
         with self.assertRaisesRegex(RuntimeError,'noncanonical_package'):self.measure(self.sha(raw))
+    def test_unknown_or_downgraded_manifest_format_cannot_skip_v2_inputs(self):
+        for version in (True,0,3,'2'):
+            manifest=dict(self.manifest,version=version);body=self.encode(manifest);sha=self.sha(body)
+            package=self.base/('normal-source-'+sha)
+            shutil.copytree(self.package,package)
+            (package/'source-bundle.json').write_bytes(body)
+            document=dict(self.document,source_bundle_sha256=sha)
+            (package/'plan.json').write_bytes(self.encode(document))
+            with self.subTest(version=version),self.assertRaisesRegex(RuntimeError,'package_version_invalid'):
+                module.measure(package,sha,self.sha(self.encode(document)))
+            shutil.rmtree(package)
+        self.document['attempt_id']='c01201af-56ee-4444-8888-0123456789ab'
+        (self.package/'plan.json').write_bytes(self.encode(self.document))
+        with self.assertRaisesRegex(RuntimeError,'package_version_invalid'):self.measure()
     def test_source_mutation_missing_inventory_or_wrong_approval_fails(self):
         with self.assertRaisesRegex(RuntimeError,'approved_bytes_changed'):self.measure('b'*64)
         target=self.package/'source'/next(iter(self.files));target.write_bytes(b'changed')
         with self.assertRaisesRegex(RuntimeError,'source_bytes_changed'):self.measure()
         target.write_bytes(b'# fixture only\n');(self.package/'source/unreviewed.py').write_bytes(b'new')
         with self.assertRaisesRegex(RuntimeError,'inventory_changed'):self.measure()
+
+    def test_capture_mode_measures_again_without_constructing_an_execution_actor(self):
+        document = dict(self.document, admission_contract={'synthetic': 'preparation-only'})
+        source = self.package/'source'
+        flags=SimpleNamespace(**{name:getattr(module.sys.flags,name) for name in dir(module.sys.flags) if not name.startswith('_')})
+        flags.isolated=1;flags.dont_write_bytecode=1
+        argv=['continue_completed_normal_upgrade.py','capture-inventory','--source-package',str(self.package),
+            '--approved-source',self.source_hash,'--approved-plan','b'*64]
+        from deployment.lib import schema150_provider_adapter as adapter
+        with patch.object(module.sys,'argv',argv),patch.object(module.sys,'flags',flags),\
+                patch.object(module.os,'geteuid',return_value=0),\
+                patch.object(module,'__file__',str(source/'web/scripts/continue_completed_normal_upgrade.py')),\
+                patch.object(module,'measure',return_value=(document,source)) as measure,\
+                patch.object(adapter,'capture_original_inventory',return_value={}) as capture,\
+                patch('deployment.lib.completed_normal_boot_actor.CompletedNormalBootActor') as actor:
+            module.main()
+            actor.assert_not_called()
+            guard=capture.call_args.kwargs['source_guard'];guard()
+            self.assertEqual(measure.call_count,2)
+            measure.return_value=(dict(document,changed=True),source)
+            with self.assertRaisesRegex(RuntimeError,'capture_source_changed'):guard()
+
+    def test_candidate_verification_is_measured_preparation_without_execution_actor(self):
+        document=dict(self.document,admission_contract={'synthetic':'preparation-only'},fixture_only=True)
+        source=self.package/'source'
+        flags=SimpleNamespace(**{name:getattr(module.sys.flags,name) for name in dir(module.sys.flags) if not name.startswith('_')})
+        flags.isolated=1;flags.dont_write_bytecode=1
+        argv=['continue_completed_normal_upgrade.py','verify-candidate','--source-package',str(self.package),
+            '--approved-source',self.source_hash,'--approved-plan','b'*64]
+        with patch.object(module.sys,'argv',argv),patch.object(module.sys,'flags',flags),\
+                patch.object(module.os,'geteuid',return_value=0),\
+                patch.object(module,'__file__',str(source/'web/scripts/continue_completed_normal_upgrade.py')),\
+                patch.object(module,'measure',return_value=(document,source)) as measure,\
+                patch('deployment.lib.completed_normal_evidence.verify_reconciled_application_evidence',return_value={}) as verify,\
+                patch('deployment.lib.control_plane_upgrade.SystemOperations') as operations,\
+                patch('deployment.lib.completed_normal_boot_actor.CompletedNormalBootActor') as actor:
+            module.main()
+            actor.assert_not_called();verify.assert_called_once()
+            self.assertEqual(measure.call_count,3)
+            self.assertEqual(verify.call_args.args[0].package,self.package)
 
     def test_fixture_package_cannot_be_used_by_production_preflight_or_execute(self):
         self.document['fixture_only']=True

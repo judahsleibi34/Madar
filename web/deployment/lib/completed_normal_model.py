@@ -125,7 +125,11 @@ def render_candidate_model(actor, *, read_only=False):
     loader.exec_module(module)
     guard()
     contract=actor.contract;sha=contract['candidate']['source_sha'];slot=contract['candidate']['slot']
-    selected=profile(actor.contract)
+    from deployment.lib.completed_normal_profile import RECONCILED
+    if read_only and contract.get('operation')==RECONCILED.operation:
+        from deployment.lib.completed_normal_admission import validate_provider_preparation
+        selected=validate_provider_preparation(contract)
+    else:selected=profile(actor.contract)
     compatibility=module.Compatibility.load(source/'web/deployment/releases'/selected.metadata)
     if ((compatibility.schema_min,compatibility.schema_max,compatibility.target_schema)!=(selected.minimum,selected.target,selected.target)
             or compatibility.excluded_schemas!=selected.excluded):
@@ -151,4 +155,9 @@ def render_candidate_model(actor, *, read_only=False):
         operations._compose(sha,slot,images,'config','--format','json',workers_active=True)
     guard()
     if len(captured)!=1:raise RuntimeError('completed_model_loader_inventory_invalid')
+    if selected is RECONCILED:
+        from deployment.lib.completed_normal_resources import allocation
+        from deployment.lib.completed_normal_private_provider import require_business_model
+        gateway=allocation(contract,slot,preparation150=read_only)['containers']['provider-gateway']
+        require_business_model(captured[0],gateway_name=gateway)
     return captured[0]

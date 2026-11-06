@@ -69,8 +69,170 @@ def captured_source(root):
     return raw, snapshots
 
 
+ISOLATED_REGISTRATION=Path('/etc/madar/schema160-isolated-acceptance.json')
+
+
+def require_independent_recovery(document,contract,system):
+    """Use the existing physical receiver verifier for this enrolled origin.
+
+    This is a technical precondition, not approval or migration authority. The
+    immutable plan names a root-enrolled receiver receipt; no caller boolean can
+    stand in for full independently signed restored-application acceptance.
+    """
+    import re,time
+    from .automatic_release_admission import execution_policy,physical_recovery_evidence
+    evidence=document.get('independent_recovery')
+    if (not isinstance(evidence,dict) or set(evidence)!={'receipt_sha256'}
+            or not re.fullmatch('[a-f0-9]{64}',str(evidence['receipt_sha256']))):
+        raise RuntimeError('schema160_independent_recovery_receipt_required')
+    policy,environment=execution_policy(system)
+    if (policy['controller_sha']!=contract['candidate']['controller_sha']
+            or environment['database_system_identifier']!=contract['database']['system_identifier']):
+        raise RuntimeError('schema160_independent_recovery_scope_changed')
+    recovery={'kind':'independent-physical-application-v1',
+        'source_system_identifier':contract['database']['system_identifier'],
+        'restore_system_identifier':contract['database']['system_identifier'],
+        'restored_schema':146,'receipt_sha256':evidence['receipt_sha256']}
+    physical_recovery_evidence(recovery,policy,contract['source_roles']['application_sha'],
+        {'delivery':1,'outbox':1,'deletion':0},now=int(time.time()),historical_binding=contract['source_roles'])
+    return recovery
+
+
+def isolated_registration(contract):
+    """Independently pinned technical profile; never SQL/deployment authority.
+
+    The ordinary registry stays closed. Only a positively identified disposable
+    KVM guest may recognize the exact frozen first-rehearsal context. A candidate
+    cannot write this root-owned policy. Every privileged effect still requires
+    the existing issuer credential and independent exceptional approval.
+    """
+    import os,re,time
+    from .provider_recovery_runtime import protected
+    from .migration_inventory import strict_json
+    from .completed_normal_admission import digest
+    from .completed_normal_profile import RECONCILED
+    from .historical_origin import KIND,validate_source_binding
+    path=protected(ISOLATED_REGISTRATION)
+    metadata=path.stat()
+    if metadata.st_mode&0o222 or not 0<metadata.st_size<=8192:
+        raise RuntimeError('schema160_isolated_registration_not_frozen')
+    p=strict_json(path.read_bytes())
+    fields={'version','kind','environment_id','guest_uuid','machine_id','root_filesystem_uuid',
+        'operation','context_sha256','plan_sha256','controller_sha','application_sha',
+        'database_system_identifier','origin_schema','target_schema','created_at','expires_at'}
+    if (not isinstance(p,dict) or set(p)!=fields or type(p.get('version')) is not int or p['version']!=1
+            or p['kind']!='isolated-canonical-controller-acceptance'
+            or contract.get('operation')!=RECONCILED.operation or contract.get('version')!=RECONCILED.version
+            or contract.get('source_roles',{}).get('origin_kind')!=KIND
+            or p['operation']!=RECONCILED.operation or p['context_sha256']!=digest(contract)
+            or p['plan_sha256']!=contract.get('plan_sha256')
+            or p['controller_sha']!=contract.get('candidate',{}).get('controller_sha')
+            or p['application_sha']!=contract.get('candidate',{}).get('source_sha')
+            or p['database_system_identifier']!=contract.get('database',{}).get('system_identifier')
+            or type(p['origin_schema']) is not int or p['origin_schema']!=146
+            or type(p['target_schema']) is not int or p['target_schema']!=160
+            or any(not re.fullmatch('[a-f0-9]{64}',str(p[k])) for k in ('context_sha256','plan_sha256'))
+            or any(not re.fullmatch('[a-f0-9]{40}',str(p[k])) for k in ('controller_sha','application_sha'))
+            or type(p['created_at']) is not int or type(p['expires_at']) is not int
+            or not p['created_at']<=int(time.time())<p['expires_at']<=p['created_at']+10800):
+        raise RuntimeError('schema160_isolated_registration_scope_invalid')
+    validate_source_binding(contract['source_roles'])
+    from .isolated_release_environment import observe_host,observe_effect_fence,run
+    if os.geteuid()==0:
+        host=observe_host();observe_effect_fence(execution=True)
+        if (host['version']!=2 or p['environment_id']!='isolated-'+host['realm_id']
+                or host['database_system_identifier']!=p['database_system_identifier']
+                or p['database_system_identifier'] in host['denied_database_identifiers']
+                or any(p[k]!=host[k] for k in ('guest_uuid','machine_id','root_filesystem_uuid'))):
+            raise RuntimeError('schema160_isolated_registration_host_changed')
+    else:
+        # A child receives only the existing fresh, context-scoped credential;
+        # root-private environment policy is never exposed to the child.
+        from .control_plane_upgrade_authorization import require_upgrade_authorization
+        require_upgrade_authorization(p['controller_sha'],required_operation=RECONCILED.operation,
+            required_schema=146,required_context_digest=digest(contract),require_rehearsal=True)
+        from .completed_normal_admission import credential_witness
+        verify_child_host_identity(p,credential_witness('canonical_host_identity','canonical_host_identity_sha256'))
+    return p
+
+
+def root_child_host_identity(contract):
+    """Project an actually reobserved host through the existing root issuer."""
+    import os
+    if os.geteuid()!=0:raise RuntimeError('schema160_host_identity_root_required')
+    p=isolated_registration(contract) # Rechecks actual DMI, filesystem and isolation.
+    return {'version':1,'kind':'root-observed-canonical-child-host',
+        'context_sha256':p['context_sha256'],'guest_uuid':p['guest_uuid'],
+        'machine_id':p['machine_id'],'root_filesystem_uuid':p['root_filesystem_uuid'],
+        'boot_id':Path('/proc/sys/kernel/random/boot_id').read_text().strip()}
+
+
+def verify_child_host_identity(registration,witness):
+    """Called only after fresh canonical authorization and witness hash checks.
+
+    DMI is root-only on ordinary Linux guests. Its actual root observation is
+    carried in LoadCredential, not made readable or replaced by caller input.
+    The child independently reobserves the boot, machine, filesystem and KVM.
+    """
+    from .isolated_release_environment import run
+    fields={'version','kind','context_sha256','guest_uuid','machine_id','root_filesystem_uuid','boot_id'}
+    if (not isinstance(witness,dict) or set(witness)!=fields or type(witness.get('version')) is not int
+            or witness['version']!=1 or witness['kind']!='root-observed-canonical-child-host'
+            or any(witness[k]!=registration[k] for k in ('context_sha256','guest_uuid','machine_id','root_filesystem_uuid'))
+            or witness['boot_id']!=Path('/proc/sys/kernel/random/boot_id').read_text().strip()
+            or Path('/etc/machine-id').read_text().strip()!=registration['machine_id']
+            or run(['/usr/bin/systemd-detect-virt']).decode().strip()!='kvm'
+            or run(['/usr/bin/findmnt','-n','-o','UUID','/']).decode().strip()!=registration['root_filesystem_uuid']):
+        raise RuntimeError('schema160_isolated_registration_host_changed')
+
+
 def admitted_manifest(root, contract):
-    raise RuntimeError('schema160_protected_controller_integration_incomplete')
+    try:isolated_registration(contract)
+    except (OSError,RuntimeError,ValueError):
+        raise RuntimeError('schema160_protected_controller_integration_incomplete') from None
+    from .completed_normal_profile import RECONCILED
+    from .control_plane_upgrade_authorization import require_upgrade_authorization
+    from .migration_executor import MigrationManifest,Migration
+    from .completed_normal_admission import digest
+    require_upgrade_authorization(contract['candidate']['controller_sha'],required_operation=RECONCILED.operation,
+        required_schema=146,required_context_digest=digest(contract),require_rehearsal=True)
+    raw,_=captured_source(root)
+    if contract['migration_manifest_sha256']!=MANIFEST_SHA256:
+        raise RuntimeError('schema160_migration_manifest_changed')
+    return MigrationManifest(release_sha=contract['candidate']['source_sha'],coordinated=True,
+        migrations=tuple(Migration(number=r['number'],path=Path(root)/r['path'],sha256=r['sha256'],
+            from_schema=r['from_schema'],to_schema=r['to_schema'],compatibility=r['compatibility']) for r in raw['migrations']))
+
+
+def isolated_controller_source(selection,contract,operations):
+    """Authenticate a test controller without claiming it is GitHub main.
+
+    This exact registered historical rehearsal cannot merge its controller into
+    main first. The root-frozen operation names the development controller and
+    actual GitHub commit/tree. Production and ordinary source resolution keep
+    their main ancestry contract; neither origin/main nor its URL is rewritten.
+    """
+    import os,re
+    from .isolated_github_observation import api
+    from .completed_normal_package import snapshot
+    from .migration_inventory import REPOSITORY
+    fields={'version','kind','repository','source_branch','source_sha','tree_oid'}
+    if (os.geteuid()!=0 or not isinstance(selection,dict) or set(selection)!=fields
+            or type(selection['version']) is not int or selection['version']!=1
+            or selection['kind']!='isolated-historical-controller-source'
+            or selection['repository']!=REPOSITORY or selection['source_branch']!='Saliba-Branch'
+            or any(not re.fullmatch('[a-f0-9]{40}',str(selection[k])) for k in ('source_sha','tree_oid'))
+            or selection['source_sha']!=contract.get('candidate',{}).get('controller_sha')
+            or operations.installed_sha()!=selection['source_sha']):
+        raise RuntimeError('schema160_isolated_controller_source_invalid')
+    isolated_registration(contract)
+    authentication=api('repos/'+REPOSITORY+'/commits/'+selection['source_sha'],operations=operations,
+        label='isolated_controller_source')
+    tree,_=snapshot(operations.repo,selection['source_sha'])
+    if (authentication.get('sha')!=selection['source_sha'] or tree!=selection['tree_oid']
+            or authentication.get('commit',{}).get('tree',{}).get('sha')!=tree):
+        raise RuntimeError('schema160_isolated_controller_source_changed')
+    return selection['source_sha']
 
 
 def expected_protocols(schema):

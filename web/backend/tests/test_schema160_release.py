@@ -8,6 +8,7 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
+from deployment.lib import completed_normal_admission as admission
 from deployment.lib import schema160_release as release
 from deployment.lib import schema150_release as historical
 from deployment.lib.completed_normal_admission import validate_provider_preparation
@@ -232,3 +233,63 @@ class Schema160ReleaseTests(unittest.TestCase):
                 with self.subTest(number=migration.number),self.assertRaisesRegex(RuntimeError,'migration_contract_changed'):
                     actor.migration_guard(cursor,migration)
             self.assertEqual(actor.require_authority.call_count,calls)
+
+
+class IsolatedCanonicalRegistrationTests(unittest.TestCase):
+    """Technical scope tests, not privileged execution or reboot acceptance."""
+    def setUp(self):
+        from test_historical_origin import HistoricalPreparationBindingTests
+        import time
+        self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.directory=Path(self.tmp.name)
+        self.contract=HistoricalPreparationBindingTests().contract();now=int(time.time())
+        self.registration={'version':1,'kind':'isolated-canonical-controller-acceptance','environment_id':'isolated-fixture',
+            'guest_uuid':'guest','machine_id':'machine','root_filesystem_uuid':'filesystem','operation':RECONCILED.operation,
+            'context_sha256':admission.digest(self.contract),'plan_sha256':self.contract['plan_sha256'],
+            'controller_sha':self.contract['candidate']['controller_sha'],'application_sha':self.contract['candidate']['source_sha'],
+            'database_system_identifier':self.contract['database']['system_identifier'],'origin_schema':146,'target_schema':160,
+            'created_at':now,'expires_at':now+600}
+        self.path=self.directory/'registration.json';self.save()
+        self.enterContext(patch.object(release,'ISOLATED_REGISTRATION',self.path))
+        self.enterContext(patch('deployment.lib.provider_recovery_runtime.protected',side_effect=lambda p,**kw:Path(p)))
+        self.enterContext(patch('os.geteuid',return_value=0))
+        self.host={'version':2,'realm_id':'fixture','guest_uuid':'guest','machine_id':'machine','root_filesystem_uuid':'filesystem',
+            'database_system_identifier':self.contract['database']['system_identifier'],'denied_database_identifiers':['9999999']}
+        self.enterContext(patch('deployment.lib.isolated_release_environment.observe_host',return_value=self.host))
+        self.firewall=self.enterContext(patch('deployment.lib.isolated_release_environment.observe_effect_fence'))
+    def save(self):
+        self.path.chmod(0o600) if self.path.exists() else None
+        self.path.write_bytes(admission.encoded(self.registration));self.path.chmod(0o444)
+    def test_only_exact_historical_contract_is_technically_recognized(self):
+        self.assertEqual(release.isolated_registration(self.contract),self.registration)
+        self.assertIs(profile(self.contract),RECONCILED)
+        self.firewall.assert_called_with(execution=True)
+        changed=copy.deepcopy(self.contract);changed['candidate']['source_sha']='0'*40
+        with self.assertRaisesRegex(RuntimeError,'profile_invalid'):profile(changed)
+    def test_policy_cannot_select_wrong_database_target_or_controller(self):
+        original=dict(self.registration)
+        for key,value in [('database_system_identifier','999'),('target_schema',164),('controller_sha','0'*40),('plan_sha256','0'*64),('kind','production')]:
+            self.registration=dict(original,**{key:value});self.save()
+            with self.subTest(key=key),self.assertRaisesRegex(RuntimeError,'scope_invalid'):release.isolated_registration(self.contract)
+    def test_expired_mutable_or_missing_policy_refuses(self):
+        self.registration['expires_at']=self.registration['created_at'];self.save()
+        with self.assertRaisesRegex(RuntimeError,'scope_invalid'):release.isolated_registration(self.contract)
+        self.path.chmod(0o644)
+        with self.assertRaisesRegex(RuntimeError,'not_frozen'):release.isolated_registration(self.contract)
+        self.path.unlink()
+        with self.assertRaisesRegex(RuntimeError,'profile_invalid'):profile(self.contract)
+    def test_correct_policy_cannot_authorize_wrong_guest_or_denied_database(self):
+        self.host['guest_uuid']='foreign'
+        with self.assertRaisesRegex(RuntimeError,'host_changed'):release.isolated_registration(self.contract)
+        self.host['guest_uuid']='guest';self.host['denied_database_identifiers']=[self.contract['database']['system_identifier']]
+        with self.assertRaisesRegex(RuntimeError,'host_changed'):release.isolated_registration(self.contract)
+    def test_registration_never_supplies_a_missing_issuer_credential(self):
+        with patch('deployment.lib.control_plane_upgrade_authorization.require_upgrade_authorization',side_effect=RuntimeError('missing_independent_authority')):
+            with self.assertRaisesRegex(RuntimeError,'missing_independent_authority'):release.admitted_manifest(self.directory,self.contract)
+    def test_rehearsal_preflight_does_not_claim_completed_upgrade_or_production_authority(self):
+        from types import SimpleNamespace
+        from deployment.lib.completed_normal_evidence import verify_complete_rehearsal
+        actor=SimpleNamespace(contract=self.contract,document={'fixture_only':True,'production_authorization':False})
+        value=verify_complete_rehearsal(actor)
+        self.assertIs(value['complete_upgrade_rehearsal'],False);self.assertIs(value['production_authorization'],False)
+        actor.document['production_authorization']=True
+        with self.assertRaisesRegex(RuntimeError,'isolated_rehearsal_scope_required'):verify_complete_rehearsal(actor)

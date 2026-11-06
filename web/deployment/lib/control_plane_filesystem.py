@@ -29,6 +29,14 @@ ACL_WRITE = 0x02
 AT_FDCWD = -100
 RENAME_EXCHANGE = 2
 
+# These are installed in both deployment/scripts and /usr/local/lib/madar.
+# Other protected source scripts execute only from their authenticated package.
+OPERATIONAL_SCRIPTS = (
+    "backup_madar.sh", "verify_backup.sh", "verify_latest_backup.sh", "backup_support.py",
+    "replicate_latest_node1.py", "replicate_latest_offhost.sh", "replicate_backup_offhost.sh",
+    "restore_madar.sh", "rehearse_backup.py", "monitor_hosted_domains.py",
+)
+
 
 class FilesystemPreflightError(RuntimeError):
     """A stable, non-secret filesystem preflight failure."""
@@ -63,15 +71,11 @@ class InstallFilesystemLayout:
         return (
             self.launcher_parent / "madar-control-plane-upgrade",
             self.alert_parent / "madar_alert_hook.sh",
-            self.alert_parent / "monitor_hosted_domains.py",
             self.systemd_parent / "madar-auto-deploy.service",
             self.systemd_parent / "madar-auto-deploy.timer",
             self.systemd_parent / "madar-release-proxy.service",
             self.systemd_parent / "madar-ops-alert@.service",
-            *(self.alert_parent / name for name in (
-                "backup_madar.sh", "verify_backup.sh", "verify_latest_backup.sh", "backup_support.py",
-                "replicate_latest_node1.py", "replicate_latest_offhost.sh", "replicate_backup_offhost.sh",
-                "restore_madar.sh", "rehearse_backup.py")),
+            *(self.alert_parent / name for name in OPERATIONAL_SCRIPTS),
             *(self.systemd_parent / (name + suffix) for name in (
                 "madar-backup", "madar-backup-verify", "madar-node1-backup", "madar-offhost-backup",
                 "madar-hosted-domain-monitor")

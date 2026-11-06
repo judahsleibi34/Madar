@@ -131,7 +131,7 @@ def rehearse(backup: Path, image: str, migration: Path | None = None, *, target_
     if len(set(new_tables)) != len(new_tables) or any(not re.fullmatch(r"[a-z][a-z0-9_]*", table) for table in new_tables):
         raise RehearsalError("invalid_expected_new_tables")
     if (len(postgres_preload) != len(set(postgres_preload))
-            or any(name not in {"pg_cron", "pg_net"} for name in postgres_preload)):
+            or any(name not in {"pg_cron", "pg_net", "pg_stat_statements"} for name in postgres_preload)):
         raise RehearsalError("unsupported_restore_preload")
     regular_source(str(backup / "database.dump"))
     migration_mount = readonly_file_mount(str(migration), "/migration.sql") if migration else None
@@ -251,7 +251,7 @@ def rehearse(backup: Path, image: str, migration: Path | None = None, *, target_
             psql.insert(psql.index('-At'),'-q')
             if json.loads(query(backup_support.ROLE_SNAPSHOT_SQL))!=original_roles:
                 raise RehearsalError('maintenance_original_role_state_mismatch')
-            if backup_support.database_fingerprint(query)!=maintenance['database_fingerprint']:
+            if backup_support.database_fingerprint(query,acl_semantics=maintenance['version']==2)!=maintenance['database_fingerprint']:
                 raise RehearsalError('maintenance_database_fingerprint_mismatch')
             result.update(role_attributes_restored=True,ownership_and_acls_restored=True,
                 database_fingerprint_verified=True,maintenance_manifest_sha256=maintenance_manifest_sha256)
@@ -363,7 +363,9 @@ WHERE table_schema='public' AND table_name='ecommerce_order_items'
     finally:
         try:
             if created:
-                run(["docker", "rm", "--force", name], phase="disposable_cleanup")
+                # Only this newly created target owns the image-declared
+                # anonymous volumes. Remove them with its container, too.
+                run(["docker", "rm", "--force", "--volumes", name], phase="disposable_cleanup")
                 result["disposable_target_removed"] = True
         finally:
             scratch_dump.cleanup()

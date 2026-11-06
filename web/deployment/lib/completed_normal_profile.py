@@ -67,6 +67,22 @@ RECONCILED = UpgradeProfile(RECONCILED_OPERATION, 8, 146, 160, (),
     'schema-146-160-coordinated.json', 'migrations-147-160-coordinated.json', tuple(range(147, 161)))
 
 
+def maintenance_role(contract):
+    """An explicit immutable DB identity, never a role elevation or discovery.
+
+    Native Supabase17 keeps postgres NOSUPERUSER and reserves provider roles
+    to supabase_admin. Only the canonical preparation may select that role;
+    historical contracts keep their original transport and serialized bytes.
+    """
+    database=contract.get('database',{}) if isinstance(contract,dict) else {}
+    role=database.get('maintenance_role','postgres')
+    if not isinstance(role,str) or role not in {'postgres','supabase_admin'} or ('maintenance_role' in database and (
+            contract.get('operation')!=RECONCILED.operation or type(contract.get('version')) is not int
+            or contract['version']!=RECONCILED.version or role!='supabase_admin')):
+        raise RuntimeError('completed_normal_maintenance_role_invalid')
+    return role
+
+
 def provider_preparation_profile(contract):
     """Select an exact preparation contract without registering execution."""
     if isinstance(contract, dict):
@@ -85,6 +101,14 @@ def profile(contract):
     selected = {LEGACY_OPERATION: LEGACY, MANUAL_OPERATION: MANUAL,
         APPLICATION_OPERATION: APPLICATION, COMMERCIAL_OPERATION: COMMERCIAL,
         FENCED_OPERATION: FENCED, OUTBOX_OPERATION: OUTBOX}.get(contract.get('operation'))
+    if selected is None and contract.get('operation')==RECONCILED_OPERATION:
+        # No global registration: independent exact isolated acceptance policy
+        # identifies technical support, while the issuer separately gates effects.
+        from .schema160_release import isolated_registration
+        try:isolated_registration(contract)
+        except (OSError,RuntimeError,ValueError):
+            raise RuntimeError('completed_normal_operation_profile_invalid') from None
+        selected=RECONCILED
     if selected is None or type(contract.get('version')) is not int or contract['version'] != selected.version:
         raise RuntimeError('completed_normal_operation_profile_invalid')
     return selected
@@ -104,3 +128,51 @@ def expected_origin_grant(contract, mode):
     elif selected in (FENCED, OUTBOX, DELETION, RECONCILED):
         value.update(compatible_min=144, compatible_max=146)
     return value
+
+
+def verify_installed_metadata(selected, *, releases=None):
+    """Read-only child-input check; existing source/tree attestation pins bytes.
+
+    Nonsecret metadata must be readable by the madar child, not merely root.
+    This validates installation, never registers a profile or grants authority.
+    """
+    import stat
+    from pathlib import Path
+    from deployment.lib.release_deployer import Compatibility
+    # Approval runs from the sealed source package, whereas the madar child
+    # runs the installed controller. Never resolve this input beside __file__.
+    root = Path('/opt/madar/control-plane/deployment/releases') if releases is None else Path(releases)
+    try:
+        path = root / selected.metadata
+        info = path.lstat()
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != 0
+                or stat.S_IMODE(info.st_mode) != 0o644 or info.st_nlink != 1):
+            raise ValueError('untrusted metadata')
+        Compatibility.load(path)
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        raise RuntimeError('completed_upgrade_installed_metadata_invalid') from exc
+    return path
+
+
+def verify_installed_compose_inputs(source, *, installed=None):
+    """Reobserve public child overlays against the already authenticated package.
+
+    This is read-only and grants no authority. The sealed package source guard
+    must have run before this check; caller-provided bytes are not a trust root.
+    """
+    import stat
+    from pathlib import Path
+    root = Path('/opt/madar/control-plane/deployment') if installed is None else Path(installed)
+    names = ('docker-compose.release.yml', 'docker-compose.write-authority.yml',
+             'docker-compose.schema160-private-provider.yml')
+    try:
+        for name in names:
+            path = root / name
+            info = path.lstat()
+            if (not stat.S_ISREG(info.st_mode) or info.st_uid != 0
+                    or stat.S_IMODE(info.st_mode) != 0o644 or info.st_nlink != 1
+                    or path.read_bytes() != (Path(source) / name).read_bytes()):
+                raise ValueError('untrusted installed compose input')
+    except (OSError, ValueError) as exc:
+        raise RuntimeError('completed_upgrade_installed_compose_invalid') from exc
+    return tuple(root / name for name in names)

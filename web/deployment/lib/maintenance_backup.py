@@ -80,6 +80,33 @@ def readonly_query(adapter, body):
         "SET LOCAL statement_timeout='60s';\n"+body+'\nCOMMIT;')
 
 
+def restore_preload(context):
+    """Observe the fenced source's bounded PostgreSQL library requirements.
+
+    Extension installation can require a preload even if a source configuration
+    is incomplete. Never infer that every historical image ships pg_cron/net,
+    nor load an arbitrary source-selected shared library in the restore target.
+    The existing source/authority/quiescence guards surround this observation.
+    """
+    adapter=require_context(context)
+    allowed={'pg_cron','pg_net','pg_stat_statements'}
+    value=json.loads(readonly_query(adapter,"SELECT json_build_object('installed',"
+        "coalesce((SELECT json_agg(extname ORDER BY extname) FROM pg_extension WHERE "
+        "extname IN ('pg_cron','pg_net','pg_stat_statements')),'[]'::json),"
+        "'configured',current_setting('shared_preload_libraries'))::text;"))
+    if (not isinstance(value,dict) or set(value)!={'installed','configured'}
+            or not isinstance(value['installed'],list)
+            or any(type(name) is not str or name not in allowed for name in value['installed'])
+            or value['installed']!=sorted(set(value['installed']))
+            or type(value['configured']) is not str):
+        raise RuntimeError('maintenance_backup_restore_preload_invalid')
+    configured=[name.strip() for name in value['configured'].split(',')] if value['configured'].strip() else []
+    if (len(configured)!=len(set(configured)) or any(name not in allowed for name in configured)):
+        raise RuntimeError('maintenance_backup_restore_preload_unsupported')
+    require_context(context)
+    return tuple(sorted(set(value['installed'])|set(configured)))
+
+
 def recovery_context(context):
     return {'origin_source_sha':context.contract['source_roles']['application_sha'],
         'origin_images':context.contract['origin']['images'],'candidate_images':context.contract['candidate']['images'],
@@ -107,7 +134,7 @@ def capture(context, env, descriptor, identity):
     snapshot['roles']=record['roles']['original']['roles']
     snapshot['memberships']=record['roles']['original']['memberships']
     bootstrap=readonly_query(adapter,'SELECT rolname FROM pg_authid WHERE oid=10;').strip()
-    before=backup_support.database_fingerprint(lambda sql:readonly_query(adapter,sql))
+    before=backup_support.database_fingerprint(lambda sql:readonly_query(adapter,sql),acl_semantics=True)
     capture_env=dict(env, MADAR_PROVIDER_BACKUP_REQUIRED='false', MADAR_RELEASE_SHA=context.plan.source_sha,
         MADAR_BUILD_TIMESTAMP=env.get('MADAR_BUILD_TIMESTAMP','unknown'), MADAR_BACKUP_CREATE_DATABASE='true')
     checked(['/bin/bash','/usr/local/lib/madar/backup_madar.sh'],env=capture_env,user=identity.pw_uid,pass_fds=(descriptor,))
@@ -128,9 +155,10 @@ def capture(context, env, descriptor, identity):
     if checkpoint['binding']!=adapter.binding:raise RuntimeError('maintenance_backup_object_binding_changed')
     result=seal_capture(backup,binding=adapter.binding,stage=context.stage,original_roles=original.sql_bytes,
         roles_snapshot=snapshot,bootstrap_role=bootstrap,roots=adapter.inventory['object_roots'],
-        previous=checkpoint['measurement'],database_fingerprint=before,recovery=recovery_context(context))
+        previous=checkpoint['measurement'],database_fingerprint=before,recovery=recovery_context(context),
+        database_fingerprint_version=2)
     require_context(context)
-    if backup_support.database_fingerprint(lambda sql:readonly_query(adapter,sql))!=before:
+    if backup_support.database_fingerprint(lambda sql:readonly_query(adapter,sql),acl_semantics=True)!=before:
         raise RuntimeError('maintenance_backup_database_changed')
     exclusive(context.root/(context.stage+'-maintenance-backup-input.json'),encoded({'version':1,
         'context_sha256':context.context,'scope':context.scope,'stage':context.stage,
@@ -139,7 +167,7 @@ def capture(context, env, descriptor, identity):
 
 
 def seal_capture(backup, *, binding, stage, original_roles, roles_snapshot, bootstrap_role,
-                 roots, previous, database_fingerprint, recovery):
+                 roots, previous, database_fingerprint, recovery, database_fingerprint_version=1):
     """Encode recovery material in a private unpublished ordinary backup.
 
     This serialization helper alone proves no authority or source identity.
@@ -149,6 +177,8 @@ def seal_capture(backup, *, binding, stage, original_roles, roles_snapshot, boot
     from scripts import backup_support
     from deployment.lib.schema150_provider_lifecycle import validate_binding
     validate_binding(binding)
+    if type(database_fingerprint_version) is not int or database_fingerprint_version not in (1,2):
+        raise RuntimeError('maintenance_backup_fingerprint_version_invalid')
     if stage not in ('pre-migration','post-migration'):raise RuntimeError('maintenance_backup_stage_invalid')
     schema=binding['source_schema' if stage=='pre-migration' else 'target_schema']
     manifest=backup_support.verify(backup)
@@ -161,7 +191,7 @@ def seal_capture(backup, *, binding, stage, original_roles, roles_snapshot, boot
     exclusive(extension/'roles.sql',original_roles)
     exclusive(extension/'roles-snapshot.json',encoded(roles_snapshot))
     objects=archive_roots(roots,extension/'objects.tar.gz',previous=previous)
-    metadata={'version':1,'binding':binding,'stage':stage,'schema':schema,
+    metadata={'version':database_fingerprint_version,'binding':binding,'stage':stage,'schema':schema,
         'bootstrap_role':bootstrap_role,'roles_sha256':hashlib.sha256(original_roles).hexdigest(),
         'roles_snapshot_sha256':backup_support.digest(extension/'roles-snapshot.json'),
         'objects_sha256':backup_support.digest(extension/'objects.tar.gz'),'objects_measurement':objects,
@@ -194,7 +224,8 @@ def expected_manifest(context, backup):
     value=backup_support.verify_maintenance(backup,expected_sha256=receipt['manifest_sha256'])
     if (value['binding']!=adapter.binding or value['stage']!=context.stage or value['schema']!=context.schema
             or value['recovery']!=recovery_context(context)
-            or value['database_fingerprint']!=backup_support.database_fingerprint(lambda sql:readonly_query(adapter,sql))):
+            or value['database_fingerprint']!=backup_support.database_fingerprint(
+                lambda sql:readonly_query(adapter,sql),acl_semantics=value['version']==2)):
         raise RuntimeError('maintenance_backup_live_binding_changed')
     original=capture_original_roles(adapter)
     if hashlib.sha256(original.sql_bytes).hexdigest()!=value['roles_sha256']:

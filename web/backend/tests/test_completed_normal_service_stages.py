@@ -119,4 +119,75 @@ class CompletedNormalServiceTests(unittest.TestCase):
             self.assertEqual(json.loads(ops.authorization_file.read_bytes())['migration_database'],lease.return_value)
             lease.assert_called_once_with(contract)
 
+    def test_historical_service_issues_under_lock_then_releases_before_child_acquisition(self):
+        import fcntl,os,tempfile
+        from test_historical_origin import HistoricalPreparationBindingTests
+        from deployment.lib import schema150_provider_adapter as provider
+        from deployment.lib.completed_normal_profile import RECONCILED
+        contract=HistoricalPreparationBindingTests().contract()
+        with tempfile.TemporaryDirectory() as directory,patch('deployment.lib.completed_normal_profile.profile',return_value=RECONCILED),patch('deployment.lib.completed_normal_admission.profile',return_value=RECONCILED),patch.object(provider,'protected',lambda p,**kw:Path(p)):
+            ops=self.operations();ops.state_root=Path(directory);path=ops.state_root/'deploy.lock';path.touch(mode=0o600)
+            ops.deploy_lock_descriptor=None
+            def issue(*a,**kw):provider.require_owned_lock(ops.deploy_lock_descriptor,path)
+            ops.write_authorization.side_effect=issue
+            def command(label,args,**kw):
+                if args[0]=='/usr/bin/systemd-run':
+                    self.assertIsNone(ops.deploy_lock_descriptor)
+                    fd=os.open(path,os.O_RDWR)
+                    try:fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+                    finally:os.close(fd)
+                return m.CommandResult('','',0)
+            ops.command.side_effect=command
+            ops.run_deploy_service('prepare',contract['candidate']['controller_sha'],completed_normal_contract=contract,completed_normal_mode='prepare')
+            ops.write_authorization.assert_called_once();self.assertIsNone(ops.deploy_lock_descriptor)
+
+    def test_historical_service_refuses_a_parent_held_deploy_lock_before_launch(self):
+        import os,tempfile
+        from test_historical_origin import HistoricalPreparationBindingTests
+        from deployment.lib.completed_normal_profile import RECONCILED
+        contract=HistoricalPreparationBindingTests().contract()
+        with tempfile.TemporaryDirectory() as directory,patch('deployment.lib.completed_normal_profile.profile',return_value=RECONCILED),patch('deployment.lib.completed_normal_admission.profile',return_value=RECONCILED):
+            ops=self.operations();ops.state_root=Path(directory);path=ops.state_root/'deploy.lock';path.touch(mode=0o600)
+            ops.deploy_lock_descriptor=m.acquire_lock(path,create=False)
+            try:
+                with self.assertRaisesRegex(m.UpgradeError,'requires_released_deployment_lock'):
+                    ops.run_deploy_service('prepare',contract['candidate']['controller_sha'],completed_normal_contract=contract,completed_normal_mode='prepare')
+                ops.write_authorization.assert_not_called();ops.command.assert_not_called()
+            finally:os.close(ops.deploy_lock_descriptor)
+
+    def test_real_historical_issuer_projects_only_the_context_bound_operation_lease(self):
+        import json,tempfile
+        from contextlib import ExitStack
+        from test_historical_origin import HistoricalPreparationBindingTests
+        from deployment.lib import completed_normal_admission as admission,historical_origin,exceptional_release_approval
+        from deployment.lib.completed_normal_profile import RECONCILED
+        contract=HistoricalPreparationBindingTests().contract()
+        runtime={'source_sha':contract['source_roles']['application_sha'],'images':contract['origin']['images'],
+            'worker_generation':contract['origin']['worker_generation']}
+        lease={'MODEL':'exact consumed canonical operation; no operator token/key/password'}
+        with tempfile.TemporaryDirectory() as directory,ExitStack() as stack:
+            root=Path(directory);admissions=root/'admissions';current=admissions/admission.digest(contract);current.mkdir(parents=True)
+            (current/'admission.json').write_text(json.dumps({'operation':RECONCILED.operation,'contract':contract}))
+            for target,value in ((admission,'ADMISSIONS'),):stack.enter_context(patch.object(target,value,admissions))
+            stack.enter_context(patch.object(admission,'profile',return_value=RECONCILED))
+            stack.enter_context(patch('deployment.lib.completed_normal_profile.profile',return_value=RECONCILED))
+            stack.enter_context(patch('deployment.lib.provider_recovery_runtime.protected',lambda p,**kw:Path(p)))
+            stack.enter_context(patch.object(admission,'verify_history'))
+            stack.enter_context(patch.object(admission,'require_candidate_authority',return_value={'mode':'READ_ONLY'}))
+            stack.enter_context(patch.object(admission,'measure_provider_record',return_value={'MODEL':'provider'}))
+            stack.enter_context(patch.object(historical_origin,'history_witness',return_value={'original_runtime':runtime}))
+            issue=stack.enter_context(patch.object(exceptional_release_approval,'require_canonical_execution',return_value=lease))
+            stack.enter_context(patch('deployment.lib.schema160_release.root_child_host_identity',
+                return_value={'MODEL':'root host identity; verified separately'}))
+            stack.enter_context(patch.object(m,'require_root_directory'))
+            ops=object.__new__(m.SystemOperations);ops.runtime_root=root/'runtime';ops.runtime_root.mkdir()
+            ops.authorization_file=ops.runtime_root/'credential';ops.interlock_file=root/'interlock';ops.state_root=root/'state'
+            ops.interlock_document=Mock(return_value={'approved_sha':contract['candidate']['controller_sha']})
+            ops.write_authorization(contract['candidate']['controller_sha'],completed_normal_contract=contract,completed_normal_mode='prepare')
+            payload=json.loads(ops.authorization_file.read_bytes());public=json.loads(ops.interlock_file.read_bytes())
+            issue.assert_called_once_with(ops,contract)
+            self.assertEqual(payload['canonical_exceptional_approval'],lease)
+            self.assertEqual(public['canonical_exceptional_approval_sha256'],admission.digest(lease))
+            self.assertNotIn('canonical_exceptional_approval',public);self.assertNotIn('migration_database',payload)
+
 if __name__=='__main__':unittest.main()

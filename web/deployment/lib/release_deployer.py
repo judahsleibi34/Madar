@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from deployment.lib.runtime_authority import (
+    open_deployment_lock,
     load_worker_authority,
     write_worker_authority,
 )
@@ -134,10 +135,16 @@ class ReleaseDeployer:
         history.append(release)
         state["history"] = history
         atomic_json(self.state_file, state)
+        self._state_published()
+
+    def _state_published(self):
+        callback=getattr(self.operations,'state_published',None)
+        if callable(callback):callback()
 
     def _checkpoint(self, state: dict[str, Any], release: dict[str, Any]) -> None:
         state["in_progress_release"] = dict(release)
         atomic_json(self.state_file, state)
+        self._state_published()
 
     @staticmethod
     def _worker_identity(release: dict[str, Any]) -> dict[str, str]:
@@ -191,6 +198,17 @@ class ReleaseDeployer:
             old=old, candidate=candidate,
         )
         release["worker_owner"] = owner.lower()
+        self._checkpoint(state, release)
+
+    def _restore_retained_workers(self, state, release, known_good):
+        """Publish the actually restored epoch without changing its preimage."""
+        self.operations.restore_workers(known_good)
+        self._require_worker_authority(release, "OLD")
+        # Recovery owns the same release under the current handoff generation.
+        # Keep the historical previous-known-good object/receipt immutable.
+        state["known_good_release"] = dict(
+            known_good, worker_generation=self._worker_generation(release),
+        )
         self._checkpoint(state, release)
 
     def _require_worker_authority(
@@ -350,7 +368,7 @@ class ReleaseDeployer:
                     state, interrupted, "NONE", expected={recorded_owner},
                 )
             self._set_worker_authority(state, interrupted, "OLD", expected={"NONE"})
-            self.operations.restore_workers(known_good)
+            self._restore_retained_workers(state, interrupted, known_good)
             ownership = self.operations.worker_ownership(known_good, candidate)
         if ownership != "old":
             raise RuntimeError(
@@ -375,12 +393,15 @@ class ReleaseDeployer:
             raise ValueError("candidate must be a full lowercase Git SHA")
         self._requested_sha = sha
         self.state_root.mkdir(parents=True, exist_ok=True, mode=0o700)
-        with self.lock_file.open("a+", encoding="utf-8") as lock:
+        with open_deployment_lock(self.lock_file) as lock:
             try:
                 fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError as error:
                 raise RuntimeError("deployment_already_running") from error
             state = self._state()
+            admission = getattr(self.operations, 'admit_deployment', None)
+            if callable(admission):
+                admission(sha, state, lock.fileno())
             self._recover_interrupted(state)
             state = self._state()
             failure = (state.get("failed_releases") or {}).get(sha)
@@ -405,6 +426,7 @@ class ReleaseDeployer:
             known_good = state.get("known_good_release")
             switched = False
             workers_cut_over = False
+            exceptional_maintenance = False
             self._checkpoint(state, release)
             try:
                 self.operations.verify_source(sha)
@@ -439,6 +461,33 @@ class ReleaseDeployer:
                 release["phase"] = "preflight"
                 self._checkpoint(state, release)
                 self.operations.preflight(sha, candidate_slot, images, schema)
+                maintenance = getattr(self.operations, 'begin_exceptional_maintenance', None)
+                if callable(maintenance) and 'exceptional' in getattr(self.operations,'automatic_release_admission',{}):
+                    self._set_worker_authority(state, release, 'OLD', expected={'OLD','CANDIDATE'})
+                    self._set_worker_authority(state, release, 'NONE', expected={'OLD'})
+                    exceptional_maintenance = True # An interrupted fencing effect is never an ordinary rollback.
+                    if maintenance(known_good) is not True:raise RuntimeError('exceptional_maintenance_not_established')
+                    self._checkpoint(state, release)
+                selected_migration = getattr(self.operations, "apply_selected_migrations", None)
+                if callable(selected_migration):
+                    release["phase"] = "database_migration"
+                    self._checkpoint(state, release)
+                    migration_receipt = selected_migration(sha)
+                    if migration_receipt is not None:
+                        release["migration"] = migration_receipt
+                        schema = self.operations.schema_version()
+                        if schema != self.compatibility.target_schema:
+                            raise RuntimeError("migration_target_not_observed")
+                        release["schema"]["observed"] = schema
+                        if known_good:
+                            if exceptional_maintenance:
+                                self.operations.validate_fenced_rollback_target(known_good, schema)
+                            else:self.operations.validate_rollback_target(known_good, schema)
+                            # Retain the operation's origin preimage; current
+                            # serving state must describe the committed schema.
+                            known_good = dict(known_good, schema=schema)
+                            state["known_good_release"] = known_good
+                        self._checkpoint(state, release)
                 release["phase"] = "candidate_start"
                 self._checkpoint(state, release)
                 self.operations.start_candidate(sha, candidate_slot, images)
@@ -452,7 +501,10 @@ class ReleaseDeployer:
                 release["phase"] = "worker_cutover"
                 self._checkpoint(state, release)
                 candidate_identity = {"sha": sha, "slot": candidate_slot, "images": images}
-                if known_good:
+                if known_good and exceptional_maintenance:
+                    if self.operations.worker_ownership(known_good,candidate_identity)!='none':
+                        raise RuntimeError('exceptional_fenced_worker_owner_changed')
+                elif known_good:
                     if self.operations.worker_ownership(known_good, candidate_identity) != "old":
                         raise RuntimeError("worker_ownership_initial_invalid")
                     self._set_worker_authority(state, release, "OLD", expected={"OLD", "CANDIDATE"})
@@ -469,6 +521,7 @@ class ReleaseDeployer:
                     release["workers_cut_over"] = True
                     self._checkpoint(state, release)
                 except Exception:
+                    if exceptional_maintenance:raise
                     if known_good:
                         self._set_worker_authority(
                             state, release, "NONE", expected={"CANDIDATE", "NONE"}
@@ -478,7 +531,7 @@ class ReleaseDeployer:
                         if self.operations.worker_ownership(known_good, candidate_identity) != "none":
                             raise RuntimeError("candidate_worker_shutdown_unverified")
                         self._set_worker_authority(state, release, "OLD", expected={"NONE"})
-                        self.operations.restore_workers(known_good)
+                        self._restore_retained_workers(state, release, known_good)
                     raise
                 release["phase"] = "traffic_switch"
                 release["rollback_required"] = True
@@ -505,6 +558,15 @@ class ReleaseDeployer:
                 self._record(state, release)
                 return release
             except Exception as error:
+                if exceptional_maintenance:
+                    code=str(error)
+                    import re
+                    release.update(failure_phase=release['phase'],failure_code=code if re.fullmatch('[a-z0-9_:,]{1,200}',code) else 'bounded_execution_failed')
+                    self.operations.fence_exceptional_failure()
+                    self._set_worker_authority(state,release,'NONE',expected={'OLD','NONE','CANDIDATE'})
+                    release.update(status='recovery_required',phase='exceptional_maintenance_fenced',failure_reason=type(error).__name__)
+                    self._checkpoint(state,release)
+                    raise
                 release.update(
                     status="failed", completed_at=utc_now().isoformat(),
                     failure_reason=type(error).__name__, failure_code=str(error)[:200],
@@ -526,7 +588,7 @@ class ReleaseDeployer:
                         if self.operations.worker_ownership(known_good, candidate_identity) != "none":
                             raise RuntimeError("candidate_worker_shutdown_unverified")
                         self._set_worker_authority(state, release, "OLD", expected={"NONE"})
-                        self.operations.restore_workers(known_good)
+                        self._restore_retained_workers(state, release, known_good)
                     try:
                         self.operations.switch_traffic(previous_slot)
                     except Exception as rollback_error:
@@ -565,7 +627,7 @@ class ReleaseDeployer:
                             if self.operations.worker_ownership(known_good, candidate_identity) != "none":
                                 raise RuntimeError("candidate_worker_shutdown_unverified")
                             self._set_worker_authority(state, release, "OLD", expected={"NONE"})
-                            self.operations.restore_workers(known_good)
+                            self._restore_retained_workers(state, release, known_good)
                 self.operations.stop_candidate(
                     candidate_slot,
                     expected_serving={
@@ -603,7 +665,7 @@ class ReleaseDeployer:
             raise RuntimeError("recovery_candidate_requires_migration")
 
         self.state_root.mkdir(parents=True, exist_ok=True, mode=0o700)
-        with self.lock_file.open("a+", encoding="utf-8") as lock:
+        with open_deployment_lock(self.lock_file) as lock:
             try:
                 fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError as error:

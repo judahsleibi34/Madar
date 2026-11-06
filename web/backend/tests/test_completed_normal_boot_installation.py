@@ -35,13 +35,120 @@ class Operations:
                 dropins=[] if name==installer.name else [*installer.baseline['old_unit_dropins'][name],
                     str(m.UNITS/(name+'.d')/('99-superseded-'+admission.digest(installer.contract)[:12]+'.conf'))]
                 return SimpleNamespace(stdout='FragmentPath='+str(m.UNITS/name)+'\nDropInPaths='+' '.join(dropins)+'\n')
-            return SimpleNamespace(stdout='Requires=docker.service '+installer.name+'\nExecStartPre='+installer.command('proxy-gate')+
+            identity=installer.historical_proxy_id()
+            lifecycle=('FragmentPath='+str(m.UNITS/m.PROXY)+'\nExecStart={ path=/usr/bin/docker ; argv[]=/usr/bin/docker start '+identity+' ; }\nExecStop={ path=/usr/bin/docker ; argv[]=/usr/bin/docker stop --time 15 '+identity+' ; }\n') if identity else ''
+            return SimpleNamespace(stdout=lifecycle+'Requires=docker.service '+installer.name+'\nExecStartPre='+installer.command('proxy-gate')+
                 '\nDropInPaths='+' '.join([*installer.baseline['proxy_dropins'],str(installer.proxy)])+'\n')
         if args[:2] not in (['systemctl','disable'],['systemctl','enable'],['systemctl','daemon-reload'],['systemd-analyze','verify']):
             raise AssertionError('unexpected effect in the boot installer')
         return SimpleNamespace(stdout='')
 
 class CompletedBootInstallationTests(unittest.TestCase):
+    def test_historical_boot_has_truthful_measured_preimages_without_fake_prior_actor(self):
+        from test_historical_origin import HistoricalPreparationBindingTests
+        from deployment.lib.completed_normal_profile import RECONCILED
+        contract=HistoricalPreparationBindingTests().contract();document=copy.deepcopy(self.installer.document)
+        before=document['boot_resources'];proxy=str(m.UNITS/m.PROXY)
+        document['boot_resources']={'files':{proxy:before['files'][proxy]},'proxy_dropins':[],
+            'old_units':[],'old_unit_dropins':{},'unit_states':{m.PROXY:before['unit_states'][m.PROXY]}}
+        baseline=document['boot_resources'];contract['plan_sha256']=admission.digest(document)
+        observed={'boot_controls':{'files':dict(baseline['files']),'units':{m.PROXY:{'state':baseline['unit_states'][m.PROXY],'dropins':[]}}}}
+        with patch.object(m,'profile',return_value=RECONCILED),patch('deployment.lib.historical_origin.recorded_observation',return_value=observed):
+            instance=m.CompletedNormalBootInstallation(contract,document,self.installer.package,lambda:None,self.ops,units=self.units,admissions=self.path/'admissions')
+            self.assertEqual(instance.baseline['old_units'],[]);self.assertTrue(instance.proxy.name.startswith('99zzzzzzz-'))
+            self.assertEqual(instance.historical_proxy_id(),'e'*64)
+            for value in (None,{},dict(document['proxy_runtime'],id='wrong'),dict(document['proxy_runtime'],image='mutable:tag')):
+                with patch.dict(document,{'proxy_runtime':value}):
+                    with self.assertRaisesRegex(RuntimeError,'proxy_identity_invalid'):instance.paths()
+
+            observed['boot_controls']['files'][proxy]={'sha256':'f'*64}
+            with self.assertRaisesRegex(RuntimeError,'historical_preimage_changed'):
+                m.CompletedNormalBootInstallation(contract,document,self.installer.package,lambda:None,self.ops,units=self.units,admissions=self.path/'admissions')
+
+    def test_historical_restart_supervisor_is_superseded_but_network_barrier_is_preserved(self):
+        from test_historical_origin import HistoricalPreparationBindingTests
+        from deployment.lib.completed_normal_profile import RECONCILED
+        from deployment.lib.automatic_release_recovery import unit_definitions
+        contract=HistoricalPreparationBindingTests().contract();document=copy.deepcopy(self.installer.document)
+        before=document['boot_resources'];proxy=str(m.UNITS/m.PROXY);name='madar-known-good-recovery.service';fragment=str(m.UNITS/name)
+        record={'sha256':hashlib.sha256(unit_definitions()[name].encode()).hexdigest(),'uid':0,'mode':0o644}
+        state={'enabled':'enabled','active':'inactive'}
+        baseline={'files':{proxy:before['files'][proxy],fragment:record},'proxy_dropins':[],
+            'old_units':[name],'old_unit_dropins':{name:[]},'unit_states':{m.PROXY:before['unit_states'][m.PROXY],name:state}}
+        document['boot_resources']=baseline;contract['plan_sha256']=admission.digest(document)
+        observed={'boot_controls':{'files':dict(baseline['files']),'units':{
+            m.PROXY:{'state':baseline['unit_states'][m.PROXY],'dropins':[]},
+            name:{'fragment':fragment,'dropins':[],'state':state}},
+            'network_barriers':{'madar-isolated-fence.service':{'MODEL':'independently observed early barrier'}}}}
+        with patch.object(m,'profile',return_value=RECONCILED),patch('deployment.lib.historical_origin.recorded_observation',return_value=observed):
+            instance=m.CompletedNormalBootInstallation(contract,document,self.installer.package,lambda:None,self.ops,units=self.units,admissions=self.path/'admissions')
+            paths=instance.paths()
+            self.assertTrue(any(p.parent.name==name+'.d' for p in paths))
+            self.assertFalse(any('madar-isolated-fence.service.d' in str(p) for p in paths))
+            observed['boot_controls']['files'][fragment]=dict(record,sha256='f'*64)
+            with self.assertRaisesRegex(RuntimeError,'historical_recovery_unit_changed'):
+                m.CompletedNormalBootInstallation(contract,document,self.installer.package,lambda:None,self.ops,units=self.units,admissions=self.path/'admissions')
+
+    def test_historical_restart_preflight_and_install_count_the_actual_static_actor(self):
+        from test_historical_origin import HistoricalPreparationBindingTests
+        from deployment.lib.completed_normal_profile import RECONCILED
+        from deployment.lib.automatic_release_recovery import unit_definitions
+        # Real private fixture files: the historical origin has the static
+        # restart service, rather than fictional completed-release boot units.
+        for path in list(self.units.rglob('*')):
+            if path.is_file() and path != self.units/m.PROXY:
+                path.unlink()
+        contract=HistoricalPreparationBindingTests().contract()
+        document=copy.deepcopy(self.installer.document)
+        name='madar-known-good-recovery.service';fragment=str(m.UNITS/name)
+        body=unit_definitions()[name].encode()
+        (self.units/name).write_bytes(body);(self.units/name).chmod(0o644)
+        barrier=self.units/'madar-isolated-fence.service'
+        barrier.write_text(unit_definitions()[barrier.name]);barrier.chmod(0o644)
+        barrier_before=barrier.read_bytes()
+        state={'enabled':'enabled','active':'inactive'}
+        proxy=str(m.UNITS/m.PROXY)
+        baseline={'files':{proxy:document['boot_resources']['files'][proxy],
+            fragment:{'sha256':hashlib.sha256(body).hexdigest(),'uid':0,'mode':0o644}},
+            'proxy_dropins':[],'old_units':[name],'old_unit_dropins':{name:[]},
+            'unit_states':{m.PROXY:self.ops.systemctl_state(m.PROXY),name:state}}
+        document['boot_resources']=baseline;contract['plan_sha256']=admission.digest(document)
+        observed={'boot_controls':{'files':copy.deepcopy(baseline['files']),'units':{
+            m.PROXY:{'state':baseline['unit_states'][m.PROXY],'dropins':[]},
+            name:{'fragment':fragment,'dropins':[],'state':state}}}}
+        self.ops.states[name]=state.copy()
+        with patch.object(m,'profile',return_value=RECONCILED),patch(
+                'deployment.lib.historical_origin.recorded_observation',return_value=observed):
+            instance=m.CompletedNormalBootInstallation(contract,document,self.installer.package,
+                lambda:None,self.ops,units=self.units,admissions=self.path/'admissions')
+        instance.preflight(read_only=True)
+        self.assertEqual(self.ops.calls,[])
+        (self.units/name).unlink()
+        with self.assertRaisesRegex(RuntimeError,'legacy_unit_inventory_changed'):
+            instance.preflight(read_only=True)
+        (self.units/name).write_bytes(body+b'# unexpected modification\n')
+        (self.units/name).chmod(0o644)
+        with self.assertRaisesRegex(RuntimeError,'exact_preimage_changed'):
+            instance.preflight(read_only=True)
+        (self.units/name).write_bytes(body)
+        self.ops.installation=instance;instance.root.mkdir()
+        instance.install()
+        self.assertEqual(barrier.read_bytes(),barrier_before)
+        actual_command=self.ops.command
+        def substitute(label,args,**kwargs):
+            result=actual_command(label,args,**kwargs)
+            if label=='completed_boot_effective_proxy':
+                result.stdout=result.stdout.replace('/usr/bin/docker start '+'e'*64,
+                    '/usr/bin/docker start '+'a'*64)
+            return result
+        with patch.object(self.ops,'command',side_effect=substitute):
+            with self.assertRaisesRegex(RuntimeError,'effective_proxy_lifecycle_changed'):
+                instance.installed()
+        self.assertFalse((self.units/(barrier.name+'.d')).exists())
+        self.assertEqual(self.ops.systemctl_state(name)['enabled'],'disabled')
+        self.assertFalse(any(args[:2] in (['systemctl','start'],['systemctl','restart'])
+                             for _,args in self.ops.calls))
+
     def test_application_successor_preserves_verified_older_compatible_boot_actor(self):
         from test_completed_normal_application_release import application_contract
         contract=application_contract();document=copy.deepcopy(self.installer.document)
@@ -149,6 +256,19 @@ class CompletedBootInstallationTests(unittest.TestCase):
         # disabled proxy activation. Its guarded boot dependency owns recovery.
         self.assertNotIn('ExecStartPost=',body)
 
+    def test_historical_proxy_starts_bound_id_without_compose_recreation(self):
+        identity='e'*64
+        body=m.proxy_bytes('madar-compatible-normal-boot-test.service','/measured/root-gate',proxy_id=identity).decode()
+        self.assertIn('ExecStartPre=+/measured/root-gate\n',body)
+        self.assertIn('ExecStart=\nExecStart=/usr/bin/docker start '+identity+'\n',body)
+        self.assertIn('ExecStop=\nExecStop=/usr/bin/docker stop --time 15 '+identity+'\n',body)
+        self.assertNotIn('compose',body);self.assertNotIn('create',body)
+        for changed in ('',None,'e'*63,'madar-release-proxy','e'*64+'\nExecStart=/evil'):
+            if changed is None:continue
+            with self.assertRaisesRegex(RuntimeError,'proxy_identity_invalid'):
+                m.proxy_bytes('unit','gate',proxy_id=changed)
+        self.assertNotIn('ExecStart=',m.proxy_bytes('unit','gate').decode())
+
     def test_proxy_gate_runs_as_root_without_changing_proxy_service_identity(self):
         body=m.proxy_bytes('madar-compatible-normal-boot-test.service','/usr/bin/python3 /root-private/gate.py').decode()
         self.assertIn('ExecStartPre=+/usr/bin/python3 /root-private/gate.py\n',body)
@@ -173,6 +293,7 @@ class CompletedBootInstallationTests(unittest.TestCase):
         states={name:{'enabled':'enabled','active':'active'} for name in [m.PROXY,*old]}
         states[m.PROXY]['active']='failed' # Real current manager/runtime split.
         document={'operation':admission.OPERATION,'source_bundle_sha256':'a'*64,
+            'proxy_runtime':{'id':'e'*64,'image':'sha256:'+'f'*64,'spec_sha256':'d'*64},
             'boot_resources':{'files':files,'proxy_dropins':proxy_dropins,'old_units':old,
                 'old_unit_dropins':{n:[] for n in old},'unit_states':states}}
         self.contract=fixture_contract();self.contract['plan_sha256']=admission.digest(document)

@@ -10,6 +10,8 @@ from pathlib import Path
 import re
 from types import SimpleNamespace
 
+from deployment.lib.completed_normal_profile import maintenance_role
+
 from deployment.lib.completed_normal_admission import ADMISSIONS,OPERATION,digest,encoded,require_fresh_authorization
 from deployment.lib.provider_recovery_runtime import protected,readonly_configuration,file_digest
 from deployment.lib.completed_normal_profile import profile
@@ -93,12 +95,17 @@ class CompletedNormalBackupContext:
         from deployment.lib.maintenance_backup import expected_manifest
         return expected_manifest(self,backup)
 
+    def restore_preload(self):
+        if self.provider_adapter is None:raise RuntimeError('completed_backup_maintenance_context_required')
+        from deployment.lib.maintenance_backup import restore_preload
+        return restore_preload(self)
+
     def role_names(self):
         # Read role NAMES from the current native database. Passwords,
         # attributes and memberships are never copied into this inventory.
         self.guard()
         raw=self.kernel.runtime.command(['docker','exec',self.contract['database']['container_id'],
-            'psql','-XqAt','-v','ON_ERROR_STOP=1','-U','postgres','-d','postgres','-c',
+            'psql','-XqAt','-v','ON_ERROR_STOP=1','-U',maintenance_role(self.contract),'-d','postgres','-c',
             "BEGIN READ ONLY; SELECT json_agg(rolname ORDER BY rolname)::text FROM pg_roles; COMMIT;"])
         names=json.loads(raw)
         if (not isinstance(names,list) or not names or len(names)!=len(set(names))

@@ -29,12 +29,21 @@ def unit_bytes(command, *, source=115, target=136):
         'NoNewPrivileges=yes\nTimeoutStartSec=300\nExecStart='+command+'\n'
         '[Install]\nWantedBy=multi-user.target docker.service\n').encode()
 
-def proxy_bytes(name,command):
+def proxy_bytes(name,command,*,proxy_id=None):
     # Dependency directives are additive in systemd drop-ins; an empty value
     # CANNOT reset them. Exact earlier preimages are narrowly superseded below.
     # ExecStartPre DOES support reset and replaces only the legacy actor calls.
+    lifecycle=''
+    if proxy_id is not None:
+        if not isinstance(proxy_id,str) or not re.fullmatch('[a-f0-9]{64}',proxy_id):
+            raise RuntimeError('completed_boot_proxy_identity_invalid')
+        # A historical proxy may belong to a different Compose project. Keep
+        # its admitted ID/image/spec; never create or recreate it at boot.
+        lifecycle=('ExecStart=\nExecStart=/usr/bin/docker start '+proxy_id+'\n'
+            'ExecStop=\nExecStop=/usr/bin/docker stop --time 15 '+proxy_id+'\n')
     return ('[Unit]\nRequires=docker.service '+name+'\nAfter=docker.service '+name+
-        '\n[Service]\nTimeoutStartSec=300\nExecStartPre=\nExecStartPre=+'+command+'\n').encode()
+        '\n[Service]\nTimeoutStartSec=300\nExecStartPre=\nExecStartPre=+'+command+'\n'+lifecycle).encode()
+
 
 def superseded_dependencies(body,old_units):
     """Remove only literal obsolete unit references, preserving all other bytes."""
@@ -80,17 +89,40 @@ class CompletedNormalBootInstallation:
         self.profile=profile(contract)
         self.source_guard,self.ops=source_guard,operations;self.units=Path(units)
         self.root=Path(admissions)/digest(contract);self.name='madar-compatible-normal-boot-'+digest(contract)[:12]+'.service'
+        historical=contract['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin'
         # A completed136 origin already has a99-compatible-normal drop-in.
         # Its ExecStartPre reset must precede the successor's gate regardless
         # of the two context hashes; lexical hash order is not ownership.
-        prefix=('99zzzzz-compatible-normal-' if self.profile is OUTBOX else '99zzzz-compatible-normal-' if self.profile in (FENCED, OUTBOX) else
+        prefix=('99zzzzzzz-compatible-normal-' if historical else '99zzzzz-compatible-normal-' if self.profile is OUTBOX else '99zzzz-compatible-normal-' if self.profile in (FENCED, OUTBOX) else
             '99zzz-compatible-normal-' if self.profile is COMMERCIAL else
             '99zz-compatible-normal-' if self.profile is APPLICATION else
             '99z-compatible-normal-' if self.profile is MANUAL else '99-compatible-normal-')
         self.proxy=self.units/(PROXY+'.d')/(prefix+digest(contract)[:12]+'.conf')
         baseline=document['boot_resources']
-        compatible_origin='madar-compatible-normal-boot-'+Path(contract['source_roles']['completion_root']).name[:12]+'.service'
-        compatible_units={compatible_origin}
+        if historical:
+            from deployment.lib.historical_origin import recorded_observation
+            original=recorded_observation(contract['source_roles'])['boot_controls']
+            compatible_units={name for name in original['units'] if re.fullmatch(r'madar-(emergency-routing|normal-local-(boot|fallback)-[a-f0-9]{12}|compatible-normal-boot-[a-f0-9]{12})\.service',name)}
+            # An enrolled historical restart controller must not race the new
+            # protected boot actor after SQL. Supersede only the exact existing
+            # static unit, preserving the independent early isolation service.
+            recovery='madar-known-good-recovery.service'
+            if recovery in original['units']:
+                from deployment.lib.automatic_release_recovery import unit_definitions
+                control=original['units'][recovery];fragment=str(UNITS/recovery)
+                expected=hashlib.sha256(unit_definitions()[recovery].encode()).hexdigest()
+                if (control['fragment']!=fragment or control['dropins']
+                        or original['files'].get(fragment)!={'sha256':expected,'uid':0,'mode':0o644}):
+                    raise RuntimeError('completed_boot_historical_recovery_unit_changed')
+                compatible_units.add(recovery)
+            if (set(baseline['old_units'])!=compatible_units
+                    or any(original['files'].get(path)!=value for path,value in baseline['files'].items())
+                    or any(original['units'].get(name,{}).get('state')!=value for name,value in baseline['unit_states'].items())
+                    or baseline['proxy_dropins']!=original['units'][PROXY]['dropins']):
+                raise RuntimeError('completed_boot_historical_preimage_changed')
+        else:
+            compatible_origin='madar-compatible-normal-boot-'+Path(contract['source_roles']['completion_root']).name[:12]+'.service'
+            compatible_units={compatible_origin}
         if self.profile in (APPLICATION, COMMERCIAL, FENCED, OUTBOX):
             # Earlier compatible actors remain historical files. Only actors
             # already measured and superseded by the exact origin receipt may
@@ -102,7 +134,7 @@ class CompletedNormalBootInstallation:
             previous=json.loads(path.read_text())
             compatible_units.update(name for name in previous.get('old_units',[])
                 if re.fullmatch('madar-compatible-normal-boot-[0-9a-f]{12}\\.service',name))
-        if (set(baseline)!={'files','proxy_dropins','old_units','old_unit_dropins','unit_states'} or not baseline['old_units']
+        if (set(baseline)!={'files','proxy_dropins','old_units','old_unit_dropins','unit_states'} or not baseline['old_units'] and not historical
                 or any(not (name=='madar-emergency-routing.service' or re.fullmatch('madar-normal-local-(boot|fallback)-[0-9a-f]{12}\\.service',name)
                     or self.profile is not LEGACY and name in compatible_units) for name in baseline['old_units'])
                 or set(baseline['unit_states'])!={PROXY,*baseline['old_units']}):
@@ -122,9 +154,19 @@ class CompletedNormalBootInstallation:
         script=self.package/'source/web/scripts/continue_completed_normal_upgrade.py'
         return ('/usr/bin/python3 -I -B '+str(script)+' '+mode+' --source-package '+str(self.package)+
             ' --approved-source '+self.document['source_bundle_sha256']+' --approved-plan '+self.contract['plan_sha256'])
+    def historical_proxy_id(self):
+        if self.contract['source_roles'].get('origin_kind')!='independently-enrolled-historical-bootstrap-origin':
+            return None
+        value=self.document.get('proxy_runtime')
+        if (not isinstance(value,dict) or set(value)!={'id','image','spec_sha256'}
+                or not re.fullmatch('[a-f0-9]{64}',str(value.get('id')))
+                or not re.fullmatch('sha256:[a-f0-9]{64}',str(value.get('image')))
+                or not re.fullmatch('[a-f0-9]{64}',str(value.get('spec_sha256')))):
+            raise RuntimeError('completed_boot_proxy_identity_invalid')
+        return value['id']
     def paths(self):
         result={self.units/self.name:unit_bytes(self.command('boot'),source=self.profile.source,target=self.profile.target),
-                self.proxy:proxy_bytes(self.name,self.command('proxy-gate'))}
+                self.proxy:proxy_bytes(self.name,self.command('proxy-gate'),proxy_id=self.historical_proxy_id())}
         for name in self.baseline['old_units']:
             result[self.units/(name+'.d')/('99-superseded-'+digest(self.contract)[:12]+'.conf')]=(
                 '[Unit]\nRefuseManualStart=yes\nConditionPathExists=!'+str(self.root/'boot-installation.json')+'\n').encode()
@@ -150,6 +192,12 @@ class CompletedNormalBootInstallation:
         if self.profile is not LEGACY:
             legacy.update(p.name for p in self.units.glob('madar-compatible-normal-boot-*.service') if p.name!=self.name)
         if (self.units/'madar-emergency-routing.service').exists():legacy.add('madar-emergency-routing.service')
+        if self.contract['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin':
+            # The constructor authenticated this static actor against the
+            # signed historical inventory and exact unit definition. Count
+            # its real file here too; it has no context-derived legacy name.
+            recovery=self.units/'madar-known-good-recovery.service'
+            if recovery.exists() or recovery.is_symlink():legacy.add(recovery.name)
         if legacy!=set(self.baseline['old_units']):raise RuntimeError('completed_boot_legacy_unit_inventory_changed')
         for raw,expected in self.baseline['files'].items():
             path=self.units/Path(raw).relative_to(UNITS)
@@ -183,12 +231,14 @@ class CompletedNormalBootInstallation:
             expected_original=dict(baseline,sha256=superseded[str(path)]) if str(path) in superseded else baseline
             if {'sha256':file_digest(path),'uid':st.st_uid,'mode':st.st_mode&0o7777}!=expected_original:
                 raise RuntimeError('completed_boot_preserved_resource_changed')
+        overlays=self.provider_barrier_dropins()
         for name,paths in self.baseline['old_unit_dropins'].items():
             actual={str(UNITS/(name+'.d')/p.name) for p in (self.units/(name+'.d')).glob('*.conf')}
             own=str(UNITS/(name+'.d')/('99-superseded-'+digest(self.contract)[:12]+'.conf'))
-            if actual!=set(paths)|{own}:raise RuntimeError('completed_boot_legacy_dropin_inventory_changed')
+            if actual!=set(paths)|{own}|overlays.get(name,set()):raise RuntimeError('completed_boot_legacy_dropin_inventory_changed')
         actual={str(p) for p in (self.units/(PROXY+'.d')).glob('*.conf')}
-        expected_inventory={str(self.units/Path(raw).relative_to(UNITS)) for raw in self.baseline['proxy_dropins']}|{str(self.proxy)}
+        expected_inventory={str(self.units/Path(raw).relative_to(UNITS)) for raw in self.baseline['proxy_dropins']}|{str(self.proxy)}|{
+            str(self.units/Path(raw).relative_to(UNITS)) for raw in overlays.get(PROXY,set())}
         if actual!=expected_inventory:
             raise RuntimeError('completed_boot_proxy_inventory_changed')
         if any(self.ops.systemctl_state(n)['enabled']!='disabled' for n in self.baseline['old_units']):
@@ -202,17 +252,68 @@ class CompletedNormalBootInstallation:
             loaded=dict(line.split('=',1) for line in raw.splitlines() if '=' in line)
             expected_dropins=set() if name==self.name else set(self.baseline['old_unit_dropins'][name])|{
                 str(UNITS/(name+'.d')/('99-superseded-'+digest(self.contract)[:12]+'.conf'))}
+            expected_dropins|=overlays.get(name,set())
             if (loaded.get('FragmentPath')!=str(UNITS/name)
                     or set(loaded.get('DropInPaths','').split())!=expected_dropins):
                 raise RuntimeError('completed_boot_effective_actor_controls_changed')
-        raw=self.ops.command('completed_boot_effective_proxy',['systemctl','show',PROXY,'--property=Requires,ExecStartPre,DropInPaths','--no-pager']).stdout
+        raw=self.ops.command('completed_boot_effective_proxy',['systemctl','show',PROXY,'--property=Requires,ExecStartPre,DropInPaths,ExecStart,ExecStop,FragmentPath','--no-pager']).stdout
         values=dict(line.split('=',1) for line in raw.splitlines() if '=' in line)
         requires=set(values.get('Requires','').split())
         if (self.name not in requires or set(self.baseline['old_units'])&requires
                 or self.command('proxy-gate') not in values.get('ExecStartPre','')
-                or set(values.get('DropInPaths','').split())!=set(self.baseline['proxy_dropins'])|{str(self.proxy)}):
+                or set(values.get('DropInPaths','').split())!=set(self.baseline['proxy_dropins'])|{str(self.proxy)}|overlays.get(PROXY,set())):
             raise RuntimeError('completed_boot_effective_proxy_controls_changed')
+        identity=self.historical_proxy_id()
+        if identity is not None:
+            for key,argv in (('ExecStart','/usr/bin/docker start '+identity),
+                    ('ExecStop','/usr/bin/docker stop --time 15 '+identity)):
+                value=values.get(key,'')
+                if (value.count('argv[]=')!=1 or 'argv[]='+argv+' ;' not in value
+                        or 'path=/usr/bin/docker ;' not in value
+                        or values.get('FragmentPath')!=str(UNITS/PROXY)):
+                    raise RuntimeError('completed_boot_effective_proxy_lifecycle_changed')
         return record
+    def provider_barrier_dropins(self):
+        """Observe the existing maintenance overlay, never amend boot evidence.
+
+        The provider publishes intent before its effect and calls the source
+        guard again before recording completion. Requiring a completed effect
+        here would make that guard impossible. An interrupted intent still
+        cannot execute again: ProviderMaintenance150 owns reconciliation.
+        """
+        from deployment.lib.completed_normal_profile import DELETION,RECONCILED
+        if self.profile not in (DELETION,RECONCILED):return {}
+        journal_path=self.root/'provider-journal'
+        if not journal_path.exists() and not journal_path.is_symlink():return {}
+        from deployment.lib.schema150_provider_lifecycle import ProtectedProviderJournal,ProviderMaintenance150,validate_binding,digest as provider_digest
+        from deployment.lib.schema150_actor_inventory import validate_inventory
+        binding=validate_binding({'operation':self.contract['operation'],'context_sha256':digest(self.contract),
+            'source_sha':self.contract['candidate']['source_sha'],'controller_sha':self.contract['candidate']['controller_sha'],
+            'inventory_sha256':self.contract['writer_inventory_sha256'],'system_identifier':self.contract['database']['system_identifier'],
+            'source_schema':self.profile.source,'target_schema':self.profile.target})
+        journal=ProtectedProviderJournal(journal_path)
+        records,completed,pending,_=ProviderMaintenance150(binding,journal,None)._state()
+        barrier=self.root/'provider-barrier.json'
+        exists=barrier.exists() or barrier.is_symlink()
+        armed='arm_boot_interlock' in completed
+        if not armed and not (pending=='arm_boot_interlock' and exists):
+            if exists:raise RuntimeError('completed_boot_provider_barrier_without_intent')
+            return {}
+        inventory=validate_inventory(json.loads(protected(self.root/'provider-inventory.json',private=True).read_bytes()),binding)
+        cleared='clear_boot_interlock' in completed or pending=='clear_boot_interlock'
+        if exists:
+            expected={'binding':binding,'preimage_sha256':provider_digest(records[0]['payload']['preimage'])}
+            if cleared and pending!='clear_boot_interlock' or json.loads(protected(barrier,private=True).read_bytes())!=expected:
+                raise RuntimeError('completed_boot_provider_barrier_changed')
+        elif not cleared:raise RuntimeError('completed_boot_provider_barrier_missing')
+        body=('[Unit]\nConditionPathExists=!'+str(barrier)+'\n').encode()
+        name='99zzzzzz-schema'+str(self.profile.target)+'-'+binding['context_sha256'][:12]+'.conf'
+        result={}
+        for unit in inventory['supervisors']:
+            path=self.units/(unit+'.d')/name
+            if protected(path).read_bytes()!=body:raise RuntimeError('completed_boot_provider_dropin_changed')
+            result[unit]={str(UNITS/(unit+'.d')/name)}
+        return result
     def install(self):
         # The complete coordinator owns deployment/upgrade locks throughout.
         # No unit is started and no application/traffic/write state is changed.

@@ -1,0 +1,664 @@
+"""Routine admission adapter to the existing ReleaseDeployer/Docker operations.
+
+No replacement deployment state machine, SQL executor, issuer or traffic driver.
+Root owns exact authority. Source-owned checks execute without Docker, network,
+credentials or writable host mounts. Production operation is not enabled here.
+"""
+from __future__ import annotations
+import json,os,re,subprocess,sys,time,tempfile
+from pathlib import Path
+from .migration_inventory import canonical,digest,strict_json
+from . import automatic_release_admission as admission
+from .provider_recovery_runtime import protected,readonly_configuration
+from .control_plane_upgrade import acquire_lock,require_root_directory
+from .release_deployer import Compatibility,ReleaseDeployer
+from .migration_executor import atomic_json
+
+ROLES=('backend','frontend','redis','parser-worker','remote-ingestion-worker',
+       'notification-worker','calendar-sync-worker','data-deletion-worker')
+LIMITS_MIB={'backend':1280,'frontend':128,'redis':128,'parser-worker':768,
+    'remote-ingestion-worker':256,'notification-worker':256,'calendar-sync-worker':256,'data-deletion-worker':256}
+
+
+def verify_traffic_driver_access():
+    """Observe the canonical traffic UID's prerequisites BEFORE persistent SQL.
+
+    The root issuer's Docker access cannot prove the child driver's access.
+    Do not repair permissions or publish upstreams as a readiness probe.
+    """
+    import pwd,stat
+    user=pwd.getpwnam('madar')
+    target=Path('/var/lib/madar/proxy/active-upstreams.conf')
+    metadata=target.lstat();parent=target.parent.lstat()
+    if (not stat.S_ISREG(metadata.st_mode) or metadata.st_uid!=user.pw_uid
+            or metadata.st_mode&0o777!=0o644 or metadata.st_nlink!=1
+            or not stat.S_ISDIR(parent.st_mode) or parent.st_uid!=user.pw_uid
+            or parent.st_mode&0o777!=0o755):
+        raise RuntimeError('automatic_traffic_driver_route_permissions_invalid')
+    result=subprocess.run(['/usr/sbin/runuser','-u','madar','--','/usr/bin/docker',
+        '--host','unix:///var/run/docker.sock','inspect','--format','{{.State.Running}}',
+        'madar-release-proxy'],env={'PATH':os.defpath,'HOME':'/nonexistent'},
+        text=True,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=5)
+    if result.returncode or result.stdout.strip()!='true':
+        raise RuntimeError('automatic_traffic_driver_unavailable')
+
+
+def observe_fenced_origin_route(rows,slot,run):
+    """Observe the existing proxy's loaded route without restarting a writer.
+
+    Called only inside authenticated exceptional maintenance. A unique failed
+    upstream request proves the loaded backend port; image bytes independently
+    prove the frontend route. The on-disk upstream file alone is insufficient.
+    """
+    import hashlib,uuid,urllib.request,urllib.error
+    if slot not in {'blue','green'}:raise RuntimeError('exceptional_route_slot_invalid')
+    names={r['Name']:r for r in rows}
+    proxy=names['/madar-release-proxy'];frontend=names['/madar-'+slot+'-frontend']
+    if not proxy['State']['Running'] or not frontend['State']['Running']:
+        raise RuntimeError('exceptional_route_observer_unavailable')
+    writers={'/madar-'+slot+'-'+r for r in ROLES if r not in {'frontend','redis'}}
+    if not writers<=names.keys() or any(names[n]['State']['Running'] for n in writers):
+        raise RuntimeError('exceptional_route_origin_not_fenced')
+    opener=urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    def get(port,path):
+        request=urllib.request.Request('http://127.0.0.1:'+str(port)+path,
+            headers={'Accept-Encoding':'identity','Connection':'close'})
+        try:response=opener.open(request,timeout=5)
+        except urllib.error.HTTPError as error:response=error
+        with response:
+            body=response.read(1024*1024+1)
+            if len(body)>1024*1024:raise RuntimeError('exceptional_route_response_unbounded')
+            return response.code,body
+    backend_port,frontend_port={'blue':(8101,3100),'green':(8201,3200)}[slot]
+    nonce=str(uuid.uuid4());path='/health/version?madar_maintenance_probe='+nonce
+    since=str(int(time.time()))
+    if get(8001,path)[0]!=502:raise RuntimeError('exceptional_route_backend_not_fenced')
+    # Docker sends nginx error logs to stderr. Bound both output and time and
+    # never retain unrelated proxy requests in a release receipt.
+    with tempfile.TemporaryFile() as output:
+        result=subprocess.run(['/usr/bin/docker','logs','--since',since,'--tail','20',proxy['Id']],
+            stdout=output,stderr=subprocess.STDOUT,timeout=5,env={'PATH':os.defpath,'HOME':'/nonexistent'})
+        size=output.tell()
+        if result.returncode or size>65536:raise RuntimeError('exceptional_route_log_unavailable')
+        output.seek(0);lines=output.read().decode(errors='strict').splitlines()
+    matches=[line for line in lines if 'request: "GET '+path+' HTTP/1.1"' in line]
+    expected='upstream: "http://127.0.0.1:'+str(backend_port)+path+'"'
+    if len(matches)!=1 or 'connect() failed (111: Connection refused)' not in matches[0] or expected not in matches[0]:
+        raise RuntimeError('exceptional_route_loaded_upstream_ambiguous')
+    expected_html=run(['/usr/bin/docker','exec',frontend['Id'],'sha256sum','/usr/share/nginx/html/index.html'],capture=True).split()[0]
+    if not re.fullmatch('[a-f0-9]{64}',expected_html):raise RuntimeError('exceptional_route_frontend_identity_invalid')
+    for port in (frontend_port,3000):
+        status,body=get(port,'/')
+        if status!=200 or hashlib.sha256(body).hexdigest()!=expected_html:
+            raise RuntimeError('exceptional_route_loaded_frontend_ambiguous')
+    return slot
+
+
+
+def source_check_git_index(directory,repository,source_sha):
+    """Expose only authenticated tracked paths, never operational Git metadata.
+
+    Linked worktree .git pointers are deliberately inaccessible in the check
+    sandbox. Build a standalone read-only index from the admitted commit using
+    trusted Git, without copying hooks, config, remotes, objects or credentials.
+    """
+    if not re.fullmatch(r'[a-f0-9]{40}',source_sha):
+        raise RuntimeError('automatic_check_source_invalid')
+    directory=Path(directory)
+    for name in ('objects','refs'):
+        (directory/name).mkdir(mode=0o755)
+    (directory/'HEAD').write_text('ref: refs/heads/check\n')
+    (directory/'config').write_text('[core]\nrepositoryformatversion = 0\nbare = false\n')
+    environment={'PATH':os.defpath,'HOME':'/nonexistent','GIT_CONFIG_NOSYSTEM':'1',
+        'GIT_CONFIG_GLOBAL':'/dev/null','GIT_NO_REPLACE_OBJECTS':'1',
+        'GIT_INDEX_FILE':str(directory/'index')}
+    subprocess.run(['/usr/bin/git','-C',str(repository),'-c','safe.directory='+str(repository),
+        '-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false','read-tree',source_sha],
+        env=environment,check=True,stdout=subprocess.DEVNULL)
+    for name in ('HEAD','config','index'):(directory/name).chmod(0o444)
+    directory.chmod(0o755)
+
+
+def validate_candidate_model(model,value,source_root):
+    """Reject elevated Compose inputs before Docker creates any candidate."""
+    if not isinstance(model,dict) or set(model.get('services',{}))!=set(ROLES):
+        raise RuntimeError('automatic_candidate_roles_changed')
+    data=Path('/var/lib/madar/storage');authority=grant_directory(value)
+    for role,row in model['services'].items():
+        host=row.get('network_mode','');image=row.get('image','')
+        if (row.get('container_name')!='madar-'+value['candidate']['slot']+'-'+role
+                or row.get('privileged') or host or row.get('pid') or row.get('ipc')=='host'
+                or row.get('cap_add') or row.get('devices') or row.get('device_requests')
+                or row.get('cap_drop')!=['ALL'] or row.get('security_opt')!=['no-new-privileges:true']
+                or row.get('read_only') is not True or row.get('restart')!='no'
+                or str(row.get('mem_limit'))!=str(LIMITS_MIB[role]*1024**2)
+                or not 0<float(row.get('cpus',0))<=2 or row.get('pids_limit')!=128):
+            raise RuntimeError('automatic_candidate_privilege_or_budget_invalid')
+        expected=value['candidate']['images']['frontend' if role=='frontend' else 'backend'].split('@',1)[1]
+        if role=='redis':
+            if not re.fullmatch(r'[^\s]+@sha256:[a-f0-9]{64}',image):raise RuntimeError('automatic_redis_not_pinned')
+        elif image!=expected:raise RuntimeError('automatic_candidate_image_not_admitted')
+        for port in row.get('ports',[]):
+            if port.get('host_ip')!='127.0.0.1':raise RuntimeError('automatic_candidate_public_port_refused')
+        for mount in row.get('volumes',[]):
+            path=Path(mount.get('source',''))
+            if mount.get('type')!='bind' or not path.is_absolute() or '..' in path.parts:
+                raise RuntimeError('automatic_candidate_volume_not_admitted')
+            if path.is_relative_to(data) and path!=data:
+                if mount.get('target') not in {'/app/uploads','/app/avatar_uploads','/app/private_uploads','/app/private_generated_charts'}:
+                    raise RuntimeError('automatic_candidate_data_destination_changed')
+            elif ((path.is_relative_to(source_root) and path!=source_root)
+                    or path==authority or path==Path('/var/lib/madar/backup-state')):
+                if mount.get('read_only') is not True:raise RuntimeError('automatic_candidate_control_mount_writable')
+            else:raise RuntimeError('automatic_candidate_host_mount_not_admitted')
+
+
+def runtime_context(value):
+    return digest({k:value[k] for k in ('attempt_id','source_sha','controller_sha')}|{
+        'database_system_identifier':value['database']['system_identifier']})
+
+
+def grant_directory(value):
+    return admission.ROOT/'runtime'/value['attempt_id']/'write-authority'
+
+
+def publish_candidate_grant(value,mode):
+    """Exact root file, not an application-readable bearer credential."""
+    if mode=='READ_ONLY':
+        admission.sealed(value,allow_expired=True);admission.require_reserved(value,allow_completed=True)
+    else:admission.require_reserved(value)
+    if mode not in {'READ_ONLY','NORMAL'}:raise RuntimeError('automatic_grant_mode_invalid')
+    runtime=admission.ROOT/'runtime';require_root_directory(runtime,create=True)
+    require_root_directory(runtime/value['attempt_id'],create=True)
+    path=grant_directory(value);require_root_directory(path,mode=0o755,create=True)
+    candidate=value['candidate'];plan=value['plan']
+    record={'version':4,'operation':admission.OPERATION,'operation_id':value['operation_id'],
+        'attempt_id':value['attempt_id'],'schema':value['database']['target_schema'],
+        'target_schema':value['database']['target_schema'],'release_sha':value['source_sha'],
+        'contract_digest':runtime_context(value),'mode':mode,'controller_sha':value['controller_sha'],
+        'database_system_identifier':value['database']['system_identifier'],'plan_sha256':digest(plan),
+        'compatible_min':candidate['compatible_min'],'compatible_max':candidate['compatible_max']}
+    atomic_json(path/'authority.json',record);(path/'authority.json').chmod(0o444)
+    return record
+
+
+def operations_adapter(base,system,value):
+    """Adapt immutable inputs/authority only; reuse real lifecycle operations."""
+    class AuthorizedOperations(base):
+        def __init__(self):
+            candidate=value['candidate'];plan=value['plan']
+            compatibility=Compatibility(candidate['compatible_min'],candidate['compatible_max'],
+                plan['target_schema'],'none' if not plan['migrations'] else 'forward-compatible' if 'exceptional' in value else 'expand-only',
+                value['origin']['compatible_min'],value['origin']['compatible_max'])
+            super().__init__(system.repo,system.state_root,Path('/etc/madar/production.env'),compatibility)
+            self.automatic_release_admission=value;self._issuer=system;self._credential_root=None
+            self._origin_fenced=[];self._model=None;self._candidate_rows=None;self._expected_route=value['origin']['slot'];self._migration_completed=False
+            self._maintenance=False;self._private_providers=[];self._private_gateway=None
+            self._initial_scope=strict_json(protected(Path('/etc/madar/isolated-release-test.json'),private=True).read_bytes())['runtime_scope']
+
+        def verify_actor_scope(self,*,enforce_maintenance=True):
+            from .isolated_release_environment import verify_runtime_scope
+            from .completed_normal_resources import measured_spec_matches
+            import copy,hashlib
+            ids=self.run(['/usr/bin/docker','ps','-aq','--no-trunc'],capture=True).split()
+            rows=json.loads(self.run(['/usr/bin/docker','inspect',*ids],capture=True))
+            candidate=self._candidate_rows or {}
+            if set(ids)!=set(self._initial_scope)|set(candidate):raise RuntimeError('automatic_unexpected_runtime_actor')
+            expected=copy.deepcopy(self._initial_scope)
+            if self._expected_route!=value['origin']['slot']:
+                # The existing traffic driver changes exactly this nonsecret
+                # file. Never ignore an entire proxy directory's drift.
+                proxy=next(r for r in rows if r['Name']=='/madar-release-proxy')
+                binding=expected[proxy['Id']]['binds']['/etc/nginx/madar']
+                path=Path(binding['source'])
+                if path!=Path('/var/lib/madar/proxy') or sorted(p.name for p in path.iterdir())!=['active-upstreams.conf']:
+                    raise RuntimeError('automatic_proxy_input_inventory_changed')
+                ports={'blue':(8101,3100),'green':(8201,3200)}[self._expected_route]
+                body=('upstream madar_backend_active { server 127.0.0.1:'+str(ports[0])+'; }\n'
+                    'upstream madar_frontend_active { server 127.0.0.1:'+str(ports[1])+'; }\n').encode()
+                if (path/'active-upstreams.conf').read_bytes()!=body:raise RuntimeError('automatic_proxy_route_changed')
+                binding['contents_sha256']=digest({'active-upstreams.conf':{'sha256':hashlib.sha256(body).hexdigest(),'uid':1000,'mode':0o644}})
+            verify_runtime_scope(expected,[r for r in rows if r['Id'] in self._initial_scope])
+            if self._maintenance and enforce_maintenance:
+                stopped={'/madar-'+value['origin']['slot']+'-'+r for r in ROLES if r not in {'frontend','redis'}}
+                if not self._migration_completed:stopped|={'/supabase-auth','/supabase-rest','/supabase-storage','/supabase-envoy'}
+                if any(r['Name'] in stopped and r['State']['Running'] for r in rows):
+                    raise RuntimeError('exceptional_original_writer_restarted')
+            for row in rows:
+                if row['Id'] not in candidate:continue
+                old=candidate[row['Id']]
+                if row['Name']!=old['Name'] or row['Image']!=old['Image'] or not measured_spec_matches(row,old['spec_sha256'],started_worker=True):
+                    raise RuntimeError('automatic_candidate_runtime_substituted')
+            return rows
+
+        def state_published(self):
+            import pwd
+            user=pwd.getpwnam('madar')
+            for name in ('state.json','worker-ownership.json'):
+                path=self.state_root/name
+                if path.exists():
+                    if path.is_symlink():raise RuntimeError('automatic_state_symlink_refused')
+                    os.chown(path,user.pw_uid,user.pw_gid);path.chmod(0o600)
+
+        def schema_version(self):
+            with admission.connect_database() as db:
+                identifier,schema=db.execute("SELECT system_identifier::text,schema_version FROM pg_catalog.pg_control_system(),public.application_schema_state WHERE contract_key='core'").fetchone()
+                if identifier!=value['database']['system_identifier']:raise RuntimeError('automatic_execution_database_substituted')
+                return schema
+
+        def authority_guard(self):
+            admission.sealed(value);admission.require_reserved(value)
+            from .control_plane_upgrade_authorization import require_upgrade_authorization
+            require_upgrade_authorization(value['source_sha'],required_operation=admission.OPERATION,
+                required_schema=value['database']['origin_schema'],required_context_digest=digest(value))
+
+        def guard(self):
+            self.authority_guard()
+            expected=value['database']['target_schema'] if self._migration_completed or not value['plan']['migrations'] else value['database']['origin_schema']
+            with admission.connect_database() as db:
+                observed=db.execute("SELECT system_identifier::text,schema_version FROM pg_catalog.pg_control_system(),public.application_schema_state WHERE contract_key='core'").fetchone()
+                if observed!=(value['database']['system_identifier'],expected):
+                    raise RuntimeError('automatic_live_execution_database_changed')
+
+        def begin_exceptional_maintenance(self,origin):
+            if 'exceptional' not in value:return False
+            self.authority_guard();rows=self.verify_actor_scope()
+            self.deactivate_workers(origin)
+            names={'/supabase-auth','/supabase-rest','/supabase-storage'}
+            self._private_providers=[r['Id'] for r in rows if r['Name'] in names]
+            if len(self._private_providers)!=3:raise RuntimeError('exceptional_provider_inventory_incomplete')
+            gateways=[r['Id'] for r in rows if r['Name']=='/supabase-envoy']
+            if len(gateways)!=1:raise RuntimeError('exceptional_gateway_inventory_incomplete')
+            self._private_gateway=gateways[0]
+            # Close gateway ingress and its cached provider addresses before
+            # stopping providers. Docker can assign new IPs to the same IDs.
+            self.run(['/usr/bin/docker','stop','--time','15',self._private_gateway])
+            self.run(['/usr/bin/docker','stop','--time','15',*self._private_providers])
+            self._maintenance=True
+            self.verify_actor_scope()
+            from .exceptional_release_approval import execution_event
+            execution_event(system,value,'EXECUTING',{'origin_writer_ids':self._origin_fenced,
+                'private_provider_ids':self._private_providers,'private_gateway_id':self._private_gateway,
+                'public_write_ingress':'origin-backend-stopped'})
+            return True
+
+        def validate_fenced_rollback_target(self,origin,schema):
+            if not self._maintenance or schema!=value['database']['target_schema']:
+                raise RuntimeError('exceptional_origin_validation_state_invalid')
+            # Only the independently measured private leaf-table contract uses
+            # this path. No application role could access the removed object.
+            self.guard();self.verify_actor_scope()
+            if not value['origin']['compatible_min']<=schema<=value['origin']['compatible_max']:
+                raise RuntimeError('exceptional_origin_target_incompatible')
+            return {'compatible_min':value['origin']['compatible_min'],'compatible_max':value['origin']['compatible_max']}
+
+        def fence_exceptional_failure(self):
+            if 'exceptional' not in value:return
+            rows=self.verify_actor_scope(enforce_maintenance=False)
+            stop=[r['Id'] for r in rows if r['Name'] in {'/madar-'+slot+'-'+role
+                for slot in ('blue','green') for role in ROLES if role not in {'frontend','redis'}} and r['State']['Running']]
+            if stop:self.run(['/usr/bin/docker','stop','--time','15',*stop])
+            publish_candidate_grant(value,'READ_ONLY')
+
+        def apply_selected_migrations(self,sha):
+            self.guard();self.verify_actor_scope()
+            if sha!=value['source_sha']:raise RuntimeError('automatic_migration_source_changed')
+            if not value['plan']['migrations']:return None
+            from .automatic_release_migration import execute as apply_sql
+            def parent_guard():
+                self.authority_guard();self.verify_actor_scope()
+            receipt=apply_sql(value,system,parent_guard)
+            self._migration_completed=True
+            if self._maintenance:
+                self.run(['/usr/bin/docker','start',*self._private_providers])
+                deadline=time.monotonic()+60
+                while True:
+                    self.guard();rows={r['Id']:r for r in self.verify_actor_scope()}
+                    states=[rows[i]['State'] for i in self._private_providers]
+                    if all(s['Running'] and s.get('Health',{}).get('Status','healthy')=='healthy' for s in states):break
+                    if time.monotonic()>=deadline:raise RuntimeError('exceptional_private_provider_readiness_failed')
+                    time.sleep(1)
+                # This restarts the SAME sealed gateway/configuration only
+                # after provider attachment, refreshing its loaded DNS safely.
+                self.run(['/usr/bin/docker','start',self._private_gateway])
+            self.guard()
+            return receipt
+
+        def admit_deployment(self,sha,state,descriptor):
+            if sha!=value['source_sha']:raise RuntimeError('automatic_execution_source_changed')
+            system.deploy_lock_descriptor=descriptor # borrowed, owned by ReleaseDeployer
+            if 'exceptional' in value:
+                from .exceptional_release_approval import verify_execution
+                verify_execution(value,system,consume=True,token=system.exceptional_operator_token)
+            admission.reserve(value,system)
+            admission.arm_operation(value)
+            system.arm_interlock(sha)
+            system.write_authorization(sha,automatic_release_admission=value)
+            credential_root=system.runtime_root/('automatic-'+value['attempt_id'])
+            require_root_directory(credential_root,mode=0o711,create=True)
+            target=credential_root/'madar-control-plane-upgrade'
+            fd=os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+            with os.fdopen(fd,'wb') as stream:
+                stream.write(protected(system.authorization_file,private=True).read_bytes());stream.flush();os.fsync(stream.fileno())
+            import pwd
+            user=pwd.getpwnam('madar');os.chown(target,user.pw_uid,user.pw_gid);target.chmod(0o400)
+            self._credential_root=credential_root;os.environ['CREDENTIALS_DIRECTORY']=str(credential_root)
+            self.guard();publish_candidate_grant(value,'READ_ONLY')
+            receipt=admission.ROOT/'attempts'/value['attempt_id']/'authorization.json'
+            atomic_json(receipt,{'admission_sha256':digest(value),'plan_sha256':digest(value['plan']),
+                'environment':value['environment'],'source_sha':sha,'database':value['database'],
+                'operation_id':value['operation_id'],'attempt_id':value['attempt_id'],
+                'authorized_at':int(time.time()),'expires_at':value['expires_at']},exclusive=True)
+
+        def run(self,command,*,cwd=None,env=None,capture=False):
+            # The generic parent owns the only issuer. Candidate scripts never
+            # inherit its root privileges, Docker socket or operational env.
+            if command and str(command[0]) in {sys.executable,'python','python3','/usr/bin/python3'} and len(command)>1 and '/web/scripts/' in str(command[1]):
+                script=Path(command[1]);relative=script.relative_to(self.release_root).as_posix()
+                if relative not in {'web/scripts/check_migrations.py','web/scripts/check_migration_transitions.py','web/scripts/check_secret_hygiene.py'}:
+                    raise RuntimeError('automatic_unreviewed_source_command')
+                # Independently enrolled locked tools, not the candidate image.
+                tool=protected(Path('/etc/madar/automatic-check-image'),private=True).read_text().strip()
+                if not re.fullmatch('sha256:[a-f0-9]{64}',tool):raise RuntimeError('automatic_check_image_unpinned')
+                command=['/usr/bin/docker','run','--rm','--network','none','--read-only','--user','65534:65534',
+                    '--cap-drop','ALL','--security-opt','no-new-privileges:true','--memory','256m','--cpus','.5','--pids-limit','64',
+                    '--tmpfs','/tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777','--volume',str(self.release_root)+':/source:ro',
+                    '--entrypoint','python',tool,'-B','/source/'+relative]
+                if relative=='web/scripts/check_secret_hygiene.py':
+                    with tempfile.TemporaryDirectory(prefix='madar-source-check-') as temporary:
+                        source_check_git_index(temporary,self.repo,value['source_sha'])
+                        command[2:2]=['--volume',temporary+':/source-git:ro',
+                            '--env','GIT_DIR=/source-git','--env','GIT_WORK_TREE=/source',
+                            '--env','GIT_CONFIG_NOSYSTEM=1','--env','GIT_CONFIG_GLOBAL=/dev/null']
+                        return super().run(command,cwd=None,env={'PATH':os.defpath,'HOME':'/nonexistent'},capture=capture)
+                cwd=None;env={'PATH':os.defpath,'HOME':'/nonexistent'}
+            elif command and command[0]=='git':
+                location=Path(cwd or self.repo).resolve()
+                if location not in {self.repo.resolve(),(self.state_root/'releases'/value['source_sha']).resolve()}:
+                    raise RuntimeError('automatic_git_location_not_admitted')
+                command=['/usr/bin/git','-c','safe.directory='+str(location),'-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false',*command[1:]]
+                env=dict(env or os.environ,GIT_CONFIG_NOSYSTEM='1',GIT_CONFIG_GLOBAL='/dev/null',GIT_NO_REPLACE_OBJECTS='1')
+            if command and command[0]==os.getenv('MADAR_TRAFFIC_SWITCH_COMMAND'):
+                # Preserve the installed traffic driver's canonical mutation UID.
+                command=['/usr/sbin/runuser','-u','madar','--',*command]
+            if 'compose' in command and 'config' in command and '--format' in command:
+                result=super().run(command,cwd=cwd,env=env,capture=True)
+                self._model=strict_json(result);return result
+            return super().run(command,cwd=cwd,env=env,capture=capture)
+
+        def build(self,sha,slot):
+            self.guard()
+            if sha!=value['source_sha'] or slot!=value['candidate']['slot']:raise RuntimeError('automatic_candidate_scope_changed')
+            images=value['candidate']['images']
+            for role in ('backend','frontend','worker'):
+                if self._digest(images[role].split('@')[0])!=images[role]:raise RuntimeError('automatic_immutable_artifact_changed')
+            return dict(images,artifact_reused=True)
+
+        def release_metadata_path(self):
+            path=admission.directory(value)/'runtime-compatibility.json'
+            if not path.exists():
+                metadata={'schema':{'compatible_min':self.compatibility.schema_min,'compatible_max':self.compatibility.schema_max,
+                    'target':self.compatibility.target_schema,'migration_class':self.compatibility.migration_class,
+                    'rollback_compatible_min':self.compatibility.rollback_schema_min,'rollback_compatible_max':self.compatibility.rollback_schema_max}}
+                atomic_json(path,metadata,exclusive=True);path.chmod(0o400)
+            return protected(path,private=True)
+
+        def _environment(self,sha,slot,images,*,workers_active=False):
+            env=super()._environment(sha,slot,images,workers_active=workers_active)
+            if sha!=value['source_sha'] or slot!=value['candidate']['slot']:return env
+            # Release receipts use tag@local-image-ID. On Docker's classic
+            # image store that ID is a config digest, not a registry manifest.
+            # Execute the inspected local ID directly; never ask a registry to
+            # resolve an invalid tag@config-digest or fall back to its tag.
+            env.update(MADAR_BACKEND_IMAGE=images['backend'].split('@',1)[1],
+                MADAR_FRONTEND_IMAGE=images['frontend'].split('@',1)[1],
+                MADAR_BUSINESS_WRITE_AUTHORITY='/run/madar/business-write-authority/authority.json',
+                MADAR_BUSINESS_WRITE_CONTRACT=runtime_context(value),MADAR_BUSINESS_WRITE_AUTHORITY_ROOT=str(grant_directory(value)),
+                MADAR_RELEASE_CONTROLLER_SHA=value['controller_sha'],MADAR_RELEASE_DATABASE_SYSTEM_IDENTIFIER=value['database']['system_identifier'])
+            return env
+
+        def additional_compose_files(self):
+            # Same compose implementation, with the existing authority RO mount.
+            if os.environ.get('MADAR_COMPOSE_OVERRIDE'):
+                raise RuntimeError('automatic_ambient_compose_override_refused')
+            require_root_directory(admission.ROOT,create=True)
+            prepared=admission.directory(value);require_root_directory(prepared,create=True)
+            override=prepared/'authority-compose.json'
+            if not override.exists():
+                # Only authority fields; candidate cannot supply host paths.
+                fields={'environment':{'MADAR_BUSINESS_WRITE_AUTHORITY':'${MADAR_BUSINESS_WRITE_AUTHORITY}',
+                    'MADAR_BUSINESS_WRITE_CONTRACT':'${MADAR_BUSINESS_WRITE_CONTRACT}',
+                    'MADAR_RELEASE_CONTROLLER_SHA':'${MADAR_RELEASE_CONTROLLER_SHA}',
+                    'MADAR_RELEASE_DATABASE_SYSTEM_IDENTIFIER':'${MADAR_RELEASE_DATABASE_SYSTEM_IDENTIFIER}'},
+                    'volumes':[{'type':'bind','source':str(grant_directory(value)),'target':'/run/madar/business-write-authority','read_only':True}]}
+                realm=strict_json(protected(Path('/etc/madar/isolated-release-test.json'),private=True).read_bytes())['realm_id']
+                services={r:{'restart':'no','mem_limit':LIMITS_MIB[r]*1024**2,'pids_limit':128,
+                    'labels':{'com.madar.test.realm':realm}} for r in ROLES}
+                for role in ('backend','parser-worker','remote-ingestion-worker','notification-worker','calendar-sync-worker','data-deletion-worker'):
+                    services[role].update(fields)
+                atomic_json(override,{'services':services,'networks':{name:{'labels':{'com.madar.test.realm':realm}}
+                    for name in ('default','parser_internal','remote_ingestion_internal','remote_ingestion_egress')}},exclusive=True)
+                override.chmod(0o400)
+            return (protected(override,private=True),)
+
+        def _compose(self,sha,slot,images,*args,workers_active=False):
+            # Seal the final requirements once; inactive consumers remain
+            # CREATED, rather than changing the backend's requirements later.
+            workers_active=True
+            super()._compose(sha,slot,images,'config','--format','json',workers_active=workers_active)
+            validate_candidate_model(self._model,value,self.release_root)
+            if digest(self._model)!=value['candidate']['configuration_sha256']:
+                raise RuntimeError('automatic_candidate_configuration_substituted')
+            if args!=('config','--format','json'):
+                return super()._compose(sha,slot,images,*args,workers_active=workers_active)
+
+        def start_candidate(self,sha,slot,images):
+            from .runtime_authority import runtime_mutation_lock
+            from .completed_normal_resources import measured_spec
+            self.guard()
+            with runtime_mutation_lock(self.state_root):
+                self.verify_actor_scope()
+                if self._maintenance:
+                    from .runtime_authority import load_worker_authority
+                    owner=load_worker_authority(self.state_root)
+                    if (not self._migration_completed or self._expected_route!=value['origin']['slot']
+                            or not owner or owner['owner']!='NONE'
+                            or owner['old']['sha']!=value['origin']['source_sha']
+                            or owner['candidate']['sha']!=sha):
+                        raise RuntimeError('exceptional_route_maintenance_authority_invalid')
+                    serving=observe_fenced_origin_route(self.verify_actor_scope(),value['origin']['slot'],self.run)
+                else:serving=self._loaded_serving_slot()
+                if serving==slot:raise RuntimeError('runtime_mutation_target_is_serving')
+                self._inhibit_worker_slot(slot)
+                self._compose(sha,slot,images,'create','--no-build','--no-recreate',*ROLES,workers_active=True)
+                rows=json.loads(self.run(['/usr/bin/docker','inspect',*['madar-'+slot+'-'+role for role in ROLES]],capture=True))
+                if len(rows)!=8 or any(r['State']['Running'] or r['State']['Status']!='created' for r in rows):
+                    raise RuntimeError('automatic_candidate_not_newly_created')
+                self._candidate_rows={r['Id']:{'Name':r['Name'],'Image':r['Image'],'spec_sha256':measured_spec(r)} for r in rows}
+                atomic_json(admission.ROOT/'attempts'/value['attempt_id']/'candidate-runtime.json',self._candidate_rows,exclusive=True)
+                self.verify_actor_scope()
+                try:
+                    self._compose(sha,slot,images,'up','-d','--no-build','--no-recreate','--wait','--wait-timeout','180',
+                        'redis','parser-worker','remote-ingestion-worker','backend','frontend',workers_active=True)
+                    self.verify_actor_scope()
+                except BaseException:
+                    # Preserve bounded PRIVATE diagnostics before the existing
+                    # deployer tears down this exact sealed failed candidate.
+                    diagnostics={}
+                    for identity in self._candidate_rows:
+                        try:
+                            result=subprocess.run(['/usr/bin/docker','logs','--tail','100',identity],
+                                capture_output=True,timeout=10)
+                            diagnostics[identity]=(result.stdout+result.stderr)[-16384:].decode(errors='replace')
+                        except Exception as error:diagnostics[identity]={'unavailable':type(error).__name__}
+                    atomic_json(admission.ROOT/'attempts'/value['attempt_id']/'private-candidate-start-diagnostics.json',
+                        diagnostics,exclusive=True)
+                    raise
+
+        def preflight(self,sha,slot,images,schema):
+            self.guard();self._compose(sha,slot,images,'config','--format','json',workers_active=True)
+            if self._model is None or digest(self._model)!=value['candidate']['configuration_sha256']:
+                raise RuntimeError('automatic_candidate_configuration_substituted')
+            super().preflight(sha,slot,images,schema)
+            verify_traffic_driver_access()
+
+        def deactivate_workers(self,release):
+            if self._maintenance and release.get('slot')==value['origin']['slot']:
+                self.verify_actor_scope();return
+            super().deactivate_workers(release)
+            if release.get('slot')==value['origin']['slot']:
+                # An ungoverned bootstrap cannot acquire a fake old grant. Fence
+                # its real backend and slot-local writers before target NORMAL.
+                # Compatible governed origins can later use their preserved RO
+                # grant without restarting the serving backend.
+                names=['madar-'+release['slot']+'-'+r for r in ('backend','parser-worker','remote-ingestion-worker')]
+                rows=json.loads(self.run(['/usr/bin/docker','inspect',*names],capture=True))
+                if any(not r['State']['Running'] for r in rows):raise RuntimeError('automatic_origin_fence_preimage_changed')
+                self._origin_fenced=[r['Id'] for r in rows]
+                self.run(['/usr/bin/docker','update','--restart=no',*self._origin_fenced])
+                self.run(['/usr/bin/docker','stop','--time','15',*self._origin_fenced])
+                if any(r['State']['Running'] for r in json.loads(self.run(['/usr/bin/docker','inspect',*self._origin_fenced],capture=True))):
+                    raise RuntimeError('automatic_origin_writer_fence_incomplete')
+            elif release.get('slot')==value['candidate']['slot']:
+                publish_candidate_grant(value,'READ_ONLY')
+
+        def activate_workers(self,sha,slot,images):
+            self.guard()
+            if not self._origin_fenced:raise RuntimeError('automatic_origin_writers_not_fenced')
+            self.verify_actor_scope()
+            publish_candidate_grant(value,'NORMAL')
+            from .runtime_authority import runtime_mutation_lock
+            with runtime_mutation_lock(self.state_root):
+                self._require_worker_authority(sha,slot);self._require_other_worker_slot_inactive(slot)
+                ids=[identity for identity,row in self._candidate_rows.items() if row['Name'].rsplit('-',1)[0] in
+                    {'/madar-'+slot+'-notification','/madar-'+slot+'-calendar-sync','/madar-'+slot+'-data-deletion'}]
+                if len(ids)!=3:raise RuntimeError('automatic_candidate_worker_inventory_invalid')
+                self.run(['/usr/bin/docker','start',*ids]);self.verify_actor_scope()
+
+        def switch_traffic(self,slot):
+            self.guard()
+            if slot==value['candidate']['slot']:self.verify_actor_scope()
+            result=super().switch_traffic(slot)
+            self._expected_route=slot
+            self.verify_actor_scope()
+            return result
+
+        def accept_runtime_inventory(self):
+            """Advance only measured test inventory after durable known-good.
+
+            Policy permissions, issuer keys, identity and expiry cannot change.
+            The existing positive observer must accept the resulting inventory.
+            This is lifecycle enrollment, never authority for another release.
+            """
+            from .isolated_release_environment import POLICY,measure_bind_source,observe
+            from .completed_normal_resources import measured_spec
+            rows=self.verify_actor_scope()
+            policy=strict_json(protected(POLICY,private=True).read_bytes())
+            if policy['runtime_scope']!=self._initial_scope:raise RuntimeError('automatic_environment_inventory_changed')
+            scope={}
+            for row in rows:
+                binds={m['Destination']:measure_bind_source(m['Source'],mutable=m['RW']) for m in row['Mounts'] if m['Type']=='bind'}
+                scope[row['Id']]={'name':row['Name'],'image':row['Image'],'spec_sha256':measured_spec(row),'binds':binds}
+            atomic_json(POLICY,dict(policy,runtime_scope=scope))
+            observe()
+
+        def restore_workers(self,release):
+            # The historical restore helper changes restart policy to
+            # unless-stopped. This sealed test runtime must retain restart=no
+            # and its exact original identities/configuration throughout recovery.
+            if (release.get('sha')!=value['origin']['source_sha']
+                    or release.get('slot')!=value['origin']['slot']
+                    or admission.image_identities(release.get('images'))!=value['origin']['images']):
+                raise RuntimeError('automatic_restore_origin_substituted')
+            publish_candidate_grant(value,'READ_ONLY')
+            self.guard();self.verify_actor_scope()
+            from .runtime_authority import runtime_mutation_lock
+            slot=release['slot'];sha=release['sha']
+            names=['/madar-'+slot+'-'+role for role in ROLES]
+            original={row['name']:identity for identity,row in self._initial_scope.items() if row['name'] in names}
+            if set(original)!=set(names) or not set(self._origin_fenced)<=set(original.values()):
+                raise RuntimeError('automatic_restore_origin_inventory_incomplete')
+            workers=[original['/madar-'+slot+'-'+role] for role in
+                ('notification-worker','calendar-sync-worker','data-deletion-worker')]
+            core=[original['/madar-'+slot+'-'+role] for role in
+                ('parser-worker','remote-ingestion-worker','backend') if original['/madar-'+slot+'-'+role] in self._origin_fenced]
+            with runtime_mutation_lock(self.state_root):
+                self._require_worker_authority(sha,slot);self._require_other_worker_slot_inactive(slot)
+                self.verify_actor_scope()
+                if core:self.run(['/usr/bin/docker','start',*core])
+                self.run(['/usr/bin/docker','start',*workers])
+                deadline=time.monotonic()+180
+                while True:
+                    self.guard();self._require_worker_authority(sha,slot);self._require_other_worker_slot_inactive(slot)
+                    rows={row['Id']:row for row in self.verify_actor_scope()}
+                    states=[rows[identity]['State'] for identity in core+workers]
+                    if all(row.get('Running') and row.get('Health',{}).get('Status')=='healthy' for row in states):return
+                    if (time.monotonic()>=deadline or any(not row.get('Running')
+                            or row.get('Health',{}).get('Status') not in {'starting','healthy'} for row in states)):
+                        raise RuntimeError('automatic_retained_origin_restore_failed')
+                    time.sleep(1)
+    return AuthorizedOperations()
+
+
+def execute(system,value,base_operations,*,manual_retry=False):
+    """One exact routine cycle through the EXISTING deployment state machine."""
+    if os.geteuid()!=0:raise RuntimeError('automatic_execution_root_required')
+    admission.sealed(value)
+    lock=acquire_lock(system.upgrade_root/'upgrade.lock',create=True)
+    system.automatic_upgrade_lock=lock
+    if 'exceptional' in value:system.exceptional_execution_lock_acquired=True
+    previous=os.environ.get('CREDENTIALS_DIRECTORY');adapter=None;result=None;completed=False
+    try:
+        adapter=operations_adapter(base_operations,system,value)
+        deployer=ReleaseDeployer(state_root=system.state_root,compatibility=adapter.compatibility,operations=adapter)
+        result=deployer.deploy(value['source_sha'],manual_retry=manual_retry)
+        if result.get('status')!='known_good':raise RuntimeError('automatic_deployment_not_accepted')
+        receipt={'operation':admission.OPERATION,'admission_sha256':digest(value),'attempt_id':value['attempt_id'],
+            'source_sha':value['source_sha'],'database':value['database'],'release':result,
+            'manual_retry_requested':manual_retry,'completed_at':int(time.time())}
+        # The independently protected policy observer must see the exact
+        # verified target inventory before it authenticates completion events.
+        adapter.accept_runtime_inventory()
+        if 'exceptional' in value:
+            from .exceptional_release_approval import execution_event
+            execution_event(system,value,'VERIFYING',{'release_sha':value['source_sha'],'status':result['status']})
+        atomic_json(admission.ROOT/'attempts'/value['attempt_id']/'completion.json',receipt,exclusive=True)
+        completed=True
+        if 'exceptional' in value:
+            execution_event(system,value,'COMPLETED',{'completion_sha256':digest(receipt),'approval_request_id':value['exceptional']['request_id']})
+        from .automatic_release_recovery import seal_known_good
+        from .runtime_authority import open_deployment_lock
+        import fcntl
+        with open_deployment_lock(system.state_root/'deploy.lock') as recovery_lock:
+            fcntl.flock(recovery_lock.fileno(),fcntl.LOCK_EX)
+            seal_known_good(system,value)
+        return receipt
+    finally:
+        # Independently observe a just-written completion if interrupted after
+        # publication. Expiry/audit failure must never prevent RO revocation.
+        path=admission.ROOT/'attempts'/value['attempt_id']/'completion.json'
+        if not completed and path.exists():
+            try:
+                record=strict_json(protected(path,private=True).read_bytes())
+                completed=(record.get('admission_sha256')==digest(value) and record.get('attempt_id')==value['attempt_id']
+                    and record.get('source_sha')==value['source_sha'] and record.get('release',{}).get('status')=='known_good')
+            except Exception:completed=False
+        try:
+            if adapter is not None and not completed and adapter._credential_root is not None:
+                publish_candidate_grant(value,'READ_ONLY')
+        finally:
+            try:
+                system.clear_authorization()
+                if completed:
+                    admission.finish_operation(value)
+                    system.clear_interlock()
+            finally:
+                try:
+                    if adapter is not None and adapter._credential_root is not None:
+                        (adapter._credential_root/'madar-control-plane-upgrade').unlink(missing_ok=True)
+                        adapter._credential_root.rmdir()
+                finally:
+                    if previous is None:os.environ.pop('CREDENTIALS_DIRECTORY',None)
+                    else:os.environ['CREDENTIALS_DIRECTORY']=previous
+                    system.deploy_lock_descriptor=None
+                    os.close(lock);system.automatic_upgrade_lock=None

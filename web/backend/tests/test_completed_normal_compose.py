@@ -24,6 +24,24 @@ from test_completed_normal_admission import fixture_contract
 
 
 class CompletedNormalComposeTests(unittest.TestCase):
+    def test_sealed_additional_overlay_preserves_ordinary_slot_networks(self):
+        # Extra root-owned authority input must not replace the ordinary release
+        # overlay (the old environment-override approach lost its networks).
+        with tempfile.TemporaryDirectory() as directory:
+            ops = cli.DockerGitOperations(WEB.parent,Path(directory),Path(directory)/'env',
+                cli.Compatibility(160,160,160,'none',160,160))
+            ops.release_root=WEB.parent;ops.schema_version=lambda:160
+            ops.additional_compose_files=lambda:(Path('/root/sealed-authority.json'),)
+            commands=[]
+            ops.run=lambda command,**kwargs:commands.append(command)
+            with patch.dict(os.environ,{'MADAR_STORAGE_ROOT':directory},clear=True):
+                ops._compose('a'*40,'green',{'backend':'backend','frontend':'frontend',
+                    'worker':'backend','build_timestamp':'test'},'config','--quiet')
+            command=commands[0]
+            normal=str(cli.WEB_ROOT/'deployment/docker-compose.release.yml')
+            self.assertIn(normal,command)
+            self.assertLess(command.index(normal),command.index('/root/sealed-authority.json'))
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.envfile = Path(self.temp.name)/'fixture.env'

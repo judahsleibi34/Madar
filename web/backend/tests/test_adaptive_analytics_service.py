@@ -20,6 +20,10 @@ WIDGET = "55555555-5555-4555-8555-555555555555"
 
 
 class AdaptiveAnalyticsTests(unittest.TestCase):
+    def setUp(self):
+        from tests.account_schema_fixture import install_legacy_schema
+        install_legacy_schema(self)
+
     def test_central_policy_selects_by_workload_format_operation_and_resources(self):
         cases = [
             ({"workload": "metric", "file_format": "xlsx", "size_bytes": 1024,

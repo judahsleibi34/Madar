@@ -22,7 +22,7 @@ INFRA_IMAGES = {
     'storage': 'supabase/storage-api:v1.74.0@sha256:f1546fac6d1c7e345428ac904bfaa7be7cecd50a1f549fe1cf38c628a7b15c85',
     'redis': 'redis@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99',
 }
-BOUNDS = {'postgres': (512, 1), 'redis': (128, .25), 'auth': (192, 1), 'rest': (128, .5),
+BOUNDS = {'postgres': (512, 1), 'redis': (128, .25), 'auth': (192, 1), 'rest': (256, .5),
           'storage': (256, .5), 'gateway': (64, .25), 'backend': (1280, 1.5),
           'notification-worker': (256, .5), 'deletion-worker': (256, .5),
           'frontend': (64, .25), 'accepted-frontend': (128, .5)}

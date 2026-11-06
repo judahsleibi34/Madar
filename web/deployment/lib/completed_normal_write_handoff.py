@@ -86,9 +86,13 @@ class CompletedNormalWriteHandoff:
         if schema is None:schema=self.profile.source
         self.authorization(schema=schema)
         roles=self.contract['source_roles']
-        origin=json.loads(protected(Path(roles['completion_root'])/'write-authority/authority.json').read_text())
-        if origin!=expected_origin_grant(self.contract,'READ_ONLY'):
-            raise RuntimeError('completed_normal_write_origin_not_fenced')
+        if roles.get('origin_kind')=='independently-enrolled-historical-bootstrap-origin':
+            from deployment.lib.historical_origin import require_fence
+            require_fence(self.contract,self.kernel.runtime,self.root)
+        else:
+            origin=json.loads(protected(Path(roles['completion_root'])/'write-authority/authority.json').read_text())
+            if origin!=expected_origin_grant(self.contract,'READ_ONLY'):
+                raise RuntimeError('completed_normal_write_origin_not_fenced')
         if self.provider_adapter is None:self.kernel.round(normal=False)
         else:self.private_round(normal=False)
         self.source_guard()
@@ -115,6 +119,9 @@ class CompletedNormalWriteHandoff:
         revoked by this fresh operation. No customer or Auth rows are modified.
         """
         self.authorization()
+        if self.contract['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin':
+            from deployment.lib.historical_origin import seal_fence
+            return seal_fence(self.contract,self.provider_adapter)
         roles=self.contract['source_roles'];old_root=Path(roles['completion_root'])
         path=old_root/'write-authority/authority.json'
         expected=expected_origin_grant(self.contract,'NORMAL')

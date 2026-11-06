@@ -22,6 +22,22 @@ class Rpc:
 
 class Client:
     def __init__(self, responses): self.responses, self.calls = responses, []
+    def table(self, name):
+        if name != "application_schema_state":
+            raise AssertionError("Unexpected fixture table: " + name)
+        class SchemaQuery:
+            def select(self, fields):
+                assert fields == "schema_version"
+                return self
+            def eq(self, key, value):
+                assert (key, value) == ("contract_key", "core")
+                return self
+            def limit(self, count):
+                assert count == 1
+                return self
+            def execute(self):
+                return SimpleNamespace(data=[{"schema_version": 166}])
+        return SchemaQuery()
     def rpc(self, name, params):
         self.calls.append((name, params))
         value = self.responses[name]

@@ -1,15 +1,16 @@
 const productionLabels = new Set(["production", "prod", "main", "shared", "live"]);
+const productionHosts = ["madar.com", "madarportal.com"];
 
 function configuredProductionHosts(environment) {
   return String(environment.MADAR_E2E_PRODUCTION_HOSTS || "")
     .split(",")
-    .map((host) => host.trim().toLowerCase())
+    .map((host) => host.trim().toLowerCase().replace(/\.$/, ""))
     .filter(Boolean);
 }
 
 function isProductionHost(hostname, environment) {
   const host = hostname.toLowerCase().replace(/\.$/, "");
-  if (host === "madar.com" || host.endsWith(".madar.com")) return true;
+  if (productionHosts.some((blocked) => host === blocked || host.endsWith(`.${blocked}`))) return true;
   return configuredProductionHosts(environment).some(
     (blocked) => host === blocked || host.endsWith(`.${blocked}`)
   );

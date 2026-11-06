@@ -327,4 +327,81 @@ class PrivilegedVmSafetyTests(unittest.TestCase):
                 self.assertNotEqual(image.read_bytes(), original)
 
 
+class AutomaticGuestCleanupTests(unittest.TestCase):
+    def test_clean_qemu_shutdown_may_remove_pidfile_but_substitution_refuses(self):
+        # CI's application UID differs from Node2's test UID. Model ownership
+        # only; links, inode identity, private modes, contents and reads are real.
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);path=root/'qemu.pid'
+            actual_lstat=Path.lstat;actual_fstat=os.fstat
+            def owned(metadata):
+                values=list(metadata);values[4]=1000
+                return os.stat_result(values)
+            def lstat(target,*args,**kwargs):
+                value=actual_lstat(target,*args,**kwargs)
+                return owned(value) if target==path else value
+            with patch.object(Path,'lstat',lstat),patch.object(vm.os,'fstat',side_effect=lambda fd:owned(actual_fstat(fd))):
+                vm.AutomaticReleaseGuest.verify_inactive_pidfile(path,12345)
+                path.write_text('12345\n');path.chmod(0o600)
+                vm.AutomaticReleaseGuest.verify_inactive_pidfile(path,12345)
+                path.write_text('54321\n')
+                with self.assertRaisesRegex(RuntimeError,'pidfile_changed'):
+                    vm.AutomaticReleaseGuest.verify_inactive_pidfile(path,12345)
+                path.unlink();path.symlink_to(root/'missing')
+                with self.assertRaisesRegex(RuntimeError,'pidfile_ownership_changed'):
+                    vm.AutomaticReleaseGuest.verify_inactive_pidfile(path,12345)
+                path.unlink();path.mkdir()
+                with self.assertRaisesRegex(RuntimeError,'pidfile_ownership_changed'):
+                    vm.AutomaticReleaseGuest.verify_inactive_pidfile(path,12345)
+
+    def test_resume_never_touches_an_active_guest_disk(self):
+        from unittest.mock import Mock
+        g=vm.AutomaticReleaseGuest.__new__(vm.AutomaticReleaseGuest)
+        g.process=Mock();g.process.poll.return_value=None;g.pid=os.getpid();g.command=Mock();g.launch=Mock()
+        with self.assertRaisesRegex(RuntimeError,'requires_observed_poweroff'):g.resume_after_poweroff()
+        g.command.assert_not_called();g.launch.assert_not_called()
+
+    def test_live_or_reused_pid_refuses_without_signaling_another_process(self):
+        from unittest.mock import Mock
+        g=vm.AutomaticReleaseGuest.__new__(vm.AutomaticReleaseGuest)
+        g.process=Mock();g.process.poll.return_value=0;g.pid=os.getpid();g.command=Mock();g.launch=Mock()
+        with patch.object(vm.os,'kill') as signal:
+            with self.assertRaisesRegex(RuntimeError,'requires_observed_poweroff'):g.resume_after_poweroff()
+            signal.assert_not_called()
+        g.command.assert_not_called();g.launch.assert_not_called()
+
+    def test_unowned_resume_directory_refuses_before_qcow_inspection(self):
+        from unittest.mock import Mock
+        g=vm.AutomaticReleaseGuest.__new__(vm.AutomaticReleaseGuest)
+        g.process=Mock();g.process.poll.return_value=0;g.pid=2147483647
+        g.directory=Path('/unowned/guest');g.run_id='foreign';g.command=Mock();g.launch=Mock()
+        with self.assertRaisesRegex(RuntimeError,'resume_scope_changed'):g.resume_after_poweroff()
+        g.command.assert_not_called();g.launch.assert_not_called()
+
+    def guest(self,root):
+        from unittest.mock import Mock
+        g=vm.AutomaticReleaseGuest.__new__(vm.AutomaticReleaseGuest)
+        g.run_id='owned-test-run';parent=root/g.run_id;parent.mkdir()
+        g.directory=parent/'guest';g.directory.mkdir();(g.directory/'guest.qcow2').write_bytes(b'owned fixture')
+        g.evidence=root/'evidence';g.evidence.mkdir();g.pid=None;g.process=None
+        g.record={'resources_removed':False};g.save=Mock();return g
+    def test_explicit_and_atexit_cleanup_are_idempotent_after_verified_removal(self):
+        with tempfile.TemporaryDirectory() as raw:
+            g=self.guest(Path(raw))
+            g.save.side_effect=lambda:self.assertFalse(g.directory.exists())
+            g.close();g.close()
+            self.assertTrue(g.record['resources_removed']);g.save.assert_called_once()
+    def test_failed_removal_never_publishes_success(self):
+        with tempfile.TemporaryDirectory() as raw:
+            g=self.guest(Path(raw))
+            with patch.object(vm.shutil,'rmtree',side_effect=OSError('bounded deletion failure')):
+                with self.assertRaises(OSError):g.close()
+            self.assertFalse(g.record['resources_removed']);g.save.assert_not_called();self.assertTrue(g.directory.exists())
+    def test_missing_scope_without_previous_verified_receipt_refuses(self):
+        with tempfile.TemporaryDirectory() as raw:
+            g=self.guest(Path(raw));(g.directory/'guest.qcow2').unlink();g.directory.rmdir()
+            with self.assertRaisesRegex(RuntimeError,'missing_without_receipt'):g.close()
+            g.save.assert_not_called()
+
+
 if __name__ == '__main__': unittest.main()

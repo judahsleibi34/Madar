@@ -52,6 +52,8 @@ def fake_builder_context(tenant_id=1, user_id=1):
 
 class DataUploadPrivacyTests(unittest.TestCase):
     def setUp(self):
+        from tests.account_schema_fixture import install_legacy_schema
+        install_legacy_schema(self)
         self.temp_dir = tempfile.TemporaryDirectory()
         self.root = Path(self.temp_dir.name).resolve()
         self.public_dir = self.root / "public_uploads"
@@ -60,6 +62,8 @@ class DataUploadPrivacyTests(unittest.TestCase):
         self.private_dir.mkdir()
 
         app = FastAPI()
+        from services.account_work_fence import AccountWorkFenceMiddleware
+        app.add_middleware(AccountWorkFenceMiddleware)
         app.mount("/uploads", StaticFiles(directory=str(self.public_dir)), name="uploads")
         app.include_router(data_routes.router)
         app.include_router(builder_routes.router)

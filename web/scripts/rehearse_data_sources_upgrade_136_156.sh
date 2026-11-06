@@ -11,24 +11,135 @@ WEB_ROOT="${ROOT_DIR}/web"
 POSTGRES_IMAGE="postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73"
 CONTAINER_NAME="madar-staging-chain-${RANDOM}-$$"
 CONTAINER_ID=''
-BACKUP_FILE="$(mktemp /tmp/madar-schema136-XXXXXX.dump)"
+RUN_PARENT=/tmp
+if [[ -d /opt/madar-development/scratch/codex-runs ]]; then
+  RUN_PARENT=/opt/madar-development/scratch/codex-runs
+fi
+# Bound peak allocation before creating a run: two 2 GiB containers plus source,
+# host/daemon overhead, and enough disk for the bounded view/dump/image pull.
+python3 - "$RUN_PARENT" <<'PYHEADROOM'
+import json,shutil,sys
+from pathlib import Path
+free=shutil.disk_usage(sys.argv[1]).free
+available=int(next(line.split()[1] for line in Path('/proc/meminfo').read_text().splitlines() if line.startswith('MemAvailable:')))*1024
+if free<3*1024**3 or available<5*1024**3:
+    raise SystemExit('native_rehearsal_insufficient_headroom: requires 3 GiB disk and 5 GiB available RAM')
+print(json.dumps({'native_rehearsal_disk_free_before':free,'memory_available_before':available}))
+PYHEADROOM
+RUN_ROOT="$(mktemp -d "$RUN_PARENT/codex-native-chain-XXXXXXXX")"
+RUN_DEVICE="$(stat -c %d "$RUN_ROOT")"
+RUN_INODE="$(stat -c %i "$RUN_ROOT")"
+RUN_ID="$(basename "$RUN_ROOT")"
+TEST_CONTAINER="${CONTAINER_NAME}-acceptance"
+SOURCE_VIEW="$RUN_ROOT/source"
+BACKUP_FILE="$RUN_ROOT/schema136.dump"
+touch "$BACKUP_FILE"
 
 cleanup() {
-  if [[ -n "${CONTAINER_ID}" ]]; then
-    if [[ "$(docker inspect --format '{{ index .Config.Labels "madar.rehearsal" }}' "${CONTAINER_ID}")" != 'data-source-chain' ]]; then
-      echo 'Refusing cleanup of an unverified rehearsal container' >&2
-      return 1
+  local failed=0 identity labels snapshot found actual_id actual_name remaining
+  # The acceptance child may outlive its CLI after timeout/interrupt. Remove
+  # only exact names AND this run's immutable label, child before database.
+  for identity in "$TEST_CONTAINER" "${CONTAINER_ID}"; do
+    [[ -n "$identity" ]] || continue
+    if ! snapshot="$(docker ps -a --no-trunc --format '{{.ID}} {{.Names}}')"; then
+      failed=1
+      continue
     fi
-    docker rm -f "${CONTAINER_ID}" >/dev/null
+    found=0
+    while read -r actual_id actual_name; do
+      if [[ "$identity" == "$actual_id" || "$identity" == "$actual_name" ]]; then found=1; fi
+    done <<< "$snapshot"
+    [[ "$found" == 1 ]] || continue
+    if ! labels="$(docker inspect --format '{{ index .Config.Labels "com.madar.codex.run" }}' "$identity")"; then
+      failed=1
+      continue
+    fi
+    if [[ "$labels" != "$RUN_ID" ]]; then
+      echo 'Refusing cleanup of a foreign rehearsal resource; retained for review' >&2
+      failed=1
+      continue
+    fi
+    docker rm -f "$identity" >/dev/null || failed=1
+  done
+  if ! remaining="$(docker ps -aq --filter "label=com.madar.codex.run=$RUN_ID")" || [[ -n "$remaining" ]]; then
+    failed=1
   fi
-  rm -f "${BACKUP_FILE}"
+  # Pin filesystem teardown to the original private directory descriptor.
+  # A replaced directory or symlink must not redirect privileged deletion.
+  if ! python3 - "$RUN_ROOT" "$RUN_DEVICE" "$RUN_INODE" "$failed" "$RUN_ID" "$TEST_CONTAINER" "${CONTAINER_ID}" <<'PYFILES'
+import json,os,shutil,stat,sys
+from pathlib import Path
+root=Path(sys.argv[1]);expected=(int(sys.argv[2]),int(sys.argv[3]));failed=int(sys.argv[4])
+if not root.exists() and not root.is_symlink():
+    if failed:raise SystemExit('cleanup scope unavailable; resource ownership requires review')
+    raise SystemExit(0)
+try:fd=os.open(root,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+except OSError:raise SystemExit('cleanup path replaced; no filesystem deletion permitted')
+try:
+    info=os.fstat(fd)
+    if (info.st_dev,info.st_ino)!=expected or info.st_uid!=os.getuid() or stat.S_IMODE(info.st_mode)!=0o700:
+        raise SystemExit('cleanup directory identity changed; no filesystem deletion permitted')
+    try:
+        try:os.unlink('schema136.dump',dir_fd=fd)
+        except FileNotFoundError:pass
+        # shutil's fd-based traversal refuses symlinks, including at source.
+        try:shutil.rmtree('source',dir_fd=fd)
+        except FileNotFoundError:pass
+    except OSError:
+        failed=1
+    if failed:
+        record={'run_id':sys.argv[5],'status':'retained_for_review','resources':sys.argv[6:],
+            'reason':'ownership_or_removal_not_proven','owner_uid':os.getuid(),
+            'review_condition':'reobserve named resources and resolve ownership before removal',
+            'protected_operational_data_removed':False}
+        out=os.open('cleanup-retained.json',os.O_WRONLY|os.O_CREAT|os.O_TRUNC|os.O_NOFOLLOW,0o600,dir_fd=fd)
+        with os.fdopen(out,'w') as stream:json.dump(record,stream);stream.write('\n')
+        raise SystemExit('cleanup incomplete; private cleanup-retained.json requires review')
+    try:os.unlink('cleanup-retained.json',dir_fd=fd)
+    except FileNotFoundError:pass
+    current=root.lstat()
+    if (current.st_dev,current.st_ino)!=expected or not stat.S_ISDIR(current.st_mode):
+        raise SystemExit('cleanup parent path changed; empty original directory retained')
+    root.rmdir()
+finally:os.close(fd)
+PYFILES
+  then failed=1; fi
+  return "$failed"
 }
 trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+# Export indexed public source only, not .git, .env, ignored data, incident
+# response material, dependency trees or untracked historical documents.
+# A readable copy avoids widening permissions on the private host checkout.
+python3 - "$ROOT_DIR" "$SOURCE_VIEW" <<'PYSOURCE'
+import os,stat,subprocess,sys
+from pathlib import Path
+root,target=map(Path,sys.argv[1:]);target.mkdir(mode=0o755)
+prefixes=('web/backend/','web/deployment/','web/scripts/','web/staging/','web/database/','web/supabase/')
+paths=subprocess.check_output(['git','-C',str(root),'ls-files','-z']).split(b'\0')
+total=0
+for raw in paths:
+    if not raw:continue
+    name=raw.decode()
+    if not name.startswith(prefixes):continue
+    path=root/name
+    if path.is_symlink() or not path.is_file():raise RuntimeError('native_source_regular_file_required')
+    body=path.read_bytes();total+=len(body)
+    if len(body)>16*1024**2 or total>256*1024**2:raise RuntimeError('native_source_size_limit')
+    dest=target/name;dest.parent.mkdir(parents=True,exist_ok=True)
+    dest.write_bytes(body);dest.chmod(0o755 if path.stat().st_mode&0o111 else 0o644)
+for folder in target.rglob('*'):
+    if folder.is_dir():folder.chmod(0o755)
+target.chmod(0o755)
+print('Owned bounded public source view prepared; private checkout remains unchanged')
+PYSOURCE
 
 python3 "${WEB_ROOT}/scripts/check_data_sources_staging_chain.py"
 
 CONTAINER_ID="$(docker run -d --name "${CONTAINER_NAME}" --network none \
-  --label madar.rehearsal=data-source-chain --memory=2g --cpus=1 --pids-limit=256 \
+  --label madar.rehearsal=data-source-chain --label "com.madar.codex.run=${RUN_ID}" --memory=2g --cpus=1 --pids-limit=256 \
   --tmpfs /var/lib/postgresql/data:rw,noexec,nosuid,size=2g \
   -e POSTGRES_HOST_AUTH_METHOD=trust "${POSTGRES_IMAGE}")"
 for _ in $(seq 1 60); do
@@ -99,10 +210,10 @@ if [[ "${MADAR_CANONICAL_EXECUTOR_TESTS:-false}" == true ]]; then
   docker exec "${CONTAINER_ID}" psql -X -U postgres -v ON_ERROR_STOP=1 -q -c 'select pg_reload_conf()'
   docker exec "${CONTAINER_NAME}" psql -X -U postgres -v ON_ERROR_STOP=1 -q -c \
     "comment on database postgres is 'madar-notification-synthetic-rehearsal'"
-  docker run --rm --read-only --memory=2g --cpus=1 --pids-limit=256 \
+  docker run --rm --name "$TEST_CONTAINER" --label "com.madar.codex.run=${RUN_ID}" --read-only --memory=2g --cpus=1 --pids-limit=256 \
     --network "container:${CONTAINER_NAME}" --tmpfs /tmp:rw,noexec,nosuid,size=256m \
-    --volume "${WEB_ROOT}/backend:/app:ro" --volume "${ROOT_DIR}:/release:ro" \
-    --env PYTHONPATH=/app:/release/web --env PYTHONDONTWRITEBYTECODE=1 \
+    --volume "${SOURCE_VIEW}/web/backend:/app:ro" --volume "${SOURCE_VIEW}:/release:ro" \
+    --env PYTHONPATH=/app:/app/tests:/release/web --env PYTHONDONTWRITEBYTECODE=1 \
     --env MADAR_TEST_REPOSITORY_ROOT=/release/web \
     --env SUPABASE_URL=http://127.0.0.1:54321 \
     --env APP_ENV=test --env SUPABASE_ANON_KEY=synthetic-placeholder-anon --env SUPABASE_SERVICE_KEY=synthetic-placeholder-service \
@@ -279,10 +390,10 @@ echo 'Disposable full schema136 -> 156 upgrade, rollback, migration locking, and
 if [[ "${MADAR_RECONCILED_INTEGRITY_TESTS:-false}" == true ]]; then
   docker exec "${CONTAINER_NAME}" psql -X -U postgres -v ON_ERROR_STOP=1 -q -c \
     "comment on database postgres is 'madar-notification-synthetic-rehearsal'"
-  docker run --rm --read-only --memory=2g --cpus=1 --pids-limit=256 \
+  docker run --rm --name "$TEST_CONTAINER" --label "com.madar.codex.run=${RUN_ID}" --read-only --memory=2g --cpus=1 --pids-limit=256 \
     --network "container:${CONTAINER_NAME}" --tmpfs /tmp:rw,noexec,nosuid,size=256m \
-    --volume "${WEB_ROOT}/backend:/app:ro" --volume "${ROOT_DIR}:/release:ro" \
-    --env PYTHONPATH=/app:/release/web --env PYTHONDONTWRITEBYTECODE=1 \
+    --volume "${SOURCE_VIEW}/web/backend:/app:ro" --volume "${SOURCE_VIEW}:/release:ro" \
+    --env PYTHONPATH=/app:/app/tests:/release/web --env PYTHONDONTWRITEBYTECODE=1 \
     --env SUPABASE_URL=http://127.0.0.1:54321 \
     --env APP_ENV=test --env SUPABASE_ANON_KEY=synthetic-placeholder-anon --env SUPABASE_SERVICE_KEY=synthetic-placeholder-service \
     --env RECONCILED_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=5432 dbname=postgres user=postgres' \

@@ -50,6 +50,8 @@ CLIENT_APP_ROLES = frozenset({'backend', 'notification-worker', 'calendar-sync-w
 MINIMUM_ROLES = frozenset({'postgres', 'authenticator', 'supabase_auth_admin', 'supabase_storage_admin'})
 TOP_KEYS = {'version', 'binding_sha256', 'target_networks', 'target_credentials', 'containers',
             'roles', 'supervisors', 'object_roots', 'session_scope', 'exclusions'}
+HISTORICAL_CORE = frozenset({'native:db','native:auth','native:rest','native:storage','native:gateway','proxy'})
+HISTORICAL_ORIGIN_ROLES = frozenset('origin:'+role for role in APP_ROLES)
 CONTAINER_KEYS = {'name', 'id', 'image', 'generation', 'source_sha', 'spec_sha256', 'mounts', 'networks', 'states'}
 
 
@@ -101,6 +103,25 @@ def binding_scope_digest(binding):
     return digest({key: item for key, item in value.items() if key not in {'context_sha256', 'inventory_sha256'}})
 
 
+def private_candidate_roles(binding=None):
+    """Only the exact canonical contract has a credential-free HTTP parser.
+
+    Names ending in '-worker' do not confer consuming authority. The concrete
+    runtime must additionally pass verify_private_parser before any start.
+    Historical and context-free observations keep the original stopped parser.
+    """
+    from deployment.lib.schema150_provider_lifecycle import binding_profile
+    from deployment.lib.completed_normal_profile import RECONCILED
+    if binding is not None and binding_profile(binding) is RECONCILED:
+        return ('candidate:redis','candidate:parser-worker','candidate:provider-gateway','candidate:backend','candidate:frontend')
+    return PRIVATE_CANDIDATE_ROLES
+
+
+def consuming_worker_roles(binding=None):
+    private = {role.split(':',1)[1] for role in private_candidate_roles(binding)}
+    return WORKER_ROLES - private
+
+
 def inventory_digest(inventory):
     return digest(_detached(inventory))
 
@@ -117,14 +138,30 @@ def _mounts(rows):
     return sorted(found, key=lambda row: row['destination'])
 
 
-def _validate(inventory, binding=None):
+def _validate(inventory, binding=None, *, original=True):
     value = _detached(inventory)
-    _require(isinstance(value, dict) and set(value) == TOP_KEYS and type(value['version']) is int and value['version'] == 1)
+    _require(isinstance(value, dict) and type(value.get('version')) is int and value['version'] in (1,2))
+    historical=value['version']==2
+    _require(set(value)==TOP_KEYS | ({'historical_origin'} if historical else set()))
+    if historical:
+        from deployment.lib.historical_origin import SOURCE_FIELDS,KIND
+        source=value['historical_origin']
+        _require(isinstance(source,dict) and set(source)==SOURCE_FIELDS and source.get('origin_kind')==KIND
+            and source.get('schema')==146 and type(source['schema']) is int
+            and _hex(source.get('application_sha'),40) and _hex(source.get('controller_sha'),40)
+            and _hex(source.get('enrollment_sha256')) and _hex(source.get('successor_intent_sha256'))
+            and _path(source.get('enrollment_root')), 'schema160_historical_inventory_origin_invalid')
+        _require(binding is not None and binding.get('operation')=='completed-normal-schema146-160-coordinated-release'
+            and binding.get('source_schema')==146 and binding.get('target_schema')==160,
+            'schema160_historical_inventory_binding_required')
     _require(_hex(value['binding_sha256']))
     if binding is not None:
         binding = validate_binding(binding)
         _require(value['binding_sha256'] == binding_scope_digest(binding), 'schema150_actor_scope_changed')
-        _require(inventory_digest(value) == binding['inventory_sha256'], 'schema150_actor_inventory_digest_changed')
+        if original:
+            _require(inventory_digest(value) == binding['inventory_sha256'], 'schema150_actor_inventory_digest_changed')
+    private_runtime_roles = PRIVATE_PROVIDER_ROLES | frozenset(private_candidate_roles(binding))
+    consumers = consuming_worker_roles(binding)
     networks = value['target_networks']
     _require(isinstance(networks, dict) and REQUIRED_TARGET_NETWORKS <= set(networks) and len(networks) <= 32
              and all(_name(name) and _hex(identifier) for name, identifier in networks.items()))
@@ -132,7 +169,12 @@ def _validate(inventory, binding=None):
     _require(isinstance(credentials, dict) and 1 <= len(credentials) <= 64
              and all(_name(name) and _hex(fingerprint) for name, fingerprint in credentials.items()))
     actors = value['containers']
-    _require(isinstance(actors, dict) and REQUIRED_ROLES <= set(actors) <= REQUIRED_ROLES | OPTIONAL_ROLES)
+    canonical = binding is not None and binding['target_schema']==160
+    candidate_app_roles=APP_ROLES+('provider-gateway',) if canonical else APP_ROLES
+    optional=OPTIONAL_ROLES | ({'candidate:provider-gateway'} if canonical else set())
+    required=HISTORICAL_CORE | HISTORICAL_ORIGIN_ROLES if historical else REQUIRED_ROLES
+    allowed=required | frozenset(NATIVE_NAMES) | optional if historical else REQUIRED_ROLES | optional
+    _require(isinstance(actors, dict) and required <= set(actors) <= allowed)
     ids, names = [], []
     for logical, actor in actors.items():
         _require(isinstance(actor, dict) and set(actor) == CONTAINER_KEYS)
@@ -148,6 +190,10 @@ def _validate(inventory, binding=None):
         else:
             generation, role = logical.split(':', 1)
             _require(actor['generation'] == generation and actor['name'].startswith('madar-') and _hex(actor['source_sha'], 40))
+            if historical and generation=='origin':
+                _require(actor['name'] in {'madar-'+slot+'-'+role for slot in ('blue','green') for role in APP_ROLES}
+                    and actor['name'].endswith('-'+role) and actor['source_sha']==source['application_sha'],
+                    'schema160_historical_inventory_actor_changed')
             if generation == 'candidate' and binding is not None:
                 _require(actor['source_sha'] == binding['source_sha'], 'schema150_candidate_source_changed')
         actor['mounts'] = _mounts(actor['mounts'])
@@ -156,7 +202,9 @@ def _validate(inventory, binding=None):
         if logical in NATIVE_NAMES:
             _require(actor['networks'].get(DEFAULT_NETWORK) == networks[DEFAULT_NETWORK], 'schema150_native_network_scope_invalid')
         if logical == 'native:db':
-            _require(set(actor['networks']) == {DEFAULT_NETWORK}, 'schema150_native_database_network_invalid')
+            _require(set(actor['networks']) == {DEFAULT_NETWORK} if not historical else
+                DEFAULT_NETWORK in actor['networks'] and set(actor['networks'])<=set(networks),
+                'schema150_native_database_network_invalid')
         if (logical == 'native:gateway' or logical == 'fallback:backend'
                 or logical.split(':')[0] in {'origin', 'candidate'} and logical.split(':')[-1] in CLIENT_APP_ROLES):
             _require(actor['networks'].get(CLIENT_NETWORK) == networks[CLIENT_NETWORK], 'schema150_client_network_scope_invalid')
@@ -175,7 +223,7 @@ def _validate(inventory, binding=None):
                 _require(not state['running'])
             if phase in {'private', 'active'} and actor['generation'] in {'canonical', 'origin', 'fallback'}:
                 _require(not state['running'] and state['restart'] == 'no')
-            if phase == 'private' and logical.startswith('candidate:') and logical.split(':', 1)[1] in WORKER_ROLES:
+            if phase == 'private' and logical.startswith('candidate:') and logical.split(':', 1)[1] in consumers:
                 _require(not state['running'])
             if logical.startswith('candidate:') and phase != 'prepared': _require(state['restart'] == 'no')
         # Admit only states reachable by the fixed concrete adapter. It stops
@@ -187,35 +235,45 @@ def _validate(inventory, binding=None):
                      'schema150_database_restart_preimage_changed')
         else:
             _require(active['restart']=='no','schema150_active_restart_not_reachable')
-        if logical in PRIVATE_RUNTIME_ROLES:
+        if logical in private_runtime_roles:
             _require(private['running'] and active['running'],'schema150_private_provider_state_not_reachable')
         if logical=='proxy' or actor['generation']=='candidate':
             _require(active['running'],'schema150_normal_actor_not_active')
         if private['running']:
             _require(active['running'],'schema150_active_state_not_reachable')
     _require(len(ids) == len(set(ids)) and len(names) == len(set(names)))
+    if historical:
+        _require(len({actors[logical]['name'].split('-')[1] for logical in HISTORICAL_ORIGIN_ROLES})==1,
+            'schema160_historical_inventory_mixed_slot')
     for generation in ('origin', 'candidate'):
         selected = {name for name in actors if name.startswith(generation+':')}
-        _require(not selected or selected == {generation+':'+role for role in APP_ROLES})
+        expected=candidate_app_roles if generation=='candidate' else APP_ROLES
+        _require(not selected or selected == {generation+':'+role for role in expected})
     roles = value['roles']
     _require(isinstance(roles, dict) and MINIMUM_ROLES <= set(roles) and len(roles) <= 128)
     for name, role in roles.items():
         _require(_name(name) and isinstance(role, dict) and set(role) == {'login', 'attributes_sha256', 'memberships_sha256'}
                  and type(role['login']) is bool and _hex(role['attributes_sha256']) and _hex(role['memberships_sha256']))
     sessions = value['session_scope']
+    maintenance = sessions.get('maintenance_role') if isinstance(sessions,dict) else None
+    allowed_maintenance={'postgres','supabase_admin'} if canonical else {'postgres'}
     _require(isinstance(sessions, dict) and set(sessions) == {'maintenance_role', 'writer_roles'}
-             and sessions['maintenance_role'] == 'postgres' and roles['postgres']['login']
+             and isinstance(maintenance,str) and maintenance in allowed_maintenance and maintenance in roles and roles[maintenance]['login']
              and isinstance(sessions['writer_roles'], list) and all(_name(name) for name in sessions['writer_roles']) and len(sessions['writer_roles']) == len(set(sessions['writer_roles']))
-             and set(sessions['writer_roles']) == {name for name, role in roles.items() if role['login'] and name != 'postgres'})
+             and set(sessions['writer_roles']) == {name for name, role in roles.items() if role['login'] and name != maintenance})
     supervisors = value['supervisors']
-    _require(isinstance(supervisors, dict) and SUPERVISOR_UNITS <= set(supervisors) and len(supervisors) <= 32)
+    required_units={'madar-release-proxy.service'} if historical else SUPERVISOR_UNITS
+    _require(isinstance(supervisors, dict) and required_units <= set(supervisors) and len(supervisors) <= 64)
     for name, supervisor in supervisors.items():
         _require(isinstance(supervisor, dict) and set(supervisor) == {'fragment_sha256', 'dropins_sha256', 'container_ids', 'enabled', 'context_sha256'})
         _require(_hex(supervisor['fragment_sha256']) and _hex(supervisor['dropins_sha256'])
                  and isinstance(supervisor['enabled'], str) and supervisor['enabled'] in {'enabled', 'enabled-runtime', 'disabled', 'static', 'indirect', 'masked'}
                  and isinstance(supervisor['container_ids'], list) and all(_hex(item) for item in supervisor['container_ids']) and len(supervisor['container_ids']) == len(set(supervisor['container_ids']))
                  and set(supervisor['container_ids']) <= set(ids))
-        if name in SUPERVISOR_UNITS: _require(supervisor['context_sha256'] is None)
+        if historical:
+            _require(re.fullmatch(r'madar-[A-Za-z0-9-]+\.(service|timer)',name) is not None
+                and supervisor['context_sha256'] is None,'schema160_historical_supervisor_invalid')
+        elif name in SUPERVISOR_UNITS: _require(supervisor['context_sha256'] is None)
         else:
             context = supervisor['context_sha256']
             _require(_hex(context) and name == 'madar-compatible-normal-boot-'+context[:12]+'.service', 'schema150_supervisor_namespace_invalid')
@@ -249,8 +307,9 @@ def bind_staged_candidates(inventory, binding, stage, rows, *, phase):
     _require(not any(k.startswith('candidate:') for k in value['containers']),
         'schema150_candidate_already_in_original_inventory')
     stage=_detached(stage)
+    roles=APP_ROLES+('provider-gateway',) if binding['target_schema']==160 else APP_ROLES
     _require(stage.get('preparation_mode')=='created-fenced'
-        and isinstance(stage.get('runtimes'),dict) and set(stage['runtimes'])==set(APP_ROLES),
+        and isinstance(stage.get('runtimes'),dict) and set(stage['runtimes'])==set(roles),
         'schema150_candidate_fenced_preparation_required')
     _require(isinstance(rows,list) and len(rows)<=2048,'schema150_container_snapshot_invalid')
     observed={}
@@ -267,11 +326,11 @@ def bind_staged_candidates(inventory, binding, stage, rows, *, phase):
             'name':sealed['name'],'id':sealed['id'],'image':sealed['image'],
             'generation':'candidate','source_sha':binding['source_sha'],'spec_sha256':sealed['spec_sha256'],
             'mounts':_actual_mounts(actual),'networks':sealed['networks'],
-            'states':{p:{'running':p=='active' or p=='private' and role not in WORKER_ROLES,
+            'states':{p:{'running':p=='active' or p=='private' and role not in consuming_worker_roles(binding),
                          'restarting':False,'restart':'no'} for p in PHASES}}
     # Includes duplicate base/candidate IDs and names, mounts, source labels,
     # complete all-daemon snapshot, network IDs, and fixed phase restrictions.
-    attest_containers(value,rows,phase=phase)
+    attest_containers(value,rows,phase=phase,binding=binding)
     return value
 
 
@@ -304,7 +363,7 @@ def _actual_mounts(row):
     return sorted(result, key=lambda item: item['destination'])
 
 
-def _host_authority(row, mounts):
+def _host_authority(row, mounts, *, historical_operator=False):
     host = row.get('HostConfig', {})
     _require(isinstance(host, dict), 'schema150_container_host_config_invalid')
     capabilities = host.get('CapAdd') or []
@@ -312,14 +371,24 @@ def _host_authority(row, mounts):
              'schema150_container_capabilities_invalid')
     sensitive = ('/etc/madar', '/var/lib/madar-control-plane', '/opt/madar/control-plane',
                  '/var/run/docker.sock', '/run/docker.sock', '/var/lib/docker', '/var/lib/containerd')
+    def ordinary_operator_volume(mount):
+        # Pure syntax only: the root historical observer independently checks
+        # the actual volume driver/options/labels and all daemon references.
+        # Other inventories and direct Docker-directory binds keep refusing.
+        if not historical_operator or mount['type']!='volume':return False
+        raw=next((v for v in row.get('Mounts',[]) if v.get('Destination')==mount['destination']),{})
+        name=raw.get('Name','')
+        return (isinstance(name,str) and re.fullmatch(r'madar-operator-[a-f0-9-]{12}-database',name) is not None
+            and raw.get('Driver')=='local' and mount['source']=='/var/lib/docker/volumes/'+name+'/_data'
+            and mount['destination']=='/var/lib/postgresql/data' and not mount['read_only'])
     return (host.get('Privileged') is True or host.get('PidMode') == 'host'
             or host.get('NetworkMode') == 'host' or host.get('IpcMode') == 'host'
             or host.get('UTSMode') == 'host'
             or bool({cap.upper().removeprefix('CAP_') for cap in capabilities} & {'SYS_ADMIN', 'ALL'})
-            or any(any(_overlaps(mount['source'], source) for source in sensitive) for mount in mounts))
+            or any(not ordinary_operator_volume(mount) and any(_overlaps(mount['source'], source) for source in sensitive) for mount in mounts))
 
 
-def attest_containers(inventory, rows, *, phase):
+def attest_containers(inventory, rows, *, phase, binding=None):
     """Require a complete all-container snapshot, not filtered target discovery.
 
     The caller must prove snapshot completeness with the Docker daemon and
@@ -327,7 +396,12 @@ def attest_containers(inventory, rows, *, phase):
     cannot authorize target-network, object-root or target-credential access.
     """
     _require(phase in ATTEST_PHASES, 'schema150_actor_phase_invalid')
-    value = _validate(inventory)
+    # Original inventory digest authentication belongs to validate_inventory;
+    # a staged extension has a different digest. Here bind its original scope
+    # and candidate source, then independently measure every actual container.
+    # This observation alone never authenticates a stage or issues authority.
+    value = _validate(inventory,binding,original=False)
+    private_runtime_roles = PRIVATE_PROVIDER_ROLES | frozenset(private_candidate_roles(binding))
     try:
         _require(len(json.dumps(rows, allow_nan=False).encode()) <= 64*1024*1024, 'schema150_container_snapshot_size_limit')
     except (TypeError, ValueError):
@@ -346,7 +420,7 @@ def attest_containers(inventory, rows, *, phase):
         if identifier not in actors:
             exclusion = value['exclusions'][identifier]
             _require(row.get('Image') == exclusion['image'] and measured_spec_matches(row, exclusion['spec_sha256']), 'schema150_unrelated_identity_changed')
-            _require(not _host_authority(row, mounts), 'schema150_unrelated_actor_has_host_authority')
+            _require(not _host_authority(row, mounts,historical_operator=value['version']==2), 'schema150_unrelated_actor_has_host_authority')
             shared_network = any(name in value['target_networks'] or endpoint.get('NetworkID') in value['target_networks'].values()
                                  for name, endpoint in networks.items())
             shared_objects = any(_overlaps(mount['source'], root['source']) for mount in mounts for root in value['object_roots'].values())
@@ -366,7 +440,7 @@ def attest_containers(inventory, rows, *, phase):
             # roles. The concrete adapter separately verifies the root-sealed
             # stage and its credential witness before accepting candidates.
             expected = actor['states']['fenced']
-            if logical in PRIVATE_RUNTIME_ROLES and matches(actor['states']['private']):
+            if logical in private_runtime_roles and matches(actor['states']['private']):
                 expected = actor['states']['private']
         elif phase == 'active-boundary':
             expected = actor['states']['private'] if matches(actor['states']['private']) else actor['states']['active']
@@ -377,7 +451,9 @@ def attest_containers(inventory, rows, *, phase):
                  and host.get('RestartPolicy', {}).get('Name') == expected['restart'], 'schema150_actor_state_changed')
         normalized = copy.deepcopy(row)
         normalized['HostConfig']['RestartPolicy']['Name'] = actor['states']['prepared']['restart']
-        _require(measured_spec_matches(normalized, actor['spec_sha256'], started_worker=logical.split(':')[-1] in WORKER_ROLES), 'schema150_actor_spec_changed')
+        canonical_created = binding is not None and binding['target_schema']==160 and logical.startswith('candidate:')
+        _require(measured_spec_matches(normalized, actor['spec_sha256'],
+            started_worker=canonical_created or logical.split(':')[-1] in WORKER_ROLES), 'schema150_actor_spec_changed')
         _require(mounts == actor['mounts'], 'schema150_actor_mounts_changed')
         _require(set(networks) == set(actor['networks']), 'schema150_actor_networks_changed')
         for name, endpoint in networks.items():
@@ -389,8 +465,20 @@ def attest_containers(inventory, rows, *, phase):
         # with this source through the sealed runtime rather than a fabricated
         # Madar image label. ID/image/spec/mount/network checks above still
         # apply; the concrete adapter also requires the approved Redis digest.
-        if actor['source_sha'] is not None and logical != 'candidate:redis':
+        if actor['source_sha'] is not None and logical!='candidate:redis' and not (value['version']==2 and logical=='origin:redis'):
             _require(row.get('Config', {}).get('Labels', {}).get('org.opencontainers.image.revision') == actor['source_sha'], 'schema150_actor_source_changed')
+        if logical == 'candidate:parser-worker' and logical in private_runtime_roles:
+            from deployment.lib.completed_normal_runtime import verify_private_parser
+            networks = actor['networks']
+            _require(len(networks)==1, 'completed_private_parser_network_invalid')
+            network = next(iter(networks))
+            _require(re.fullmatch('madar-schema160-'+binding['context_sha256'][:16]+'-(blue|green)-parser',network)
+                     is not None, 'completed_private_parser_network_invalid')
+            verify_private_parser(row,source_sha=binding['source_sha'],image=actor['image'],
+                network_name=network,uploads_root=value['object_roots']['private_uploads']['source'])
+    if binding is not None and binding['target_schema']==160:
+        from deployment.lib.completed_normal_private_provider import verify_topology
+        verify_topology(value,binding,rows)
     return {'inventory_sha256': inventory_digest(value), 'phase': phase, 'containers': len(actors),
             'exclusion_proof_references': len(value['exclusions']), 'unknown_target_actors': 0,
             'supervisors_verified': False, 'database_roles_verified': False, 'sessions_verified': False,

@@ -22,8 +22,10 @@ REQUIRED_FILES={'web/scripts/continue_completed_normal_upgrade.py',*(
         'completed_normal_runtime','completed_normal_migration','completed_normal_database',
         'completed_normal_resources','compatible_normal_boot','completed_normal_boot_installation',
         'completed_normal_write_handoff','completed_normal_backup','completed_normal_execution',
-        'completed_normal_model','completed_normal_evidence','completed_normal_forward','completed_normal_profile','schema148_release','schema148_artifacts','schema148_consumers','schema149_release','schema149_consumers','schema149_provider_lifecycle','schema149_controller','schema150_release','schema150_provider_lifecycle','schema150_actor_inventory','schema150_object_inventory','schema150_provider_adapter','schema150_status','schema160_release'))}
+        'completed_normal_model','completed_normal_evidence','completed_normal_forward','completed_normal_profile','completed_normal_private_acceptance','schema148_release','schema148_artifacts','schema148_consumers','schema149_release','schema149_consumers','schema149_provider_lifecycle','schema149_controller','schema150_release','schema150_provider_lifecycle','schema150_actor_inventory','schema150_object_inventory','schema150_provider_adapter','schema150_status','schema160_release'))}
 REQUIRED_FILES.update({
+    'web/deployment/lib/isolated_github_observation.py',
+    'web/deployment/lib/isolated_candidate_images.py',
     'web/deployment/lib/maintenance_backup_roles.py',
     'web/deployment/lib/maintenance_backup.py',
     *{'web/deployment/lib/'+name+'.py' for name in ('migration_inventory','migration_plan','migration_policy','migration_risk','migration_drift')},
@@ -40,9 +42,10 @@ def secured(path, *, directory=False):
         raise RuntimeError('completed_upgrade_boot_source_not_frozen')
     return path
 
-def measure(package,source_hash,plan_hash):
+def measure(package,source_hash,plan_hash,*,base=None):
+    base=BASE if base is None else base
     if (not re.fullmatch('[0-9a-f]{64}',source_hash) or not re.fullmatch('[0-9a-f]{64}',plan_hash)
-            or package!=BASE/('normal-source-'+source_hash)):
+            or package!=base/('normal-source-'+source_hash)):
         raise RuntimeError('completed_upgrade_boot_package_binding_invalid')
     secured(package,directory=True)
     manifest_bytes=secured(package/'source-bundle.json').read_bytes()
@@ -59,10 +62,37 @@ def measure(package,source_hash,plan_hash):
     if (document.get('source_bundle_sha256')!=source_hash
             or document.get('controller_source_sha')!=manifest.get('source_sha')):
         raise RuntimeError('completed_upgrade_boot_source_plan_mismatch')
+    if type(manifest.get('version')) is not int or manifest['version'] not in {1,2}:
+        raise RuntimeError('completed_upgrade_package_version_invalid')
+    if manifest['version']==1 and any(k in document for k in ('operation_id','attempt_id','source_authentication_sha256','candidate_model_sha256','provider_inventory_input_sha256')):
+        raise RuntimeError('completed_upgrade_package_version_invalid')
+    if manifest['version']==2:
+        import uuid
+        for key in ('operation_id','attempt_id'):
+            try:valid=str(uuid.UUID(manifest.get(key,'')))==manifest[key]==document.get(key)
+            except (ValueError,TypeError,KeyError,AttributeError):valid=False
+            if not valid:raise RuntimeError('completed_upgrade_package_attempt_changed')
+        required={'source-authentication.json':'source_authentication_sha256',
+            'provider-inventory-input.json':'provider_inventory_input_sha256',
+            'original-provider-probes.json':'original_provider_probe_sha256',
+            'candidate-model.json':'candidate_model_sha256'}
+        for name,key in required.items():
+            path=secured(package/name)
+            if not 0<path.stat().st_size<=2*1024**2:
+                raise RuntimeError('completed_upgrade_package_input_changed')
+            value=path.read_bytes()
+            if hashlib.sha256(value).hexdigest()!=document.get(key):
+                raise RuntimeError('completed_upgrade_package_input_changed')
+        if manifest.get('source_authentication_sha256')!=document['source_authentication_sha256']:
+            raise RuntimeError('completed_upgrade_package_authentication_changed')
     source=secured(package/'source',directory=True)
     files=manifest.get('files',{})
     actual={p.relative_to(source).as_posix() for p in source.rglob('*') if p.is_file() or p.is_symlink()}
-    if not isinstance(files,dict) or not REQUIRED_FILES.issubset(files) or set(files)!=actual:
+    required_files=set(REQUIRED_FILES)
+    if document.get('admission_contract',{}).get('source_roles',{}).get('origin_kind')=='independently-enrolled-historical-bootstrap-origin':
+        required_files.update('web/deployment/lib/'+name+'.py' for name in
+            ('historical_origin','exceptional_release_approval','automatic_release_admission','isolated_release_environment'))
+    if not isinstance(files,dict) or not required_files.issubset(files) or set(files)!=actual:
         raise RuntimeError('completed_upgrade_boot_source_inventory_changed')
     for relative,expected in files.items():
         path=Path(relative)
@@ -76,16 +106,59 @@ def main():
     if os.geteuid()!=0 or not sys.flags.isolated or not sys.flags.dont_write_bytecode:
         raise RuntimeError('completed_upgrade_boot_isolated_root_required')
     parser=argparse.ArgumentParser()
-    parser.add_argument('mode',choices=('preflight','execute','forward-preflight','forward-resume','boot','proxy-gate'))
+    parser.add_argument('mode',choices=('capture-inventory','verify-candidate','preflight','execute','forward-preflight','forward-resume','boot','proxy-gate',
+        'prepare-isolated-images','approval-prepare','approval-inspect','approval-approve','approval-reject','approval-revoke','approved-execute','recovery-prepare','recovery-execute'))
     for name in ('source-package','approved-source','approved-plan'):parser.add_argument('--'+name,required=True)
     parser.add_argument('--resumption-plan');parser.add_argument('--approved-resumption')
+    parser.add_argument('--request-id');parser.add_argument('--confirm-request-digest')
     args=parser.parse_args();package=Path(args.source_package)
+    review=args.mode.startswith(('approval-','recovery-'));recovery_execution=args.mode=='recovery-execute';approved_execution=args.mode in {'approved-execute','recovery-execute'};controlled=review or approved_execution
+    mutation=args.mode in {'approval-approve','approval-reject','approval-revoke','approved-execute','recovery-execute'}
+    if not controlled and (args.request_id or args.confirm_request_digest):parser.error('approval arguments require an approval action')
+    if controlled and (args.resumption_plan or args.approved_resumption):parser.error('approval cannot mix with forward recovery')
+    if controlled and ((args.mode=='approval-prepare')==bool(args.request_id)):parser.error('approval preparation creates a request; other approval actions require its exact UUID')
+    if controlled and (mutation!=bool(args.confirm_request_digest)):parser.error('only deliberate approval decisions require explicit request-digest confirmation')
     document,source=measure(package,args.approved_source,args.approved_plan)
     if Path(__file__)!=source/'web/scripts/continue_completed_normal_upgrade.py':
         raise RuntimeError('completed_upgrade_boot_entry_location_changed')
-    if args.mode in {'preflight','execute','forward-preflight','forward-resume'} and (document.get('fixture_only') or document.get('production_authorization') is False):
+    fixture_request=document.get('fixture_only') or document.get('production_authorization') is False
+    if args.mode in {'execute','forward-preflight','forward-resume'} and fixture_request:
         raise RuntimeError('completed_upgrade_fixture_cannot_authorize_production')
     sys.path.insert(0,str(source/'web'))
+    if args.mode=='preflight' and fixture_request:
+        from deployment.lib.schema160_release import isolated_registration
+        from deployment.lib.completed_normal_admission import digest
+        try:isolated_registration(dict(document['admission_contract'],plan_sha256=digest(document)))
+        except (OSError,RuntimeError,ValueError,KeyError):
+            raise RuntimeError('completed_upgrade_fixture_cannot_authorize_production') from None
+    if args.mode in {'capture-inventory','verify-candidate','prepare-isolated-images'}:
+        from deployment.lib.completed_normal_admission import digest,ADMISSIONS
+        contract = dict(document['admission_contract'], plan_sha256=digest(document))
+        def source_guard():
+            current, measured_source = measure(package,args.approved_source,args.approved_plan)
+            if current != document or measured_source != source:
+                raise RuntimeError('completed_upgrade_capture_source_changed')
+        if args.mode == 'capture-inventory':
+            from deployment.lib.schema150_provider_adapter import capture_original_inventory
+            from deployment.lib.emergency_routing_repair import Runtime
+            result=capture_original_inventory(package,contract,Runtime(),source_guard=source_guard)
+        else:
+            from types import SimpleNamespace
+            from deployment.lib.completed_normal_evidence import verify_reconciled_application_evidence
+            from deployment.lib.control_plane_upgrade import SystemOperations
+            # Package/API/archive verification creates no boot/execution actor,
+            # admission or credential. Image import is a separate explicit
+            # isolated-only preparation action below; verify-candidate stays read-only.
+            source_guard()
+            actor=SimpleNamespace(contract=contract,document=document,package=package,
+                root=ADMISSIONS/digest(contract),ops=SystemOperations())
+            result=verify_reconciled_application_evidence(actor)
+            if args.mode=='prepare-isolated-images':
+                from deployment.lib.isolated_candidate_images import prepare
+                result=prepare(actor,source_guard)
+            source_guard()
+        print(json.dumps({'operation':args.mode,'result':result},sort_keys=True))
+        return
     from deployment.lib.completed_normal_boot_actor import CompletedNormalBootActor
     actor=CompletedNormalBootActor(document,package,lambda:measure(package,args.approved_source,args.approved_plan))
     if args.mode in {'forward-preflight','forward-resume'}:
@@ -105,16 +178,57 @@ def main():
             rehearsal_guard=lambda:verify_complete_rehearsal(actor))
         try:result=driver.preflight() if args.mode=='forward-preflight' else driver.execute()
         finally:actor.ops.close_locks()
-    elif args.mode in {'preflight','execute'}:
+    elif args.mode in {'preflight','execute','approved-execute'} or review:
         from deployment.lib.completed_normal_execution import CompletedNormalUpgrade,verify_serving
         from deployment.lib.completed_normal_evidence import verify_application_evidence,verify_complete_rehearsal
         from deployment.lib.completed_normal_model import render_candidate_model
+        from deployment.lib.completed_normal_profile import RECONCILED
+        maintenance={};observer=None
+        if actor.contract.get('operation')==RECONCILED.operation:
+            from deployment.lib.completed_normal_private_acceptance import CompletedNormalMaintenanceGuards
+            observer=CompletedNormalMaintenanceGuards(actor)
+            maintenance={'maintenance_original_guard':observer.capture_original,
+                'maintenance_acceptance_guard':observer.acceptance,'maintenance_activation_guard':observer.activation}
         driver=CompletedNormalUpgrade(actor,
             artifact_guard=lambda:verify_application_evidence(actor),
             model_loader=lambda:render_candidate_model(actor),
             acceptance_guard=lambda **kw:verify_serving(actor,**kw),
-            rehearsal_guard=lambda:verify_complete_rehearsal(actor))
-        try:result=driver.preflight() if args.mode=='preflight' else driver.execute()
+            rehearsal_guard=lambda:verify_complete_rehearsal(actor),**maintenance)
+        if observer is not None:observer.bind(driver)
+        try:
+            if controlled:
+                from deployment.lib import exceptional_release_approval as approval
+                actor.ops.canonical_exceptional_driver=driver
+                if args.mode=='recovery-prepare':
+                    from deployment.lib.completed_normal_maintenance_recovery import create
+                    result=create(actor.ops,args.request_id)
+                elif args.mode=='approval-prepare':result=approval.create_canonical(actor.ops)
+                elif args.mode=='approval-inspect':result=approval.inspect(actor.ops,args.request_id)
+                else:
+                    if approved_execution:
+                        status=approval.inspect(actor.ops,args.request_id)
+                        from deployment.lib.completed_normal_maintenance_recovery import KIND as RECOVERY_KIND
+                        required_kind=RECOVERY_KIND if recovery_execution else approval.CANONICAL_KIND
+                        if (status['request'] is None or status['request']['admission'].get('kind')!=required_kind
+                                or status['request']['admission'].get('contract')!=driver.contract
+                                or status['request_sha256']!=args.confirm_request_digest
+                                or status['state']!='APPROVED' or status['consumed']):
+                            raise RuntimeError('exceptional_canonical_explicit_approved_request_required')
+                    if sys.stdin.isatty():
+                        import getpass
+                        token=getpass.getpass('Fresh infrastructure AAL2 access token: ')
+                    else:token=sys.stdin.read(16385).strip()
+                    if not token or len(token)>16384:raise RuntimeError('release_operator_credential_invalid')
+                    if approved_execution:
+                        if recovery_execution:
+                            result=driver.recover_maintenance_finalization(status['request']['admission'],token)
+                        else:
+                            actor.ops.canonical_exceptional_admission=status['request']['admission']
+                            actor.ops.exceptional_operator_token=token
+                            try:result=driver.execute()
+                            finally:actor.ops.exceptional_operator_token=None
+                    else:result=approval.decide(actor.ops,args.request_id,args.mode.removeprefix('approval-'),token,args.confirm_request_digest)
+            else:result=driver.preflight() if args.mode=='preflight' else driver.execute()
         finally:actor.ops.close_locks()
     else:result=actor.resume() if args.mode=='boot' else actor.proxy_gate()
     print(json.dumps({'operation':args.mode,'result':result},sort_keys=True))

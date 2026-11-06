@@ -249,7 +249,7 @@ class CompletedNormalUpgrade:
     summary or an old acceptance grant cannot substitute for these verifiers.
     """
     def __init__(self,actor,*,artifact_guard,model_loader,acceptance_guard,rehearsal_guard,
-                 maintenance_acceptance_guard=None,maintenance_activation_guard=None):
+                 maintenance_acceptance_guard=None,maintenance_activation_guard=None,maintenance_original_guard=None):
         if not all(callable(f) for f in (artifact_guard,model_loader,acceptance_guard,rehearsal_guard)):
             raise RuntimeError('completed_upgrade_independent_execution_guards_required')
         self.actor=actor;self.contract=actor.contract;self.document=actor.document
@@ -266,6 +266,8 @@ class CompletedNormalUpgrade:
         self.controller_installed=False;self.lock=None
         self.maintenance_acceptance_guard=maintenance_acceptance_guard
         self.maintenance_activation_guard=maintenance_activation_guard
+        self.maintenance_original_guard=maintenance_original_guard
+        self.provider_adapter=None
 
     def preparation_source(self):
         measured,_=self.actor.measure()
@@ -274,11 +276,16 @@ class CompletedNormalUpgrade:
         verify_live_configuration(self.document)
 
     def canonical_main(self):
+        if self.document.get('isolated_controller_source') is not None:
+            raise RuntimeError('isolated_controller_is_not_github_main')
         from deployment.lib.control_plane_upgrade import validate_immutable_release_selection
         selection=self.document.get('immutable_release_selection')
         return self.controller if selection is None else validate_immutable_release_selection(selection,self.controller)
 
     def verify_candidate_remote(self):
+        if self.document.get('isolated_controller_source') is not None:
+            self.ops.resolve_candidate(self.controller,dry_run=True,**self.source_options())
+            return
         # Read-only: production refs are fetched only by the approved installer.
         # A moving main must reject before timer, boot or controller effects.
         remote=self.ops.madar_git('completed_upgrade_candidate_remote','ls-remote',
@@ -287,9 +294,34 @@ class CompletedNormalUpgrade:
         if remote!=[expected,'refs/heads/main']:
             raise RuntimeError('completed_upgrade_candidate_remote_changed')
 
+    def source_options(self):
+        selected=self.document.get('isolated_controller_source')
+        if selected is not None:
+            from deployment.lib.completed_normal_profile import RECONCILED
+            from deployment.lib.historical_origin import KIND
+            if (self.profile is not RECONCILED or self.contract['source_roles'].get('origin_kind')!=KIND
+                    or self.document.get('fixture_only') is not True or self.document.get('production_authorization') is not False
+                    or self.document.get('immutable_release_selection') is not None):
+                raise RuntimeError('isolated_controller_source_not_historical_rehearsal')
+            return {'isolated_selection':selected,'isolated_contract':self.contract}
+        selection=self.document.get('immutable_release_selection')
+        return {} if selection is None else {'immutable_selection':selection}
+
     def preflight(self, *, locked=False):
         """No authorization consumption, service effects, or live SQL writes."""
         self.preparation_source();self.verify_candidate_remote();self.artifact_guard();self.rehearsal_guard()
+        from deployment.lib.completed_normal_profile import RECONCILED
+        if self.profile is RECONCILED:
+            from deployment.lib.schema148_artifacts import verify_prepared_candidate_images
+            verify_prepared_candidate_images(self.contract,
+                self.document['application_artifacts']['build_timestamp'],self.actor.runtime.command)
+            from deployment.lib.completed_normal_runtime import verify_historical_native_network
+            verify_historical_native_network(self.contract,self.actor.runtime)
+
+        from deployment.lib.completed_normal_profile import verify_installed_metadata
+        verify_installed_metadata(self.profile)
+        from deployment.lib.completed_normal_profile import verify_installed_compose_inputs
+        verify_installed_compose_inputs(self.package/'source/web/deployment')
         before=self.ops.current_preflight(lock_deployment=locked)
         if self.profile is APPLICATION:
             from deployment.lib.control_plane_upgrade import validate_immutable_release_selection
@@ -313,8 +345,14 @@ class CompletedNormalUpgrade:
         if self.document.get('failed_boot_interlock') is not None and self.reconciliation_root().exists():
             raise RuntimeError('completed_upgrade_interlock_reconciliation_already_consumed')
         observe_native(self.contract,self.actor.runtime)
+        if self.contract['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin':
+            from deployment.lib.schema160_release import require_independent_recovery
+            require_independent_recovery(self.document,self.contract,self.ops)
         from deployment.lib.active_recovery_backup import verify_backup_execution_context
-        if self.profile is not LEGACY:
+        from deployment.lib.completed_normal_profile import RECONCILED
+        if self.profile is RECONCILED and 'maintenance_role' in self.contract['database']:
+            verify_backup_execution_context(self.package,expected_schema=self.profile.source,maintenance_contract=self.contract)
+        elif self.profile is not LEGACY:
             verify_backup_execution_context(self.package,expected_schema=self.profile.source)
         else:verify_backup_execution_context(self.package)
         baseline=customer_baseline(self.contract,self.actor.runtime)
@@ -455,8 +493,7 @@ class CompletedNormalUpgrade:
 
     def install_controller(self):
         self.actor.source();self.actor.installation.installed()
-        selection=self.document.get('immutable_release_selection')
-        options={} if selection is None else {'immutable_selection':selection}
+        options=self.source_options()
         self.ops.resolve_candidate(self.controller,dry_run=False,**options)
         transaction,staged=self.ops.stage_candidate(self.controller,**options)
         tree=self.ops.static_preflight(staged)
@@ -688,6 +725,241 @@ class CompletedNormalUpgrade:
                         if self.lock is not None:os.close(self.lock)
                     finally:self.lock=None
 
+    def maintenance_recovery_components(self):
+        from .schema150_provider_adapter import Schema150ProviderAdapter
+        from .schema150_provider_lifecycle import ProviderMaintenance150,ProtectedProviderJournal
+        binding={'operation':self.profile.operation,'context_sha256':digest(self.contract),
+            'source_sha':self.contract['candidate']['source_sha'],'controller_sha':self.controller,
+            'inventory_sha256':self.contract['writer_inventory_sha256'],
+            'system_identifier':self.contract['database']['system_identifier'],
+            'source_schema':self.profile.source,'target_schema':self.profile.target}
+        provider=Schema150ProviderAdapter(self.contract,binding,self.actor.runtime,
+            source_guard=self.actor.guard,lock_descriptors=(self.lock,self.ops.deploy_lock_descriptor),
+            acceptance_guard=self.maintenance_acceptance_guard,activation_guard=self.maintenance_activation_guard)
+        self.provider_adapter=provider
+        return provider,ProviderMaintenance150(binding,ProtectedProviderJournal(self.root/'provider-journal'),provider)
+
+    def observe_maintenance_environment(self):
+        """Observe the sealed post-handoff actors, not the obsolete origin set.
+
+        This is observation only. Parent signatures, fresh approval, consumption
+        and both locks remain mandatory in the recovery adapter.
+        """
+        from .isolated_release_environment import observe_host,observe_effect_fence,verify_host_interfaces
+        from .schema150_actor_inventory import bind_staged_candidates,attest_containers
+        from .completed_normal_profile import RECONCILED
+        if self.profile is not RECONCILED:
+            raise RuntimeError('maintenance_recovery_profile_invalid')
+        self.actor.guard()
+        environment=observe_host();interface=observe_effect_fence(execution=True)
+        if (environment['version']!=2
+                or environment['database_container_id']!=self.contract['database']['container_id']
+                or environment['database_system_identifier']!=self.contract['database']['system_identifier']):
+            raise RuntimeError('maintenance_recovery_environment_changed')
+        provider,_=self.maintenance_recovery_components()
+        if provider._database_identity()!=self.profile.target:
+            raise RuntimeError('maintenance_recovery_committed_target_required')
+        realm=json.loads(provider._sql("BEGIN READ ONLY; SELECT to_json(shobj_description(oid,'pg_database')) FROM pg_database WHERE datname='postgres'; COMMIT;"))
+        if realm!='madar-isolated-'+environment['realm_id']:
+            raise RuntimeError('maintenance_recovery_database_scope_changed')
+        stage=json.loads(protected(self.root/'candidate-staged-runtime.json',private=True).read_bytes())
+        interlock=json.loads(protected(self.ops.interlock_file,private=False).read_bytes())
+        # The original root issuer bound this stage before handing off writers.
+        # No stale bearer credential is loaded or reused for this observation.
+        if (digest(stage)!=interlock.get('candidate_stage_sha256')
+                or stage.get('context_sha256')!=digest(self.contract)
+                or stage.get('source_sha')!=self.contract['candidate']['source_sha']
+                or stage.get('images')!=self.contract['candidate']['images']):
+            raise RuntimeError('maintenance_recovery_candidate_changed')
+        rows=provider._rows()
+        inventory=bind_staged_candidates(provider.original_inventory,provider.binding,stage,rows,phase='active')
+        attest_containers(inventory,rows,phase='active',binding=provider.binding)
+        # Exact runtime network IDs come from the authenticated original and
+        # root-sealed candidate. Reobserve their driver and host interfaces too.
+        ids={v['NetworkID'] for row in rows for v in row['NetworkSettings']['Networks'].values() if v['NetworkID']}
+        networks=json.loads(self.actor.runtime.command(['docker','network','inspect',*sorted(ids)]))
+        if ({n['Id'] for n in networks}!=ids or any(n.get('EnableIPv6') or
+                n.get('Driver') not in {'bridge','host'} or
+                n.get('Driver')=='host' and n.get('Name')!='host' for n in networks)):
+            raise RuntimeError('maintenance_recovery_network_changed')
+        verify_host_interfaces(interface,[n for n in networks if n['Driver']=='bridge'])
+        volumes={m['Name'] for row in rows for m in row.get('Mounts',[]) if m.get('Type')=='volume'}
+        if volumes:
+            actual=json.loads(self.actor.runtime.command(['docker','volume','inspect',*sorted(volumes)]))
+            if ({v['Name'] for v in actual}!=volumes or any(v.get('Driver')!='local' or v.get('Options')
+                    or (v.get('Labels') or {}).get('com.madar.test.realm')!=environment['realm_id'] for v in actual)):
+                raise RuntimeError('maintenance_recovery_volume_scope_changed')
+        self.actor.guard()
+        return {**environment,'control_interface':interface}
+
+    def maintenance_recovery_timer_snapshot(self):
+        """Read the existing durable timer preimages; never recapture current state."""
+        from .control_plane_upgrade import validate_backup_timer_states
+        expected=validate_backup_timer_states(self.document['backup_timer_states'])
+        recorded=json.loads(protected(self.root/'backup-timer-preimages.json',private=True).read_bytes())
+        durable=self.ops.interlock_backup_states(self.controller)
+        if recorded!=expected or durable!=expected:
+            raise RuntimeError('maintenance_recovery_backup_timer_preimages_changed')
+        return expected
+
+    def observe_maintenance_finalization(self):
+        """Read-only exact F04 state; earlier or ambiguous effects are not resumed."""
+        from .completed_normal_profile import RECONCILED
+        from .completed_normal_database import require_normal_migration_boundary
+        from .schema150_provider_lifecycle import STEPS
+        if self.profile is not RECONCILED:
+            raise RuntimeError('maintenance_recovery_profile_invalid')
+        self.actor.guard();self.artifact_guard();self.rehearsal_guard()
+        if any((self.root/name).exists() for name in ('normal-completion.json','normal-acceptance.json','failure.json')):
+            raise RuntimeError('maintenance_recovery_finalization_state_unsupported')
+        events=protected(self.root/'boot-events.jsonl',private=True).read_text().splitlines()
+        if not events or json.loads(events[-1]).get('phase')!='service_adopt_completed':
+            raise RuntimeError('maintenance_recovery_finalization_boundary_required')
+        schema=self.actor.native()
+        if schema!=160:raise RuntimeError('maintenance_recovery_committed_target_required')
+        require_normal_migration_boundary(self.contract,schema,self.root,self.ops.state_root)
+        grant=require_candidate_authority(self.contract,mode='NORMAL')
+        provider,lifecycle=self.maintenance_recovery_components()
+        records,completed,pending,ready=lifecycle._state()
+        if pending or not ready or completed!=list(STEPS[:-1]):
+            raise RuntimeError('maintenance_recovery_provider_effect_ambiguous')
+        stage=json.loads(protected(self.root/'candidate-runtime.json',private=True).read_bytes())
+        owner_path=readonly_configuration(self.ops.state_root/'worker-ownership.json',private=True)
+        owner=json.loads(owner_path.read_bytes())
+        if (owner.get('owner')!='CANDIDATE' or owner.get('generation')!=stage.get('worker_generation')
+                or owner.get('candidate')!={'sha':self.contract['candidate']['source_sha'],'slot':self.contract['candidate']['slot']}
+                or owner.get('old')!={'sha':self.contract['source_roles']['application_sha'],'slot':self.contract['origin']['slot']}):
+            raise RuntimeError('maintenance_recovery_worker_ownership_changed')
+        from .emergency_routing_repair import UPSTREAM
+        route=readonly_configuration(UPSTREAM,private=False).read_bytes()
+        if route!=provider.target_route():raise RuntimeError('maintenance_recovery_route_changed')
+        ids=self.actor.runtime.command(['docker','ps','-aq','--no-trunc']).split()
+        if not ids or len(ids)>1024 or len(set(ids))!=len(ids):
+            raise RuntimeError('maintenance_recovery_actor_inventory_invalid')
+        rows=self.actor.runtime.inspect(ids)
+        staged=json.loads(protected(self.root/'candidate-staged-runtime.json',private=True).read_bytes())
+        if (staged.get('context_sha256')!=digest(self.contract)
+                or staged.get('source_sha')!=self.contract['candidate']['source_sha']
+                or staged.get('images')!=self.contract['candidate']['images']):
+            raise RuntimeError('maintenance_recovery_candidate_changed')
+        originals=provider.original_inventory['containers']
+        expected_ids={r['id'] for r in originals.values()}|set(provider.original_inventory['exclusions'])|{r['id'] for r in staged['runtimes'].values()}
+        if set(ids)!=expected_ids or {r['Id'] for r in rows.values()}!=expected_ids:
+            raise RuntimeError('maintenance_recovery_unexpected_actor')
+        from .historical_origin import stopped_originals,original_runtime
+        stopped_originals(self.contract,self.actor.runtime,original_runtime(self.contract))
+        actual={r['Id']:r for r in rows.values()}
+        from .completed_normal_resources import measured_spec_matches
+        for role,record in staged['runtimes'].items():
+            row=actual[record['id']]
+            # Match the existing staged-candidate observer's narrowly defined
+            # Docker start normalization, including non-worker created actors.
+            started=staged.get('preparation_mode')=='created-fenced' or role.endswith('-worker')
+            if (row['State']['Running'] is not True or row['State']['Restarting'] is not False
+                    or row['Image']!=record['image']
+                    or not measured_spec_matches(row,record['spec_sha256'],started_worker=started)
+                    or {k:v['NetworkID'] for k,v in row['NetworkSettings']['Networks'].items()}!=record['networks']
+                    or {k:sorted(v.get('Aliases') or []) for k,v in row['NetworkSettings']['Networks'].items()}
+                        !={k:sorted(v) for k,v in record['network_aliases'].items()}):
+                raise RuntimeError('maintenance_recovery_candidate_not_running_exactly')
+        actors={r['Id']:{'image':r['Image'],'configuration_sha256':digest(r['Config']),
+            'host_sha256':digest(r['HostConfig']),'running':r['State']['Running'],
+            'restarting':r['State']['Restarting'],'status':r['State']['Status']}
+            for r in rows.values()}
+        names=('migration-intent.json','migration-completion.json','migration-execution.json',
+            'migration-manifest.json','migration-customer-preservation.json','candidate-runtime.json','candidate-staged-runtime.json',
+            'post-migration-backup.json','target-route-publication.json','provider-barrier.json')
+        original=json.loads(protected(self.root/'pre-migration-customer-snapshot.json',private=True).read_bytes())
+        current=migration_customer_snapshot(self.contract,self.actor.runtime,columns=original['columns'])
+        stale={}
+        for label,path in {'root':self.ops.runtime_root/('root-credentials-'+digest(self.contract)[:16])/'madar-control-plane-upgrade',
+                           'issuer':self.ops.authorization_file}.items():
+            if not path.exists() and not path.is_symlink():stale[label]=None;continue
+            body=protected(path,private=True).read_bytes()
+            credential=json.loads(body)
+            stale[label]={'sha256':hashlib.sha256(body).hexdigest(),'lease':credential.get('canonical_exceptional_approval',{})}
+        self.actor.guard()
+        return {'schema':schema,'database_system_identifier':self.contract['database']['system_identifier'],
+            'boot_id':Path('/proc/sys/kernel/random/boot_id').read_text().strip(),
+            'phase':'service_adopt_completed','backup_timer_states':self.maintenance_recovery_timer_snapshot(),'files':{n:file_digest(protected(self.root/n,private=True)) for n in names},
+            'provider_journal_sha256':digest(records),'grant_sha256':digest(grant),
+            'interlock_sha256':file_digest(protected(self.ops.interlock_file,private=False)),
+            'worker_owner_sha256':file_digest(owner_path),'route_sha256':hashlib.sha256(route).hexdigest(),
+            'actors_sha256':digest(actors),'current_data_sha256':digest(current),'stale_credentials':stale}
+
+    def recover_maintenance_finalization(self,value,token):
+        """Freshly approved F04 only; no SQL, prepare, activate, adopt or grant replay."""
+        from . import completed_normal_maintenance_recovery as recovery
+        from .exceptional_release_approval import execution_event
+        if os.geteuid()!=0 or self.lock is not None:
+            raise RuntimeError('maintenance_recovery_root_idle_required')
+        self.lock=acquire_lock(self.ops.upgrade_root/'upgrade.lock',create=False)
+        consumed=False
+        try:
+            self.ops.automatic_upgrade_lock=self.lock
+            self.ops.deploy_lock_descriptor=acquire_lock(self.ops.state_root/'deploy.lock',create=False)
+            recovery.verify(self.ops,value,consume=True,token=token);consumed=True
+            self.admitted=True  # Existing admitted operation was revalidated under both locks.
+            self.ops.canonical_maintenance_recovery=value
+            self.phase='maintenance_recovery_finalization'
+            execution_event(self.ops,value,'EXECUTING',{'parent_request_id':value['parent_request_id']})
+            recovery.retire_parent_credential(self.ops,value)
+            timers=self.maintenance_recovery_timer_snapshot()
+            if timers!=value['observation']['backup_timer_states']:
+                raise RuntimeError('maintenance_recovery_backup_timer_preimages_changed')
+            self.ops.backup_timer_states=timers
+            self.ops.backup_timer_sha=self.controller
+            with self.root_credential():
+                provider,lifecycle=self.maintenance_recovery_components()
+                provider.verify_target_route()
+                self.acceptance_guard(schema=160,normal=True)
+                final=json.loads(protected(self.root/'post-migration-backup.json',private=True).read_bytes())
+                result=self.finish_maintenance(self.actor.candidate(),lifecycle,final,historical=True,value=value)
+            self.ops.clear_interlock()
+            return {'action':recovery.ACTION,'recovery_request_id':value['request_id'],
+                'parent_request_id':value['parent_request_id'],'completion':result,'migration_sql_executed':False}
+        except Exception as error:
+            if consumed:
+                try:
+                    from .exceptional_release_approval import inspect
+                    if inspect(self.ops,value['request_id'])['state'] in {'AUTHORIZED_FOR_EXECUTION','EXECUTING','VERIFYING'}:
+                        execution_event(self.ops,value,'RECOVERY_REQUIRED',{'error_type':type(error).__name__})
+                finally:
+                    self.fenced=True;self.failure(error)
+            raise
+        finally:
+            try:
+                if consumed:self.ops.clear_authorization()
+            finally:
+                self.ops.canonical_maintenance_recovery=None
+                self.ops.close_locks()
+                if self.lock is not None:os.close(self.lock)
+                self.lock=None
+
+    def finish_maintenance(self,kernel,lifecycle,final,*,historical,value):
+        """Common accepted finalization; callers must hold fresh authority and both locks."""
+        from deployment.lib.exceptional_release_approval import execution_event
+        kernel.round(normal=True)
+        result={'operation':self.profile.operation,'context_sha256':digest(self.contract),'schema':self.profile.target,'mode':'NORMAL',
+            'application_sha':self.contract['candidate']['source_sha'],'controller_sha':self.controller,
+            'images':self.contract['candidate']['images'],'backup':final,'customer_database_restored':False}
+        exclusive(self.root/'normal-acceptance.json',encoded(result))
+        if historical:
+            execution_event(self.ops,value,'VERIFYING',{'acceptance_sha256':file_digest(self.root/'normal-acceptance.json')})
+        # Public acceptance precedes boot release; final completion is
+        # published only after that independently observed effect.
+        lifecycle.activate_after_grant()
+        self.ops.restore_backup_timers()
+        exclusive(self.root/'normal-completion.json',encoded(result))
+        from deployment.lib.completed_normal_baseline import seal_compatible_release
+        seal_compatible_release(self.contract,self.root,self.ops.state_root)
+        self.event('normal_completed',schema=self.profile.target,mode='NORMAL')
+        if historical:
+            execution_event(self.ops,value,'COMPLETED',{'context_sha256':digest(self.contract),
+                'completion_path':str(self.root/'normal-completion.json'),
+                'completion_sha256':file_digest(protected(self.root/'normal-completion.json',private=True))})
+        return result
+
     def _execute_maintenance(self):
         """Maintenance first; never publish a schema146 candidate bridge.
 
@@ -703,12 +975,26 @@ class CompletedNormalUpgrade:
         if self.profile is DELETION:
             raise RuntimeError('schema150_superseded_release_contract_not_executable')
         if (self.profile not in (DELETION, RECONCILED) or not callable(self.maintenance_acceptance_guard)
-                or not callable(self.maintenance_activation_guard)):
+                or not callable(self.maintenance_activation_guard) or not callable(self.maintenance_original_guard)):
             raise RuntimeError('schema150_independent_private_verifiers_required')
-        self.preflight()
+        historical=self.contract['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin'
+        # Canonical consumption performs the complete preflight through the
+        # measured driver under both existing locks. Do not repeat that same
+        # scan before handing control to the independent consumption verifier.
+        if not historical:self.preflight()
         self.lock=acquire_lock(self.ops.upgrade_root/'upgrade.lock',create=False)
         try:
-            self.preflight(locked=True)
+            if not historical:self.preflight(locked=True)
+            if historical:
+                from deployment.lib.exceptional_release_approval import verify_canonical_execution,execution_event
+                self.ops.automatic_upgrade_lock=self.lock
+                if self.ops.deploy_lock_descriptor is None:
+                    self.ops.deploy_lock_descriptor=acquire_lock(self.ops.state_root/'deploy.lock',create=False)
+                value=getattr(self.ops,'canonical_exceptional_admission',None)
+                if not isinstance(value,dict) or value.get('contract')!=self.contract:
+                    raise RuntimeError('schema160_exceptional_execution_approval_required')
+                verify_canonical_execution(value,self.ops,consume=True,token=getattr(self.ops,'exceptional_operator_token',None))
+                execution_event(self.ops,value,'EXECUTING',{'context_sha256':digest(self.contract)})
             self.reconcile_failed_interlock()
             self.quiesced=True;self.ops.quiesce(self.controller)
             # Retain this lock across root credential windows. Release it only
@@ -742,13 +1028,23 @@ class CompletedNormalUpgrade:
                 provider=Schema150ProviderAdapter(self.contract,binding,self.actor.runtime,
                     source_guard=self.actor.guard,lock_descriptors=(self.lock,self.ops.deploy_lock_descriptor),
                     acceptance_guard=self.maintenance_acceptance_guard,activation_guard=self.maintenance_activation_guard)
+                self.provider_adapter=provider
                 lifecycle=ProviderMaintenance150(binding,ProtectedProviderJournal(self.root/'provider-journal'),provider)
                 kernel=self.actor.candidate()
                 handoff=CompletedNormalWriteHandoff(self.contract,kernel,source_guard=self.actor.source,
                     boot_guard=self.actor.installation.installed,artifact_guard=self.artifact_guard,provider_adapter=provider)
+                self.event('original_application_acceptance_pending');self.maintenance_original_guard(binding)
                 self.event('original_provider_preimage_pending');lifecycle.prepare()
-                self.event('origin_write_fence_pending');self.fenced=True;handoff.fence_origin()
-                self.event('provider_maintenance_fence_pending');lifecycle.fence()
+                self.fenced=True
+                if self.contract['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin':
+                    # Legacy actors have no mounted grant to revoke. The same
+                    # concrete ingress/actor/role/session fence precedes their
+                    # authenticated fence receipt; no old grant is invented.
+                    self.event('provider_maintenance_fence_pending');lifecycle.fence()
+                    self.event('origin_write_fence_pending');handoff.fence_origin()
+                else:
+                    self.event('origin_write_fence_pending');handoff.fence_origin()
+                    self.event('provider_maintenance_fence_pending');lifecycle.fence()
                 self.event('pre_migration_backup_pending')
                 backup=CompletedNormalBackupContext(self.contract,self.document,self.package,kernel,
                     stage='pre-migration',source_guard=self.actor.guard,artifact_guard=self.artifact_guard,provider_adapter=provider)
@@ -782,6 +1078,14 @@ class CompletedNormalUpgrade:
                 exclusive(self.root/'migration-customer-preservation.json',encoded(preservation))
                 seal_completion(self.contract,self.ops.state_root/'releases'/self.contract['candidate']['source_sha'],
                     self.ops.state_root,source_guard=self.actor.guard,runtime_guard=self.actor.native)
+                if self.profile is RECONCILED:
+                    # Capture the target checkpoint while every provider/writer
+                    # is still fenced. An ordinary online backup cannot replace
+                    # original-role and object-byte maintenance preservation.
+                    self.event('post_migration_backup_pending')
+                    final=CompletedNormalBackupContext(self.contract,self.document,self.package,kernel,
+                        stage='post-migration',source_guard=self.actor.guard,artifact_guard=self.artifact_guard,
+                        provider_adapter=provider).capture()
                 self.event('private_provider_recovery_pending');lifecycle.prepare_private_activation()
                 self.event('target_normal_grant_pending');handoff.grant(schema=self.profile.target)
             # Existing child owns the worker-generation transfer. Its historical
@@ -803,25 +1107,24 @@ class CompletedNormalUpgrade:
             provider.lock_descriptors=(self.lock,self.ops.deploy_lock_descriptor)
             with self.root_credential():
                 self.acceptance_guard(schema=self.profile.target,normal=True)
-                self.event('post_migration_backup_pending')
-                final=CompletedNormalBackupContext(self.contract,self.document,self.package,kernel,
-                    stage='post-migration',source_guard=self.actor.guard,artifact_guard=self.artifact_guard).capture()
-                kernel.round(normal=True)
-                result={'operation':self.profile.operation,'context_sha256':digest(self.contract),'schema':self.profile.target,'mode':'NORMAL',
-                    'application_sha':self.contract['candidate']['source_sha'],'controller_sha':self.controller,
-                    'images':self.contract['candidate']['images'],'backup':final,'customer_database_restored':False}
-                exclusive(self.root/'normal-acceptance.json',encoded(result))
-                # Public acceptance precedes boot release; final completion is
-                # published only after that independently observed effect.
-                lifecycle.activate_after_grant()
-                self.ops.restore_backup_timers()
-                exclusive(self.root/'normal-completion.json',encoded(result))
-                from deployment.lib.completed_normal_baseline import seal_compatible_release
-                seal_compatible_release(self.contract,self.root,self.ops.state_root)
-                self.event('normal_completed',schema=self.profile.target,mode='NORMAL')
+                if self.profile is not RECONCILED:
+                    self.event('post_migration_backup_pending')
+                    final=CompletedNormalBackupContext(self.contract,self.document,self.package,kernel,
+                        stage='post-migration',source_guard=self.actor.guard,artifact_guard=self.artifact_guard).capture()
+                result=self.finish_maintenance(kernel,lifecycle,final,historical=historical,value=value if historical else None)
             self.ops.clear_interlock()
             return result
         except Exception as error:
+            if self.contract['source_roles'].get('origin_kind')=='independently-enrolled-historical-bootstrap-origin':
+                try:
+                    from deployment.lib import exceptional_release_approval as approval
+                    value=getattr(self.ops,'canonical_exceptional_admission',None)
+                    if isinstance(value,dict) and self.lock is not None:
+                        status=approval.inspect(self.ops,value['request_id'])
+                        if status['state'] in {'APPROVED','REVALIDATING','AUTHORIZED_FOR_EXECUTION','EXECUTING','VERIFYING'}:
+                            approval.execution_event(self.ops,value,'RECOVERY_REQUIRED' if status['consumed'] else 'FAILED',
+                                {'error_type':type(error).__name__,'context_sha256':digest(self.contract)})
+                except Exception:pass # Preserve original error and durable consumed authority.
             self.failure(error)
             raise
         finally:
@@ -831,7 +1134,9 @@ class CompletedNormalUpgrade:
                 finally:
                     try:
                         if self.lock is not None:os.close(self.lock)
-                    finally:self.lock=None
+                    finally:
+                        self.lock=None
+                        if hasattr(self.ops,'automatic_upgrade_lock'):self.ops.automatic_upgrade_lock=None
 
     def complete_application(self, handoff, kernel):
         """The existing handoff at144, with no migration intent or SQL child.

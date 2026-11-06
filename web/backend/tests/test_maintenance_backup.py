@@ -19,8 +19,53 @@ from deployment.lib.maintenance_backup import seal_capture, private_copy
 from deployment.lib.schema150_object_inventory import measure_roots,archive_roots
 from deployment.lib.schema150_actor_inventory import REQUIRED_OBJECT_ROOTS
 from deployment.lib import completed_normal_profile as profiles
+from deployment.lib import maintenance_backup
 from deployment.lib.schema150_release import admitted_manifest
 from deployment.lib.completed_normal_admission import digest as profiles_json_digest
+
+
+class MaintenanceRestorePreloadTests(unittest.TestCase):
+    def observe(self,value):
+        context=object();adapter=object()
+        with patch.object(maintenance_backup,'require_context',return_value=adapter) as guard,\
+                patch.object(maintenance_backup,'readonly_query',return_value=json.dumps(value)) as query:
+            result=maintenance_backup.restore_preload(context)
+        self.assertEqual(guard.call_args_list,[unittest.mock.call(context),unittest.mock.call(context)])
+        self.assertIs(query.call_args.args[0],adapter)
+        self.assertIn('pg_extension',query.call_args.args[1])
+        return result
+
+    def test_historical_image_requires_only_its_observed_statistics_library(self):
+        self.assertEqual(self.observe({'installed':['pg_stat_statements'],'configured':'pg_stat_statements'}),('pg_stat_statements',))
+
+    def test_plain_database_does_not_require_absent_worker_libraries(self):
+        self.assertEqual(self.observe({'installed':[],'configured':''}),())
+
+    def test_installed_workers_require_safe_preloads_even_if_configuration_omits_them(self):
+        self.assertEqual(self.observe({'installed':['pg_cron','pg_net'],'configured':' pg_stat_statements '}),
+                         ('pg_cron','pg_net','pg_stat_statements'))
+
+    def test_unknown_library_malformed_inventory_and_duplicate_requirements_refuse(self):
+        for value in ({'installed':[],'configured':'untrusted'},
+                      {'installed':[],'configured':'pg_cron,pg_cron'},
+                      {'installed':[],'configured':'pg_net,'},
+                      {'installed':['untrusted'],'configured':''},
+                      {'installed':['pg_net','pg_cron'],'configured':''},
+                      {'installed':['pg_net','pg_net'],'configured':''},
+                      {'installed':None,'configured':''},
+                      {'installed':[],'configured':[]},
+                      {'installed':[],'configured':'','pass':True}):
+            with self.subTest(value=value),self.assertRaisesRegex(RuntimeError,'maintenance_backup_restore_preload_'):
+                self.observe(value)
+
+    def test_source_or_authority_guard_failure_never_falls_back(self):
+        with patch.object(maintenance_backup,'require_context',side_effect=RuntimeError('source_changed')),\
+                patch.object(maintenance_backup,'readonly_query') as query:
+            with self.assertRaisesRegex(RuntimeError,'source_changed'):maintenance_backup.restore_preload(object())
+        query.assert_not_called()
+        with patch.object(maintenance_backup,'require_context',side_effect=[object(),RuntimeError('fence_changed')]),\
+                patch.object(maintenance_backup,'readonly_query',return_value='{"installed":[],"configured":""}'):
+            with self.assertRaisesRegex(RuntimeError,'fence_changed'):maintenance_backup.restore_preload(object())
 
 
 class MaintenanceBackupTests(unittest.TestCase):
@@ -65,12 +110,30 @@ class MaintenanceBackupTests(unittest.TestCase):
     def test_native_forest_and_original_roles_are_bound_in_ordinary_backup(self):
         digest=self.seal();outer=backup.verify(self.data)
         value=backup.verify_maintenance(self.data,expected_sha256=digest)
+        self.assertEqual(value['version'],1)
         self.assertEqual(outer['maintenance_backup'],'maintenance/manifest.json')
         self.assertEqual(value['binding'],self.binding);self.assertFalse(value['authority_issued'])
         self.assertEqual((self.data/'maintenance/roles.sql').read_bytes(),self.roles)
         with tarfile.open(self.data/'maintenance/objects.tar.gz','r:gz') as archive:
             members=archive.getmembers();self.assertFalse(any(m.name.startswith('database/') for m in members))
             self.assertTrue(any('madar.xattrs.base64' in m.pax_headers for m in members))
+
+    def test_version2_explicitly_binds_acl_semantics_without_rewriting_version1(self):
+        digest=self.seal(database_fingerprint_version=2)
+        self.assertEqual(backup.verify_maintenance(self.data,expected_sha256=digest)['version'],2)
+        path=self.data/'maintenance/manifest.json';value=json.loads(path.read_bytes());value['version']=1
+        path.write_text(json.dumps(value))
+        with self.assertRaisesRegex(backup.BackupError,'manifest_changed'):
+            backup.verify_maintenance(self.data,expected_sha256=digest)
+
+    def test_unknown_or_boolean_fingerprint_versions_refuse(self):
+        for version in (0,3,True,'2'):
+            with self.subTest(version=version),self.assertRaisesRegex(RuntimeError,'fingerprint_version_invalid'):
+                self.seal(database_fingerprint_version=version)
+        self.assertFalse((self.data/'maintenance').exists())
+        self.seal();path=self.data/'maintenance/manifest.json';value=json.loads(path.read_bytes());value['version']=3
+        path.write_text(json.dumps(value))
+        with self.assertRaisesRegex(backup.BackupError,'manifest_invalid'):backup.verify_maintenance(self.data)
 
     def migration_context(self):
         """Actual files/archives/flock, MODEL authority and restore/replica results.
@@ -235,5 +298,25 @@ class MaintenanceBackupTests(unittest.TestCase):
         self.assertEqual(a,backup.database_fingerprint(query(['owner=arwdDxt/owner','reader=r/owner'])))
         self.assertNotEqual(a,backup.database_fingerprint(query(['reader=rw/owner','owner=arwdDxt/owner'])))
         self.assertNotEqual(backup.database_fingerprint(query(None)),backup.database_fingerprint(query([])))
+
+    def test_only_explicit_v2_observation_expands_postgresql_acl_defaults(self):
+        def exercise(semantic):
+            calls=[]
+            def query(body):
+                calls.append(body)
+                if len(calls)==1:return '[{"schema":"public","name":"fixture","kind":"r"}]'
+                return '["fixture",1,"'+('a'*64)+'"]\n'+json.dumps({'database':['postgres','owner',[]],
+                    'relations':[],'schemas':[],'functions':[]})
+            backup.database_snapshot(query,acl_semantics=semantic)
+            return calls[-1]
+        self.assertNotIn('acldefault(',exercise(False))
+        sql=exercise(True)
+        for expression in ("acldefault('d',datdba)","acldefault('n',nspowner)","acldefault('f',p.proowner)",
+                "CASE WHEN c.relkind='S' THEN 'S' ELSE 'r' END"):
+            self.assertIn(expression,sql)
+        self.assertIn('c.relrowsecurity,c.relforcerowsecurity',sql)
+        self.assertIn('pg_get_functiondef(p.oid)',sql)
+        with self.assertRaisesRegex(backup.BackupError,'acl_semantics_invalid'):
+            backup.database_snapshot(lambda _:self.fail('invalid mode must refuse before SQL'),acl_semantics=1)
 
 if __name__=='__main__':unittest.main()

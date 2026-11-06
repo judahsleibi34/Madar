@@ -1,5 +1,192 @@
 # Privileged control-plane upgrade architecture
 
+The measured activation observer uses the provider lifecycle's existing compact
+JSON digest for its binding and observed write-grant projections. Package and
+admission digests retain their separate existing encoding. The lifecycle accepts
+only its established digest; no alternate-hash fallback is allowed. All migration,
+preservation, backup, image, worker, boot and private-boundary observations still
+precede this projection. A source correction never rewrites signed evidence or
+permits replay of an already consumed post-SQL operation.
+The subsequent maintenance handoff projection uses the admission consumer's
+existing indented-JSON digests for stage, journal prefix and grant. Internal
+provider journals and route-publication records retain compact encoding. These
+are distinct wire contracts; changing one global digest function would invalidate
+previous evidence and is prohibited.
+
+The installed controller includes the selected schema146–160 release descriptor.
+Read-only coordinator preflight now requires its selected metadata to be a
+root-owned, singly linked, nonsecret0644 regular file parsed by the same
+Compatibility loader used by the madar child. Missing/private/malformed metadata
+refuses before authority consumption and is rechecked by locked preflight.
+The descriptor path is the fixed installed controller path even when approval
+executes from a sealed private source package. Package-relative resolution would
+incorrectly inspect the private archive rather than the child input.
+Existing source and installed-tree attestation still bind the actual bytes;
+this installation check neither registers a release nor grants execution.
+A consumed failed attempt is never repaired in place or replayed by this fix.
+
+The installed child also requires all three public Compose overlays, including
+the canonical160 private-provider overlay. Read-only preflight compares their
+actual bytes with the authenticated sealed package and requires root ownership,
+0644 mode, regular files and single links before approval consumption. Missing
+or substituted overlays refuse with `completed_upgrade_installed_compose_invalid`.
+The installer includes these inputs; source rendering alone does not demonstrate
+that an installed child can read them. Consumed attempts remain immutable.
+
+An enrolled historical canonical origin uses its authenticated existing native
+provider bridge as an internal network. Preapproval and candidate sealing both
+reobserve the exact enrolled network ID, name, bridge driver, Internal=true and
+disabled IPv6. No network is modified to satisfy validation. Ordinary modern
+origins retain their existing topology contract. This fixes the former blanket
+non-internal native-bridge assumption without permitting new networks, native
+egress or unauthenticated historical flags.
+
+Compose's rendered long-syntax bind may omit `create_host_path: false`; the
+runtime verifier treats that omitted false value equivalently while rejecting
+true, null and nonboolean values. Exact authenticated overlay bytes, existing
+root-issued authority directory, read-only mount and actual source/destination
+checks remain required. Short-syntax auto-creation is not accepted.
+
+Historical origin measurement checks operator access to the existing private
+release state, worker-owner record and deployment lock before collecting account
+or database evidence. The genuine bootstrap lifecycle must create those mutable
+operator files under User madar, as the governed child will use them. This is a
+read-only prerequisite, not permission to chmod/chown a signed origin or expose
+root-private state through a projection. Independent issuer records remain root
+owned; ordinary completed-release admission is unchanged.
+
+Canonical historical child credentials additionally carry a nonsecret host
+identity witness. The root issuer reobserves actual DMI, machine/root filesystem
+and effect isolation before each issuance; its public interlock binds the witness
+digest. After verifying the fresh credential and live parent/boot lease, the
+unprivileged child verifies that projection plus its actual boot, machine,
+filesystem and KVM identity. Linux's root-only DMI permissions are unchanged.
+Missing/changed projections, foreign hosts and stale boots refuse; no caller
+PASS or permissions change substitutes for the root's actual observation.
+
+The governed release child selects canonical historical admission from the
+existing protected interlock even when provider-recovery.json never existed.
+Selection invokes the unchanged full admission verifier: exact application,
+controller, credential/interlock digest, live parent lease, historical enrollment
+and provider witness remain mandatory. It creates no historical marker and does
+not equate the application SHA with the controller SHA. A missing/foreign
+credential or a modern origin on this markerless path refuses; ordinary release
+authorization and existing provider-recovery behavior remain unchanged.
+
+Backup publication configuration and the preceding LATEST marker are checked in
+the existing read-only preflight before approval consumption, then reobserved
+before capture/publication. Legacy unprefixed backup keys do not satisfy the
+protected contract. Only an independently enrolled canonical historical origin's
+first pre-migration capture may have no previous marker: the journal explicitly
+records absence, without inventing old backup bytes or publishing freshness.
+Ordinary origins and post-migration captures still require the existing marker.
+The marker is published only after real restoration and authenticated replication.
+
+Disposable logical-restore cleanup removes the exact newly created target and
+its image-declared anonymous volumes. Required backup archives and operational
+volumes are outside that scope. Native CI verifies volume absence through a
+successful daemon listing, so daemon failure cannot masquerade as cleanup.
+
+New fenced maintenance captures use manifest version2 for ACL-semantic database
+fingerprints. PostgreSQL's `acldefault` expands NULL ACLs by object kind and owner;
+an equivalent explicit owner grant can therefore survive pg_dump's canonical
+representation. Explicitly empty ACLs, privileges, grant options, grantors,
+owners, RLS flags, function definitions and row/sequence fingerprints remain
+distinct and verified. Source and restored observations use the same version.
+Version1 signed archives retain their original raw-ACL interpretation; no old
+manifest, checksum or receipt is rewritten. Unknown versions refuse.
+See PostgreSQL17 [access privilege functions](https://www.postgresql.org/docs/17/functions-info.html#FUNCTIONS-INFO-ACCESS-TABLE)
+and [privileges](https://www.postgresql.org/docs/17/ddl-priv.html).
+
+The fenced maintenance backup observes its source PostgreSQL extension inventory
+and configured preload libraries through the existing concrete provider's
+read-only connection, guarded by source, authority and quiescence checks. The
+restore permits only pg_cron, pg_net and pg_stat_statements; unknown libraries or
+malformed observations refuse. Historical images do not implicitly acquire
+pg_cron/net dependencies. When present, their existing scheduler-disable and
+unreachable-database checks remain mandatory in the networkless restore target.
+This changes no migration authority, backup format or independent recovery gate.
+
+The package producer binds `proxy_runtime` from the validated original actor
+inventory before hashing or freezing the plan. It independently reobserves that
+proxy by ID, image, specification and running state around publication. A
+caller-supplied mismatch refuses; missing or malformed bindings in older
+packages receive a fixed diagnostic before runtime inspection. This never
+retrofits an immutable package or a signed historical inventory, and grants no
+execution authority.
+
+Historical calendar preparation pins the native connection before signing the
+origin. The canonical renderer changes only its fixed internal hostname to the
+context-derived gateway after validating the explicit credential, database, TLS
+and cluster binding. The final measured backend and unique private gateway DNS
+owner are still independently verified. See the historical calendar connection
+section of `production-release-policy.md`; no source file or signed origin is
+rewritten during candidate rendering.
+
+Historical boot supersession counts the authenticated static
+`madar-known-good-recovery.service` in its live preflight inventory, as well as
+the older context-named boot actors. The signed historical record, exact unit
+bytes, loaded state and drop-in inventories remain mandatory. The early
+isolation service is preserved and receives no supersession drop-in. Missing
+or modified restart services still refuse before installation; completed-release
+origins retain their existing inventory rules. This correction alone provides
+no migration authority or protected-upgrade acceptance.
+
+Canonical160 target backup now precedes private recovery/handoff in the existing
+maintenance coordinator. It retains the concrete provider fence and original
+role/object preimages through the actual backup pipeline. Numeric160 support is
+conditional on that context and exact archive/manifest/transfer binding on both
+ends. Historical profiles retain their behavior. Independent test receiver
+enrollment and complete restored-application acceptance are still outstanding;
+this change does not register an operation or issue authority.
+
+The isolated package producer now publishes version2 requests through the
+existing frozen-source entrypoint, with fresh operation/attempt identities and
+measured source, original inventory, private probes and candidate model. It
+does not issue credentials or register160. The existing issuer still requires
+truthful original-release history; disposable running146 enrollment remains an
+integration dependency, never a reason to invent historical completions.
+Environment identity/fencing observation is separate from authority. See
+`production-release-policy.md`, “Immutable isolated operation requests”.
+Both preparation and execution entrypoints are protected control-plane inputs.
+
+The measured completed-NORMAL source inventory now requires
+`completed_normal_private_acceptance.py`. Its canonical160 observers bind to
+the actual coordinator and concrete provider adapter; original-account probes
+run before fencing and private target probes precede the write handoff. The
+root-private approved credential/object probe input is hash-bound to the plan,
+and results never mint authority. Historical profiles keep their existing
+guards. Schema160 registry/admission remain closed; this wiring does not accept
+a privileged upgrade, independent receiver restore or reboot operation.
+
+The immutable canonical160 private gateway configuration in the accepted
+frontend image is a protected controller input. Candidate creation/sealing and
+inventory attestation bind its ninth role, image, fixed command, privileges and
+two measured networks. It has no host listener or write credential. Historical
+profiles retain eight roles. This source connection does not admit the protected
+upgrade, accept recovery or install a production controller.
+
+## Protected inventory preparation (2026-10-25)
+
+The measured root entrypoint adds `capture-inventory`. Before constructing an
+operational actor it validates the exact schema160 preparation contract and
+root-private expected `provider-inventory-input.json`, whose digest is already
+bound into the approved plan. It independently reobserves all Docker actors,
+exact146 cluster/schema, role attributes/memberships, protected systemd fragment
+and drop-in hashes, pending jobs and filesystem root identities twice. Changed
+source, late/foreign actors, missing observations and already published output
+refuse. It publishes only the existing `provider-inventory.json` format, with
+exclusive creation and directory fsync, for the maintenance coordinator.
+
+This is read-only preparation plus protected file publication: no authority,
+fencing, SQL mutation, receiver acceptance or operation registration is implied.
+Candidate-bearing inventories and independently unproven exclusions refuse.
+Actual private provider guards, full preserved-application acceptance, receiver/
+restore and privileged reboot proof remain required before schema160 admission.
+Development now uses only `Saliba-Branch` in the repository checkout, preserving
+published SQL and historical authorship. Production stays read-only.
+
+
 Canonical160 child ownership transfer is now explicitly separated from worker
 startup. The existing issuer projects protected private acceptance without role
 archives or a child PostgreSQL superuser lease. Pending transfer refuses replay;
@@ -1885,3 +2072,1401 @@ raw provider logs. Completion follows observed owned-service shutdown. None of
 this is protected handoff,boot/reboot or production acceptance. See
 [staging scope](architecture-phase9-2026-10-20/10-AUTOMATIC-FULL-STAGING.md) and
 [maintenance backup limits](architecture-phase9-2026-10-20/03-MAINTENANCE-BACKUP-AND-REPLICA.md).
+
+### Canonical candidate evidence preparation (2026-10-25)
+
+The measured `continue_completed_normal_upgrade.py verify-candidate` mode checks
+image provenance and authenticated fresh-application CI evidence without creating
+an execution/boot actor, importing images, admitting SQL or issuing credentials.
+It remeasures its root-private source package before and after verification.
+Canonical160 evidence no longer falls through to historical115/136 verification.
+
+Before API verification, preparation checks all fourteen canonical SQL bytes
+and mirrors against the pinned schema160 contract. The fresh artifact verifier
+requeries the fixed repository/workflow and exact
+run/attempt, rejects stale/expired/foreign inputs, authenticates a bounded ZIP,
+and binds its observed images/protocols to the candidate. A local PASS file is
+insufficient. The returned result explicitly leaves preserved-upgrade and Node1
+recovery acceptance false. `verify_complete_rehearsal` refuses fresh evidence as
+protected146→160 acceptance; operational registration and admitted_manifest stay
+closed. This connects candidate evidence only, not private original-provider
+acceptance or production authorization.
+
+### Independent operator identity interface (engineering, 2026-10-26)
+
+The existing root controller has an identity-only `--authenticate-operator`
+mode. It reads the token from terminal/stdin, never argv, and cannot approve,
+install or execute a release. A root-private operational policy enrolls explicit
+infrastructure Auth IDs in an independently signed identity realm. Business or
+tenant admin roles are insufficient. The operator signing key must differ from
+the business realm key, whose digest is projected without auditing raw secrets.
+Signature/issuer/audience/expiry, fresh AAL2/TOTP and current verified factors
+and user identity are mandatory. Provider redirects, stale MFA, missing factors,
+foreign scope and business-realm tokens refuse. HTTP needs the live disposable
+KVM/owned-runtime environment contract; production identity endpoints use TLS.
+
+This is identity observation for the SAME existing issuer, not a new issuer,
+approval or production authority. Exact-request approval, revocation/consumption
+and technical-gate revalidation still have to be connected before operational
+approval or generic dispatch is available. Model identity tests are not an
+independent real MFA acceptance demonstration. No production operator policy,
+key, controller or service is provisioned by this source increment.
+
+Disposable environment observation v2 (2026-10-26) retains the v1 preparation
+contract and adds exact root-enrolled container/image/spec, finite CPU/RAM/PID
+budgets and mount identities. Immutable bind contents are hashed; writable binds
+are restricted to explicitly measured application-data directories. Unknown
+actors, sockets, host roots, substitutions and unowned mounts refuse. Only the
+exact enrolled release proxy may use guest host networking. The v2 firewall
+blocks initiated public/private egress and incoming application traffic on the
+control NIC, permitting SSH requests/replies for parent control. Native nft
+grammar and exact observation run in a fresh network namespace; this is NOT KVM
+controller, receiver or preserved-upgrade acceptance. Receiver transport and
+authenticated lifecycle enrollment still require integration; v2 observation
+issues no credential and does not register schema160 or open dispatch.
+
+The independent operator identity reader is also exercised against genuine
+GoTrue v2.196.0 and PostgreSQL17 in an owned internal Docker network. The native
+test uses actual password/TOTP elevation and a TLS relay of the real provider,
+root-private keys/policy in the read-only test container, and separately tests
+AAL1 refusal, foreign database/business-key refusal, current ban/unban and global
+session revocation. This verifies identity, not administrator release approval,
+rehearsal completion or execution authority. The harness pins images, bounds
+resources, checks subnet overlap, journals owned IDs, handles interruption and
+removes owned containers/network and temporary credentials on completion/failure.
+
+Execution environment v2 additionally measures host links: only the control
+NIC, loopback, enrolled Docker bridges and their veth endpoints are accepted.
+The default Docker bridge must be empty. An additional physical/tunnel uplink
+is refused even when the default-NIC firewall is valid. Native network-namespace
+tests prove that a second interface is detected; no host firewall is modified.
+
+## Generic automatic execution integration (2026-10-26)
+
+The existing root controller now has an isolated routine-admission adapter to
+ReleaseDeployer. An assessment remains preparation only. Execution separately
+authenticates independent signed test-runner source/CI/artifact/staging/recovery
+evidence, reobserves native database/catalog/applied history, measures the real
+serving eight-role runtime and immutable images, and checks root policy under
+both existing locks. The same SystemOperations issuer projects the sealed scope
+through its existing interlock/credential boundary. Single-use attempt records
+precede credentials/effects. Root state publication preserves the deploy user's
+access while admission/authority records remain independently protected.
+
+Candidate-owned checks run without network, daemon socket, operational credentials
+or writable host mounts. The actual existing Docker operations and traffic driver
+retain candidate validation, singleton ownership, promotion and rollback behavior.
+The new v4 runtime authority format is distinct from all historical grants and
+binds exact source/controller/database/operation/attempt/plan and actual image
+compatibility. NORMAL requires the exact authorized target. No existing160 image
+or historical range is declared compatible with future versions.
+
+This increment enables no production policy or service. Its execution enrollment
+requires a positively identified disposable KVM guest and a separate public key;
+production cannot accept that test evidence. Migration execution, full automatic
+acceptance, independent recovery and protected146-to160 remain unaccepted until
+their actual integrated scenarios run. Existing schema160 admission and Class D
+refusals are not removed. The historical Phase7 guest profile is unchanged; a
+bounded manifest-owned Node2 guest profile is used for actual release testing.
+
+The routine adapter preserves the existing release network overlay, renders the
+exact final candidate configuration before mutations, refuses elevated/foreign
+host mounts and unbounded resources, and seals CREATED container identities. It
+starts those same identities, rechecks the original actor set and candidate before
+worker/traffic handoff, and advances only the measured disposable-test inventory
+after durable known-good state. This remains isolated-test-only engineering; an
+ordinary bootstrap receipt is never called a protected migration receipt.
+
+An explicit isolated automatic-source retry forwards the existing deployer
+circuit-breaker override. It creates no authority, retires no interlock, changes
+no consumed attempt, and bypasses none of the independent admission gates.
+The completion receipt records any requested override.
+
+
+Source hygiene in the isolated routine adapter receives a minimal read-only Git
+index generated by trusted Git from the admitted commit. Linked worktree pointers
+cannot expose operational repository metadata inside the sandbox. No remote,
+hooks, objects, credentials or writable host paths accompany this path inventory.
+The sandbox remains nonroot, networkless and unable to access the Docker daemon.
+
+
+The isolated routine adapter restores the exact retained origin IDs under OLD
+ownership after revoking the failed target to READ_ONLY. It does not delegate to
+the historical restore helper, which changes restart policy to unless-stopped.
+Its sealed origin retains restart=no, exact image/configuration and bounded
+health verification; the opposite consumer slot must remain inactive. This
+changes no historical profiles and is not privileged reboot acceptance.
+
+
+After restoring retained workers under OLD ownership, the existing deployer
+publishes that verified handoff generation in current known-good state. The
+previous-known-good journal preimage remains unchanged. A successful restore
+must not leave current state referring to the obsolete pre-failure epoch.
+
+
+The isolated automatic issuer publishes a root-private, no-replace persistent
+in-progress pointer after durable attempt consumption and before any credential.
+It binds the exact scope/attempt/source/plan/database. Both polling and explicit
+execution refuse a pending pointer, even after reboot removes /run. Only the
+same live attempt with a genuine bound known-good completion may retire it,
+followed by directory fsync. Failed/interrupted scopes require independently
+observed recovery; expiry and missing /run never authorize retry. Production
+execution remains disabled and historical profile interlocks are unchanged.
+
+## Root-selected automatic SQL integration (2026-10-26)
+
+Publication does not select a target. The installed automatic observer defaults
+an unselected release to its current schema. A nonempty plan requires a fixed
+root-private per-source selection binding source/controller/database/origin/target,
+plan, images and the independent routine policy. Canonical SQL and mirrors remain
+immutable. Published161–164 remain unselected and Class D under the conservative
+AST analyzer; their permission/RLS/provider/worker contracts are not routine A/B.
+
+The existing ReleaseDeployer invokes selected SQL after preflight and before
+candidate startup. The parent owns the sole LockedMigrationExecutor connection,
+both operational locks and its advisory lock. Exact Git bytes, real original
+backup bytes, signed native migration/restore acceptance and each target catalog
+and protocol boundary are required. The candidate stays READ_ONLY until existing
+worker/traffic handoff. History advances only after observed committed target;
+unknown replies preserve the consumed attempt and durable recovery fence.
+
+An optional executor transaction guard uses PostgreSQL AST byte boundaries to
+enter the original BEGIN before measuring/locking. Class B locks its exact plain
+table, remeasures bytes/rows under that lock and keeps it through authenticated
+COMMIT, with independent lock/statement/transaction deadlines on that same session.
+Class A uses the same finite ceilings without acquiring Class B permissions.
+Historical execution without this hook is unchanged.
+
+Separately enrolled isolated fixtures live under web/staging/fixtures/automatic-migrations,
+use schema identifiers900160 and above, and record their explicit initialization
+and canonical160 data-prefix digest. They cannot replace canonical migration161,
+select production SQL, open schema160 coordinated admission or authorize production.
+The exact fixture manifest must be independently pinned in the root selection and
+pass positive KVM/isolation admission. Full application A/B promotion and recovery
+remain unaccepted until the actual installed entrypoint completes those tests.
+
+Cross-cluster migration acceptance uses a separate semantic catalog fingerprint.
+The historical physical/OID-sensitive local drift digest is preserved. Semantic
+comparison retains schema, database configuration, role/default ACLs, RLS, columns
+and order, constraints, function definitions/ownership/search paths and trigger
+enablement. Only physical OIDs, dropped-column gaps and generated internal FK
+trigger names are normalized. Protocol functions are invoked only after the
+expected semantic catalog matches in the same read-only snapshot. Each committed
+boundary then seals its actual LOCAL physical digest under the executor's existing
+advisory lock. A semantic mismatch after COMMIT remains fenced and cannot replay
+the consumed SQL attempt.
+
+The automatic parent and canonical unprivileged traffic driver share the existing
+runtime-mutation lock inode. Root creation transfers that private 0600 inode to
+the established runtime-state directory owner while holding its flock; it never
+replaces a live lock or makes it group/world writable. Symlinks, shared inodes,
+unsafe modes and foreign ownership refuse. A real root/traffic-UID test verifies
+mutual exclusion and acquisition after release. This fixes an observed promotion
+refusal after committed SQL, not permission to replay the consumed operation.
+
+Automatic preflight now checks the canonical unprivileged traffic UID's Docker
+access and actual running proxy before any selected SQL. The existing root
+parent's access is insufficient. The original route file must already have its
+canonical private-directory owner and nonsecret 0644 mode; symlink/shared/foreign
+files refuse rather than being silently repaired. No route publication is used
+as a probe. Disposable bootstrap fixtures must establish these real operating
+permissions before enrollment, not grant privileges after a migration commits.
+
+Admission now reauthenticates its unchanged signed evidence and evaluates policy
+using the clock AFTER live observations finish. In particular, a genuine Class B
+measurement obtained after preparation begins is not compared with an earlier
+start timestamp. Stale/future measurements, expired evidence and changed packets
+still refuse; an earlier start cannot extend authorization validity. This fixes
+an observed pre-effect refusal without relaxing measurement age limits.
+
+
+### Isolated known-good boot recovery (2026-10-27)
+
+The installed controller has separate `--restore-isolated-fence`,
+`--install-isolated-recovery` and `--recover-known-good` operations. These are
+restricted to independently enrolled disposable KVM guests. Ordinary production
+admission, schema160 protection and production timer enablement are unchanged.
+A root-owned, expiring restart policy pins guest, filesystem, control interface
+and installed controller bytes. Early systemd fencing precedes networking and
+Docker (including socket activation); the owned guest uses static addressing,
+with no additional outbound exceptions. Existing altered rules are refused.
+
+Only an actual completed release can publish the root known-good recovery
+binding. Recovery rechecks its immutable completion, exact container/image/mount
+identities, existing NORMAL grant, worker generation, database identity, committed
+schema, protocols and authenticated history. It starts private providers, accepted
+core services and the exclusive accepted workers, then uses the existing traffic
+driver and health checks. It does not pull images, select newer source, execute
+SQL, reserve a deployment, mint grants or fabricate deployment completion. Boot
+receipts are distinct. Uncertain SQL, changed ownership or effectful interrupted
+operations remain fenced pending supported authorized recovery. Native reboot
+and physical-host restoration are separate acceptance gates; source tests alone
+do not pass either gate. Production activation requires separate authorization.
+
+
+### Independently enrolled physical test receiver (2026-10-28)
+
+`normal_backup_replica.receive_enrolled_test` is a separately enrolled append-only
+namespace under `/opt/madar-recovery-tests/<owned-run>`. Production receiver
+BASE, filesystem/mount checks, namespaces and schema allowlists are unchanged.
+An expiring root-private enrollment binds physical host/machine/filesystem,
+source guest/database/release, operation, exact backup inventory and independent
+source signing key. Altered bytes, foreign scope, replay and incomplete transfer
+are refused. Receipt of bytes explicitly does not mean database or application
+restoration. Existing archive and storage metadata verification are reused.
+
+The bounded `staging/integration/offhost_application_restore.py` adapter requires
+actual receiver receipt and independently observed source power-off before
+restoring a physical synthetic PostgreSQL backup. Physical recovery preserves
+the source database system identifier and existing grant bytes; it never issues
+deployment authority. This requires source writer exclusivity, a separate receiver
+enrollment, exact immutable images, verified role/ACL/data/history fingerprints,
+and private application acceptance. It cannot authorize production. The receiver
+uses an internal bridge with gateway mode `isolated`, no host-network actors or
+published ports, and no external DNS forwarding. Resource totals are bounded at
+2656 MiB/1.9 CPUs for the application, leaving a separate acceptance budget.
+
+Full restored-application acceptance and authenticated evidence are distinct
+from successful transfer, pg_verifybackup and database startup. Operational proof
+and generic admission integration must be reported separately; source tests
+alone do not open schema160 or production dispatch. Exact-owner teardown refuses
+foreign actor references and preserves existing operational backup/controller data.
+
+Restart bindings distinguish the accepted application's deployment controller
+from the independently approved installed recovery controller. Re-enrollment
+requires the genuine completed receipt, unchanged grant and live exact runtime;
+it issues no deployment authority. The operator environment is hashed at sealing
+and rechecked before effects. Recovery always invokes the measured installed
+traffic driver, rather than an executable selected by ambient configuration.
+
+Physical test restoration also preserves an explicitly captured, bounded Redis
+RDB snapshot taken after source writers stop. The restored source grant is
+unchanged, and the independently observed source power-off remains mandatory.
+This is separate from deployment authorization or restarting two write owners.
+
+The enrolled receiver's transfer authority authorizes receipt of bytes only.
+Before restoration, the independent test issuer must publish a separate private,
+expiring, single-use restore authority binding received evidence, implementation
+bytes, source-off observation, receiver, source and exact attempt. Source updates
+before that admission are recorded; changes after admission are refused. Restore
+consumption is durable before effects. Native role health checks and init settings
+are preserved. An exact-owned transient cleanup timer retires test resources on
+parent interruption; production retention and services are not selected.
+
+Receiver image inspection must also prove selected-platform content can be
+exported: an image metadata ID with missing OCI blobs is insufficient. This
+read-only gate precedes consumption and database creation. Host-network origins
+can have null Docker DNS aliases; restoration retains the explicit service/name
+aliases while creating only the independently enrolled isolated receiver network.
+
+Restore attempts retain exclusive per-attempt consumption records under the
+receiver's protected attempt journal. A separately issued retry has a new attempt
+identity; archiving a demonstrably pre-database failed attempt must preserve its
+consumption and actual failure. Existing database/worker effects cannot be reset
+as a preparation retry. Missing immutable image content is a technical refusal,
+not administrator approval or permission to substitute image identities.
+
+Database restoration fingerprints run in the independently pinned native tool
+through single-statement prepared PostgreSQL execution inside an established
+READ ONLY snapshot. This observer cannot apply migrations or metadata-supplied
+SQL writes. Database identity, schema, roles/ACL/data and protocol checks precede
+provider/application startup; the owned observer is bounded and removed.
+
+A failed database-only receiver stage can continue only with separately issued
+continuation authority binding its exact stopped database ID, owned runtime,
+failed stage, prior consumed attempt and new implementation. Existing database
+bytes are not restored again. Verification unwraps only the exact trusted
+historical catalog observer; all other inputs remain single prepared statements
+in READ ONLY. Unknown runtime/provider effects remain refused.
+
+Native Storage recovery binds its two-component namespace to authenticated
+original provider configuration; the historical default remains `stub/stub`.
+Traversal and unknown namespace shapes are refused. Database-only continuation
+can reverify a matching prior read-only observation without replacing that
+receipt or restoring database bytes again. Each continuation has fresh authority.
+
+Receiver verification correction (2026-10-28): restored object ownership follows the
+authenticated Storage provider user; omitted Docker user means root, while named
+users or implicit primary groups require independent review. CI receiver tests
+use deterministic measured disk capacity and the configured repository mount,
+with an explicit insufficient-headroom refusal. Operational headroom and
+production admission checks are unchanged.
+
+The existing automatic admission module consumes independently pinned physical
+restoration evidence from root-only `/etc/madar/independent-test-recovery`.
+The trusted parent enrolls the actual independently observed receiver public key
+and exact signed receipt scope; candidate code cannot enroll a key or replace a
+root pin. This evidence path neither issues recovery/deployment authority nor
+changes the installed production controller. Historical native verification is
+not a fresh acceptance or permission to replay restoration.
+
+Known-good compensation correction (2026-10-28): a refreshed
+`schema_attested_at` audit timestamp cannot change the accepted source identity;
+all other known-good fields, images, schema, worker generation and grants remain
+strictly bound. Independently enrolled current inventory may retire an inactive
+slot, while every accepted actor must still match its sealed original preimage.
+
+A consumed application-only attempt may recover automatically after exact
+candidate teardown when its original worker ownership is unchanged, candidate
+authority is READ_ONLY, no candidate remains and no SQL/completion receipt exists.
+Recovery independently reobserves the original database and history, preserves
+the consumed attempt and original deployment completion, records an idempotent
+recovery abort, and restores the same known-good application. Nonempty migration
+plans, surviving candidates, changed ownership and uncertain effects remain
+fenced for authorized recovery. This neither replays SQL nor issues fresh
+deployment authority, and does not open production/schema160 dispatch.
+
+Recovery observes historical consumed-attempt records through a separate
+read-only check of the sealed scope, original PID/start/boot tuple and owner
+liveness. It never calls live execution authorization with an obsolete process
+identity. The ordinary issuer's strict live PID/start/boot check is unchanged;
+an active owner, altered consumed record or ambiguous effects still refuse.
+
+Recovery diagnostics are created only after positive guest/code policy
+verification, and before examining pending state, so trusted-host refusals have
+a durable fenced boot record. Any existing pending candidate grant must remain
+READ_ONLY even before candidate creation. CI's live-owner test uses a bounded
+real child process because its test runner can be PID1; host-owner validation
+is not relaxed to accommodate a container test runner.
+
+
+### Exact exceptional review and isolated execution (Milestone B, 2026-10-28)
+
+The existing root controller exposes `--exceptional prepare|list|inspect|approve|reject|revoke|execute`,
+with immutable request UUIDs and explicit request-digest confirmation. Fresh
+infrastructure AAL2 enters only through protected stdin/terminal input; identity
+verification is not approval. The independently root-protected exceptional
+policy and separate approval signing key cannot be selected or widened by a
+candidate. Requests, signed audit transitions, approval, revocation and durable
+single-use consumption live beneath the existing automatic-admissions journal.
+
+Only an exact reviewed PostgreSQL AST contract for one private, ordinary,
+ungranted, dependency-free leaf table is supported here: DROP TABLE RESTRICT
+(Class D), or enable RLS (Class C). Unknown SQL, CASCADE, critical/provider
+objects, protocol changes and source-controlled verifier/policy changes refuse.
+No Class C/D permission is added to routine policy. Technical CI, staging,
+compatibility, actual backup bytes, separately root-pinned fresh physical
+full-application restoration, live identity/history and resource gates remain
+mandatory. Approval does not override a failed gate.
+
+Execution converges on the existing ReleaseDeployer/Docker operations and
+LockedMigrationExecutor under both existing locks. Original write ingress and
+providers/consumers are quiesced before SQL; exact table impact is reobserved
+under ACCESS EXCLUSIVE with finite PostgreSQL17 budgets. Candidate authority
+remains READ_ONLY until the existing exclusive worker handoff. Committed or
+uncertain failures retain maintenance and durable consumption; no blind SQL
+rollback, automatic replay or old-worker restoration follows. Completion links
+the existing genuine release receipt into the separately authenticated approval
+audit. Accepted known-good boot recovery remains a distinct operation.
+
+This implementation path currently requires independently enrolled isolated-test
+execution policy. Source/unit/native results are not privileged acceptance.
+Production execution/enrollment, schema160 registration and automatic timers
+remain unchanged and closed until their separate operational gates pass.
+
+The existing locked executor admits exceptional transactional SQL only with the exact
+AST-verified supported contract, one coordinated forward-compatible step, and the
+existing under-lock impact guard. Approval deadlines can shorten, never extend,
+the immutable admission deadline; delayed approval does not change that scope.
+
+The independent test receiver reserves 0.2 CPU for notification execution and its
+health probe, within its unchanged two-CPU total ceiling. Native acceptance must
+observe every required container healthy after functional checks as well as before.
+
+Only a controller that acquired the existing execution lock may record exceptional
+execution failure. A concurrent lock loser cannot change the active approval
+journal or revoke the owning controller's operation.
+
+A consumed planned migration may be abandoned by known-good boot recovery only
+at the authenticated source/build/preflight boundary: no candidate runtime, no
+SQL execution/boundary/completion marker, unchanged original worker authority,
+and independently reverified known-good database/schema/history. Recovery issues
+no migration authority and never reuses the consumed approval. Any later or
+ambiguous boundary remains fenced for authorized recovery.
+
+After actual target health and promotion acceptance, the existing runtime-inventory
+attestor seals the verified actor set before exceptional VERIFYING/COMPLETED
+events reobserve policy. Those events still require the exact approved policy
+digest; no unknown actor or changed policy can be accepted by this ordering.
+
+Exceptional maintenance route observation (2026-10-28): candidate creation after a committed supported migration verifies the already fenced origin through a unique loaded-proxy upstream observation and immutable frontend bytes. It requires the exact sealed actor inventory and NONE worker authority; it never restarts the old writer to obtain a healthy-route probe. Routine and post-promotion route health verification remain mandatory. A failed observation preserves maintenance, consumed authority, and committed migration evidence.
+
+Exceptional provider maintenance and audit (2026-10-28): fence the sealed private gateway before Auth/REST/Storage, restore providers with bounded readiness, then restart the same gateway so its loaded provider addresses are refreshed. No original backend or consumer regains authority. Journal display and failure/completion auditing authenticate independent root configuration, controller bytes, enrolled scope and signed records without demanding the obsolete pre-candidate runtime inventory. This read/audit path issues no authority: prepare, approve, revoke and execution admission/consumption retain full live observation. Preserve the original safe failure code and phase even when secondary audit observation fails.
+
+
+### Historical bootstrap-origin enrollment (Milestone C, 2026-10-29)
+
+The existing root issuer now has an isolated-only historical-origin enrollment
+namespace and `--historical-origin prepare|inspect|enroll`. Independently
+protected policy pins the actual historical source/tree/images, database/guest,
+full observation and a successor intent. Real original accounts/MFA/private
+objects, current provider endpoints, eight healthy roles, bootstrap-adoption
+receipt, workers, route, canonical history and database catalog are independently
+reobserved. Fresh infrastructure AAL2 plus explicit request confirmation consumes
+the enrollment once before linking a distinct historical_origin state marker.
+This marker is never a completed_normal_upgrade marker and claims no historical
+protected completion or migration authority. Ordinary completed admission stays
+strict. A later exact context can bind the approved successor intent once; the
+release still requires its own approval and complete technical admission.
+
+Production enrollment/execution and schema160 operational registration remain
+closed. This source integration is not preserved146-to160 acceptance. The full
+maintenance, receiver, canonical execution, handoff and reboot tests remain
+required before the protected refusal can be replaced.
+
+Canonical160's deletion protocol function returns2 only at160; unchanged161–164
+therefore report0. Do not ignore that refusal, change historical SQL, or widen
+application compatibility. The owner authorized preparation ONLY of an unselected
+forward repair under deployment/proposals/schema165-deletion-compatibility. It is
+outside canonical inventories/manifests. No proposal execution or expansion of
+Milestone C's accepted target164 is authorized.
+
+Historical enrollment additionally fingerprints public business rows/sequences
+and stable original Auth/MFA/Storage identities through a bounded native READ
+ONLY snapshot; only documented probe challenge/access timestamps are normalized.
+Application, backup and database-transport configurations are separately hashed.
+The original backend's actual bootstrap history reports no protected migration
+completion: serving preflight returns not_requested only after reattesting the
+distinct enrolled origin, and rejects any conflicting migration directory or
+fabricated completed marker. Account acceptance probes create only their
+explicitly enrolled synthetic Auth sessions; they issue no SQL/write authority.
+
+Historical enrollment holds and rechecks the existing upgrade and deployment
+lock inodes before durable effects. Infrastructure AAL2/current session identity
+is checked again after potentially lengthy native observations and before
+consumption; revocation during observation cannot create an enrollment.
+
+The canonical160 package producer now accepts a distinct typed historical-origin
+reference for preparation only. Its signed original observations remain DATA
+after writer fencing, with a separate enrollment root and no completion alias.
+The source binding pins a non-circular exact successor intent (original/candidate
+source, controller, database, canonical manifest and images). Changed candidates
+or databases cannot reuse it. Every operational profile/manifest gate remains
+closed; preparation does not issue a grant or execute147–160.
+
+The disposable infrastructure-identity pair is independently verified against
+its protected operator record, exact actor/network specifications, private
+transport and a native PostgreSQL system identifier distinct from the origin
+and production. It remains in the full runtime inventory; it cannot be hidden
+behind a broad writer-name exclusion. Legacy origin successor-protocol function
+absence is observed natively rather than inferred solely from schema146.
+
+Historical bootstrap adoption records are operator-owned original lifecycle DATA,
+read through a separate bounded, private, nonsymlink path check. Only native
+verification and an independently pinned root-policy digest can enroll them.
+This does not relax root-only trust for signed enrollment, authorization or
+protected completion records, and issues no migration authority.
+
+The enrolled native operator Auth transport uses its exact private database
+network alias and restricted supabase_auth_admin login, not the PostgreSQL
+superuser. Enrollment verifies alias ownership/no collision and actual native
+role privileges and connection bounds as well as its distinct system identity.
+
+Canonical package preparation distinguishes enrolled pre-grant bootstrap
+authority from a completed origin grant. The former requires the exact signed
+enrollment digest, actual ungoverned historical runtime configuration and no
+fabricated grant file or mount; the ordinary completed grant checks remain
+mandatory. This source preparation support does not authorize maintenance.
+
+Physical test restoration accepts a separately root-enrolled v2 historical
+source context only when the exact locally verified source enrollment DATA is
+pinned in both receiver policy and authenticated backup manifest. No source
+issuer key is copied. Historical146 requires native absence of successor
+protocol functions, not a numeric schema allowlist or fabricated completion.
+Ordinary receiver/completed-release and production contracts are unchanged.
+
+Physical test proxy restoration derives upstream ports from exact authenticated
+source loopback bindings. It refuses missing, ambiguous or public bindings and
+preserves historical frontend8080 as well as reviewed frontend80 configurations.
+A guessed frontend80 is not compatible restoration evidence.
+
+Original-data fingerprinting also requires native transaction status IDLE on
+an autocommit connection. A manually opened caller transaction is refused
+without BEGIN, COMMIT or ROLLBACK, preserving the caller-owned boundary.
+
+Owned KVM teardown is idempotent across explicit/finally/atexit calls. Its
+removal receipt is published only after actual directory removal; an unrecorded
+missing scope or failed deletion cannot be reported as successful cleanup.
+
+Historical canonical maintenance now consumes a distinct original-runtime
+projection through the existing root credential issuer. Grantless origins must
+first complete the concrete provider ingress/actor/role/session fence; only then
+may a root-private historical fence receipt be sealed. No prior grant or
+completion is synthesized. Runtime sealing, handoff and compensation consume
+that exact identity. Ordinary grant-backed paths remain unchanged; canonical
+operational registration and isolated exceptional admission remain closed until
+their complete integration and native acceptance are established.
+
+Historical provider provenance is the independently signed enrollment-consumption
+record, rather than an invented provider-recovery completion. Fresh root
+credentials carry the exact measured history projection to the deployment user.
+Original systemd fragments, drop-ins and unit states are captured at enrollment;
+boot installation must match that preimage before superseding its supervisors.
+These source-level integrations do not constitute protected operational acceptance.
+
+Historical provider inventory v2 binds the complete original Docker universe
+to signed enrollment data, eight actual origin roles and the actual native
+provider set. Missing historical slots are not invented. Only the separately
+verified operator-authentication pair may be excluded; shared target access
+and arbitrary exclusions still refuse. Original systemd controls are compared
+with the existing installer's exact supersession record, and native provider
+DNS remains restricted to the original bridge when the database also has an
+independently enrolled loopback control bridge. Version1 topology is unchanged.
+
+The first canonical historical engineering rehearsal may receive exact
+root-protected, read-only technical registration in a positively identified
+isolated KVM guest. It binds the full context, plan, controller, application,
+database,146→160 boundary and a maximum three-hour lifetime. This permits only
+read-only fixture preflight and never claims a prior completed rehearsal.
+The existing issuer refuses canonical execution credentials until its exact
+exceptional-approval bridge is integrated; fixture execute/forward modes and
+production registration remain closed. Native SQL leases resolve the exact
+enrolled provider bridge, never an alternate loopback control bridge.
+
+Canonical historical artifact verification keeps application and controller
+revisions distinct. When the exact candidate differs from the canonical160
+controller, build-input hashes come from the existing authenticated Git snapshot
+codec at that candidate commit, including commit/tree/blob integrity checks.
+Current checkout bytes and newer controller dependencies cannot relabel older
+images. GitHub source, CI, archive checksums and immutable image identity checks
+remain mandatory. This correction issues no execution or migration authority.
+
+Historical boot enrollment records the installed static, uninstantiated
+madar-ops-alert@.service template as authenticated configuration, separately
+from concrete stoppable supervisors. Its fragment/drop-in bytes, ownership and
+mode remain mandatory during provider-inventory attestation. Unknown templates
+and unexpected instantiated alerts refuse. This fixes native enrollment without
+inventing a runnable template instance or weakening writer fencing.
+
+Native systemd observation distinguishes an uninstantiated alert template
+from a concrete unit: systemctl show cannot observe a template's process state.
+Enrollment captures its exact static unit-file identity and root-protected
+fragment/drop-ins, with an explicit nonapplicable active state. Any loaded alert
+instance requires review. Provider attestation reobserves that absence and the
+exact template configuration; no alert instance is started for measurement.
+
+Independent test restoration preserves bounded private routed readiness
+observations, including non-200 JSON responses, so failures identify the actual
+dependency boundary. Both HTTP endpoints must return200, readiness must be true
+and the release identity must match. A response body cannot override HTTP503.
+Failed restoration still fences all owned services and consumes its authority;
+continuation requires a separately authenticated exact attempt.
+
+A separately authorized independent-restore continuation reuses the existing
+restored PostgreSQL instance and revalidates Storage bytes against the original
+authenticated archive. Existing Storage attributes are verified exactly in an
+explicit read-only mode; they are never recreated or overwritten. Ordinary
+metadata recovery still refuses preexisting attributes. Changed bytes, versions,
+metadata or scope refuse before restored application acceptance.
+
+Historical enrollment now measures actual readiness through both the stable
+proxy and active backend, along with both frontend routes, using the existing
+controller's HTTP transport. Docker liveness is insufficient. The separately
+verified historical bootstrap still supplies no modern migration completion.
+A degraded/backlogged application cannot become an enrolled upgrade origin.
+
+The full preserved-data fixture uses a genuine future in-app calendar reminder
+created by the historical event API for pending work. It does not create a
+synthetic delayed outbox job that ages into the historical backlog alarm. This
+change applies before new baseline capture/enrollment; previously captured
+failed restoration data and its receipts are never rewritten or declared PASS.
+Readiness thresholds, canonical SQL and source application images are unchanged.
+
+Historical native database observation now binds every bridge ID separately
+from the Docker configuration hash. The original provider bridge remains the
+mandatory primary endpoint; an enrolled control bridge is accepted only in the
+exact canonical historical profile. Root uses signed enrollment DATA, and the
+deployment child requires the existing fresh context-bound issuer witness.
+Extra, missing, substituted or unobserved networks refuse; ordinary completed
+origins retain their single-network contract. Older enrollments without this
+new observation cannot acquire it implicitly. This source correction does not
+issue canonical execution authority or establish protected-upgrade acceptance.
+
+Canonical historical preflight now requires an exact independent physical
+restoration receipt in its immutable plan. The existing receiver verifier has
+an explicit historical v2 trust shape: the signed receiver context must match
+both original locally authenticated enrollment journal packets, the exact
+successor intent, source guest, database and canonical history. It claims no
+modern completion. Ordinary routine-release verification still accepts only
+its original completed-release trust shape. Expired enrollment, failed full
+application acceptance and changed tenant/MFA/Storage checks refuse. This is
+consumer integration; the latest full-data native restoration failed readiness
+and has no acceptance receipt. Canonical execution remains issuer-blocked.
+
+The existing exceptional approval issuer now has a distinct v2, isolated-only
+policy for one exact canonical146→160 context, plan, source bundle, enrollment,
+operation and attempt. It does not expand the v1 private-table contracts or
+routine Class A/B policy. Canonical review runs the existing coordinator's full
+read-only technical preflight and verifies all fourteen immutable SQL files with
+the PostgreSQL analyzer. A prior modern completion or an original runtime
+compatibility range through160 is never invented.
+
+The frozen existing continuation entrypoint exposes approval-prepare,
+approval-inspect, approval-approve, approval-reject, approval-revoke and
+approved-execute. Decisions/execution require the exact request UUID and digest;
+fresh infrastructure AAL2 enters through terminal/protected stdin. The ordinary
+fixture execute path and generic automatic executor cannot dispatch this chain.
+The separate independently protected exact policy and technical registration are
+mandatory; production registration and authority remain closed.
+
+Consumption occurs under both existing lock inodes before maintenance effects.
+It binds the historical enrollment to one successor without recursively taking
+flock. Approval expires before consumption; the consumed parent has a separately
+bounded execution deadline fixed before approval (at most three hours). Every
+fresh root credential checks the same consumed owner and scope. Its nonsecret
+child lease is root-hash-bound to the context, approval, process start, boot ID
+and deadline; missing/substituted/expired leases and dead or changed parents
+refuse. The existing service receives the credential after root releases its
+temporary deployment lock so User=madar can acquire that same inode itself.
+Original release-state ownership remains operator-owned DATA; no fake grant,
+historical completion, or privilege change is used.
+
+The existing coordinator/executor/provider/handoff/traffic/receipt mechanisms
+remain responsible for actual effects and technical acceptance. Consumption or
+SQL uncertainty stays durable and cannot authorize replay. Canonical approval
+completion links the actual protected normal-completion receipt. These are
+source/component integrations, not a claim that canonical147–160 has executed:
+the current full-data restore failed readiness, and full native package,
+protected execution, handoff, preservation and reboot acceptance remain pending.
+
+### Historical grantless restart integration (2026-11-02)
+
+The existing known-good recovery controller accepts a separately root-enrolled
+v2 historical policy and a distinct historical-bootstrap-known-good-recovery
+manifest. It authenticates the original enrollment packets, host/filesystem,
+database and canonical history, original bootstrap DATA, configuration, actors,
+route and worker generation. It creates no migration authority, prior completion
+or mounted write grant. Unknown/changed actors, schema, protocols or ownership
+refuse. Ordinary completed v1 recovery remains a separate strict contract.
+
+Install the existing early-fence/recovery units before historical enrollment;
+the early barrier must be active and enabled, and the recovery unit inactive.
+After truthful enrollment, the independent root v2 policy pins that exact source.
+The same explicit recovery installation then seals its historical restart
+manifest. The original private infrastructure-identity pair is restored only
+from its separately enrolled IDs, native database identity/role scope and health.
+All application startup still follows native schema/history verification and
+exclusive original ownership, using the existing Docker operations and traffic
+driver. Recovery journals are distinct from deployment completion receipts.
+
+The exact loaded early-isolation unit is authenticated as network-barrier DATA,
+not a stoppable writer supervisor. Its immutable fragment, enabled/active/exited
+state, empty jobs/control processes, absence of drop-ins and loaded-file freshness
+remain mandatory. Provider inventory reobserves that barrier at its authority
+boundaries. The existing protected boot installer supersedes only the measured
+old recovery supervisor; it preserves early isolation and Docker's dependencies.
+
+An independent-restore source hold is root controlled and never self-expires.
+The independent recovery operator must retire its receiver before releasing the
+hold. Any consumed successor or approval, including the crash gap between those
+two records, blocks historical restart for authorized recovery. There is no blind
+SQL replay or implicit consumed-approval reuse. Automatic historical pre-effect
+abandonment and protected forward continuation still require separate acceptance.
+
+The existing owned KVM construction class can restart the same powered-off disk
+at most twice, without changing UUID, keys, disk or resource budget. It requires
+observed old-process exit, authenticated paths/ownership, no file users, unchanged
+standalone QCOW2 metadata and the original unextended run deadline. It never
+modifies an active QCOW2 directly. The parent watchdog and exact teardown remain
+mandatory. These are source/component integrations; real historical restart,
+full-data restoration and protected canonical execution have not yet passed on
+this source. Production, permanent staging and automatic-deployment timers remain
+unchanged.
+
+
+### Authenticated GitHub observations in isolated historical acceptance (2026-11-02)
+
+The existing package, artifact and fresh-staging validators can consume a
+root-enrolled read-only parent transport when the disposable KVM execution
+firewall denies guest egress. It reuses the independent test observer public-key
+pin; the private key and GitHub credential remain outside the guest. The parent
+performs an actual fixed github.com GET for an exact allowlisted repository
+endpoint. Each signed response binds the root policy, guest/filesystem/database,
+installed controller/tree, request nonce and at most sixty seconds of validity.
+The guest rechecks policy and isolation after the response. Forged, stale,
+substituted or unenrolled observations refuse without direct-network fallback.
+
+This transport carries raw GitHub metadata, never deployment authority or a
+caller-supplied PASS. Existing source, CI, artifact digest and fresh-application
+checks remain mandatory. Ordinary direct GitHub observation is unchanged when
+no isolated transport is enrolled. Unknown endpoints and production environments
+cannot enroll this policy. Root journals retain bounded observation hashes and
+failures; the owned run retires its request workspace. Positive guest/parent
+transport and protected canonical execution still require native acceptance.
+
+
+### Isolated controller source versus GitHub main (2026-11-02)
+
+The exact root-registered historical rehearsal may name an
+`isolated_controller_source` in its immutable plan. This identifies the actual
+Saliba-Branch controller commit/tree and is displayed in administrator review.
+It is never described as GitHub main. The existing resolver requires the exact
+installed controller, positive isolated registration, real authenticated GitHub
+commit/tree metadata and a full local Git-object snapshot. Staging then uses
+its existing exclusive selected-ref and bundle path. The canonical GitHub origin
+URL and actual origin/main remain unchanged; no network-ref substitution occurs.
+
+The ordinary resolver and immutable-main-ancestor contract remain mandatory for
+production. Mixed source modes, a changed tree/source/registration, an ordinary
+completed-origin operation, or production use refuse. The exact package, CI,
+staging, recovery, AAL2 approval and protected execution gates are still required.
+This source transport is not unattended real-GitHub-main dispatch acceptance.
+
+
+The existing root-sealed backup address lease can observe the exact registered
+historical contract. It reuses the native database observer and signed original
+network inventory, verifies the running healthy container, immutable specification
+and PostgreSQL identity, and selects only its enrolled native bridge address.
+Historical labels and a loopback control bridge are not relabeled as a modern
+production Compose deployment. The child still receives only the existing
+anonymous sealed address/maintenance-role fd with no supplementary groups.
+Default production address discovery keeps its strict single-network/no-port
+Compose contract. Preflight and post-capture reobservation use the same exact
+historical contract; this grants neither SQL migration nor backup success.
+
+
+Native historical acceptance found source-only controller dependencies missing
+from the explicit installer inventory. The installer now includes the isolated
+GitHub reader and the existing private-provider verifier. A dependency-closure
+check parses imports of every installed library, so source tests cannot silently
+succeed with a module absent from the installed controller. A controller marker
+alone does not substitute for installed file/manifest verification.
+
+
+### Restore recorded routing without a new promotion (2026-11-02)
+
+Repeated native historical reboot testing exposed an ownership transition: the
+promotion driver atomically rewrote an originally root-owned upstream file as
+operator-owned, changing the sealed read-only bind despite identical routing
+bytes. The first reboot became healthy; the second correctly refused that drift.
+That failed attempt remains failed in the acceptance evidence.
+
+Known-good restart now stops the proxy before recovery, verifies the recorded
+route hash, and starts the exact existing proxy against that unchanged file.
+Under the existing runtime-mutation lock it waits within the recovery budget for
+the loopback listener, verifies exact release SHA and slot, runs the existing
+backend/frontend stable validation, and rechecks runtime bindings and independent
+policy. It never calls a new promotion or changes the upstream file's ownership,
+inode, mode or bytes. A changed route, wrong loaded identity or failed readiness
+still fences writers. This correction requires fresh native repeated-reboot
+acceptance; its component tests do not replace that test.
+
+
+The Node2 disk-reference utility check uses the platform-supported read-only
+`fuser -I` invocation against an already authenticated absolute owned path. An
+unsupported option, missing utility, active reference or any diagnostic refuses
+resume. Native utility verification detected an actual open owned file and then
+observed no reference after closing it; that is not full guest-resume acceptance.
+A restoration hold remains enforced during resumed guest boot until independent
+receiver retirement is authenticated through the guest control channel.
+
+
+### Actual historical provider configuration bindings (2026-11-02)
+
+New historical enrollment captures all five original provider identities and
+immutable Docker specifications, including environment configuration. For each
+read-only host input it additionally authenticates the actual source path,
+filesystem identity, ownership, mode and contents through the existing isolated
+bind codec. Writable PostgreSQL/object data remains subject to backup and
+preservation contracts. No future native.env, Compose override or Envoy file is
+invented to represent a historical provider that did not use that layout.
+
+The existing immutable package/configuration guard uses the genuine signed
+historical observation, the original application/backup/database-transport file
+hashes, the independently prepared Node1 configuration hash and the original
+provider-input digest. Every provider ID/image/spec and read-only input is
+reobserved. Missing enrollment metadata, changed bytes/inodes, added inputs or a
+changed profile refuse. Ordinary completed origins retain their existing fixed
+configuration contract. This root-only read observer issues no authority and
+cannot substitute for independent restoration, exact approval or actual SQL
+execution. Its native canonical acceptance remains required.
+
+### Independent receiver retirement and historical source holds (2026-11-02)
+
+The existing disposable physical receiver can retire with `--retire-and-attest`.
+It reads its original root-private receiver key, performs the exact-owned cleanup,
+removes the receiver directory, and then independently reobserves Docker for any
+remaining receiver-labeled containers, networks or volumes. Only absence permits
+a retirement signature. The receipt binds the original enrollment, physical
+host/filesystem, source guest/database/revision, backup operation and manifest,
+and historical origin. It certifies retirement only: not restoration acceptance,
+release completion, migration or write authority. Ordinary `--retire` remains an
+available cleanup action even when attestation cannot be produced.
+
+Before powering off the source, the independent parent must pin a root-private
+`automatic-recovery/independent-restore-in-progress.json` with the exact receiver
+public key/enrollment and those source bindings, the enrolled recovery policy,
+the existing historical known-good manifest, a unique hold ID and bounded lifetime.
+The hold never expires itself. Boot recovery continues refusing while it exists.
+An absent receipt, wrong scope/key, expired hold or stale retirement cannot clear it.
+
+The installed controller's `--release-independent-restore-hold` accepts only the
+bounded signed receipt on stdin. Under the existing upgrade/deployment locks it
+revalidates the independent historical recovery policy, HMAC-authenticated origin,
+known-good manifest and runtime identities, requires every source actor stopped,
+and checks the exact network fence. It durably consumes the hold/receipt before
+unlinking and fsyncing the original hold. A crash between consumption and unlink
+may finish only that identical hold; absent-hold replay refuses. No actor starts,
+SQL runs, approval is consumed, route changes or new grant issues in this action.
+The separate existing known-good recovery must subsequently pass all its checks.
+A lost receipt after receiver deletion leaves the source fenced for independently
+authorized recovery; it is not claimed as unattended availability acceptance.
+
+These source/signature/journal checks require fresh native source-poweroff,
+physical receiver retirement, safe owned guest resume and application acceptance.
+Component tests do not establish that operational result or open canonical160
+execution or production registration.
+
+### Historical maintenance replica transport (2026-11-02)
+
+The historical canonical backup context uses the existing maintenance capture,
+ordinary logical archive, executed local restore, migration-input sealing and
+`normal_backup_replica` verification. Its transport adapter keeps Node1 SSH
+credentials on the independent parent and leaves the KVM effect firewall intact.
+It cannot use the production backup namespace or substitute a physical archive
+for a logical one. Ordinary production replication keeps its original SSH/mount
+contract and schema gates.
+
+The immutable plan authenticates a root-private typed Node1 configuration with
+the historical enrollment, source guest/database/controller and target software,
+independent observer and receiver public keys, physical receiver/filesystem,
+bounded archive size and expiry. The actual installed controller, signed source
+context, measured isolation and current fenced authority are revalidated. The
+artifact report must identify the same filesystem. A new root-only nonce scope
+contains the exact archive and request; the parent must independently pin the
+frozen context/plan and pre/post backup scopes before signing and transferring.
+No caller PASS field or guest-supplied command, destination or SSH key is accepted.
+
+The independently root-enrolled Node1 test receiver checks the actual physical
+host/filesystem, parent signature, exact stage/plan/context, deadline and measured
+headroom before durably consuming the transfer. It verifies complete transported
+bytes, the shared normal backup checksums/inventory and canonical146→160
+maintenance manifest, original-role/object bindings, schema, controller and
+application identity. Both146 and160 are tied to their actual pre/post scopes.
+Accepted files are append-only under the exact owned test run. A receiver-key
+signature binds the exact request and received inventory. Receipt of bytes
+explicitly does not claim database or full-application restoration, SQL execution
+or deployment authority. The independent full application receipt remains required.
+
+The guest authenticates that receipt before the existing pipeline publishes its
+backup evidence; it rechecks local authority and policy and removes only its own
+verified bulk transfer copy. Failed or replayed transfers never overwrite prior
+evidence. Compact transfer journals are bounded; exhaustion refuses further runs
+until exact-owned retirement. Parent orchestration, physical receiver acceptance
+and the complete canonical operation still require native testing. Source/archive
+tests do not establish schema160 acceptance or production authorization.
+
+The existing owned KVM helper now provides a bounded control loop in the original
+supervisor process. Before source poweroff it pins the actual root hold observed
+over the original guest's pinned SSH link, under the source controller's normal
+locks and stopped-actor checks. A fresh receiver signature for that exact hold is
+required before the same original `Popen` owner can consume a resume attempt and
+relaunch the same verified inactive disk. It does not create a new supervisor or
+extend the original three-hour lifetime. A fixed, private, nonce-consumed IPC
+channel accepts only pin/resume actions for that exact guest/run; malformed,
+foreign or replayed requests refuse and the supervisor's teardown still runs.
+
+After boot, the parent sends the retirement receipt to the existing installed
+root hold-release action. It does not remove the hold itself, bypass boot checks
+or issue deployment/migration authority. The application's recovery remains a
+separate existing controller operation. A failed or consumed resume never becomes
+a fresh attempt implicitly. Native physical-retirement and guest-resume testing
+remains required; modeled process/SSH tests are not that acceptance evidence.
+
+### Historical provider probe identities across reboot (2026-11-02)
+
+Fresh native testing recovered the historical application through two actual
+reboots with unchanged route inode/ownership, release/worker/manifest receipts,
+provider IDs/specifications and original data fingerprints. Subsequent origin
+readmission nevertheless refused: the old probe file pinned transient Docker
+addresses which had changed during restart. The refusal and unchanged-source
+diagnosis remain in the run's evidence; the run did not execute canonical SQL.
+
+Explicit version2 historical probe inputs bind each fixed Auth, PostgREST and
+Storage provider by container ID, immutable image, measured Docker specification
+and native network ID. Before sending any credentials, the observer verifies
+those bindings against both the actual running provider and independently
+enrolled runtime scope. It resolves the current private IPv4 address only from
+that authenticated native network and uses code-owned provider ports. Caller
+URLs, public/loopback/invalid addresses, substituted actors/images/configurations,
+foreign networks and unknown versions refuse. Legacy endpoint files retain their
+strict old address contract and cannot silently gain the new capability.
+
+The root-private probe input is still hashed into the signed historical origin
+observation. Existing consumed enrollment is not rewritten to select a new probe
+contract or controller. Fresh controller/enrollment and native readmission after
+repeated reboot are required before canonical admission can use this correction.
+Clean QEMU shutdown may remove its PID file. The original supervisor accepts
+that absence only after observing its original child exit, the old PID disappear,
+and the exact owned disk, guest, filesystem scope and unextended run deadline.
+A surviving PID file must remain private, regular, singly linked, owned by the
+test user and contain the original PID. Symlink or PID substitution refuses.
+Disk reference checks and fresh positive guest identity still precede recovery.
+
+Historical immutable package preparation measures the customer baseline through
+`historical_preparation_baseline`. This root-only read observer requires genuine
+historical enrollment and the exact live schema146 database, and shares the SQL
+and identity checks used by execution. It does not register a provisional
+operation merely to calculate its future plan digest. Ordinary execution, boot
+and migration snapshot entrypoints retain their strict registered-profile gate.
+
+Release state remains operator-owned mutable data: the preparation reader uses
+the existing private configuration reader and then requires independent historical
+enrollment attestation. Root-only receipt and signing-key trust rules do not change.
+Native acceptance caught this distinction; changing state ownership is not a fix.
+
+Real native observations confirmed successful Auth/MFA verification changes
+`auth.users` and `auth.mfa_factors` fingerprints. Historical preparation now
+uses the same explicit probe-timestamp exclusions as historical enrollment:
+users' sign-in/update times, factors' challenge/update times, and objects'
+access/update times. Password/MFA material, ownership, all other original columns
+and all public business records remain hashed; schema/roles/ACLs remain bound.
+The plan also binds the names of those excluded preparation columns. Existing
+SQL-execution snapshots remain exact across every original column after writer
+fencing; they cannot opt into preparation normalization through their public API.
+
+Historical operator exclusion now distinguishes its ordinary named PostgreSQL
+volume from a Docker data-directory bind. The pure inventory permits only the
+fixed historical operator-volume spelling, local driver, canonical mountpoint and
+PGDATA destination to reach independent proof verification. Generic inventories,
+direct binds and unknown names/drivers/destinations retain refusal. Root observes
+the actual named volume's driver, empty options, realm/operator labels and every
+container reference, then binds that observation into the existing authenticated
+operator scope. Shared, foreign or bind-driver volumes refuse. No volume-name
+allowlist by itself authenticates an exclusion or authorizes a release.
+
+
+### Historical boot prerequisite ordering (2026-11-03)
+
+The existing isolated recovery installer now recognizes a genuine unsigned
+schema146 bootstrap and installs its existing fence/recovery units before origin
+inventory signing. An independent v1 recovery policy is required first. The
+installer records a protected scope and attempt intent in the existing automatic
+recovery journal, enables the unchanged units, starts and verifies the exact
+network barrier, and accepts a ready receipt only after rechecking source, live
+database, filesystem, controller and policy. It starts no application or worker
+and issues no deployment/migration authority.
+
+Historical request creation and enrollment both require that ready journal and
+actual unchanged units. Missing, failed or interrupted construction refuses
+before signing/consumption. Signed requests or enrolled origins cannot be
+retroactively modified by reinstalling prerequisites. A retry before signing
+must retain the same scope and preserves earlier attempt/failure records; an
+unknown unit or tampered firewall is never silently repaired. Historical v2
+known-good sealing follows enrollment without changing its signed boot preimage
+or extending the original policy lifetime. Ordinary completed-release recovery
+installation retains its existing pathway. Real reboot remains a separate
+operational acceptance requirement.
+
+First installation creates and syncs the existing automatic-recovery parent
+before its historical prerequisite journal. A missing parent must be handled
+by that ordered protected creation, never by an unchecked recursive mkdir.
+
+The canonical independent-recovery adapter distinguishes the native historical
+full-business receipt from modern schema160 acceptance. It authenticates the
+existing receiver packet unchanged and matches every original subject/factor and
+private-object hash to the signed source enrollment. It does not synthesize new
+receipt fields or claim protocol2 notification delivery on146. An independent
+restore is not release approval or a protected upgrade completion. After an
+intentional restoration hold, restart through the existing recovery systemd
+service so successful recovery also restores its recorded inactive unit state.
+
+Original supervisor capture and fencing distinguish native systemd service and
+timer properties. Services require an observed live MainPID and zero ControlPID;
+completed oneshots may retain a historical ExecMainPID. Timers expose no PID
+properties and retain strict pending-job and inactive/dead fencing checks. Every
+signed timer stays in the original universe; no missing service PID defaults to
+zero and no unit is omitted to satisfy preparation.
+
+The isolated policy v2 physical-restoration acceptance budget is independent of
+the short-lived release-observation budget (see production-release-policy.md).
+The actual9e rehearsal obtained genuine AAL2 exact approval but execution refused
+`automatic_physical_recovery_stale` before consumption/effects: review plus repeat
+technical checks outlasted the600-second observation budget. The old signed
+receipt/approval are retained unchanged. No existing policy is widened in place;
+a new independently enrolled policy/source, fresh restoration and new approval
+must establish the longer explicitly bounded physical-acceptance contract.
+
+Canonical historical consumption runs the complete existing preflight through
+the independently measured driver with both actual deployment locks held. The
+consumption verifier owns that scan; duplicate scans before it are omitted only
+on this exact historical path. No authority or maintenance effect occurs before
+the full locked technical revalidation passes. Ordinary maintenance keeps its
+previous order. Approval issuance rechecks current operator/session, independent
+policy/key and request/admission expiry after technical review, then records its
+actual issue time. Existing approvals are never extended; request/approval caps
+remain600/300 seconds. Expiry, changed identity/policy or failed gates refuse.
+
+Boot supersession can precede controller installation when the independently
+measured origin controller is already the exact target revision. The boot source
+guard accepts that pre-installation state only when controller SHA, original
+measured tree, target tree, checkout, immutable package, configuration and durable
+operation authorization all match. It creates no installation intent. A changed
+controller, an existing malformed intent, or advanced candidate/migration state
+without the real intent still refuses. The current consumed native attempt
+stopped at this missing-future-intent boundary before SQL; its approval remains
+consumed/RECOVERY_REQUIRED and cannot authorize the corrected source.
+
+Installed operational helper verification uses the shared filesystem-installation contract, cross-checked against the existing installer array. The protected package producer and continuation scripts remain in PROTECTED_PATHS and immutable package verification; they are not backup-helper aliases and are not installed into /usr/local/lib/madar. Both real copies of every declared operational helper still require root ownership, mode0755, regular non-symlink files and identical bytes. Native95f363a7 passed boot supersession then exposed this contract mismatch before migration; its consumed authority remains recovery-required and is never reused for this correction.
+
+The provider adapter treats only the fixed root-owned upgrade interlock as the issuer's public, non-writable SHA/digest document (mode0644). The separate bearer credential remains private and is verified first, including exact operation/schema/context, rehearsal and canonical lease; both live coordinator locks remain required. Provider inventory, journals and receipts keep their private0600 contract. Unknown readable files, altered ownership, writable paths, symlinks, oversized input and missing/forged credentials refuse. Native64e66a4d passed boot/controller installation and inventory publication, then exposed this public-versus-private role mismatch before original account acceptance or SQL. Its consumed approval is retained and cannot authorize the corrected source.
+
+### Provider maintenance boot overlay (2026-11-03)
+
+The installed boot verifier recognizes only the current protected provider
+maintenance journal's exact context-scoped barrier drop-ins. The existing
+Root-private inventory, journal hash chain, lifecycle sequence and barrier's
+binding/preimage digest remain mandatory. Both pending post-effect and completed
+arm intents are observable: the provider must run its source guard after effects
+before it can publish completion. A missing partial installation, changed file,
+unknown physical/effective drop-in, foreign binding or lost barrier refuses.
+Authorized clear intent/completion retains the exact drop-ins without requiring
+the deleted barrier. No signed original inventory or boot receipt is rewritten,
+no effect is performed by verification, and an interrupted intent still requires
+the existing lifecycle reconciliation rather than replay. Component acceptance
+does not establish a protected schema160 completion.
+
+### Inactive provider supervisor condition observation (2026-11-03)
+
+Native128fc854 passed the boot-overlay guard but the following provider barrier
+verification refused `command_failed:busctl`: Manager.GetUnit returns no object
+for unloaded idle services/timers. The verifier now derives the exact systemd
+D-Bus object path only from a validated authenticated Madar supervisor name and
+reads its typed Conditions property directly. systemd resolves that unit's
+configuration within the property request, avoiding an unloaded-unit lookup and
+the two-call collection race. This starts no unit, creates no job/reference and
+changes no enablement. Exact original fragment/drop-in hashes and effective
+DropInPaths are still required before the strict negative, non-trigger barrier
+condition tuple. Unknown names/paths, wrong types, positive/trigger conditions,
+wrong barriers and missing physical/effective controls still refuse. No consumed
+authority is reused; complete corrected-source native acceptance remains required.
+
+Primary API/implementation references:
+https://www.freedesktop.org/software/systemd/man/255/org.freedesktop.systemd1.html
+https://github.com/systemd/systemd/blob/v255/src/core/dbus.c
+https://github.com/systemd/systemd/blob/v255/src/basic/bus-label.c
+
+### Sealed database endpoint for fenced backup children (2026-11-03)
+
+Native51ee6019 completed all original-provider fencing and quiescence, then the
+mandatory pre-migration dump child failed before SQL. The maintenance branch
+invokes the existing ordinary dump helper directly, without scheduled()'s
+libpq projection. It passed the protected descriptor but omitted PGHOSTADDR,
+leaving PGHOST=supabase-db to host DNS. The real restricted child reproduced
+`could not translate host name`; the same READ ONLY query with the observed
+bound address reached the exact source cluster as supabase_admin. No dump or
+consumed operation was retried.
+
+The shared capture dispatcher now supplies PGHOSTADDR from the same newly
+created root-observed sealed descriptor before either capture branch. A caller
+PGHOSTADDR cannot replace it. Original PGHOST/role validation, empty supplementary
+groups, no-new-privileges, read-only database options, inherited sealed FD and
+post-capture database/address reobservation remain required. This does not alter
+backup format, credentials, grants, retention, replication or SQL authority.
+Corrected-source full protected acceptance is still required.
+
+
+The disposable historical constructor now lives in the existing integration
+tooling at `web/staging/integration/running146_origin_lifecycle.py`. It observes
+the guest identity and effect fence, reads construction inputs, then permanently
+drops to the real madar UID before calling the existing release lifecycle. It
+refuses preexisting or partially constructed state rather than reowning it.
+`historical_operator_state_native.py` exercises real UID and filesystem boundaries
+in an exact-owned synthetic directory, including interruption and process restart;
+it does not claim systemd-credential, VM-reboot or protected-upgrade acceptance.
+
+### Historical worker lookup (2026-11-04)
+
+The release child's existing worker ownership observer uses the exact original
+runtime IDs from the independently enrolled historical projection. Both current
+root-issued witnesses must agree, and the historical witness still verifies the
+successor/source/database binding and fresh child authority. Historical actors
+have no completed-release context; no completion marker or old grant is created.
+Modern origins retain the exact completion-context check. Worker states, original
+fencing, generation transfer and candidate authority checks remain unchanged.
+This correction addresses a deterministic post-SQL handoff failure found before
+approval issuance in the cd1ac417 rehearsal; it is not operational acceptance.
+
+### Isolated canonical candidate image preparation
+
+An authenticated CI archive is not proof of Docker image availability. The existing
+package entrypoint's `prepare-isolated-images` action imports hash-verified archive
+members into an independently enrolled disposable guest before approval. It takes
+the existing deployment lock, verifies the measured package, controller, exact
+GitHub artifact and isolated registration, and refuses an already started admission
+or conflicting image tag. It creates no container, approval or SQL authority.
+The canonical preflight reobserves the actual CI image names, immutable IDs, source
+labels, build timestamp and frontend API origin before single-use consumption.
+The child uses the producer's `madar-schema148-{role}:{sha}` names and independently
+checks the accepted IDs; it never rebuilds or retags missing accepted artifacts.
+Interrupted imports require reobservation under a still-valid preparation scope;
+a consumed failed operation cannot use this action to retry execution. Production
+image preparation remains outside this isolated-only action.
+
+The prepared record retains the verified CI tag/ID association. Compose receives
+the exact admitted local OCI image IDs for canonical candidates: a loaded local
+manifest ID is not a registry RepoDigest, so `tag@ID` must not be sent to Docker
+as if it were a registry-qualified reference. No tag mutation or digest relabeling
+is permitted. The existing tag/ID reobservation still runs before creation.
+
+### Canonical private gateway application contract (2026-11-05)
+
+The v3 application grant binds the canonical160 provider URL to the first sixteen
+characters of the root-verified context digest and a blue/green gateway name,
+matching the existing resource allocator. The controller independently attests
+which slot and immutable gateway actually own that context. The backend still
+requires the fixed `madar-supabase-client` network, exact schema bounds, controller
+and manifest bindings, and the root-owned read-only authority mount. A v3 grant
+cannot select the old public gateway, another context, an arbitrary port or host.
+Other grant versions retain their existing endpoint contract. Read-only request,
+provider and worker fences remain active until the real authority transition.
+
+This fixes application startup validation, not a failed operation in place. Frozen
+candidate images and consumed approvals remain immutable; a changed application
+requires newly authenticated image artifacts and independently scoped acceptance.
+
+The canonical controller overlay must also export the fixed client-network
+identifier to every grant-bearing container. Attaching a Compose network or
+setting a variable in the interpolation process does not place that variable in
+the container environment. The historical env file legitimately lacks it.
+Preapproval now checks the actual `docker compose config` model for the exact
+private URL and client-network declaration on backend and all three business
+workers. Runtime and provider inventory revalidation enforce the same contract.
+Missing or substituted declarations refuse before approval, and again before
+activation; no application guard is weakened. Native Compose regression uses a
+historical env file without this key, not a hand-filled container environment.
+
+
+Private handoff and final public route checks interpret an omitted
+`schema_excluded_versions` as the application's existing empty-exclusion response,
+matching ordinary completed compatibility validation. Explicit null, malformed
+values and nonempty exclusions still refuse; source, slot, exact schema bounds,
+recovery mode, readiness, authority and runtime seals remain mandatory. This
+corrects the actual post-SQL `schema150_private_handoff_serving_identity_changed`
+refusal after canonical160 private acceptance. It does not authorize continuation
+of the consumed operation or establish full protected completion. Regression
+executes the actual pure application version-response function against both
+consumers; modeled transports remain component evidence, not operational PASS.
+
+### Disposable canonical acceptance lifetime
+
+The canonical rehearsal must reserve its full bounded execution, preserved
+business verification, target reboot and retirement budget before requesting
+single-use approval. `web/staging/integration/canonical_acceptance_window.py`
+checks the observed frozen registration and the existing three-hour supervisor
+limit, then runs the existing privileged-operation, business and reboot scripts
+consecutively. It neither authenticates nor renews authority: installed-controller
+policy and effect-boundary checks remain mandatory. An expired isolated policy
+still refuses boot. Preserve the completed operation separately from that failed
+availability test, retire its owned resources, and obtain fresh evidence in a new
+scope; never extend expired registration or replay consumed approval.
+
+For an independently enrolled historical origin whose canonical upgrade has a
+verified NORMAL completion, the existing boot actor must explicitly restore the
+pinned native providers: database first, then Auth, REST, storage and the native
+gateway. It verifies the complete admitted container inventory, the candidate
+publication and exclusive worker owner before starting anything. Missing
+completion, changed actors/networks, active original writers, or early ingress
+refuse. After database health, it observes the actual system/schema and verifies
+the committed migration boundary before starting any other provider. It does
+not replay role restoration or migration effects. The existing compatible boot
+kernel starts the sealed private candidate gateway before backend and workers.
+These changes require fresh real guest reboot acceptance; component tests alone
+do not establish unattended availability.
+The cold database boundary also observes delivery, outbox and deletion protocols
+through read-only SQL and requires the existing exact target protocol contract
+before starting the remaining providers. A matching schema number alone is not
+sufficient; missing, malformed or incompatible capabilities remain fenced.
+
+Readiness follows the preserved provider's actual contract. PostgreSQL and Auth
+retain their required Docker health observations. REST, storage and the native
+gateway may have no Docker healthcheck; after exact inventory/network validation,
+the actor probes their fixed private HTTP interfaces instead. REST must answer
+its root endpoint, storage its status endpoint, and the gateway all three fixed
+Auth/REST/storage routes. Freshly observed RFC1918 addresses on the enrolled
+native bridge are required; no caller URL, credential, redirect or ambient proxy
+is accepted. Temporary transport failures retry only within the existing boot
+deadline. A running container alone never establishes readiness. These probes
+do not replace final authenticated application and worker acceptance.
+
+The parent acceptance window also bounds the nested request/execution transport.
+The request has2500 seconds inside its2700-second parent phase; before invoking
+`approved-execute`, preparation and MFA elapsed time is subtracted,60 seconds
+remain reserved for completion observation, and at least2100 execution seconds
+must remain. Slow preparation refuses before consumption instead of resetting
+the clock. The parent retains200 seconds for journal capture/transport teardown.
+This replaces the inconsistent1600-second inner timeout that killed a real
+operation after NORMAL acceptance but before final completion. Such a killed
+operation is not completed and its authority cannot be reused. Its committed
+SQL, receipts and reboot fencing remain distinct evidence. No lifetime in a
+signed registration, approval, recovery receipt or supervisor is extended.
+
+The actual rehearsal request wrapper is source-controlled alongside this window
+and is copied from the frozen controller source into each fresh owned scope.
+Its remote installed-package adapter uses its own monotonic clock, not a clock
+value transmitted from Node2. The inner approved execution uses the remaining
+budget; the outer SSH request is2500 seconds, phase2700, business600, reboot600,
+window overhead60, and retirement180 (4140 seconds minimum remaining lifetime).
+A missing native prerequisite refuses immediately; waiting for it is not hidden
+inside the approval window. Independent signed expiry checks remain at every
+controller boundary. The adapter runs once with exclusive private diagnostics
+and kills/reaps its owned process group on timeout, without replay or signalling
+independently managed application/systemd actors. Native harmless subprocess
+coverage establishes wrapper behavior, not migration or recovery acceptance.
+
+Fresh isolated enrollment selects the same2500-second execution-policy maximum
+from the immutable package. Existing1800-second enrollments are never rewritten
+or renewed. The wrapper reads the authenticated approval inspection and caps its
+local remaining time by the signed admission expiry, preserving60 seconds for
+final observation; less than2100 seconds refuses before consumption. Approval
+issuance/consumption still has its separate300-second validity and controller
+revalidation. A longer process timeout does not extend signed execution rights.
+
+The child adapter preserves stdout and stderr separately in exclusive private
+files. Diagnostic output cannot corrupt the controller's JSON completion stream;
+retaining diagnostics must not introduce a post-effect response-parsing failure.
+
+The isolated parent GitHub observer retries only the same fixed-host GET for
+allowlisted transient transport errors or HTTP429/500/502/503/504. At most three
+attempts fit within55 seconds and the original request/policy expiry, with a
+two-second delivery reserve. Each attempt revalidates scope and expiry; response
+signing still requires fresh valid JSON. Permanent/unknown errors, invalid
+responses and stale evidence refuse. Diagnostics retain only classification,
+attempt count, HTTP status and endpoint hash, never API stderr or credentials.
+This transport resilience neither retries a deployment nor reuses its approval.
+
+Historical proxy recovery preserves the independently admitted container identity.
+The root proxy gate still verifies the exact ID/image/spec, candidate state and
+route before startup. Its owned systemd drop-in resets the base Compose start/stop
+commands and starts/stops only the immutable proxy ID bound by the approved plan.
+This avoids recreating a historical proxy under a different Compose project after
+reboot. Missing/malformed binding or changed effective service commands refuse.
+Ordinary completed-origin unit behavior remains unchanged. Installation grants no
+new release authority and never starts a service; real reboot acceptance must
+verify the public route, not merely successful application boot-service exit.
+
+The reproducible `historical_proxy_boot_native.py` component exercises this
+project-mismatch boundary using a bounded network-none fixture, root pre-start
+identity guard and real User=madar transient service. It checks exact-ID startup,
+private HTTP readiness, exact-ID stop and owned retirement. It is component
+evidence, not preserved-upgrade or production authorization.
+
+## Finite canonical interruption acceptance
+
+Gate A fault acceptance uses four observed maintenance-controller boundaries:
+pre-migration backup before intent/SQL, target backup after independently
+verified canonical commits, accepted-worker startup after the child ownership
+transfer, and service adoption after ingress but before final completion.
+The same run must bind source, operation, process identity and database history.
+The bounded staging helper pins a process with pidfd, observes its stopped state,
+rechecks the durable boundary and only then interrupts that exact owned session.
+A missed/changed boundary refuses and resumes the stopped session; no arbitrary
+sleep selects a migration boundary. Private durable intent precedes signals.
+Native harmless-process tests establish targeting only, not upgrade safety.
+
+Historical maintenance recovery remains distinct from legacy READ_ONLY bridge
+resumption. Current boot requires genuine NORMAL completion before restoring
+historical providers; incomplete states fence. Existing SQL-only forward repair
+requires service_migrate_pending and a READ_ONLY runtime and is not proof of
+maintenance-first parent_migration_pending recovery. Full fault acceptance must
+exercise independently authorized recovery rather than label fencing as healthy
+availability or replay a consumed release approval. Accepted success receipts
+remain immutable and source-specific while this recovery coverage is completed.
+
+The fault helper's elapsed budget includes its independent observations and
+durable evidence writes. It rechecks both policy and time before stop/kill;
+an expired observation cannot authorize a late signal. If expiry occurs after
+stopping, the pinned live session is resumed without killing it. Native tests
+exercise slow observation and both intent-write boundaries. These constraints
+govern fault injection only and grant no recovery or deployment authority.
+The root-controlled fault plan also pins the adapter and helper file digests.
+Under isolated Python, the adapter explicitly loads that root-protected helper;
+ambient module lookup cannot substitute it. This plan is test targeting policy,
+not an approval or a continuation grant.
+
+## Independently approved maintenance finalization recovery
+
+The existing exceptional issuer supports an opt-in version3 canonical policy
+with exactly `recovery_actions: ["finalize-target160-v1"]`. Version1/2 policies
+retain their previous authority and cannot authorize this action. A fresh
+recovery request uses the same signed journals, deliberate AAL2 approval,
+revocation, expiry and consumption machinery. It binds the immutable parent
+request/approval/consumption/audit, exact source/context/database, provider
+journal, actual schema160, protected canonical migration history, worker owner,
+route, runtime inventory and current data fingerprint. Parent authority remains
+consumed and unchanged. Actual upgrade/deployment locks and fresh observations
+precede recovery consumption. A live parent, changed observation, ambiguous
+provider intent, partial SQL, wrong ownership or absent recovery policy refuses.
+
+The sealed continuation entrypoint exposes `recovery-prepare --request-id
+<PARENT>` and `recovery-execute --request-id <NEW-RECOVERY-REQUEST>`; ordinary
+approval inspect/approve/reject/revoke actions operate on the new request. The
+same explicit digest confirmation and protected token input apply. Recovery
+execution uses the existing root credential issuer and maintenance finalization
+routine. It cannot dispatch child prepare/activate/adopt, migration resumption,
+SQL or new worker/route transfer. Existing target services, private/public
+acceptance, current NORMAL grant and provider effects must actually verify
+before boot release, backup-timer restoration, genuine completion and known-good
+publication. It never manufactures historical completion or renews deployment
+approval. The fresh request has a separate execution deadline bounded by the
+independent environment, origin and recovery evidence; old expiry is not edited.
+
+This first adapter supports only the finite matrix's post-adoption/pre-final
+completion boundary. Pre-SQL return, committed-SQL forward activation and
+worker-handoff recovery remain unsupported engineering work. Safe fencing is
+not recovered availability. Source/component tests do not establish installed
+fault, recovered application, reboot or production acceptance. Extracting the
+shared finalization body affects the ordinary success tail, so its operational
+success/reboot acceptance must be repeated at the corrected source;938e2ace
+receipts remain specific to938e2ace.
+
+Recovery observations also bind any private credential left by the dead parent.
+Only fresh recovery consumption under both locks permits retirement of the exact
+matching ephemeral root credential. Changed bytes or a live parent refuse; the
+original signed approval, consumption and audit records remain immutable.
+
+The existing isolated runner can select the F04 ingress-finalization fault before
+enrollment. Its version3 policy requires a fresh genuine operator approval for
+recovery. The separately reserved 1800-second recovery window must fit inside
+existing environment and supervisor lifetimes; it does not extend the original
+2500-second deployment window or renew its authority. Native root-parent and
+User=madar LoadCredential tests verify transport and stale-lease refusal only,
+not application recovery. Installer closure includes the recovery module.
+
+A fresh recovery process restores its backup-timer context only from preimages
+that match both the immutable plan and the original durable interlock. It does
+not recapture stopped timers as their original state. The approved observation
+also binds the interlock bytes. Recovery failures retain the existing admitted
+operation's durable failure diagnostics and maintenance compensation.
+
+The first installed F04 attempt refused before approval because the old fresh
+physical-restoration producer capped evidence at5400 seconds, below the5940
+seconds reserved for F04 acceptance alone. New evidence now derives its expiry
+from the unchanged supervisor and independently observed origin deadlines,
+with an additional1800-second preparation reserve and a10800-second maximum.
+The source-controlled historical backup producer checks this before fencing or
+backup effects. Existing packets are never extended or rebound. Routine
+ninety-minute evidence retains its existing upper bound. A short remaining
+lifetime requires retirement and genuinely new scoped evidence.
+
+Fresh F04 environment and historical-origin enrollment now use that same
+original supervisor deadline. Their previous two-hour producer constants could
+not cover the required preparation and recovery window. Both existing producers
+are source-controlled, pass bounded epoch deadlines to the actual guest, and
+revalidate time there. Existing consumed origins cannot be repinned. Routine
+enrollment retains its two-hour cap. This applies only before new disposable
+enrollment; signed prior policies, enrollment receipts and consumed approvals
+are never extended. The installed verifier's four-hour maximum is unchanged.
+
+Maintenance finalization recovery observes the post-handoff environment through
+its installed canonical driver. The original isolated enrollment inventory is
+still mandatory for ordinary deployment admission; it is not rewritten when
+candidate actors are added. Recovery rechecks the enrolled host and effect
+fence, actual database identity, authenticated historical provider inventory,
+root-interlock-bound candidate stage, complete active actor set, network
+identities, database realm marker and local realm-owned volumes. Independent issuer configuration and fresh recovery approval remain
+mandatory. Approval dispatch authenticates the request before choosing this
+observer, and rechecks policy after technical observation. Historical policy
+expiry is validated against the same post-transition observer for recovery only.
+This does not authorize earlier partial-SQL or handoff states, and it does not
+turn reboot fencing into recovered service availability.

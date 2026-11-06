@@ -35,12 +35,16 @@ def fake_user_scope(user_id, request, response):
 
 class LargeDatasetProcessingTests(unittest.TestCase):
     def setUp(self):
+        from tests.account_schema_fixture import install_legacy_schema
+        install_legacy_schema(self)
         self.temp_dir = tempfile.TemporaryDirectory()
         self.root = Path(self.temp_dir.name).resolve()
         self.private_dir = self.root / "private_uploads"
         self.private_dir.mkdir()
 
         app = FastAPI()
+        from services.account_work_fence import AccountWorkFenceMiddleware
+        app.add_middleware(AccountWorkFenceMiddleware)
         app.include_router(data_routes.router)
         self.client = TestClient(app)
 

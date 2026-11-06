@@ -169,10 +169,19 @@ class RecoveryTransport(httpx.BaseTransport):
 def validate_configuration() -> None:
     from services.business_write_authority import read_authority
     authority = read_authority()
-    minimum = str(authority["compatible_min"]) if authority is not None and authority["version"] == 2 else "115"
-    maximum = str(authority["compatible_max"]) if authority is not None and authority["version"] == 2 else "115"
+    minimum = str(authority["compatible_min"]) if authority is not None and authority["version"] in {2, 3, 4} else "115"
+    maximum = str(authority["compatible_max"]) if authority is not None and authority["version"] in {2, 3, 4} else "115"
+    provider_urls = {"http://madar-supabase:8000"}
+    if authority is not None and authority["version"] == 3:
+        # The canonical160 controller seals a private gateway in the exact
+        # root-granted context. A caller-selected URL or schema range is not
+        # authority. Slot ownership and the gateway's actual network identity
+        # are independently attested by the controller before activation.
+        prefix = "madar-schema160-" + authority["contract_digest"][:16]
+        provider_urls = {f"http://{prefix}-{slot}-provider-gateway:8000"
+                         for slot in ("blue", "green")}
     if authority is not None and (
-            os.getenv("SUPABASE_URL") != "http://madar-supabase:8000" or
+            os.getenv("SUPABASE_URL") not in provider_urls or
             os.getenv("MADAR_SUPABASE_CLIENT_NETWORK") != "madar-supabase-client" or
             os.getenv("SCHEMA_COMPATIBLE_MIN") != minimum or
             os.getenv("SCHEMA_COMPATIBLE_MAX") != maximum):

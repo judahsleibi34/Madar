@@ -120,12 +120,65 @@ class ConcreteAdapterTests(unittest.TestCase):
                 actor,scope,stage,_,journal,grant,_,_=self.private_handoff_component(normal=normal,target=target)
                 result=actor.verify_private_handoff(normal=normal)
                 self.assertEqual(result['mode'],grant['mode'])
-                self.assertEqual(result['candidate_stage_sha256'],lifecycle.digest(stage))
-                self.assertEqual(result['provider_journal_sha256'],lifecycle.digest(journal.read()))
+                from deployment.lib.completed_normal_admission import digest as admission_digest
+                self.assertEqual(result['candidate_stage_sha256'],admission_digest(stage))
+                self.assertEqual(result['provider_journal_sha256'],admission_digest(journal.read()))
+                self.assertEqual(result['write_authority_sha256'],admission_digest(grant))
+                self.assertNotEqual(result['candidate_stage_sha256'],lifecycle.digest(stage))
                 self.assertFalse(result['workers_started']);self.assertFalse(result['ingress_restored'])
                 self.assertEqual(actor.runtime.denied.call_count,0 if normal else 2)
                 actor.runtime.command.assert_not_called()
                 self.assertFalse((actor.root/'normal-publication.json').exists())
+
+    def application_version_response(self, actor):
+        """Execute the actual pure application response producer; no HTTP fixture PASS."""
+        import ast, os
+        path=Path(__file__).resolve().parents[1]/'routes/health_routes.py'
+        tree=ast.parse(path.read_text())
+        function=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='version')
+        function.decorator_list=[]
+        namespace={'os':os}
+        with patch.dict(os.environ,{'MADAR_RELEASE_SHA':actor.binding['source_sha'],
+                'MADAR_RELEASE_SLOT':actor.contract['candidate']['slot'],
+                'SCHEMA_COMPATIBLE_MIN':str(actor.binding['source_schema']),
+                'SCHEMA_COMPATIBLE_MAX':str(actor.binding['target_schema']),
+                'SCHEMA_EXCLUDED_VERSIONS':''},clear=True):
+            exec(compile(ast.Module(body=[function],type_ignores=[]),str(path),'exec'),namespace)
+            return namespace['version']()
+
+    def test_private_handoff_accepts_actual_application_optional_exclusions_contract(self):
+        for target,normal in ((150,False),(150,True),(160,False),(160,True)):
+            with self.subTest(target=target,normal=normal):
+                actor,_,_,_,_,_,version,_=self.private_handoff_component(normal=normal,target=target)
+                version.clear();version.update(self.application_version_response(actor))
+                self.assertNotIn('schema_excluded_versions',version)
+                actor.verify_private_handoff(normal=normal)
+                actor.runtime.command.assert_not_called()
+
+    def test_private_handoff_refuses_explicit_invalid_or_nonempty_exclusions(self):
+        for value in (None,False,0,'',{},[142],[159],[160]):
+            with self.subTest(value=value):
+                actor,_,_,_,_,_,version,_=self.private_handoff_component()
+                version['schema_excluded_versions']=value
+                with self.assertRaisesRegex(RuntimeError,'serving_identity_changed'):
+                    actor.verify_private_handoff(normal=False)
+                actor.runtime.command.assert_not_called()
+
+    def test_public_target_accepts_actual_application_optional_exclusions_contract(self):
+        actor,_,_,_,_=self.route_component()
+        actor.public_version.clear();actor.public_version.update(self.application_version_response(actor))
+        self.assertNotIn('schema_excluded_versions',actor.public_version)
+        actor._public_target_round()
+        actor.runtime.command.assert_not_called()
+
+    def test_public_target_refuses_explicit_invalid_or_nonempty_exclusions(self):
+        for value in (None,False,0,'',{},[142],[159],[160]):
+            with self.subTest(value=value):
+                actor,_,_,_,_=self.route_component()
+                actor.public_version['schema_excluded_versions']=value
+                with self.assertRaisesRegex(RuntimeError,'public_target_not_accepted'):
+                    actor._public_target_round()
+                actor.runtime.command.assert_not_called()
 
     def test_private_handoff_rejects_pending_journal_missing_acceptance_and_started_consumer(self):
         for fault in ('pending','missing_private_acceptance','started_worker','role','session','protocol','object'):
@@ -165,9 +218,8 @@ class ConcreteAdapterTests(unittest.TestCase):
         stack.enter_context(patch.object(retained, 'require_root_directory', lambda path: None))
         (data, scope), rows = fixture(candidates=candidates)
         if target==160:
-            from deployment.lib.completed_normal_profile import RECONCILED
-            scope=dict(scope,operation=RECONCILED.operation,target_schema=160)
-            data,scope=repin(data,scope)
+            from test_schema160_private_parser import canonical_parser
+            data,scope=canonical_parser(data,scope,rows)
         actor = adapter.Schema150ProviderAdapter.__new__(adapter.Schema150ProviderAdapter)
         actor.binding, actor.inventory, actor.root = scope, data, root
         actor.original_inventory=data
@@ -223,14 +275,14 @@ class ConcreteAdapterTests(unittest.TestCase):
                     ('id','image','spec_sha256','networks')},'network_aliases':{
                         k:v.get('Aliases') or [] for k,v in next(r for r in observed
                             if r['Id']==data['containers']['candidate:'+role]['id'])['NetworkSettings']['Networks'].items()}}
-                    for role in inventory.APP_ROLES},
+                    for role in (k.split(':',1)[1] for k in data['containers'] if k.startswith('candidate:'))},
                 'networks':{},'worker_generation':'f'*64,'origin_workers':[]}
             (root/'candidate-staged-runtime.json').write_text(json.dumps(candidate_stage))
             stack.enter_context(patch('deployment.lib.completed_normal_admission.credential_witness',return_value=copy.deepcopy(candidate_stage)))
         return actor, scope, preimage, journal
 
-    def candidate_extension(self, *, phase='fenced'):
-        actor,scope,preimage,journal=self.component(stage='fenced',candidates=True)
+    def candidate_extension(self, *, phase='fenced', target=150):
+        actor,scope,preimage,journal=self.component(stage='fenced',candidates=True,target=target)
         stage_path=actor.root/'candidate-staged-runtime.json'
         stage=json.loads(stage_path.read_text())
         stage['preparation_mode']='created-fenced'
@@ -269,6 +321,42 @@ class ConcreteAdapterTests(unittest.TestCase):
         self.assertEqual(actor.inventory['containers'],identities)
         actor.verify_candidate_stage()
         actor.runtime.command.assert_not_called()
+
+    def test_canonical_created_stage_derives_private_parser_without_mutating_original_inventory(self):
+        actor,scope,stage,_,_=self.candidate_extension(phase='private',target=160)
+        original=copy.deepcopy(actor.original_inventory)
+        actor._attest('private')
+        self.assertTrue(actor.inventory['containers']['candidate:parser-worker']['states']['private']['running'])
+        self.assertEqual(actor.original_inventory,original)
+        self.assertEqual(inventory.inventory_digest(original),scope['inventory_sha256'])
+        actor.inventory=copy.deepcopy(original)
+        actor._attest('private')
+        self.assertEqual(actor.verify_candidate_stage(phase='private'),stage)
+        actor.runtime.command.assert_not_called()
+
+    def test_canonical_private_core_keeps_created_seals_after_native_start_defaults_change(self):
+        from deployment.lib.completed_normal_resources import measured_spec
+        actor,scope,_,_=self.component(stage='private',candidates=True,target=160)
+        path=actor.root/'candidate-staged-runtime.json';stage=json.loads(path.read_text())
+        stage['preparation_mode']='created-fenced'
+        for logical,record in actor.inventory['containers'].items():
+            if not logical.startswith('candidate:'):continue
+            role=logical.split(':',1)[1];stage['runtimes'][role]['name']=record['name']
+            row=next(r for r in actor._rows.return_value if r['Id']==record['id'])
+            row['HostConfig']['OomKillDisable']=False
+            record['spec_sha256']=stage['runtimes'][role]['spec_sha256']=measured_spec(row)
+            if row['State']['Running']:
+                row['State']['Status']='running';row['HostConfig']['OomKillDisable']=None
+        actor.inventory,actor.binding=repin(actor.inventory,scope)
+        actor.original_inventory=actor.inventory
+        path.write_text(json.dumps(stage))
+        with patch('deployment.lib.completed_normal_admission.credential_witness',return_value=stage):
+            actor._attest('private')
+            for role in ('redis','backend','frontend','parser-worker'):
+                row=next(r for r in actor._rows.return_value if r['Id']==stage['runtimes'][role]['id'])
+                row['HostConfig']['OomKillDisable']=True
+                with self.subTest(role=role),self.assertRaises(RuntimeError):actor._attest('private')
+                row['HostConfig']['OomKillDisable']=None
 
     def test_candidate_extension_rejects_missing_stale_or_unmarked_stage(self):
         for fault in ('missing','stale','unmarked'):
@@ -418,9 +506,23 @@ class ConcreteAdapterTests(unittest.TestCase):
             if 'pg_prepared_xacts' in body:return '0'
             raise AssertionError('Unexpected SQL')
         actor._sql=Mock(side_effect=query)
-        observed=actor.observe_private_boundary(scope)
+        with patch('deployment.lib.completed_normal_admission.require_candidate_authority',
+                return_value={'mode':'READ_ONLY'}) as grant:
+            observed=actor.observe_private_boundary(scope)
+        grant.assert_called_once_with(actor.contract,mode='READ_ONLY')
+        actor.activation_guard.assert_not_called()
         self.assertEqual(observed['unknown_writers'],1)
         self.assertEqual(observed['unknown_client_sessions'],0)
+
+    def test_private_boundary_cannot_replace_missing_root_grant_with_callback_flags(self):
+        actor,scope,_,_=self.component(stage='private')
+        actor._supervisors_stopped=Mock();actor._sessions=Mock(return_value=[])
+        actor.activation_guard.return_value={'target_write_authority':False,'candidate_read_only':True}
+        with patch('deployment.lib.completed_normal_admission.require_candidate_authority',
+                side_effect=RuntimeError('synthetic_missing_root_grant')):
+            with self.assertRaisesRegex(RuntimeError,'missing_root_grant'):
+                actor.observe_private_boundary(scope)
+        actor.activation_guard.assert_not_called()
 
 
     def test_default_fresh_credential_validator_refuses_before_transport(self):
@@ -648,7 +750,8 @@ class ConcreteAdapterTests(unittest.TestCase):
         actor._unit=Mock(return_value={'DropInPaths':str(dropin)})
         condition={'type':'a(sbbsi)','data':[['ConditionPathExists',False,True,str(actor.barrier),0]]}
         def response(command,**kwargs):
-            if 'GetUnit' in command:return json.dumps({'type':'o','data':['/org/freedesktop/systemd1/unit/synthetic_2eservice']})
+            self.assertEqual(command,['busctl','--json=short','get-property','org.freedesktop.systemd1',
+                '/org/freedesktop/systemd1/unit/madar_2dauto_2ddeploy_2eservice','org.freedesktop.systemd1.Unit','Conditions'])
             return json.dumps(condition)
         actor.runtime.command.side_effect=response
         with patch.object(adapter,'UNITS',units),patch.object(adapter,'protected',lambda path,**kwargs:Path(path)):
@@ -768,6 +871,31 @@ class ConcreteAdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'provider_start_failed'):actor.resume_providers_private(scope,preimage)
         self.assertEqual(actor.runtime.command.call_count,1)
 
+    def test_canonical_private_resume_starts_bounded_parser_before_backend_and_no_consumers(self):
+        actor,scope,preimage,_=self.component(stage='fenced',candidates=True,target=160)
+        actor._roles=Mock(return_value={});actor._expected_roles=Mock(return_value={})
+        by_id={r['Id']:r for r in actor._rows.return_value}
+        def start(arguments):
+            self.assertEqual(arguments[:2],['docker','start']);by_id[arguments[2]]['State']['Running']=True
+        actor.runtime.command.side_effect=start
+        actor.resume_providers_private(scope,preimage)
+        expected=['native:auth','native:rest','native:storage','candidate:redis','candidate:parser-worker','candidate:provider-gateway',
+            'candidate:backend','candidate:frontend']
+        self.assertEqual([c.args[0][2] for c in actor.runtime.command.call_args_list],
+            [actor.inventory['containers'][key]['id'] for key in expected])
+        actor._attest('private')
+        for role in inventory.consuming_worker_roles(scope):
+            self.assertFalse(by_id[actor.inventory['containers']['candidate:'+role]['id']]['State']['Running'])
+        self.assertFalse(by_id[actor.inventory['containers']['proxy']['id']]['State']['Running'])
+
+    def test_canonical_private_resume_refuses_credentialed_parser_before_any_provider_start(self):
+        actor,scope,preimage,_=self.component(stage='fenced',candidates=True,target=160)
+        row=next(r for r in actor._rows.return_value
+            if r['Id']==actor.inventory['containers']['candidate:parser-worker']['id'])
+        row['Config']['Env'].append('SUPABASE_SERVICE_KEY=synthetic-forbidden')
+        with self.assertRaises(RuntimeError):actor.resume_providers_private(scope,preimage)
+        actor.runtime.command.assert_not_called()
+
     def test_activation_starts_only_workers_then_supporting_native_actors_and_proxy_last(self):
         actor,scope,preimage,_=self.component(stage='private',candidates=True)
         actor.require_authority=Mock();actor.activation_guard.return_value={'target_write_authority':True}
@@ -883,6 +1011,26 @@ class ConcreteAdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'publication_changed'):actor.clear_boot_interlock(scope,preimage)
         self.assertTrue(actor.barrier.exists())
 
+    def test_public_acceptance_is_measured_without_unvalidated_callback_flag(self):
+        actor,scope,preimage,_,_=self.route_component()
+        # Full activation evidence has a strict lifecycle schema that contains
+        # neither public_acceptance nor candidate_read_only. These properties
+        # must come from actual route probes / protected authority instead.
+        actor.activation_guard.return_value={'target_write_authority':True}
+        actor.restore_ingress(scope,preimage)
+        self.assertIs(actor.verify_effect('restore_ingress',scope,preimage),True)
+        actor.barrier.write_text(json.dumps({'binding':scope,'preimage_sha256':lifecycle.digest(preimage)}))
+        actor.clear_boot_interlock(scope,preimage)
+        self.assertFalse(actor.barrier.exists())
+
+    def test_public_pass_flag_cannot_replace_failed_live_readiness(self):
+        actor,scope,preimage,_,_=self.route_component()
+        actor.restore_ingress(scope,preimage)
+        actor.runtime.json_http.side_effect=lambda url:(actor.public_version
+            if url.endswith('/health/version') else {'ready':False})
+        with self.assertRaises(RuntimeError):actor.clear_boot_interlock(scope,preimage)
+        self.assertTrue(actor.barrier.exists())
+
     def test_target_authority_alone_cannot_open_ingress_before_workers_are_running(self):
         actor,scope,preimage,_=self.component(stage='private',candidates=True)
         actor.require_authority=Mock();actor.activation_guard.return_value={'target_write_authority':True}
@@ -945,7 +1093,7 @@ class ConcreteAdapterTests(unittest.TestCase):
         actor._unit=Mock(return_value={'DropInPaths':str(dropin)})
         condition={'type':'a(sbbsi)','data':[]}
         def response(command,**kwargs):
-            if 'GetUnit' in command:return json.dumps({'type':'o','data':['/org/freedesktop/systemd1/unit/synthetic_2eservice']})
+            self.assertEqual(command[2],'get-property')
             return json.dumps(condition)
         actor.runtime.command.side_effect=response
         with patch.object(adapter,'UNITS',units),patch.object(adapter,'protected',lambda path,**kwargs:Path(path)):
@@ -1000,6 +1148,23 @@ class ConcreteAdapterTests(unittest.TestCase):
                 r['Config']['Env']=[key+'=postgresql://'+role+':synthetic-fixture-password@db:5432/postgres?sslmode=disable']
         return rows,database['Id']
 
+    def test_historical_control_network_never_becomes_provider_database_dns_authority(self):
+        rows,identifier=self.native_database_rows()
+        database=next(r for r in rows if r['Id']==identifier)
+        database['NetworkSettings']['Networks']['historical-control']={'NetworkID':'8'*64,'IPAddress':'10.8.0.2','Aliases':['control-db']}
+        with self.assertRaisesRegex(RuntimeError,'database_uri_scope_invalid'):
+            adapter.require_provider_database_bindings(rows,identifier)
+        enrolled={k:v['NetworkID'] for k,v in database['NetworkSettings']['Networks'].items()}
+        self.assertTrue(adapter.require_provider_database_bindings(rows,identifier,enrolled_database_networks=enrolled))
+        rest=next(r for r in rows if r['Name']=='/supabase-rest')
+        rest['Config']['Env']=['PGRST_DB_URI=postgresql://authenticator:synthetic@control-db:5432/postgres']
+        with self.assertRaisesRegex(RuntimeError,'database_uri_scope_invalid'):
+            adapter.require_provider_database_bindings(rows,identifier,enrolled_database_networks=enrolled)
+        rest['Config']['Env']=['PGRST_DB_URI=postgresql://authenticator:synthetic@db:5432/postgres']
+        database['NetworkSettings']['Networks']['historical-control']['NetworkID']='9'*64
+        with self.assertRaisesRegex(RuntimeError,'database_uri_scope_invalid'):
+            adapter.require_provider_database_bindings(rows,identifier,enrolled_database_networks=enrolled)
+
     def test_provider_database_uri_binds_exact_cluster_network_alias_role_and_database(self):
         rows,identifier=self.native_database_rows()
         self.assertIs(adapter.require_provider_database_bindings(rows,identifier),True)
@@ -1033,7 +1198,7 @@ class ConcreteAdapterTests(unittest.TestCase):
             with self.subTest(kind=kind),self.assertRaisesRegex(RuntimeError,'database_(uri_scope_invalid|binding_missing)'):
                 adapter.require_provider_database_bindings(bad,identifier)
 
-    def test_effective_bus_unit_and_conditions_malformed_types_fail_closed(self):
+    def test_effective_bus_path_namespace_and_conditions_malformed_types_fail_closed(self):
         actor,scope,preimage,_=self.component(stage='fenced');del actor._verify_barrier
         actor.inventory['supervisors']={'madar-auto-deploy.service':next(iter(actor.inventory['supervisors'].values()))}
         name='madar-auto-deploy.service';units=actor.root/'synthetic-systemd';units.mkdir()
@@ -1041,24 +1206,30 @@ class ConcreteAdapterTests(unittest.TestCase):
         dropin.write_text('[Unit]\nConditionPathExists=!'+str(actor.barrier)+'\n')
         actor.barrier.write_text(json.dumps({'binding':scope,'preimage_sha256':lifecycle.digest(preimage)}))
         actor._unit=Mock(return_value={'DropInPaths':str(dropin)})
-        valid_unit={'type':'o','data':['/org/freedesktop/systemd1/unit/synthetic_2eservice']}
         valid_conditions={'type':'a(sbbsi)','data':[['ConditionPathExists',False,True,str(actor.barrier),0]]}
-        state={'unit':valid_unit,'conditions':valid_conditions}
-        actor.runtime.command.side_effect=lambda command,**kwargs:json.dumps(state['unit'] if 'GetUnit' in command else state['conditions'])
+        state={'conditions':valid_conditions}
+        actor.runtime.command.side_effect=lambda command,**kwargs:json.dumps(state['conditions'])
         with patch.object(adapter,'UNITS',units),patch.object(adapter,'protected',lambda path,**kwargs:Path(path)):
             actor._verify_barrier()
-            for bad in (None,[],{'type':'s','data':valid_unit['data']},{'type':'o','data':[]},
-                        {'type':'o','data':[valid_unit['data'][0],valid_unit['data'][0]]},
-                        {'type':'o','data':['/org/freedesktop/systemd1/unit/../manager']},
-                        {'type':'o','data':[True]}):
-                state['unit']=bad
-                with self.subTest(unit=bad),self.assertRaisesRegex(RuntimeError,'effective_boot_unit_invalid'):actor._verify_barrier()
-            state['unit']=valid_unit
+            # No manager-returned object path can substitute a different unit.
+            # Only a validated, code-encoded authenticated inventory name enters
+            # the one typed property query, even if systemd unloaded it.
+            for bad in (None,[],{},True,'/org/freedesktop/systemd1/unit/../manager',
+                        'madar-test.service/../other','other.service','madar-test.socket',
+                        'madar-test.service\n','madar-test_2eservice','madar-ä.service'):
+                with self.subTest(unit=bad),self.assertRaisesRegex(RuntimeError,'effective_boot_unit_invalid'):
+                    adapter.supervisor_bus_path(bad)
             for bad in (None,[],{'type':'a(sbbsi)','data':True},{'type':'invalid','data':valid_conditions['data']},
                         {'type':'a(sbbsi)','data':[['ConditionPathExists',False,True,str(actor.barrier),True]]},
                         {'type':'a(sbbsi)','data':[['ConditionPathExists',False,True,str(actor.barrier)]]}):
                 state['conditions']=bad
                 with self.subTest(conditions=bad),self.assertRaisesRegex(RuntimeError,'effective_boot_condition_missing'):actor._verify_barrier()
+
+    def test_unit_bus_path_encoding_preserves_exact_service_timer_identity(self):
+        for name,encoded in [('madar-auto-deploy.service','madar_2dauto_2ddeploy_2eservice'),
+                ('madar-backup.timer','madar_2dbackup_2etimer'),
+                ('madar-compatible-normal-boot-a01b2c3d4e5f.service','madar_2dcompatible_2dnormal_2dboot_2da01b2c3d4e5f_2eservice')]:
+            self.assertEqual(adapter.supervisor_bus_path(name),'/org/freedesktop/systemd1/unit/'+encoded)
 
 
     def object_component(self):

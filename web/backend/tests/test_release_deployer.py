@@ -14,6 +14,56 @@ from deployment.lib.release_deployer import Compatibility, ReleaseDeployer
 SHA = "a" * 40
 
 
+class DeploymentLockPermissionsTests(unittest.TestCase):
+    def test_runtime_lock_preserves_inode_and_excludes_competing_process(self):
+        import subprocess
+        from deployment.lib.runtime_authority import runtime_mutation_lock
+        with tempfile.TemporaryDirectory() as root:
+            root=Path(root);path=root/'runtime-mutation.lock'
+            with runtime_mutation_lock(root):
+                identity=path.stat().st_ino
+                result=subprocess.run([sys.executable,'-c',
+                    "import fcntl,sys;f=open(sys.argv[1],'a+');"
+                    "fcntl.flock(f,fcntl.LOCK_EX|fcntl.LOCK_NB)",str(path)],capture_output=True)
+                self.assertNotEqual(result.returncode,0)
+            with runtime_mutation_lock(root):
+                self.assertEqual(path.stat().st_ino,identity)
+                self.assertEqual(path.stat().st_uid,root.stat().st_uid)
+                self.assertEqual(path.stat().st_mode&0o777,0o600)
+
+    def test_runtime_lock_refuses_unsafe_files_without_repairing_them(self):
+        from deployment.lib.runtime_authority import runtime_mutation_lock
+        with tempfile.TemporaryDirectory() as root:
+            root=Path(root);path=root/'runtime-mutation.lock';victim=root/'victim'
+            victim.write_text('preserve');victim.chmod(0o600);path.symlink_to(victim)
+            with self.assertRaises(OSError),runtime_mutation_lock(root):pass
+            path.unlink();os.link(victim,path)
+            with self.assertRaises(RuntimeError),runtime_mutation_lock(root):pass
+            path.unlink();path.write_text('private');path.chmod(0o644)
+            with self.assertRaises(RuntimeError),runtime_mutation_lock(root):pass
+            self.assertEqual(victim.read_text(),'preserve')
+            self.assertEqual(path.stat().st_mode&0o777,0o644)
+
+    def test_private_creation_under_permissive_operator_umask(self):
+        from deployment.lib.runtime_authority import open_deployment_lock
+        with tempfile.TemporaryDirectory() as root:
+            path=Path(root)/'deploy.lock';previous=os.umask(0o022)
+            try:
+                with open_deployment_lock(path):self.assertEqual(path.stat().st_mode&0o777,0o600)
+            finally:os.umask(previous)
+
+    def test_unsafe_existing_file_symlink_or_shared_inode_refuses(self):
+        from deployment.lib.runtime_authority import open_deployment_lock
+        with tempfile.TemporaryDirectory() as root:
+            root=Path(root);victim=root/'victim';victim.write_text('preserve');victim.chmod(0o600)
+            symbolic=root/'symbolic';symbolic.symlink_to(victim)
+            shared=root/'shared';os.link(victim,shared)
+            unsafe=root/'unsafe';unsafe.write_text('preserve');unsafe.chmod(0o644)
+            for path in (symbolic,shared,unsafe):
+                with self.subTest(path=path),self.assertRaises((OSError,RuntimeError)):open_deployment_lock(path)
+            self.assertEqual(victim.read_text(),'preserve');self.assertEqual(unsafe.read_text(),'preserve')
+
+
 class FakeOperations:
     def __init__(self, fail_at=None, schema=82):
         self.fail_at = fail_at
@@ -185,9 +235,15 @@ class ReleaseDeployerTests(unittest.TestCase):
             operations = FakeOperations(fail_at="activate_workers")
             with self.assertRaisesRegex(RuntimeError, "injected_activate_workers_failure"):
                 self.deployer(root, operations).deploy("b" * 40)
+            from deployment.lib.runtime_authority import load_worker_authority
+            state=json.loads((Path(root)/"state.json").read_text())
+            authority=load_worker_authority(Path(root))
         self.assertFalse(any(call[0] == "switch_traffic" for call in operations.calls))
         self.assertIn(("deactivate_workers", "green"), operations.calls)
         self.assertIn(("restore_workers", "green"), operations.calls)
+
+        self.assertEqual(state["known_good_release"]["worker_generation"],authority["generation"])
+        self.assertNotEqual(state["history"][-1]["previous_known_good_release"]["worker_generation"],authority["generation"])
 
     def test_db_redis_worker_storage_and_frontend_faults_are_preflight_or_validation_failures(self):
         # The operations layer maps these dependency injections into one of the
@@ -253,3 +309,34 @@ class ReleaseDeployerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class SelectedMigrationLifecycleTests(unittest.TestCase):
+    def test_sql_is_between_preflight_and_candidate_and_target_is_recorded(self):
+        class Operations(FakeOperations):
+            def apply_selected_migrations(self,sha):
+                self._call('selected_migration',sha);self.schema=83
+                return {'execution':{'status':'completed','observed_schema':83}}
+        with tempfile.TemporaryDirectory() as directory:
+            ops=Operations(schema=82)
+            result=ReleaseDeployer(state_root=Path(directory),compatibility=Compatibility(81,83,83,'expand-only',81,83),operations=ops).deploy(SHA)
+            names=[c[0] for c in ops.calls]
+            self.assertLess(names.index('preflight'),names.index('selected_migration'))
+            self.assertLess(names.index('selected_migration'),names.index('start_candidate'))
+            self.assertEqual(result['schema']['observed'],83)
+            self.assertEqual(result['migration']['execution']['observed_schema'],83)
+            self.assertEqual(json.loads((Path(directory)/'state.json').read_text())['known_good_release']['schema'],83)
+    def test_failed_sql_never_starts_or_promotes_candidate(self):
+        class Operations(FakeOperations):
+            def apply_selected_migrations(self,sha):raise RuntimeError('native_sql_failed')
+        with tempfile.TemporaryDirectory() as directory:
+            ops=Operations()
+            with self.assertRaisesRegex(RuntimeError,'native_sql_failed'):
+                ReleaseDeployer(state_root=Path(directory),compatibility=Compatibility(81,83,83,'expand-only',81,83),operations=ops).deploy(SHA)
+            self.assertFalse(any(c[0] in {'start_candidate','activate_workers','switch_traffic'} for c in ops.calls))
+    def test_empty_selected_plan_preserves_application_only_deployment(self):
+        class Operations(FakeOperations):
+            def apply_selected_migrations(self,sha):return None
+        with tempfile.TemporaryDirectory() as directory:
+            ops=Operations()
+            result=ReleaseDeployer(state_root=Path(directory),compatibility=Compatibility(81,82,82,'none',81,82),operations=ops).deploy(SHA)
+            self.assertEqual(result['status'],'known_good');self.assertNotIn('migration',result)

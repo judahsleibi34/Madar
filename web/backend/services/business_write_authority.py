@@ -31,8 +31,32 @@ def read_authority() -> dict | None:
     fields = {"version", "schema", "release_sha", "contract_digest", "mode"}
     version = value.get("version")
     minimum, maximum = 115, 115
-    if type(version) is not int or version not in {1, 2, 3}:
+    if type(version) is not int or version not in {1, 2, 3, 4}:
         raise RuntimeError("business_write_authority_binding_invalid")
+    if version == 4:
+        fields |= {'compatible_min','compatible_max','operation','operation_id','attempt_id',
+                   'controller_sha','database_system_identifier','plan_sha256','target_schema'}
+        import uuid
+        try:attempt_valid=str(uuid.UUID(value.get('attempt_id','')))==value['attempt_id']
+        except (ValueError,TypeError,KeyError,AttributeError):attempt_valid=False
+        if (value.get('operation')!='policy-governed-automatic-release' or not attempt_valid
+                or not re.fullmatch('migration-plan-[a-f0-9]{64}',str(value.get('operation_id')))
+                or not re.fullmatch('[a-f0-9]{40}',str(value.get('controller_sha')))
+                or value['controller_sha']!=os.getenv('MADAR_RELEASE_CONTROLLER_SHA')
+                or not re.fullmatch('[1-9][0-9]{0,31}',str(value.get('database_system_identifier')))
+                or value['database_system_identifier']!=os.getenv('MADAR_RELEASE_DATABASE_SYSTEM_IDENTIFIER')
+                or not re.fullmatch('[a-f0-9]{64}',str(value.get('plan_sha256')))
+                or any(type(value.get(k)) is not int for k in ('compatible_min','compatible_max','target_schema'))
+                or not 0<value['compatible_min']<=value['target_schema']<=value['compatible_max']<10**9
+                or os.getenv('SCHEMA_COMPATIBLE_MIN')!=str(value['compatible_min'])
+                or os.getenv('SCHEMA_COMPATIBLE_MAX')!=str(value['compatible_max'])
+                or os.getenv('SCHEMA_EXCLUDED_VERSIONS','')!=''
+                or value.get('mode')=='NORMAL' and value.get('schema')!=value['target_schema']):
+            raise RuntimeError('business_write_authority_binding_invalid')
+        # These bounds belong to the independently verified actual image. No
+        # historical160 contract is widened. Root may refresh exact-operation
+        # metadata for a still-compatible serving process through its RO mount.
+        minimum,maximum=value['compatible_min'],value['compatible_max']
     if version == 3:
         # A distinct exact operation; historical v2 ranges are never widened.
         fields |= {'compatible_min','compatible_max','operation','origin_schema',

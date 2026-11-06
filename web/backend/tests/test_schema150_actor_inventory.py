@@ -319,3 +319,93 @@ class ActorInventoryTests(unittest.TestCase):
         for mutate in mutations:
             bad = copy.deepcopy(data); mutate(bad); bad, scope = repin(bad)
             with self.assertRaises(RuntimeError): inventory.validate_inventory(bad, scope)
+
+
+class HistoricalOperatorVolumeSyntaxTests(unittest.TestCase):
+    def test_only_historical_operator_named_data_volume_can_reach_independent_proof_check(self):
+        name='madar-operator-12345678-123-database'
+        actual=row('f'*64,'operator-database')
+        actual['Mounts']=[{'Type':'volume','Name':name,'Driver':'local',
+            'Source':'/var/lib/docker/volumes/'+name+'/_data','Destination':'/var/lib/postgresql/data','RW':True}]
+        (data,scope),rows=historical_fixture()
+        data['exclusions'][actual['Id']]={'image':actual['Image'],'spec_sha256':measured_spec(actual),'proof_sha256':'a'*64}
+        data,scope=repin(data,scope)
+        inventory.attest_containers(data,rows+[actual],phase='prepared',binding=scope)
+        # This pure observation does not verify the root enrollment proof.
+        # Nonhistorical data and direct/foreign engine mounts remain blocked.
+        (ordinary,ordinary_scope),ordinary_rows=fixture()
+        ordinary['exclusions'][actual['Id']]={'image':actual['Image'],'spec_sha256':measured_spec(actual),'proof_sha256':'a'*64}
+        ordinary,ordinary_scope=repin(ordinary,ordinary_scope)
+        with self.assertRaisesRegex(RuntimeError,'host_authority'):
+            inventory.attest_containers(ordinary,ordinary_rows+[actual],phase='prepared',binding=ordinary_scope)
+        for change in ({'Type':'bind'},{'Driver':'nfs'},{'Name':'unrelated-volume'},
+                {'Source':'/var/lib/docker'},{'Destination':'/run/docker.sock'}):
+            changed=copy.deepcopy(actual);changed['Mounts'][0].update(change)
+            edited=copy.deepcopy(data);edited['exclusions'][actual['Id']]['spec_sha256']=measured_spec(changed)
+            edited,bound=repin(edited,scope)
+            with self.subTest(change=change),self.assertRaisesRegex(RuntimeError,'host_authority'):
+                inventory.attest_containers(edited,rows+[changed],phase='prepared',binding=bound)
+
+
+def historical_fixture():
+    (data,_),rows=fixture()
+    from deployment.lib.completed_normal_profile import RECONCILED
+    from deployment.lib.historical_origin import KIND
+    scope=dict(binding(),operation=RECONCILED.operation,target_schema=160)
+    source={'origin_kind':KIND,'enrollment_root':'/var/lib/madar-control-plane/automatic-release/historical-origins/test',
+        'enrollment_sha256':'8'*64,'application_sha':'9'*40,'controller_sha':'c'*40,'schema':146,
+        'successor_intent_sha256':'a'*64}
+    data['version']=2;data['historical_origin']=source
+    data['containers']={k:v for k,v in data['containers'].items() if k in inventory.HISTORICAL_CORE}
+    ids={r['id'] for r in data['containers'].values()};rows=[r for r in rows if r['Id'] in ids]
+    for index,role in enumerate(inventory.APP_ROLES,50):
+        actual=row(f'{index:064x}','madar-green-'+role,running=True,source=None if role=='redis' else source['application_sha'])
+        networks={inventory.CLIENT_NETWORK:'2'*64} if role in inventory.CLIENT_APP_ROLES else {}
+        actual['NetworkSettings']['Networks']={k:{'NetworkID':v,'EndpointID':'','IPAddress':''} for k,v in networks.items()}
+        data['containers']['origin:'+role]={'name':actual['Name'][1:],'id':actual['Id'],'image':actual['Image'],
+            'generation':'origin','source_sha':source['application_sha'],'spec_sha256':measured_spec(actual),
+            'mounts':[],'networks':networks,'states':{p:{'running':p=='prepared','restarting':False,'restart':'no'} for p in inventory.PHASES}}
+        rows.append(actual)
+    data['supervisors']={k:v for k,v in data['supervisors'].items() if k=='madar-release-proxy.service'}
+    return repin(data,scope),rows
+
+
+class HistoricalActorInventoryTests(unittest.TestCase):
+    def test_exact_historical_topology_requires_no_invented_inactive_slots(self):
+        (data,scope),rows=historical_fixture()
+        inventory.validate_inventory(data,scope)
+        for phase in inventory.PHASES:
+            inventory.attest_containers(data,phase_rows(data,rows,phase),phase=phase,binding=scope)
+
+    def test_historical_shape_cannot_widen_an_ordinary_operation(self):
+        (data,scope),_=historical_fixture()
+        for changed in (dict(scope,operation=binding()['operation']),None):
+            with self.assertRaisesRegex(RuntimeError,'historical_inventory_binding_required'):
+                inventory.validate_inventory(data,changed)
+
+    def test_missing_original_or_extra_unenrolled_slot_refuses(self):
+        (data,scope),_=historical_fixture()
+        for logical in ('origin:notification-worker','native:auth','proxy'):
+            changed=copy.deepcopy(data);changed['containers'].pop(logical);changed,other=repin(changed,scope)
+            with self.subTest(logical=logical),self.assertRaises(RuntimeError):inventory.validate_inventory(changed,other)
+        changed=copy.deepcopy(data)
+        full,_=fixture();changed['containers']['slot:blue:backend']=full[0]['containers']['slot:blue:backend']
+        changed,other=repin(changed,scope)
+        with self.assertRaises(RuntimeError):inventory.validate_inventory(changed,other)
+
+    def test_unexpected_actor_and_changed_original_source_refuse(self):
+        (data,scope),rows=historical_fixture()
+        with self.assertRaisesRegex(RuntimeError,'snapshot_incomplete'):
+            inventory.attest_containers(data,rows+[row('f'*64,'unrelated')],phase='prepared',binding=scope)
+        changed=copy.deepcopy(rows);changed[-1]['Config']['Labels']['org.opencontainers.image.revision']='0'*40
+        with self.assertRaises(RuntimeError):inventory.attest_containers(data,changed,phase='prepared',binding=scope)
+
+    def test_second_database_network_is_explicit_and_remains_in_exact_spec(self):
+        (data,scope),rows=historical_fixture()
+        db=data['containers']['native:db'];actual=next(r for r in rows if r['Id']==db['id'])
+        data['target_networks']['historical-control']='3'*64;db['networks']['historical-control']='3'*64
+        actual['NetworkSettings']['Networks']['historical-control']={'NetworkID':'3'*64,'EndpointID':'','IPAddress':''}
+        db['spec_sha256']=measured_spec(actual);data,scope=repin(data,scope)
+        inventory.attest_containers(data,rows,phase='prepared',binding=scope)
+        actual['NetworkSettings']['Networks']['historical-control']['NetworkID']='4'*64
+        with self.assertRaises(RuntimeError):inventory.attest_containers(data,rows,phase='prepared',binding=scope)

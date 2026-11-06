@@ -91,7 +91,7 @@ def digest(stream):
 
 
 @contextmanager
-def authenticated_bytes(path,expected_digest):
+def authenticated_bytes(path,expected_digest,*,max_bytes=6*1024**3):
     """Parse exactly the authenticated bytes, even if an operator changes the path.
 
     The source is operator-owned read-only input, not a protected receipt. A
@@ -99,6 +99,8 @@ def authenticated_bytes(path,expected_digest):
     assuming that either its directory entry or its open inode stays immutable.
     Callers importing archive contents must use this same boundary as well.
     """
+    if type(max_bytes) is not int or not 0<max_bytes<=6*1024**3:
+        raise RuntimeError('schema148_ci_archive_limit_invalid')
     if not re.fullmatch('sha256:[0-9a-f]{64}',str(expected_digest)):
         raise RuntimeError('schema148_ci_archive_digest_invalid')
     path=Path(path)
@@ -108,7 +110,7 @@ def authenticated_bytes(path,expected_digest):
         raise RuntimeError('schema148_ci_archive_invalid') from None
     with os.fdopen(descriptor,'rb') as source:
         measured=os.fstat(source.fileno())
-        if not stat.S_ISREG(measured.st_mode) or not 0<measured.st_size<=6*1024**3:
+        if not stat.S_ISREG(measured.st_mode) or not 0<measured.st_size<=max_bytes:
             raise RuntimeError('schema148_ci_archive_invalid')
         with tempfile.TemporaryFile(mode='w+b') as frozen:
             value=hashlib.sha256();remaining=measured.st_size
@@ -123,8 +125,8 @@ def authenticated_bytes(path,expected_digest):
 
 
 @contextmanager
-def authenticated_archive(path,expected_digest):
-    with authenticated_bytes(path,expected_digest) as frozen:
+def authenticated_archive(path,expected_digest,*,max_bytes=6*1024**3):
+    with authenticated_bytes(path,expected_digest,max_bytes=max_bytes) as frozen:
         with zipfile.ZipFile(frozen) as archive:yield archive
 
 
@@ -177,17 +179,41 @@ def provenance_inputs(actor,binding):
     if (set(binding)!={'archive','artifact_id','run_id'} or any(type(binding[k]) is not int or binding[k]<=0 for k in ('artifact_id','run_id'))):
         raise RuntimeError('schema148_ci_provenance_binding_invalid')
     def api(endpoint):
-        return json.loads(actor.ops.command('schema148_ci_provenance',[
-            '/usr/sbin/runuser','-u','madar','--','/usr/bin/gh','api','repos/'+REPOSITORY+'/actions/'+endpoint]).stdout)
+        from deployment.lib.isolated_github_observation import api as observe_api
+        return observe_api('repos/'+REPOSITORY+'/actions/'+endpoint,
+            operations=actor.ops,label='schema148_ci_provenance')
     artifact=api('artifacts/'+str(binding['artifact_id']));run=api('runs/'+str(binding['run_id']))
     if artifact.get('id')!=binding['artifact_id'] or run.get('id')!=binding['run_id']:
         raise RuntimeError('schema148_ci_provenance_binding_changed')
     candidate=actor.contract['candidate']['source_sha']
     verify_required_ci({workflow:api('workflows/'+workflow+'/runs?head_sha='+candidate+'&per_page=100')
         for workflow in ('backend-check.yml','frontend-check.yml')},candidate)
-    source=actor.package/'source'
-    inputs={relative:file_digest(readonly_configuration(source/relative,private=True)) for relative in INPUTS}
+    inputs=application_build_inputs(actor)
     return artifact,run,inputs
+
+
+def application_build_inputs(actor):
+    """Keep application build provenance separate from controller provenance.
+
+    Canonical historical preparation can use an already verified compatible
+    application revision with a newer controller. Authenticate the candidate's
+    actual commit, every tree and blob through the existing snapshot codec;
+    neither a mutable checkout nor the controller's dependency files describe
+    that image. GitHub artifact/run/CI authentication remains mandatory above.
+    Other profiles retain their original frozen-source behavior.
+    """
+    from .completed_normal_profile import RECONCILED
+    from .provider_recovery_runtime import readonly_configuration,file_digest
+    candidate=actor.contract['candidate']
+    if (actor.contract.get('operation')==RECONCILED.operation
+            and candidate['source_sha']!=candidate['controller_sha']):
+        from .completed_normal_package import snapshot
+        _,files=snapshot(actor.ops.repo,candidate['source_sha'])
+        if any(relative not in files for relative in INPUTS):
+            raise RuntimeError('schema148_application_build_inputs_missing')
+        return {relative:hashlib.sha256(files[relative][1]).hexdigest() for relative in INPUTS}
+    source=actor.package/'source'
+    return {relative:file_digest(readonly_configuration(source/relative,private=True)) for relative in INPUTS}
 
 
 def capture_candidate_archive(path,destination,artifact,run,*,source_sha,images,expected_inputs):
@@ -287,3 +313,40 @@ def verify_provenance(actor,binding):
     archive=readonly_configuration(Path(binding['archive']),private=True)
     return verify_archive(archive,artifact,run,source_sha=actor.contract['candidate']['source_sha'],
         images=actor.contract['candidate']['images'],expected_inputs=inputs)
+
+
+def candidate_image_tags(source_sha):
+    """Names emitted by the authenticated CI producer, never legacy aliases."""
+    if not re.fullmatch('[0-9a-f]{40}', str(source_sha)):
+        raise RuntimeError('schema148_candidate_source_invalid')
+    return {role: 'madar-schema148-'+role+':'+source_sha for role in ('backend','frontend')}
+
+
+def verify_prepared_candidate_images(contract, build_timestamp, command):
+    """Read-only Docker availability check before single-use approval.
+
+    Archive acceptance alone does not prove that the child can use the images.
+    Recheck the CI names, immutable IDs and labels; never pull, build or retag.
+    The child repeats its own image check at the actual prepare boundary.
+    """
+    candidate=contract['candidate'];tags=candidate_image_tags(candidate['source_sha'])
+    for role,tag in tags.items():
+        try:
+            rows=json.loads(command(['docker','image','inspect',tag]))
+        except Exception as error:
+            raise RuntimeError('schema148_candidate_image_unavailable') from error
+        if not isinstance(rows,list) or len(rows)!=1 or not isinstance(rows[0],dict):
+            raise RuntimeError('schema148_candidate_image_invalid')
+        row=rows[0];config=row.get('Config')
+        if not isinstance(config,dict):raise RuntimeError('schema148_candidate_image_invalid')
+        labels=config.get('Labels',{})
+        if (row.get('Id')!=candidate['images'][role] or not isinstance(labels,dict)
+                or labels.get('com.madar.release.sha')!=candidate['source_sha']
+                or labels.get('org.opencontainers.image.revision')!=candidate['source_sha']
+                or labels.get('com.madar.release.built_at')!=build_timestamp
+                or labels.get('com.madar.build.mode')!='fresh-locked-ci'
+                or labels.get('com.madar.staging.build_mode')
+                or role=='frontend' and labels.get('com.madar.frontend.api_origin')!='/api'):
+            raise RuntimeError('schema148_candidate_image_changed')
+    return {'images':dict(candidate['images']), 'source_sha':candidate['source_sha'],
+            'authority_issued':False}

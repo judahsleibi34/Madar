@@ -80,6 +80,9 @@ class Database:
         self.rpc_result = [{"id": "job", "status": "pending"}]
 
     def table(self, name):
+        if name=='application_schema_state':
+            from tests.account_schema_fixture import SchemaStateQuery
+            return SchemaStateQuery()
         return Query(self, name)
 
     def rpc(self, name, payload):
@@ -122,6 +125,10 @@ def google_event(remote_id="provider-event", **overrides):
 
 
 class CalendarInboundSyncTests(unittest.TestCase):
+    def setUp(self):
+        from tests.account_schema_fixture import install_legacy_schema
+        install_legacy_schema(self)
+
     def connection(self, **overrides):
         value = {
             "id": "connection",

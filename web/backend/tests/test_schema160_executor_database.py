@@ -100,6 +100,53 @@ class CanonicalExecutorDatabaseTests(unittest.TestCase):
             # No protected backup claim: this test isolates SQL/observation.
             backup_verifier=lambda path:None,migration_guard=observe,completion_guard=complete,expected_origin=146)
 
+    def test_00_inventory_publication_reobserves_native_read_only_role_and_cluster_state(self):
+        # Native SQL and durable publication; Docker/systemd/filesystem-root
+        # observations remain explicit models, not privileged host acceptance.
+        from tests.test_schema160_inventory_capture import OriginalInventoryCaptureTests
+        from test_schema150_actor_inventory import repin
+        from deployment.lib import schema150_provider_adapter as adapter
+        fixture=OriginalInventoryCaptureTests();fixture.setUp();self.addCleanup(fixture.doCleanups)
+        dsn=self.fault_dsn()
+        with connect(dsn) as db:
+            # This SQL-only cluster has no provider services. Add inert provider
+            # role names so the inventory parser tests its real required scope;
+            # do not substitute model role rows for the native observation.
+            for role in ('authenticator', 'supabase_auth_admin', 'supabase_storage_admin'):
+                if not db.execute('select 1 from pg_roles where rolname=%s',(role,)).fetchone():
+                    db.execute(sql.SQL('create role {} nologin').format(sql.Identifier(role)))
+            roles=db.execute(adapter.ROLE_SQL).fetchone()[0]
+        fixture.roles=roles
+        fixture.inventory['roles']=adapter.role_measurements(roles)
+        fixture.inventory['session_scope']['writer_roles']=sorted(name for name, value in fixture.inventory['roles'].items()
+            if value['login'] and name!='postgres')
+        fixture.contract['database']['system_identifier']=self.identifier
+        scope={'operation':fixture.contract['operation'],'context_sha256':'0'*64,
+            'source_sha':fixture.contract['candidate']['source_sha'],'controller_sha':fixture.contract['candidate']['controller_sha'],
+            'inventory_sha256':'0'*64,'system_identifier':self.identifier,'source_schema':146,'target_schema':160}
+        fixture.inventory,scope=repin(fixture.inventory,scope)
+        fixture.contract['writer_inventory_sha256']=scope['inventory_sha256']
+        from deployment.lib.completed_normal_admission import encoded
+        (fixture.package/'provider-inventory-input.json').write_bytes(encoded(fixture.inventory))
+        original=fixture.command
+        def command(args,**kwargs):
+            if args[:2]!=['docker','exec']:return original(args,**kwargs)
+            with connect(dsn) as db:
+                cursor=db.execute(kwargs['input'])
+                observations=[]
+                while True:
+                    if cursor.description:observations.append(cursor.fetchone()[0])
+                    if not cursor.nextset():break
+                self.assertEqual(len(observations),1)
+                return json.dumps(observations[0])
+        fixture.runtime.command.side_effect=command
+        result=fixture.capture()
+        self.assertFalse(result['authority_issued'])
+        self.assertEqual(result['schema'],146)
+        with connect(dsn) as db:
+            self.assertEqual(db.execute(adapter.ROLE_SQL).fetchone()[0],roles)
+            self.assertEqual(db.execute("select schema_version from application_schema_state where contract_key='core'").fetchone()[0],146)
+
     def test_01_existing_executor_requires_its_actual_advisory_locked_connection(self):
         with connect(self.fault_dsn()) as db:
             with self.assertRaisesRegex(RuntimeError,'migration_lock_required'):

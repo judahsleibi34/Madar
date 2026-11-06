@@ -5,6 +5,7 @@ from __future__ import annotations
 import fcntl
 import json
 import os
+import stat
 import tempfile
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -13,6 +14,22 @@ from typing import Any, Iterator
 
 
 WORKER_OWNERS = {"OLD", "NONE", "CANDIDATE", "RECOVERY"}
+
+
+def open_deployment_lock(path: Path):
+    """Create private lock bytes independent of a shell/systemd umask.
+
+    Existing unsafe files are refused, never silently chmodded or followed.
+    The protected issuer separately verifies owner, ancestry and held flock.
+    """
+    fd=os.open(path,os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW|os.O_CLOEXEC|os.O_NONBLOCK,0o600)
+    try:
+        current=os.fstat(fd)
+        if not stat.S_ISREG(current.st_mode) or current.st_mode&0o077 or current.st_nlink!=1:
+            raise RuntimeError('deployment_lock_unprotected')
+        return os.fdopen(fd,'a+',encoding='utf-8')
+    except BaseException:
+        os.close(fd);raise
 
 
 def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
@@ -109,6 +126,17 @@ def runtime_mutation_lock(state_root: Path) -> Iterator[None]:
 
     state_root = state_root.resolve()
     state_root.mkdir(parents=True, exist_ok=True, mode=0o700)
-    with (state_root / "runtime-mutation.lock").open("a+", encoding="utf-8") as lock:
+    # The privileged parent and the canonical unprivileged traffic driver must
+    # flock the SAME inode. A root-created 0600 file otherwise prevents traffic
+    # promotion after a successful migration. Never replace a live lock or
+    # loosen its mode; transfer only a root-owned regular private inode to the
+    # already established runtime-state owner while holding it exclusively.
+    owner = state_root.stat()
+    with open_deployment_lock(state_root / "runtime-mutation.lock") as lock:
         fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        current = os.fstat(lock.fileno())
+        if current.st_uid != owner.st_uid:
+            if os.geteuid() != 0 or current.st_uid != 0:
+                raise RuntimeError("runtime_mutation_lock_owner_invalid")
+            os.fchown(lock.fileno(), owner.st_uid, owner.st_gid)
         yield

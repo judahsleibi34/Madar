@@ -57,13 +57,14 @@ class CompatibleNormalBoot:
         if receipt.get('operation') != self.profile.operation or receipt.get('contract') != self.contract:
             raise RuntimeError('compatible_boot_fresh_contract_changed')
         publication = json.loads(protected(self.root/self.publication_name, private=True).read_text())
+        from deployment.lib.completed_normal_resources import verify_runtime_binding,candidate_roles
         if (set(publication) != {'operation','context_sha256','source_sha','images','runtimes','networks','worker_generation','origin_workers'}
                 or publication['operation'] != self.profile.operation or publication['context_sha256'] != digest(self.contract)
                 or publication['source_sha'] != self.contract['candidate']['source_sha']
                 or publication['images'] != self.contract['candidate']['images']
-                or set(publication['runtimes']) != set(ROLES) or len(publication['origin_workers']) != 3):
+                or set(publication['runtimes']) != set(candidate_roles(self.contract))
+                or len(publication['origin_workers']) != 3):
             raise RuntimeError('compatible_boot_publication_changed')
-        from deployment.lib.completed_normal_resources import verify_runtime_binding
         selected=verify_runtime_binding(self.contract,publication,self.runtime,self.state_root)
         schema = self.native_verifier()
         if not self.profile.supports(schema):
@@ -157,7 +158,8 @@ class CompatibleNormalBoot:
             self._converge(normal=normal)
 
     def _start(self, rows):
-        for kind in ('redis','parser-worker','remote-ingestion-worker','backend','frontend',*WORKERS):
+        gateway = ('provider-gateway',) if 'provider-gateway' in rows else ()
+        for kind in ('redis','parser-worker',*gateway,'remote-ingestion-worker','backend','frontend',*WORKERS):
             self.source_guard()
             actual=next(iter(self.runtime.inspect([rows[kind]['Id']]).values()))
             if not actual['State']['Running']:

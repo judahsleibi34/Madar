@@ -175,3 +175,52 @@ def analyze(sql, *, origin, target):
         else: escalate('D', 'unrecognized_statement_' + kind)
     if classification == 'A': reasons.add('isolated_new_table_only_not_runtime_compatibility_proof')
     return Risk(classification, tuple(sorted(reasons)), transactional, envelope, PARSER_VERSION)
+
+
+def measured_operations(sql, *, origin, target):
+    """Audited Class B shapes, never a lower classification or permission.
+
+    Measurements/lock budgets apply only to nullable builtin columns without
+    defaults and ordinary nonunique btree indexes on plain builtin columns.
+    Expressions, predicates, opclasses, rewrites and best-effort DDL remain
+    outside automatic support even when their overall classification is B.
+    """
+    risk=analyze(sql,origin=origin,target=target)
+    if risk.classification!='B' or not risk.schema_envelope_verified:return []
+    from pglast import parser
+    rows=[_strip_locations(r['stmt']) for r in json.loads(parser.parse_sql_json(sql.decode()))['stmts']][2:-2]
+    operations=[]
+    def name(value):return isinstance(value,str) and IDENTIFIER.fullmatch(value) is not None
+    for row in rows:
+        kind,value=next(iter(row.items()));relation=value.get('relation',{})
+        if (set(relation)-{'schemaname','relname','inh','relpersistence'}
+                or relation.get('schemaname')!='public' or relation.get('relpersistence')!='p'
+                or not name(relation.get('relname'))):return []
+        base={'schema':'public','table':relation['relname']}
+        if kind=='IndexStmt':
+            if (set(value)-{'idxname','relation','accessMethod','indexParams'}
+                    or not name(value.get('idxname')) or value.get('accessMethod')!='btree'):return []
+            columns=[]
+            for entry in value.get('indexParams',[]):
+                item=entry.get('IndexElem',{})
+                if (set(entry)!={'IndexElem'} or set(item)!={'name','ordering','nulls_ordering'}
+                        or not name(item['name']) or item['ordering']!='SORTBY_DEFAULT'
+                        or item['nulls_ordering']!='SORTBY_NULLS_DEFAULT'):return []
+                columns.append(item['name'])
+            if not 1<=len(columns)<=8 or len(set(columns))!=len(columns):return []
+            operations.append({**base,'kind':'create_btree_index','index':value['idxname'],'columns':columns})
+        elif kind=='AlterTableStmt':
+            if set(value)!={'relation','cmds','objtype'} or value['objtype']!='OBJECT_TABLE':return []
+            if len(value['cmds'])!=1:return []
+            command=value['cmds'][0].get('AlterTableCmd',{})
+            if (set(command)!={'subtype','def','behavior'} or command['subtype']!='AT_AddColumn'
+                    or command['behavior']!='DROP_RESTRICT' or set(command['def'])!={'ColumnDef'}):return []
+            column=command['def']['ColumnDef'];typ=column.get('typeName',{})
+            if (set(column)!={'colname','typeName','is_local'} or column['is_local'] is not True
+                    or not name(column['colname']) or set(typ)!={'names','typemod'} or typ['typemod']!=-1
+                    or len(typ['names'])!=2 or typ['names'][0]!={'String':{'sval':'pg_catalog'}}
+                    or typ['names'][1] not in [{'String':{'sval':t}} for t in BUILTINS]):return []
+            operations.append({**base,'kind':'add_nullable_column','column':column['colname'],
+                               'type':typ['names'][1]['String']['sval']})
+        else:return []
+    return operations

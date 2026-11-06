@@ -144,8 +144,8 @@ INSERT INTO storage.objects VALUES('synthetic-object','fixture/asset');''')
                 # Instrument the unchanged read-only measurement, not its
                 # result. Keep private component differences if restore fails.
                 measure=backup_support.database_snapshot;observations=[]
-                def record(query):
-                    value=measure(query);observations.append(value);return value
+                def record(query, *, acl_semantics=False):
+                    value=measure(query,acl_semantics=acl_semantics);observations.append(value);return value
                 backup_support.database_snapshot=record
                 try:report=rehearse(backup,IMAGE,maintenance_manifest_sha256=digest)
                 except Exception:

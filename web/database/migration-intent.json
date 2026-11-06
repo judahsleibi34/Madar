@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "compatible_min": 160,
+  "compatible_max": 160,
+  "rolling_compatible": true,
+  "worker_protocols": {
+    "delivery": 2,
+    "outbox": 2,
+    "deletion": 2
+  },
+  "declared_class": "A"
+}

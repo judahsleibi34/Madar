@@ -6,6 +6,7 @@ unknown objects/attributes or divergent versions fail closed. A separate reader
 compares every derived attribute and byte with the current restricted source.
 """
 import os
+import re
 from pathlib import Path
 from deployment.lib.coordinated_checkpoint import relative,digest_file
 
@@ -21,7 +22,10 @@ def checked_file(path,root):
     return path
 
 
-def recover_metadata(objects,restored_root,*,source_root=None):
+def recover_metadata(objects,restored_root,*,source_root=None,namespace=("stub","stub"),verify_only=False):
+    if type(verify_only) is not bool:raise RuntimeError('storage_restore_verification_mode_invalid')
+    if (not isinstance(namespace,tuple) or len(namespace)!=2 or any(not isinstance(v,str) or not re.fullmatch('[a-zA-Z0-9_-]{1,63}',v) for v in namespace)):
+        raise RuntimeError('storage_restore_namespace_invalid')
     restored_root=Path(restored_root)
     if restored_root.is_symlink() or not restored_root.is_dir():raise RuntimeError('storage_restore_root_invalid')
     if source_root is not None:source_root=Path(source_root)
@@ -29,7 +33,7 @@ def recover_metadata(objects,restored_root,*,source_root=None):
     for row in objects:
         bucket=relative(row['bucket']).as_posix();name=relative(row['name']).as_posix();version=relative(row['version']).as_posix()
         if '/' in bucket or '/' in version:raise RuntimeError('storage_restore_identity_invalid')
-        base=restored_root/'stub/stub'/bucket/name
+        base=restored_root.joinpath(*namespace)/bucket/name
         current=checked_file(base/version,restored_root);current_digest=digest_file(current)
         attributes={key:row['metadata'].get(field) for key,field in ATTRIBUTES.items()}
         if any(not isinstance(value,str) or not value or len(value.encode())>4096 or '\r' in value or '\n' in value for value in attributes.values()):
@@ -55,11 +59,13 @@ def recover_metadata(objects,restored_root,*,source_root=None):
                 raise RuntimeError('storage_restore_source_metadata_changed')
     for key,attributes in selected.items():
         target=checked_file(restored_root/key,restored_root)
-        if os.listxattr(target):raise RuntimeError('storage_restore_destination_metadata_exists')
-        for attribute,value in attributes.items():os.setxattr(target,attribute,value,flags=os.XATTR_CREATE,follow_symlinks=False)
+        if not verify_only:
+            if os.listxattr(target):raise RuntimeError('storage_restore_destination_metadata_exists')
+            for attribute,value in attributes.items():os.setxattr(target,attribute,value,flags=os.XATTR_CREATE,follow_symlinks=False)
         if set(os.listxattr(target))!=set(attributes) or any(os.getxattr(target,attribute)!=value for attribute,value in attributes.items()):
             raise RuntimeError('storage_restore_metadata_mismatch')
     return {'objects':len(objects),'files':len(selected),'attributes':sum(len(a) for a in selected.values()),
         'metadata_source':'exact-restored-database','all_versions_have_identical_object_bytes':True,
         'source_bytes_and_attributes_independently_match':source_root is not None,
-        'original_storage_modified':False,'values_reported':False}
+        'original_storage_modified':False,'values_reported':False,
+        **({'verification_only':True} if verify_only else {})}
