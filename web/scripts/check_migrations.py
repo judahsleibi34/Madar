@@ -427,6 +427,119 @@ def check_tenant_relationship_debt(
 
 
 
+# Owner-approved source-validation adapter; no execution or admission authority.
+RECONCILIATION_EVIDENCE = "0bd06575e886b98296bdee4d9921d29afbad1c91"
+RECONCILIATION_RECORD_BLOB = "7fa511160024af3021f2e2f36d0f9269c67fb43f"
+ARCHITECTURE_HISTORY = "23254c786fdfa3731ff63cd004a4160b6d2f60fa"
+CANONICAL_HISTORY = "cf444303e55a2c6a214ab53f683442cf2fac15fe"
+RELOCATED_NAMES = (
+    "147_fence_notification_delivery_claims.sql",
+    "148_guard_reservation_reactivation_capacity.sql",
+    "149_fence_notification_outbox_claims.sql",
+    "150_fence_data_deletion_ownership.sql",
+)
+
+
+def verify_relocated_history(original, current, archived, canonical, lock, forward):
+    """Pure byte checks; arguments must come from independently authenticated Git objects."""
+    def require(ok, code):
+        if not ok:
+            raise RuntimeError(code)
+    def checksum(body):
+        return hashlib.sha256(body).hexdigest()
+    pairs = {
+        f"web/{tree}/migrations/{name}":
+        f"web/{tree}/historical-architecture-146-150/{name}"
+        for tree in ("database", "supabase") for name in RELOCATED_NAMES
+    }
+    require(set(archived) == set(pairs.values()) == set(lock["historical"]),
+            "migration_relocation_archive_inventory")
+    missing = set(original) - set(current)
+    require(missing == set(pairs), "migration_relocation_missing_paths")
+    for old, new in pairs.items():
+        require(old in original and original[old] == archived[new]
+                and checksum(archived[new]) == lock["historical"][new],
+                "migration_relocation_original_bytes")
+    require(all(current[p] == body for p, body in original.items() if p not in pairs),
+            "migration_published_history_changed")
+    require(all(current.get(p) == body for p, body in canonical.items()),
+            "migration_canonical_history_changed")
+    published = {p: checksum(b) for p, b in canonical.items()
+                 if 147 <= int(Path(p).name.split("_", 1)[0]) <= 156}
+    require(len(published) == 20 and published == lock["published_main"],
+            "migration_relocation_canonical_evidence")
+    historical_hashes = {checksum(body) for body in archived.values()}
+    require(not any(checksum(body) in historical_hashes for body in current.values()),
+            "migration_relocation_active_duplicate")
+    require(checksum(forward) == lock["forward_manifest_sha256"],
+            "migration_relocation_forward_manifest")
+    from deployment.lib.migration_inventory import strict_json
+    manifest = strict_json(forward)
+    rows = manifest["migrations"]
+    require(manifest["execution_status"] == "blocked_pending_protected_controller_reconciliation"
+            and [r["number"] for r in rows] == [157, 158, 159, 160],
+            "migration_relocation_forward_contract")
+    names = set()
+    for row in rows:
+        p = row["path"]
+        require(p.startswith("web/database/migrations/")
+                and len(Path(p).parts) == 4
+                and Path(p).name.startswith(str(row["number"]) + "_")
+                and row["from_schema"] == row["number"] - 1
+                and row["to_schema"] == row["number"] and p not in names,
+                "migration_relocation_forward_identity")
+        names.add(p)
+        mirror = "web/supabase/migrations/" + Path(p).name
+        require(p in current and current.get(mirror) == current[p]
+                and checksum(current[p]) == row["sha256"],
+                "migration_relocation_forward_bytes")
+
+
+def discover_reconciled_history(root, head=None):
+    from deployment.lib.migration_inventory import GitSource, TREES, discover, strict_json
+    root = Path(root)
+    git = GitSource(root)
+    if head is None:
+        head = git.command("rev-parse", "HEAD").decode().strip()
+    for revision in (ARCHITECTURE_HISTORY, CANONICAL_HISTORY, RECONCILIATION_EVIDENCE, head):
+        git.commit(revision)
+    # Evidence must predate the candidate; a candidate-supplied JSON is not authority.
+    for ancestor in (ARCHITECTURE_HISTORY, CANONICAL_HISTORY):
+        git.command("merge-base", "--is-ancestor", ancestor, RECONCILIATION_EVIDENCE)
+    git.command("merge-base", "--is-ancestor", RECONCILIATION_EVIDENCE, head)
+    record = "web/deployment/migration-history-reconciliation.json"
+    manifest = "web/deployment/releases/migrations-157-160-reconciled.json"
+    if git.command("rev-parse", RECONCILIATION_EVIDENCE + ":" + record).decode().strip() != RECONCILIATION_RECORD_BLOB:
+        raise RuntimeError("migration_relocation_record_blob_changed")
+    if git.command("cat-file", "-t", RECONCILIATION_RECORD_BLOB).strip() != b"blob":
+        raise RuntimeError("migration_relocation_record_blob_required")
+    trusted = git.files(RECONCILIATION_EVIDENCE, record, manifest)
+    candidate = git.files(head, record, manifest)
+    if candidate != trusted or set(trusted) != {record, manifest}:
+        raise RuntimeError("migration_relocation_evidence_changed")
+    if any((root / p).read_bytes() != body for p, body in trusted.items()):
+        raise RuntimeError("migration_relocation_worktree_evidence_changed")
+    lock = strict_json(trusted[record])
+    if (lock["authoritative_main"] != CANONICAL_HISTORY
+            or lock["controller_execution"] != "BLOCKED" or lock["reconciled_target"] != 160):
+        raise RuntimeError("migration_relocation_evidence_identity")
+    archived_paths = tuple(f"web/{t}/historical-architecture-146-150/"
+                           for t in ("database", "supabase"))
+    archived = git.files(head, *archived_paths)
+    # The approved archive also includes README files. Preserve the full frozen
+    # inventory and bytes, rather than ignoring arbitrary non-SQL additions.
+    if archived != git.files(RECONCILIATION_EVIDENCE, *archived_paths):
+        raise RuntimeError("migration_relocation_archive_evidence_changed")
+    archived = {p: b for p, b in archived.items() if p.endswith(".sql")}
+    current = git.files(head, *TREES)
+    verify_relocated_history(git.files(ARCHITECTURE_HISTORY, *TREES), current,
+                             archived, git.files(CANONICAL_HISTORY, *TREES),
+                             lock, trusted[manifest])
+    # Preserve mode, filename, numbering, mirror, gap and historical-exception checks.
+    # No exception is added to the shared discovery engine.
+    return discover(root, source_sha=head, history_base_sha=CANONICAL_HISTORY)
+
+
 def check_production_lineage(errors: list[str]) -> None:
     import json
     pin = REPO_ROOT / "deployment/releases/production-001-099.json"
@@ -535,11 +648,7 @@ def check_production_lineage(errors: list[str]) -> None:
             # production release or grants migration authority. Trusted CI also
             # compares the PR's independent base SHA, preserving later history.
             sys.path.insert(0, str(REPO_ROOT))
-            from deployment.lib.migration_inventory import GitSource, discover
-            source = GitSource(REPO_ROOT.parent)
-            head = source.command('rev-parse', 'HEAD').decode().strip()
-            inventory = discover(REPO_ROOT.parent, source_sha=head,
-                history_base_sha='23254c786fdfa3731ff63cd004a4160b6d2f60fa')
+            inventory = discover_reconciled_history(REPO_ROOT.parent)
             for migration in inventory.migrations:
                 if migration.number > known_ceiling:
                     generic_tail[migration.path] = migration.sql
@@ -563,7 +672,12 @@ def check_production_lineage(errors: list[str]) -> None:
                         f"unexpected migration beyond release target {release_target}: {relative}"
                     )
     except (OSError, KeyError, ValueError, TypeError, RuntimeError) as error:
-        errors.append(f"production lineage manifest invalid: {type(error).__name__}")
+        # Emit bounded integrity codes only, never arbitrary exception payloads.
+        code = str(error)
+        if isinstance(error, RuntimeError) and re.fullmatch(r"migration_[a-z0-9_]{1,96}", code):
+            errors.append(f"production lineage manifest invalid: {code}")
+        else:
+            errors.append(f"production lineage manifest invalid: {type(error).__name__}")
 
 def main() -> int:
     errors: list[str] = []

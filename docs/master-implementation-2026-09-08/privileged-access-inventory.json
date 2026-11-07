@@ -1138,6 +1138,31 @@
       "path": "web/backend/services/project_source_ingestion_service.py",
       "boundary": "tenant/project/source/resource/operation-scoped149\u2013152 ingestion and reconciliation RPCs, lease/token/version checks; no blind replay of uncertain storage/provider effects.",
       "review_scope": "Integration classification of published main cf444303; not independent production security approval."
+    },
+    {
+      "path": "web/backend/routes/data_deletion_routes.py",
+      "boundary": "Self-action targets come from require_regular_user with admin account access disabled and current-session AAL2; tenant deletion requires actor-derived tenant context, owner role and AAL2. Self-status checks requested_by_user_id. Global administration requires system-admin AAL2. Direct service-role calls are account lifecycle request/reactivation helpers and administrator-only lifecycle status lookup; capability/admission and guarded lifecycle RPCs remain required. Status responses use explicit serializers. RLS is not the service-role authorization boundary.",
+      "review_scope": "PR224 bounded source review at a1eef8e0948c0135843fb81233a9b26ba67c2621 (2026-11-07). Caller/RPC source tracing and offline security tests; not deployed-policy certification or a new review of the retained92 entries. No SQL executed. Native database/provider acceptance remains separate."
+    },
+    {
+      "path": "web/backend/services/account_work_fence.py",
+      "boundary": "Internal coordination, not standalone user authorization: trusted request/job callers supply tenant/user identities. Registration checks schema and account_fence_registration167; 146\u2013166 retain historical behavior and unsupported schemas refuse. Scoped shared/exclusive filesystem locks, hold markers, no-follow/regular-file checks and registry locking fence work and retirement. Calendar queries bind job tenant and resource IDs; notification work resolves durable recipient/resource/home-tenant identities and revalidates after locking. Request middleware invokes authenticated-user checks for registered multipart paths. Callers still enforce permissions and worker leases. scoped_work currently does not forward the job injected client to registration; tests isolate the global dependency while exercising real locks.",
+      "review_scope": "PR224 bounded source review at a1eef8e0948c0135843fb81233a9b26ba67c2621 (2026-11-07). Caller/RPC source tracing and offline security tests; not deployed-policy certification or a new review of the retained92 entries. No SQL executed. Native database/provider acceptance remains separate."
+    },
+    {
+      "path": "web/backend/services/bi_report_delivery_service.py",
+      "boundary": "Data routes derive tenant/user through get_storage_scope and require_active_tenant_user_id. Reads constrain tenant, project, schedule/report and owner; member IDs come from active tenant memberships. Service-only configure166 RPCs verify resource ownership, recipient membership and revisions. Internal jobs claim bounded leases and authorize by token/fence before delivery or cleanup; SQL rechecks share/configuration/recipient or retention scope. Account shared locks enclose work. Private attachments require bounded path/size/hash checks; cleanup is bounded to the selected report directory. Sending requires an explicit adapter; production transport/admission is not established by inventory inclusion. Service role bypasses RLS; callers and guarded RPCs supply authorization.",
+      "review_scope": "PR224 bounded source review at a1eef8e0948c0135843fb81233a9b26ba67c2621 (2026-11-07). Caller/RPC source tracing and offline security tests; not deployed-policy certification or a new review of the retained92 entries. No SQL executed. Native database/provider acceptance remains separate."
+    },
+    {
+      "path": "web/backend/services/bi_sharing_service.py",
+      "boundary": "Data routes derive tenant/user from authenticated active membership and matching path user through get_storage_scope, with entitlement and account fencing. Resource reads bind tenant/project/id and creator or exact member share; editor/owner-only checks distinguish read/edit/share authority. Service-only set/revoke165 RPCs enforce owner/resource scope, active recipient membership and revision checks; report shares are viewer-only. Member directory and shared-resource listings are scoped. Services trust the authorized caller identity and guarded RPCs, not service-role RLS; storage fields are available only through separately authorized internal report access.",
+      "review_scope": "PR224 bounded source review at a1eef8e0948c0135843fb81233a9b26ba67c2621 (2026-11-07). Caller/RPC source tracing and offline security tests; not deployed-policy certification or a new review of the retained92 entries. No SQL executed. Native database/provider acceptance remains separate."
+    },
+    {
+      "path": "web/backend/workers/account_lifecycle_worker.py",
+      "boundary": "No HTTP entry point or import-time execution. Explicit ACCOUNT_LIFECYCLE_WORKER_ENABLED starts an internal worker with hostname/PID/random owner identity. run_batch requires worker consumption permission and exact protocol3 lifecycle capability before claiming bounded account-erasure leases. process_claim binds subject/tenant/storage identity, takes account EX and renews token/generation-scoped claims before guarded destructive stages and finalization. Customer deactivate/delete admission remains false; worker enablement does not grant customer or production acceptance. Runtime configuration, shared filesystem and provider credentials remain operator trust prerequisites.",
+      "review_scope": "PR224 bounded source review at a1eef8e0948c0135843fb81233a9b26ba67c2621 (2026-11-07). Caller/RPC source tracing and offline security tests; not deployed-policy certification or a new review of the retained92 entries. No SQL executed. Native database/provider acceptance remains separate."
     }
   ],
   "related_privileged_paths": [
