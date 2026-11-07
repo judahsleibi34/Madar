@@ -1,3 +1,4 @@
+from tests.account_work_test_support import account_fixture
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -51,6 +52,9 @@ def dashboard(policy="pinned"):
 
 
 class BiDashboardServiceTests(unittest.TestCase):
+    def setUp(self):
+        self.fence_client = self.enterContext(account_fixture([(1, 7)]))
+
     def test_analysis_layout_and_display_validation_are_allowlisted(self):
         self.assertEqual(bi_dashboard_service.validate_analysis_spec({
             "operation": "date_aggregate", "date_column": "date", "period": "month",

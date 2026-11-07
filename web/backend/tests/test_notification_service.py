@@ -1,3 +1,4 @@
+from tests.account_work_test_support import FenceClient, account_fixture
 import unittest
 import os
 from unittest.mock import patch
@@ -72,7 +73,10 @@ class FakeQuery:
 
 class FakeSupabase:
     def __init__(self):
+        self.fences = FenceClient([(7, 11), (7, 12), (7, 13)])
         self.tables = {
+            "application_schema_state": [{"contract_key": "core", "schema_version": 167}],
+            "users": [{"id": user, "tenant_id": 7, "account_status": "active"} for user in (11, 12, 13)],
             "tenant_memberships": [
                 {"tenant_id": 7, "user_id": 11, "role": "owner", "status": "active"},
                 {"tenant_id": 7, "user_id": 12, "role": "member", "status": "active"},
@@ -88,6 +92,8 @@ class FakeSupabase:
         return FakeQuery(self, table_name)
 
     def rpc(self, name, payload):
+        if name == "account_fence_registration167":
+            return self.fences.rpc(name, payload)
         assert name in {"create_notification_event_intent", "get_or_create_notification_event"}
         existing = next((
             event for event in self.tables["notification_events"]
@@ -122,6 +128,7 @@ class FakeQueryResult:
 
 class NotificationServiceTests(unittest.TestCase):
     def setUp(self):
+        self.enterContext(account_fixture([(7, 11), (7, 12), (7, 13)]))
         self.enterContext(patch.dict(os.environ))
 
     def patch_attribute(self, target, name, value):

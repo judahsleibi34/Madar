@@ -1,3 +1,4 @@
+from tests.account_work_test_support import account_fixture
 import tempfile
 import unittest
 from pathlib import Path
@@ -50,6 +51,9 @@ def immutable_report():
 
 
 class BiReportExportServiceTests(unittest.TestCase):
+    def setUp(self):
+        self.fence_client = self.enterContext(account_fixture([(3, 7)]))
+
     def test_arabic_pdf_is_private_bounded_and_uses_immutable_snapshot(self):
         with tempfile.TemporaryDirectory() as directory:
             path, filename, media_type = bi_report_export_service.write_export(

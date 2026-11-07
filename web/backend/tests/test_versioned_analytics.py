@@ -1,3 +1,4 @@
+from tests.account_work_test_support import account_fixture
 import unittest
 from pathlib import Path
 import tempfile
@@ -30,6 +31,7 @@ def resolved(*, size=100, rows=4):
 
 class VersionedAnalyticsTests(unittest.TestCase):
     def setUp(self):
+        self.fence_client = self.enterContext(account_fixture([(1, 7)]))
         self.frame = pd.DataFrame({
             "name": ["C", "A", "B", "D"],
             "amount": [30, 10, 20, None],

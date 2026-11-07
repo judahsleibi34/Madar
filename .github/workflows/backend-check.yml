@@ -56,7 +56,7 @@ jobs:
             --env XDG_CACHE_HOME=/tmp/madar-ci/cache/xdg \
             --env PYGWALKER_TELEMETRY_ENABLED=false \
             --env MADAR_TEST_REPOSITORY_ROOT=/test-repository \
-            --tmpfs /tmp:rw,exec,nosuid,nodev,size=1g,mode=1777 \
+            --tmpfs /tmp:rw,exec,nosuid,nodev,size=4g,mode=1777 \
             --volume "$PWD/web/scripts:/scripts:ro" \
             --volume "$PWD/web/demo-data:/demo-data:ro" \
             --volume "$PWD/web/frontend/public:/frontend/public:ro" \
@@ -64,6 +64,11 @@ jobs:
             --volume "$PWD/web/supabase:/app/supabase:ro" \
             --volume "$PWD/web/scripts:/test-repository/scripts:ro" \
             --volume "$PWD/web/deployment:/test-repository/deployment:ro" \
+            --volume "$PWD/web/database:/test-repository/database:ro" \
+            --volume "$PWD/web/supabase:/test-repository/supabase:ro" \
+            --volume "$PWD/web/deployment:/web/deployment:ro" \
+            --volume "$PWD/web/database:/web/database:ro" \
+            --volume "$PWD/web/supabase:/web/supabase:ro" \
             --volume "$PWD/web/precutover:/test-repository/precutover:ro" \
             --volume "$PWD/web/staging:/test-repository/staging:ro" \
             --volume "$PWD/web/database:/workspace/database:ro" \

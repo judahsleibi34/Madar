@@ -1,3 +1,5 @@
+from tests.account_work_test_support import route_account_fixture, session_token
+from services.account_work_fence import AccountWorkFenceMiddleware
 import tempfile
 import unittest
 from pathlib import Path
@@ -52,6 +54,7 @@ def fake_builder_context(tenant_id=1, user_id=1):
 
 class DataUploadPrivacyTests(unittest.TestCase):
     def setUp(self):
+        self.fence_client = self.enterContext(route_account_fixture([(1, 1), (1, 2), (2, 1)]))
         self.temp_dir = tempfile.TemporaryDirectory()
         self.root = Path(self.temp_dir.name).resolve()
         self.public_dir = self.root / "public_uploads"
@@ -60,10 +63,11 @@ class DataUploadPrivacyTests(unittest.TestCase):
         self.private_dir.mkdir()
 
         app = FastAPI()
+        app.add_middleware(AccountWorkFenceMiddleware)
         app.mount("/uploads", StaticFiles(directory=str(self.public_dir)), name="uploads")
         app.include_router(data_routes.router)
         app.include_router(builder_routes.router)
-        self.client = TestClient(app)
+        self.client = TestClient(app, cookies={"madar_access_token": session_token("offline-1-1")})
 
         self.patches = [
             patch.dict(

@@ -1,4 +1,5 @@
 """Real pinned provider SDK and application session code; HTTP/database boundaries only."""
+from tests.account_work_test_support import FenceClient
 import base64
 import json
 import time
@@ -21,6 +22,7 @@ class ProviderHttp:
     def __init__(self):
         self.now = int(time.time())
         self.tokens = {}
+        self.sessions = set()
         self.identities = {}
         self.refresh_identities = {}
         self.refresh = {}
@@ -40,9 +42,11 @@ class ProviderHttp:
         identity = identity or ADMIN["auth_id"]
         self.serial += 1
         exp = self.now + 900
+        session_id = "synthetic-session-" + str(self.serial)
+        self.sessions.add((identity, session_id))
         def encode(value):
             return base64.urlsafe_b64encode(json.dumps(value).encode()).decode().rstrip("=")
-        token = encode({"alg": "HS256", "typ": "JWT"}) + "." + encode({"sub": identity, "exp": exp, "aal": level, "jti": self.serial}) + ".c3ludGhldGlj"
+        token = encode({"alg": "HS256", "typ": "JWT"}) + "." + encode({"sub": identity, "exp": exp, "aal": level, "jti": self.serial, "session_id": session_id}) + ".c3ludGhldGlj"
         refresh = "synthetic-refresh-" + str(self.serial)
         self.tokens[token] = (level, exp)
         self.identities[token] = identity
@@ -85,24 +89,9 @@ class ProviderHttp:
         raise AssertionError("Unexpected synthetic provider operation: " + path)
 
 
-class ProfileStore:
-    def __init__(self):
-        self.single_row = False
-        self.found = True
-    def table(self, _name):
-        return ProfileStore()
-    def select(self, *_args): return self
-    def eq(self, field, value):
-        if field in {"auth_id", "id"} and value != ADMIN[field]:
-            self.found = False
-        return self
-    def limit(self, *_args): return self
-    def single(self):
-        self.single_row = True
-        return self
-    def execute(self):
-        row = dict(ADMIN) if self.found else None
-        return SimpleNamespace(data=row if self.single_row else [row] if row else [])
+class ProfileStore(FenceClient):
+    def __init__(self, provider):
+        super().__init__(users=[ADMIN], sessions=provider.sessions)
 
 
 def sdk_cookie_fixture(secure=True):
@@ -116,7 +105,7 @@ def sdk_cookie_fixture(secure=True):
     for target, name, value in [
         (database, "supabase", shared),
         (auth_service, "supabase", shared),
-        (auth_service, "service_supabase", ProfileStore()),
+        (auth_service, "service_supabase", ProfileStore(provider)),
         (auth_service, "COOKIE_SECURE", secure),
         (auth_routes, "supabase", shared),
         (auth_routes, "get_local_user_by_auth_id", lambda _id: dict(ADMIN)),
@@ -128,7 +117,7 @@ def sdk_cookie_fixture(secure=True):
         (mfa_login_service, "COOKIE_SECURE", secure),
         (mfa_login_service, "pending_mfa_store", lambda: store),
         (mfa_routes, "supabase", shared),
-        (mfa_routes, "service_supabase", ProfileStore()),
+        (mfa_routes, "service_supabase", ProfileStore(provider)),
         (mfa_routes, "get_user_security_settings", lambda _id: {"mfa_required": False, "last_aal2_at": "2026-10-01T10:53:24Z"}),
         (mfa_routes, "mark_aal2_verified", lambda **_kw: None),
         (mfa_routes, "record_mfa_event", lambda **_kw: None),

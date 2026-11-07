@@ -1,3 +1,4 @@
+from tests.account_work_test_support import FenceClient, session_token
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -55,18 +56,16 @@ class _FakeUsersQuery:
         return SimpleNamespace(data=dict(self.user))
 
 
-class _FakeServiceSupabase:
+class _FakeServiceSupabase(FenceClient):
     def __init__(self, user):
-        self.user = user
-
-    def table(self, name):
-        if name != "users":
-            raise AssertionError(f"unexpected table {name}")
-        return _FakeUsersQuery(self.user)
+        identities = [(user["tenant_id"], user["id"])] if user["tenant_id"] else []
+        super().__init__(identities, users=[user], sessions={(user["auth_id"], "offline-session")})
 
 
 def build_auth_client():
+    from services.account_work_fence import AccountWorkFenceMiddleware
     app = FastAPI()
+    app.add_middleware(AccountWorkFenceMiddleware)
 
     @app.get("/admin/aal2")
     def admin_aal2(request: Request, response: Response):
@@ -114,7 +113,7 @@ class AdminAal2EnforcementTests(unittest.TestCase):
             "service_supabase",
             _FakeServiceSupabase(ADMIN_USER),
         ), patch.object(auth_service, "get_current_aal", return_value={"current_level": "aal1"}):
-            response = client.get("/admin/aal2", cookies={"madar_access_token": "access"})
+            response = client.get("/admin/aal2", cookies={"madar_access_token": session_token("auth-admin")})
 
         self.assertEqual(response.status_code, 403)
         self.assertEqual(response.json()["detail"]["code"], "aal2_required")
@@ -133,7 +132,7 @@ class AdminAal2EnforcementTests(unittest.TestCase):
             "service_supabase",
             _FakeServiceSupabase(ADMIN_USER),
         ), patch.object(auth_service, "get_current_aal", return_value={"current_level": "aal2"}):
-            response = client.get("/admin/aal2", cookies={"madar_access_token": "access"})
+            response = client.get("/admin/aal2", cookies={"madar_access_token": session_token("auth-admin")})
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"ok": True, "user_id": ADMIN_USER["id"]})
@@ -152,7 +151,7 @@ class AdminAal2EnforcementTests(unittest.TestCase):
             "service_supabase",
             _FakeServiceSupabase(REGULAR_USER),
         ), patch.object(auth_service, "get_current_aal", return_value={"current_level": "aal2"}):
-            response = client.get("/admin/aal2", cookies={"madar_access_token": "access"})
+            response = client.get("/admin/aal2", cookies={"madar_access_token": session_token("auth-admin")})
 
         self.assertEqual(response.status_code, 403)
         self.assertEqual(response.json()["detail"], "Admin access is required")
@@ -177,7 +176,7 @@ class AdminAal2EnforcementTests(unittest.TestCase):
             response = client.get(
                 "/admin/aal2",
                 cookies={
-                    "madar_access_token": "access",
+                    "madar_access_token": session_token("auth-admin"),
                     "madar_admin_access_session": "admin-session",
                 },
             )
@@ -203,13 +202,15 @@ class AdminAal2EnforcementTests(unittest.TestCase):
             "service_supabase",
             _FakeServiceSupabase(ADMIN_USER),
         ), patch.object(auth_service, "get_current_aal") as get_aal:
-            response = client.get("/admin/basic", cookies={"madar_access_token": "access"})
+            response = client.get("/admin/basic", cookies={"madar_access_token": session_token("auth-admin")})
 
         self.assertEqual(response.status_code, 403)
         get_aal.assert_called_once()
 
     def test_sensitive_admin_routes_opt_into_aal2(self):
+        from services.account_work_fence import AccountWorkFenceMiddleware
         app = FastAPI()
+        app.add_middleware(AccountWorkFenceMiddleware)
         app.include_router(admin_user_routes.router)
         app.include_router(admin_billing_routes.router)
         app.include_router(admin_account_access_routes.router)
@@ -270,7 +271,9 @@ class AdminAal2EnforcementTests(unittest.TestCase):
         self.assertTrue(require_admin.call_args.kwargs["require_aal2"])
 
     def test_mfa_enrollment_remains_usable_without_aal2(self):
+        from services.account_work_fence import AccountWorkFenceMiddleware
         app = FastAPI()
+        app.add_middleware(AccountWorkFenceMiddleware)
         app.include_router(mfa_routes.router)
         client = TestClient(app)
         enroll_response = SimpleNamespace(
@@ -305,7 +308,9 @@ class AdminAal2EnforcementTests(unittest.TestCase):
         get_aal.assert_not_called()
 
     def test_status_and_logout_do_not_require_aal2(self):
+        from services.account_work_fence import AccountWorkFenceMiddleware
         app = FastAPI()
+        app.add_middleware(AccountWorkFenceMiddleware)
         app.include_router(auth_routes.router)
         client = TestClient(app)
 

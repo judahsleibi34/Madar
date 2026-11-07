@@ -1,3 +1,4 @@
+from tests.account_work_test_support import account_fixture
 import tempfile
 import unittest
 from pathlib import Path
@@ -156,6 +157,7 @@ def assert_no_private_path(test_case, response):
 
 class DataRouteAuthorizationMatrixTests(unittest.TestCase):
     def setUp(self):
+        self.fence_client = self.enterContext(account_fixture([(1, 1), (1, 2), (2, 3)]))
         self.entitlement_state = EntitlementTestState().activate_plan("1", "business")
         self.entitlement_state.allow_capability("2", "data_import")
         self.entitlement_state.allow_capability("2", "charts")
