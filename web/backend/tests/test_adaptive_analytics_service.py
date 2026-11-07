@@ -1,3 +1,4 @@
+from tests.account_work_test_support import account_fixture
 import tempfile
 import time
 import unittest
@@ -20,6 +21,9 @@ WIDGET = "55555555-5555-4555-8555-555555555555"
 
 
 class AdaptiveAnalyticsTests(unittest.TestCase):
+    def setUp(self):
+        self.fence_client = self.enterContext(account_fixture([(3, 7)]))
+
     def test_central_policy_selects_by_workload_format_operation_and_resources(self):
         cases = [
             ({"workload": "metric", "file_format": "xlsx", "size_bytes": 1024,

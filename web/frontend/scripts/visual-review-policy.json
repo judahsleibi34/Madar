@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "repository": "judahsleibi34/Madar",
+  "repositoryId": 1233897731,
+  "reviewer": { "login": "Saliba-codes", "id": 75858844, "type": "User" },
+  "maximumAgeMs": 86400000,
+  "purpose": "AUTHENTICATED_REPORTING_ONLY",
+  "requiresExplicitWillingness": true
+}

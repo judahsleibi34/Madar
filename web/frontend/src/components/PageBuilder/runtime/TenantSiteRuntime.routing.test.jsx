@@ -210,6 +210,30 @@ describe("TenantSiteRuntime standalone form requests", () => {
   beforeEach(() => vi.clearAllMocks());
   afterEach(cleanup);
 
+  it("preserves indexed duplicate choices in the published form", async () => {
+    fetchPublicForm.mockResolvedValueOnce({
+      site: { subdomain: "tenant-site", brand: "Route Test" },
+      publication: { project_id: "project-1", published_version: 1 },
+      form: { id: "form-1", name: "Choices", sections: [{ id: "choices", fields: [
+        { id: "radio", type: "radio", label: "Radio", options: ["Same", "Same"] },
+        { id: "checks", type: "checkboxes", label: "Checks", options: ["Same", "Same"] },
+      ] }], settings: {} }, theme: {}, language: "en",
+    });
+    renderStandaloneForm();
+    const radios = await screen.findAllByRole("radio");
+    fireEvent.click(radios[1]);
+    expect(radios.map(node => node.checked)).toEqual([false, true]);
+    fireEvent.click(radios[0]);
+    expect(radios.map(node => node.checked)).toEqual([true, false]);
+    const boxes = screen.getAllByRole("checkbox");
+    fireEvent.click(boxes[1]);
+    expect(boxes.map(node => node.checked)).toEqual([false, true]);
+    fireEvent.click(boxes[0]);
+    expect(boxes.map(node => node.checked)).toEqual([true, true]);
+    fireEvent.click(boxes[1]);
+    expect(boxes.map(node => node.checked)).toEqual([true, false]);
+  });
+
   it("renders a standalone form without a protected-page lookup for the form path", async () => {
     renderStandaloneForm();
 

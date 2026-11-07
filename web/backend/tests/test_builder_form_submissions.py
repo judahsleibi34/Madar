@@ -1657,10 +1657,29 @@ class BuilderFormSubmissionTests(unittest.TestCase):
             {
                 "id": RESERVATION_BLOCK_ID,
                 "type": "reservationBlock",
-                "reservation": {"title": "Book a table"},
+                "reservation": {"title": "Book a table", "sessionType": "group", "seatCapacity": 2},
             }
         )
         fake_supabase.tables["builder_projects"][0]["published_schema"] = published_schema
+        # Group booking requires the atomic RPC boundary; this fixture records
+        # the exact reservation and notification intent without executing SQL.
+        rpc_calls = []
+
+        def seated_reservation(name, args):
+            from types import SimpleNamespace
+            self.assertEqual(name, "create_builder_reservation_seated_safe")
+            self.assertEqual(set(args), {"p_reservation", "p_idempotency_key_hash",
+                                        "p_request_hash", "p_exclusive_slot", "p_notification"})
+            row = args["p_reservation"]
+            self.assertEqual((row["tenant_id"], row["project_id"], row["block_id"]),
+                             (1, PROJECT_ID, RESERVATION_BLOCK_ID))
+            self.assertEqual(row["payload"]["guests"], 2)
+            self.assertTrue(args["p_notification"])
+            rpc_calls.append(args)
+            saved = fake_supabase.table("builder_reservations").insert(row).execute().data[0]
+            return SimpleNamespace(execute=lambda: FakeResponse({"reservation": saved, "duplicate": False}))
+
+        fake_supabase.rpc = seated_reservation
         client = build_public_client(fake_supabase)
 
         with patch.object(public_site_routes, "service_supabase", fake_supabase), \
@@ -1683,11 +1702,12 @@ class BuilderFormSubmissionTests(unittest.TestCase):
                 },
             )
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 200, response.text)
         body = response.json()
         self.assertTrue(body["success"])
         self.assertEqual(body["reservation_id"], SUBMISSION_ID)
         self.assertEqual(body["message"], "Reservation submitted successfully.")
+        self.assertEqual(len(rpc_calls), 1)
         saved = fake_supabase.tables["builder_reservations"][-1]
         self.assertEqual(saved["tenant_id"], 1)
         self.assertEqual(saved["project_id"], PROJECT_ID)

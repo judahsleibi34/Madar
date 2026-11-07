@@ -1,3 +1,4 @@
+from tests.account_work_test_support import FenceClient, session_token, account_fixture
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -46,15 +47,15 @@ class _FakeUsersQuery:
         return SimpleNamespace(data=dict(ADMIN_USER))
 
 
-class _FakeServiceSupabase:
-    def table(self, name):
-        if name != "users":
-            raise AssertionError(f"unexpected table {name}")
-        return _FakeUsersQuery()
+class _FakeServiceSupabase(FenceClient):
+    def __init__(self):
+        super().__init__([(7, 5)], users=[{**ADMIN_USER, "account_status": "active"}, {**TARGET_USER, "account_status": "active"}], sessions={(ADMIN_USER["auth_id"], "offline-session")})
 
 
 def build_auth_probe_client():
+    from services.account_work_fence import AccountWorkFenceMiddleware
     app = FastAPI()
+    app.add_middleware(AccountWorkFenceMiddleware)
 
     @app.get("/allowed")
     def allowed(request: Request, response: Response):
@@ -77,7 +78,9 @@ def build_auth_probe_client():
 
 
 def build_route_client(*routers):
+    from services.account_work_fence import AccountWorkFenceMiddleware
     app = FastAPI()
+    app.add_middleware(AccountWorkFenceMiddleware)
     for router in routers:
         app.include_router(router)
     return TestClient(app)
@@ -94,6 +97,7 @@ def resolve_target_with_context(request, response, admin_user):
 
 class AdminAccountAccessHardeningTests(unittest.TestCase):
     def setUp(self):
+        self.enterContext(account_fixture([(7, 5)]))
         self.enterContext(patch.object(auth_routes, "create_supabase_auth_client", side_effect=lambda: auth_routes.supabase))
         self.enterContext(patch.object(mfa_routes, "get_request_auth_client", side_effect=lambda *_args: mfa_routes.supabase))
         self.enterContext(patch.object(mfa_routes, "persist_auth_client_session"))
@@ -114,12 +118,12 @@ class AdminAccountAccessHardeningTests(unittest.TestCase):
             response = client.get(
                 "/allowed",
                 cookies={
-                    "madar_access_token": "access",
+                    "madar_access_token": session_token("auth-admin"),
                     "madar_admin_access_session": "admin-session",
                 },
             )
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(response.json()["user_id"], TARGET_USER["id"])
         self.assertEqual(
             response.json()["admin_access"],
@@ -147,7 +151,7 @@ class AdminAccountAccessHardeningTests(unittest.TestCase):
             response = client.get(
                 "/denied",
                 cookies={
-                    "madar_access_token": "access",
+                    "madar_access_token": session_token("auth-admin"),
                     "madar_admin_access_session": "admin-session",
                 },
             )
@@ -284,7 +288,7 @@ class AdminAccountAccessHardeningTests(unittest.TestCase):
         ) as end_session:
             response = client.post("/admin/account-access/end")
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 200, response.text)
         self.assertFalse(require_admin.call_args.kwargs["reject_admin_account_access"])
         end_session.assert_called_once()
 
@@ -302,7 +306,7 @@ class AdminAccountAccessHardeningTests(unittest.TestCase):
         ):
             response = client.post(f"/users/{TARGET_USER['id']}/info")
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 200, response.text)
         self.assertNotIn("allow_admin_account_access", require_user.call_args.kwargs)
 
     def test_normal_user_sensitive_route_still_uses_deny_flag_without_blocking(self):
@@ -329,7 +333,7 @@ class AdminAccountAccessHardeningTests(unittest.TestCase):
         ), patch.object(billing_routes, "record_audit_event"):
             response = client.post("/billing/checkout", json=checkout)
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 200, response.text)
         self.assertFalse(require_member.call_args.kwargs["allow_admin_account_access"])
 
 

@@ -8,8 +8,49 @@ import {
   serializePhotoProofingContent,
 } from "./PageBuilder.uploadHandlers";
 import { builderAssetMaxBytes } from "./PageBuilder.config";
+import { getMediaFileName } from "../../../utils/media";
 
 describe("Page Builder image uploads", () => {
+  it("retains the existing filename export as the shared function itself", () => {
+    expect(getBuilderAssetFileName).toBe(getMediaFileName);
+  });
+
+  it("uses the returned filename fallback only after upload and clears busy state", async () => {
+    const events = [];
+    let finishUpload;
+    const upload = new Promise((resolve) => { finishUpload = resolve; });
+    const updateSelectedElement = vi.fn(() => events.push("update"));
+    const file = { name: "", type: "application/pdf", size: 100 };
+    const uploadBuilderAsset = vi.fn(() => {
+      events.push("upload");
+      return upload;
+    });
+    const handlers = createUploadHandlers({
+      selectedElement: { id: "document-1", type: "document" },
+      builderDocumentMimeTypes: new Set(["application/pdf"]),
+      builderDocumentMaxBytes: 1000,
+      uploadBuilderAsset,
+      setAssetUploadBusy: (busy) => events.push(busy ? "busy" : "idle"),
+      updateSelectedElement,
+      showToast: () => events.push("toast"),
+      user: { id: "user-1" },
+    });
+    const target = { files: [file], value: "selected" };
+    const pending = handlers.handleSelectedElementDocumentUpload({ target });
+    expect(target.value).toBe("");
+    expect(events).toEqual(["busy", "upload"]);
+    expect(updateSelectedElement).not.toHaveBeenCalled();
+    expect(uploadBuilderAsset).toHaveBeenCalledWith(file, "user-1");
+    const assetUrl = "/uploads/My%20Guide.pdf?version=2";
+    finishUpload(assetUrl);
+    await pending;
+    expect(updateSelectedElement).toHaveBeenCalledWith(expect.objectContaining({
+      content: assetUrl,
+      assetFileName: "My Guide.pdf",
+    }));
+    expect(events).toEqual(["busy", "upload", "update", "toast", "idle"]);
+  });
+
   it('replaces a photographic hero image without overwriting its headline or resizing its canvas',async()=>{
     const updateSelectedElement=vi.fn();
     const handlers=createUploadHandlers({selectedElement:{id:'hero',type:'card',variant:'educationHero',content:'Keep this headline',mode:'direct',position:{desktop:{width:1000,height:740}}},carouselElementTypes:new Set(['card']),builderAssetMimeTypes:new Set(['image/png']),builderAssetMaxBytes,uploadBuilderAsset:vi.fn().mockResolvedValue({url:'/uploads/new-photo.png'}),setAssetUploadBusy:vi.fn(),updateSelectedElement,showToast:vi.fn(),user:{id:'owner'}});

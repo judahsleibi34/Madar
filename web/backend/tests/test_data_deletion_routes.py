@@ -19,10 +19,24 @@ class DataDeletionAuthorizationTests(unittest.TestCase):
         user = {"id": 7, "tenant_id": 3}
         with patch.object(data_deletion_routes, "require_regular_user", return_value=(object(), user)), \
              patch.object(data_deletion_routes, "request_user_deletion", return_value={"request_id": "request-1"}) as create, \
+             patch.object(data_deletion_routes, "require_current_session_aal2", return_value={"current_level": "aal2"}) as aal2, \
              patch.object(data_deletion_routes, "delete_auth_cookies"):
             response = self.client.post("/account/deletion")
         self.assertEqual(response.status_code, 202)
-        self.assertEqual(create.call_args.kwargs, {"target_user_id": 7, "requested_by_user_id": 7})
+        aal2.assert_called_once()
+        self.assertEqual(create.call_args.kwargs["target_user_id"], 7)
+        self.assertEqual(create.call_args.kwargs["requested_by_user_id"], 7)
+        self.assertIs(create.call_args.kwargs["request"], aal2.call_args.args[0])
+        self.assertEqual(set(create.call_args.kwargs), {"target_user_id", "requested_by_user_id", "request"})
+
+    def test_self_closure_without_aal2_does_not_schedule_deletion(self):
+        user = {"id": 7, "tenant_id": 3}
+        with patch.object(data_deletion_routes, "require_regular_user", return_value=(object(), user)), \
+             patch.object(data_deletion_routes, "require_current_session_aal2", side_effect=HTTPException(status_code=403, detail={"code": "aal2_required"})), \
+             patch.object(data_deletion_routes, "request_user_deletion") as create:
+            response = self.client.post("/account/deletion")
+        self.assertEqual(response.status_code, 403)
+        create.assert_not_called()
 
     def test_ordinary_member_cannot_delete_tenant(self):
         context = SimpleNamespace(tenant_id=3, user_id=7, role="member")

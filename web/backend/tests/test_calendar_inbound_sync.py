@@ -1,3 +1,4 @@
+from tests.account_work_test_support import account_fixture
 import unittest
 from copy import deepcopy
 from types import SimpleNamespace
@@ -122,6 +123,11 @@ def google_event(remote_id="provider-event", **overrides):
 
 
 class CalendarInboundSyncTests(unittest.TestCase):
+    def setUp(self):
+        self.enterContext(account_fixture([(7, 12)], tables={
+            "calendar_sync_connections": [{"id": "connection", "tenant_id": 7, "user_id": 12}],
+        }))
+
     def connection(self, **overrides):
         value = {
             "id": "connection",

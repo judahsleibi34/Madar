@@ -1,4 +1,5 @@
 from __future__ import annotations
+from tests.account_work_test_support import account_fixture
 
 import hashlib
 import json
@@ -47,6 +48,7 @@ def _write_csv(path: Path, rows: int = 20_000) -> str:
 
 class ParquetCacheServiceTests(unittest.TestCase):
     def setUp(self):
+        self.fence_client = self.enterContext(account_fixture([(3, 7), (4, 8)]))
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
@@ -94,8 +96,13 @@ class ParquetCacheServiceTests(unittest.TestCase):
 
     def test_wrong_scope_hash_and_path_are_never_reused(self):
         with patch.object(parquet_cache_service, "MIN_SOURCE_BYTES", 1):
+            from fastapi import HTTPException
+            with self.assertRaises(HTTPException) as denied:
+                parquet_cache_service.get_or_create(**self.args(tenant_id=4))
+            self.assertEqual(denied.exception.status_code, 409)
+            # A separately admitted actor still cannot reuse another tenant's path.
             self.assertIsNone(parquet_cache_service.get_or_create(
-                **self.args(tenant_id=4),
+                **self.args(tenant_id=4, user_id=8),
             ))
             self.assertIsNone(parquet_cache_service.get_or_create(
                 **self.args(source_hash="0" * 64),
@@ -423,6 +430,7 @@ class ParquetCacheServiceTests(unittest.TestCase):
         entered = threading.Event()
         release = threading.Event()
         outcomes = []
+        failures = []
 
         def slow_convert(*args, **kwargs):
             entered.set()
@@ -430,18 +438,32 @@ class ParquetCacheServiceTests(unittest.TestCase):
             return original_convert(*args, **kwargs)
 
         def convert():
-            outcomes.append(parquet_cache_service.get_or_create(**self.args()))
+            try:
+                outcomes.append(parquet_cache_service.get_or_create(**self.args()))
+            except Exception as error:
+                failures.append(error)
+                entered.set()
 
         with patch.object(parquet_cache_service, "MIN_SOURCE_BYTES", 1), \
                 patch.object(parquet_cache_service, "_convert", side_effect=slow_convert):
             first = threading.Thread(target=convert)
-            first.start()
-            self.assertTrue(entered.wait(2))
             second = threading.Thread(target=convert)
-            second.start()
-            second.join(2)
-            release.set()
-            first.join(5)
+            first.start()
+            try:
+                self.assertTrue(entered.wait(2))
+                if failures:
+                    raise failures[0]
+                second.start()
+                second.join(2)
+                self.assertFalse(second.is_alive(), "contender did not return bounded fallback")
+            finally:
+                release.set()
+                first.join(5)
+                if second.ident is not None:
+                    second.join(2)
+            self.assertFalse(first.is_alive(), "publisher did not finish")
+            if failures:
+                raise failures[0]
         self.assertEqual(sum(item is not None for item in outcomes), 1)
         self.assertEqual(len(list(self.root.rglob("*.parquet"))), 1)
         self.assertFalse(list(self.root.rglob("*.building")))

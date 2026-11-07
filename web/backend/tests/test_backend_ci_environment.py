@@ -4,6 +4,9 @@ import shlex
 import subprocess
 import sys
 import unittest
+import tempfile
+from types import SimpleNamespace
+from unittest.mock import patch
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -160,8 +163,49 @@ class BackendCiEnvironmentTests(unittest.TestCase):
         tmpfs_index = tokens.index("--tmpfs")
         self.assertEqual(
             tokens[tmpfs_index + 1],
-            "/tmp:rw,exec,nosuid,nodev,size=1g,mode=1777",
+            "/tmp:rw,exec,nosuid,nodev,size=4g,mode=1777",
         )
+
+    def test_incorrect_or_insufficient_tmpfs_configuration_is_rejected(self):
+        command = _named_run_command(WORKFLOW, "Run backend tests")
+        expected = "/tmp:rw,exec,nosuid,nodev,size=4g,mode=1777"
+        self.assertIn(expected, command)
+        invalid = [
+            expected.replace("size=4g", "size=" + size)
+            for size in ("0g", "1g", "2g", "8g")
+        ] + [expected.replace("nosuid,", ""),
+             expected.replace("nodev,", ""),
+             expected.replace("mode=1777", "mode=0777")]
+        for configuration in invalid:
+            with self.subTest(configuration=configuration), patch(
+                __name__ + "._named_run_command",
+                return_value=command.replace(expected, configuration),
+            ), self.assertRaises(AssertionError):
+                self.test_backend_ci_uses_safe_complete_hermetic_environment()
+
+    def test_storage_floor_remains_two_gib_with_headroom_for_uploads(self):
+        from services import storage_quota_service as storage
+        gib = 1024 ** 3
+        self.assertEqual(storage.DEFAULT_DISK_FREE_FLOOR_BYTES, 2 * gib)
+        with tempfile.TemporaryDirectory() as directory, patch.dict(
+            os.environ, {"STORAGE_DISK_FREE_FLOOR_BYTES": str(2 * gib)},
+        ):
+            for free, incoming in ((gib, 0), (2 * gib, 1)):
+                with self.subTest(free=free, incoming=incoming), patch.object(
+                    storage.shutil, "disk_usage", return_value=SimpleNamespace(free=free),
+                ), self.assertRaises(storage.StorageSafetyError):
+                    storage.ensure_disk_capacity(Path(directory), incoming_bytes=incoming)
+            with patch.object(storage.shutil, "disk_usage", return_value=SimpleNamespace(free=4 * gib)):
+                self.assertEqual(storage.ensure_disk_capacity(
+                    Path(directory), incoming_bytes=250 * 1024 ** 2), 4 * gib)
+
+    def test_repository_shaped_migration_fixtures_are_read_only(self):
+        tokens = shlex.split(_named_run_command(WORKFLOW, "Run backend tests"))
+        mounts = [tokens[index + 1] for index, token in enumerate(tokens) if token == "--volume"]
+        for name in ("deployment", "database", "supabase"):
+            with self.subTest(tree=name):
+                matching = [mount for mount in mounts if mount.split(":")[1] == "/web/" + name]
+                self.assertEqual(matching, [f"$PWD/web/{name}:/web/{name}:ro"])
 
     def test_backend_ci_mounts_frontend_vite_config_read_only(self):
         command = _named_run_command(WORKFLOW, "Run backend tests")

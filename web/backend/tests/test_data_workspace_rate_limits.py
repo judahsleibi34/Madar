@@ -1,3 +1,5 @@
+from tests.account_work_test_support import route_account_fixture, session_token
+from services.account_work_fence import AccountWorkFenceMiddleware
 import unittest
 from contextlib import contextmanager
 from types import SimpleNamespace
@@ -14,11 +16,12 @@ from tests.entitlement_test_support import EntitlementTestState
 
 
 def fake_require_active_tenant_user_id(user_id, request, response):
-    return SimpleNamespace(user_id=int(user_id), tenant_id="tenant-a")
+    return SimpleNamespace(user_id=int(user_id), tenant_id="1")
 
 
 class DataWorkspaceRateLimitTests(unittest.TestCase):
     def setUp(self):
+        self.fence_client = self.enterContext(route_account_fixture([(1, 1), (1, 2), (1, 3)]))
         rate_limit_service._store = None
         rate_limit_service._memory_store = InMemoryRateLimitStore()
         self.audit_patch = patch("services.audit_service.record_security_event")
@@ -29,7 +32,7 @@ class DataWorkspaceRateLimitTests(unittest.TestCase):
             side_effect=fake_require_active_tenant_user_id,
         )
         self.auth_patch.start()
-        self.entitlement_state = EntitlementTestState().activate_plan("tenant-a", "business")
+        self.entitlement_state = EntitlementTestState().activate_plan("1", "business")
         self.entitlement_patch = self.entitlement_state.installed()
         self.entitlement_patch.__enter__()
 
@@ -42,11 +45,12 @@ class DataWorkspaceRateLimitTests(unittest.TestCase):
 
     def build_client(self):
         app = FastAPI()
+        app.add_middleware(AccountWorkFenceMiddleware)
         app.include_router(data_routes.router)
         app.include_router(cleaning_routes.router)
         app.include_router(analysis_routes.router)
         app.include_router(visualization_routes.router)
-        return TestClient(app)
+        return TestClient(app, cookies={"madar_access_token": session_token("offline-1-1")})
 
     @contextmanager
     def rate_limit_config(self, *, limit_attr, window_attr, limit=1):
@@ -240,7 +244,7 @@ class DataWorkspaceRateLimitTests(unittest.TestCase):
         payload = {"input_path": "https://example.com/data.csv"}
         overrides = (
             '{"1":{"read":{"limit":5,"window_seconds":60}},'
-            '"tenant:tenant-a:user:1":{"read":{"limit":1,"window_seconds":60}}}'
+            '"tenant:1:user:1":{"read":{"limit":1,"window_seconds":60}}}'
         )
 
         with self.rate_limit_config(

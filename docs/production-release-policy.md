@@ -295,6 +295,38 @@ A persistent schema150 architecture database is divergent, not a canonical
 schema150 data-source database. No persistent database may be reset or advanced
 without a separately reviewed exact-history plan.
 
+### Owner-approved source-only relocation boundary
+
+The namespace validator retains architecture boundary 23254c786fdfa3731ff63cd004a4160b6d2f60fa.
+Only the four named 147–150 architecture migrations in each SQL tree may be absent
+from their original active paths. Their exact original Git blobs must match the
+archived blobs and the historical checksums in the reconciliation record frozen
+at 0bd06575e886b98296bdee4d9921d29afbad1c91. Candidate records cannot redefine authority.
+All other original paths remain byte-identical. Canonical main history at
+cf444303e55a2c6a214ab53f683442cf2fac15fe remains byte-identical, including 147–156.
+The exact approved 157–160 manifest and mirrored forward SQL remain independently
+verified; these are forward adaptations, not byte-identical moves. Extra/missing
+archives, active historical duplicates, collisions and content changes fail.
+Existing generic discovery still checks the complete candidate inventory against
+canonical main after these additional checks. Missing Git history fails closed;
+no fallback or current-HEAD history anchor is permitted. Any future change to
+these frozen contracts requires separate review. This grants no migration,
+controller, staging, deployment or QA-acceptance authority. Staging continues to
+require successful independent CI. The approved record must also resolve to Git blob
+7fa511160024af3021f2e2f36d0f9269c67fb43f. The complete archived inventory, including
+its README files, remains frozen. Backend Check fetches full history solely to
+satisfy these source checks; permissions and execution authority are unchanged.
+
+The forward source validator recognizes only the existing unadmitted
+`167_add_account_recovery_hold.sql` candidate after verifying its STAGING manifest,
+166→167 identity, the existing candidate validator's SQL checksum, exact mirrors,
+and coordinated bridge with `blocked-pending-account-erasure-acceptance` policy.
+Requirements through166 remain intact. Missing/duplicate167, changed SQL or
+metadata, and unapproved168 or later fail the forward release gate. This is
+source recognition only: active release profiles, manifests, checksums, customer
+admission and execution authority remain unchanged.
+
+
 
 ## Atomic calendar edits
 

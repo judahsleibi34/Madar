@@ -1,3 +1,4 @@
+from tests.account_work_test_support import account_fixture
 import asyncio
 import unittest
 from types import SimpleNamespace
@@ -54,6 +55,9 @@ def claim():
 
 
 class AutomaticSourceSyncTests(unittest.TestCase):
+    def setUp(self):
+        self.fence_client = self.enterContext(account_fixture([(1, 7)]))
+
     def test_schema_gate_and_schedule_configuration_are_bounded(self):
         database = Database()
         database.responses["configure_data_source_sync156"] = [{"id": SCHEDULE}]

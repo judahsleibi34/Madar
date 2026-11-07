@@ -5,7 +5,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from services import bi_report_delivery_service
+from services import bi_report_delivery_service, account_work_fence
+from fastapi import HTTPException
+import database
 
 
 DELIVERY = "11111111-1111-4111-8111-111111111111"
@@ -29,7 +31,49 @@ class Client:
                    value=None if isinstance(value, Exception) else value)
 
 
+class FenceRegistrationClient:
+    """Only schema discovery and exact account registration are permitted offline."""
+    def __init__(self):
+        self.allowed = True
+        self.calls = []
+    def table(self, name):
+        assert name == "application_schema_state"
+        return self
+    def select(self, fields):
+        assert fields == "schema_version"
+        return self
+    def eq(self, field, value):
+        assert (field, value) == ("contract_key", "core")
+        return self
+    def limit(self, count):
+        assert count == 1
+        return self
+    def execute(self):
+        return SimpleNamespace(data=[{"schema_version": 167}])
+    def rpc(self, name, params):
+        assert name == "account_fence_registration167"
+        assert params == {"p_tenant_id": 3, "p_user_id": 5}
+        self.calls.append((name, dict(params)))
+        return Rpc(value=self.allowed)
+
+
 class ReportDeliveryServiceTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.fence_root = Path(directory.name)
+        self.registration = FenceRegistrationClient()
+        # scoped_work currently uses the global client for registration, rather
+        # than the job's injected client. Isolate that dependency, not the fence.
+        for target, name, value in (
+            (database, "service_supabase", self.registration),
+            (account_work_fence, "get_data_upload_dir", lambda: self.fence_root),
+        ):
+            replacement = patch.object(target, name, value)
+            replacement.start(); self.addCleanup(replacement.stop)
+        spy = patch.object(account_work_fence, "account_lock", wraps=account_work_fence.account_lock)
+        self.fence = spy.start(); self.addCleanup(spy.stop)
+
     def row(self):
         return {"tenant_id": 3, "owner_user_id": 5, "id": DELIVERY, "report_id": REPORT, "lease_token": TOKEN, "lease_fence": 2}
 
@@ -57,6 +101,14 @@ class ReportDeliveryServiceTests(unittest.TestCase):
             with patch.object(bi_report_delivery_service, "get_private_charts_dir", return_value=root):
                 result = bi_report_delivery_service.process_delivery(self.row(), adapter=adapter, client=client)
         self.assertEqual(result["status"], "sent")
+        self.fence.assert_called_once_with(3, 5)
+        self.assertEqual(self.registration.calls, [("account_fence_registration167", {"p_tenant_id": 3, "p_user_id": 5})])
+        self.assertEqual(client.calls[0], ("authorize_bi_report_delivery166", {
+            "p_delivery_id": DELIVERY, "p_lease_token": TOKEN, "p_lease_fence": 2}))
+        self.assertEqual(client.calls[-1][1]["p_lease_token"], TOKEN)
+        self.assertEqual(client.calls[-1][1]["p_lease_fence"], 2)
+        with account_work_fence.account_lock(3, 5, exclusive=True):
+            pass  # The real shared filesystem lock was released on completion.
         self.assertEqual(adapter.delivered[0]["recipient"], "member@example.com")
         self.assertEqual(adapter.delivered[0]["sha256"], hashlib.sha256(content).hexdigest())
         self.assertTrue(adapter.delivered[0]["provider_message_id"].startswith("offline-"))
@@ -148,6 +200,29 @@ class ReportDeliveryServiceTests(unittest.TestCase):
             result = bi_report_delivery_service.process_cleanup(self.cleanup_row(), client=client)
         cleanup.assert_not_called()
         self.assertEqual(result["status"], "cancelled")
+
+    def test_registration_denial_prevents_authorization_and_delivery(self):
+        self.registration.allowed = False
+        client = Client({})
+        adapter = bi_report_delivery_service.OfflineTestEmailAdapter()
+        with self.assertRaises(HTTPException) as caught:
+            bi_report_delivery_service.process_delivery(self.row(), adapter=adapter, client=client)
+        self.assertEqual(caught.exception.status_code, 409)
+        self.fence.assert_called_once_with(3, 5)
+        self.assertFalse(client.calls)
+        self.assertFalse(adapter.delivered)
+
+    def test_real_account_hold_prevents_delivery_and_cleanup(self):
+        with account_work_fence.account_lock(3, 5, exclusive=True) as marker:
+            account_work_fence.publish_hold(marker, {"state": "offline-test-hold"})
+        client = Client({})
+        adapter = bi_report_delivery_service.OfflineTestEmailAdapter()
+        with self.assertRaises(HTTPException):
+            bi_report_delivery_service.process_delivery(self.row(), adapter=adapter, client=client)
+        with self.assertRaises(HTTPException):
+            bi_report_delivery_service.process_cleanup(self.cleanup_row(), client=client)
+        self.assertFalse(client.calls)
+        self.assertFalse(adapter.delivered)
 
 
 if __name__ == "__main__":

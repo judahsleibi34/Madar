@@ -1,6 +1,37 @@
 import { describe, expect, it } from "vitest";
 
-import { getResponsiveMediaProps, resolveDocumentUrl, resolveMediaUrl } from "./media";
+import { getMediaFileName, getResponsiveMediaProps, resolveDocumentUrl, resolveMediaUrl } from "./media";
+
+describe("getMediaFileName", () => {
+  it.each([
+    ["photo.png", "photo.png"],
+    ["/uploads/tenant_7/photo.png", "photo.png"],
+    ["/photo.png?version=2#preview", "photo.png"],
+    ["/photo.png#preview?version=2", "photo.png"],
+    ["C:\\uploads\\photo.png", "photo.png"],
+    ["/uploads/", ""],
+    ["", ""],
+    [null, ""],
+    [undefined, ""],
+    [0, ""],
+    [false, ""],
+    ["/My%20Photo.png", "My Photo.png"],
+    ["/صورة.png", "صورة.png"],
+    ["/%D8%B5%D9%88%D8%B1%D8%A9.png", "صورة.png"],
+    ["/bad%ZZ.png", "bad%ZZ.png"],
+    ["/bad%E0%A4.png", "bad%E0%A4.png"],
+    ["/name%2Fpart%3F%23.png?ignored", "name/part?#.png"],
+    ["/name%2520.png", "name%20.png"],
+    ["/ spaced name.png ", " spaced name.png "],
+    [42, "42"],
+    [true, "true"],
+    [NaN, ""],
+    [{}, "[object Object]"],
+    [["/photo.png"], "photo.png"],
+  ])("preserves filename display for %j", (input, expected) => {
+    expect(getMediaFileName(input)).toBe(expected);
+  });
+});
 
 
 describe("resolveMediaUrl", () => {

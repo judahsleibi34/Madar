@@ -64,6 +64,30 @@ that cannot be tested locally.
 Never bypass a failed release gate or directly modify production to compensate
 for a source-code rejection.
 
+## Frontend architecture authority
+
+For changes to `web/frontend`, hosted tenant frontend delivery, or
+frontend-facing FastAPI contracts, read and follow
+`docs/architecture/MADAR_FRONTEND_ARCHITECTURE_CONSTITUTION.md`
+once its repository adoption gates are satisfied.
+
+The approved constitution governs business-domain ownership, shared contracts,
+Page Builder reuse, module boundaries, frontend state and styling boundaries,
+and architecture change control.
+
+It adds to—and does not replace—the security, QA, CI, release, migration,
+deployment, and production-authorization rules in this file and its referenced
+policies.
+
+Architecture reporting must be included in addition to the mandatory QA
+completion report.
+
+No ADR or architectural exception may weaken backend tenant authorization,
+release protections, published-content compatibility, or mandatory QA.
+
+If applicable instructions conflict, follow the constitution's precedence
+policy and stop for an explicit decision when the conflict remains unresolved.
+
 ## Mandatory Madar Continuous QA Contract
 
 These rules apply automatically to every Codex coding task

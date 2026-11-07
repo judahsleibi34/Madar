@@ -3,6 +3,16 @@ import { describe, expect, it } from "vitest";
 import { getRuntimeFieldError, getRuntimeFormErrors } from "./formValidation";
 
 describe("runtime form validation", () => {
+  it.each(["", "invalid", "person@example.test"])("preserves wrapped email validation for %s", value => {
+    const field = { type: "email", label: "Email", required: true };
+    expect(getRuntimeFieldError(field, { value, optionIndex: 1 })).toBe(getRuntimeFieldError(field, value));
+    expect(getRuntimeFieldError(field, Object.create({ value }))).toBe(getRuntimeFieldError(field, value));
+  });
+  it("validates scalar and indexed choice arrays identically", () => {
+    const field = { type: "checkboxes", options: ["One", "Two"] };
+    expect(getRuntimeFieldError(field, [{ value: "One", optionIndex: 0 }])).toBe(getRuntimeFieldError(field, ["One"]));
+    expect(getRuntimeFieldError(field, [{ value: "Unknown", optionIndex: 0 }])).toBe(getRuntimeFieldError(field, ["Unknown"]));
+  });
   it("flags forgotten required fields", () => {
     expect(getRuntimeFieldError({ id: "name", label: "Full name", required: true }, ""))
       .toBe("Full name is required.");

@@ -1,3 +1,4 @@
+from tests.account_work_test_support import account_fixture
 import asyncio
 import unittest
 from io import BytesIO
@@ -126,6 +127,9 @@ def run(**overrides):
 
 
 class ProjectSourceIngestionServiceTests(unittest.TestCase):
+    def setUp(self):
+        self.enterContext(account_fixture([(1, 7)]))
+
     def test_resource_status_summary_is_scoped_and_keeps_checkpoint_freshness_distinct(self):
         resource_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
         client = FakeClient({
@@ -544,6 +548,9 @@ class ProjectSourceIngestionServiceTests(unittest.TestCase):
 
 
 class ProjectSourceIngestionRouteTests(unittest.TestCase):
+    def setUp(self):
+        self.fence_client = self.enterContext(account_fixture([(1, 7)]))
+
     def _file(self):
         return UploadFile(filename="sales.csv", file=BytesIO(b"name,value\na,1\n"))
 

@@ -308,6 +308,47 @@ def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def validate_account_recovery_source(root: Path) -> None:
+    """Recognize only the existing unadmitted167 candidate; never select it."""
+    # Reuse the independently pinned SQL identity. The existing CLI validates its
+    # own root, so this adapter must also validate the caller's copied test tree.
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from check_account_recovery_candidate import SQL_SHA256
+    def read(relative):
+        path = root / relative
+        if path.is_symlink() or path.resolve() != path.absolute() or not path.is_file():
+            raise ValueError("candidate167_regular_file_required")
+        return path.read_bytes()
+    def unique(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("candidate167_duplicate_json_key")
+            result[key] = value
+        return result
+    releases = "web/deployment/releases/"
+    manifest = json.loads(read(releases + "migrations-166-167-account-recovery.json"), object_pairs_hook=unique)
+    expected = {"manifest_version": 1, "release_sha": "STAGING", "migrations": [{
+        "number": 167, "from_schema": 166, "to_schema": 167,
+        "path": "web/database/migrations/167_add_account_recovery_hold.sql",
+        "sha256": SQL_SHA256, "compatibility": "coordinated"}]}
+    if json.dumps(manifest, sort_keys=True) != json.dumps(expected, sort_keys=True):
+        raise ValueError("candidate167_manifest_identity_invalid")
+    body = read(expected["migrations"][0]["path"])
+    if (body != read("web/supabase/migrations/167_add_account_recovery_hold.sql")
+            or hashlib.sha256(body).hexdigest() != SQL_SHA256):
+        raise ValueError("candidate167_mirror_checksum_invalid")
+    bridge = json.loads(read(releases + "schema-166-167-account-recovery-bridge.json"), object_pairs_hook=unique)
+    if (set(bridge) != {"release_metadata_version", "deployment_profile", "schema", "migration_policy", "migration_manifest", "notes"}
+            or type(bridge["release_metadata_version"]) is not int or bridge["release_metadata_version"] != 1
+            or bridge["deployment_profile"] != "account-lifecycle166-167-unadmitted"
+            or bridge["migration_policy"] != "blocked-pending-account-erasure-acceptance"
+            or bridge["migration_manifest"] != "migrations-166-167-account-recovery.json"
+            or json.dumps(bridge["schema"], sort_keys=True) != json.dumps({"compatible_min": 166, "compatible_max": 167, "target": 167,
+                "migration_class": "coordinated", "rollback_compatible_min": 167, "rollback_compatible_max": 167}, sort_keys=True)):
+        raise ValueError("candidate167_blocked_contract_invalid")
+
+
 def validate(root: Path = ROOT) -> list[str]:
     errors: list[str] = []
     release_dir = root / "web/deployment/releases"
@@ -544,6 +585,8 @@ def validate(root: Path = ROOT) -> list[str]:
         if not schema115_bridge_valid(bridge):
             errors.append("schema115 bridge descriptor invalid")
 
+        if learning_contract["status"] == "finalized":
+            validate_account_recovery_source(root)
         for tree in ("database", "supabase"):
             versions = sorted(
                 int(path.name.split("_", 1)[0])
@@ -552,10 +595,10 @@ def validate(root: Path = ROOT) -> list[str]:
                 ).glob("*.sql")
             )
 
-            if versions != list(range(1, 167 if learning_contract['status']=='finalized' else 143)):
+            if versions != list(range(1, 168 if learning_contract['status']=='finalized' else 143)):
                 errors.append(
                     "migration namespace must contain exactly "
-                    f"001 through {166 if learning_contract['status']=='finalized' else 142}: {tree}"
+                    f"001 through {167 if learning_contract['status']=='finalized' else 142}: {tree}"
                 )
 
     except (OSError, KeyError, ValueError, TypeError) as error:
